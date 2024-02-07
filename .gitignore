@@ -21,5 +21,6 @@ __pycache__/
 telegram_bot_api_working_dir/
 .dev.vars
 .dev.vars.*
+.wrangler
 
 dustbin.js
