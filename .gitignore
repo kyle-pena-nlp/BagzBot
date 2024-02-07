@@ -6,3 +6,20 @@
 
 /dist
 /build
+
+dev.plan
+dev.setup
+*.binlog
+.wrangler/
+.prettierrc
+*.plan
+
+*~*/
+__pycache__/
+*./
+.editorconfig
+telegram_bot_api_working_dir/
+.dev.vars
+.dev.vars.*
+
+dustbin.js
