@@ -24,3 +24,7 @@ telegram_bot_api_working_dir/
 .wrangler
 
 dustbin.js
+
+archive/
+.vscode/*
+!.vscode/launch.json

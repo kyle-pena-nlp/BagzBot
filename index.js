@@ -1,8 +1,8 @@
-/**
- * @typedef Bindings
- * @property {DurableObjectNamespace} COUNTER
- */
 
+import { UserDO } from "./user_DO";
+/*import { PositionTrackerDO } from "./position_tracker_DO";
+import { PolledTokenListDO } from "./polled_token_list_DO";
+*/
 const ERRORS = Object.freeze({
 	UNHANDLED_EXCEPTION:     "UNHANDLED_EXCEPTION",
 	MISMATCHED_SECRET_TOKEN: "MISMATCHED_SECRET_TOKEN",
@@ -44,9 +44,7 @@ export default {
 	 * @returns {Promise<Response>}
 	 */
 	async fetch(req, env) {
-		/*
-			The Telegram bot's webhook hits the fetch method for this worker.
-		*/
+		// Wrap fetch with custom error handling that always returns 200 (any non-200 code results in endless retries by telegram)
 		try {
 			const response = await this._fetch(req, env);
 			if (!response) {
@@ -57,34 +55,45 @@ export default {
 		}
 		catch(e) {
 			this.logWebhookRequestFailure(req, ERRORS.UNHANDLED_EXCEPTION, { "e": e.toString() });
-			return this.makeFailedRequestResponse(500);
+			return this.makeFailedRequestResponse(500); // 500 is stored in statusText, status is still 200
 		}
 	},
 
 	async _fetch(req, env) {
 
-		// First, validate that this req is coming from the telegram bot's webhook. Early out if not.
+		const userDO = this.getUserDO(req, env);
+
+		// First, validate that this req is coming from the telegram bot's webhook by checking secret key.
 		const webhookRequestValidation = this.validateRequest(req,env);
 		if (!webhookRequestValidation.ok) {
+			// early out
 			this.logWebhookRequestFailure(req,webhookRequestValidation.message);
 			return this.makeResponseToSussyWebhookRequest(req,webhookRequestValidation.message);
 		}
-		// parse JSON from request
+
+		// Parse JSON from request
 		const content = await this.tryParseContent(req,env);
 		if (!content.ok) {
+			// Early out if json parse fails
 			this.logWebhookRequestFailure(req,content.message);
 			return this.makeFailedRequestResponse(400);
 		}
-		// handle button presses
+
+		// If the user clicks a menu button...
 		if (this.isCallbackQuery(content.value)) {
+			// Handle the menu button
 			return await this.handleCallbackQuery(req, env, content.value);
 		}
-		// handle commands
-		else if (this.isRecognizedCommand(content.value)) {
-			return await this.handleCallbackQuery(req, env, content.value);
+		
+		// If the user issues a command...
+		if (this.isRecognizedCommand(content.value)) {
+			// Handle the command
+			return await this.handleCommand(req, env, content.value);
 		}
-		// handle messages
-		else if (this.isMessage(content.value)) {
+
+		// If the user sends a message
+		if (this.isMessage(content.value)) {
+			// Handle the message
 			return await this.handleMessage(req, env, content.value);
 		}
 		
@@ -92,12 +101,24 @@ export default {
 		return this.makeSuccessResponse();
 	},
 
-	async handleNewPrivateChat(content) {
+	getUserDO(req, env) {
+		return null;
+	},
 
+	async handleNewPrivateChat(content) {
+		return this.makeSuccessResponse();
+	},
+
+	isMessage(content) {
+		return false;
 	},
 
 	isCallbackQuery(content) {
 		return "callback_query" in content;
+	},
+
+	async handleMessage(req, env, content) {
+		return this.makeSuccessResponse();
 	},
 
 	async handleCallbackQuery(req, env, content) {
@@ -306,8 +327,19 @@ See here for Legal.
 		return ((text === "/start") || (text === "/help") || (text == "/menu"));
 	},
 
-	async handleCommand(content) {
-
+	async handleCommand(req, env, content) {
+		const command = content?.text;
+		switch(command) {
+			case '/start':
+				break;
+			case '/help':
+				break;
+			case '/menu':
+				break;
+			default:
+				throw new Error(`Unrecognized command: ${command}`);
+		}
+		return this.makeSuccessResponse();
 	},
 
 	makeTelegramBotUrl(methodName, env) {
@@ -392,19 +424,6 @@ See here for Legal.
 		return response;
 	},
 
-	async executeVerb(verb, req, env) {
-		switch(verb) {
-			case 'CREATE_BOT_ADMINISTERED_WALLET':
-				return await this.createBotAdministeredWallet(req, env);
-			case 'CREATE_TRAILING_STOP_LOSS_ORDER':
-				return await this.createTrailingStopLossOrder(req, env);
-			case 'CANCEL_TRAILING_STOP_LOSS_ORDER':
-				return await this.cancelTrailingStopLossOrder(req, env);
-			case 'LIST_OPEN_TRAILING_STOP_LOSS_ORDER_STATUSES':
-				return await this.listOpenTrailingStopLossOrderStatuses(req, env);
-		}
-	},
-
 	// TODO
 	async createBotAdministeredWallet(req, env) {
 		return;
@@ -425,174 +444,8 @@ See here for Legal.
 		return;
 	},
 
-	getTrailingStopLossOpenOrdersDurableObject() {
-		let trailingStopLossOpenOrdersDurableObjectID = env.TRAILING_STOP_LOSS_OPEN_ORDERS.idFromName('TRAILING_STOP_LOSS_OPEN_ORDERS');
-		let trailingStopLossOpenOrders = env.PAIR_OPEN_ORDERS.get(trailingStopLossOpenOrdersDurableObjectID);
-		return trailingStopLossOpenOrders;
+	async scheduled(event, env, ctx) {
+		ctx.waitUntil(doSomeTaskOnASchedule());
 	},
 
-	async fetchAndUpdateAllPrices(trailingStopLossOpenOrders) {
-		let resp = await trailingStopLossOpenOrders.fetch(UPDATE_PRICES_URL);
-		return resp;
-	}
 };
-
-
-
-/**
- * Durable Object
- */
-export class TrailingStopLossOpenOrders {
-	 /**
-	 * @param {DurableObjectState} state
-	 */
-	constructor(state) {
-		this.state = state;
-	}
-
-	async fetch(request) {
-		let url = new URL(request.url);
-		switch (url.pathname) {
-			case '/update':
-				let latestPrice = 0.0; // pull from request somehow				
-				const trailingStopLossSellOrders = await this.updateHighestPrices(latestPrice);
-				this.executeTrailingStopLessSellOrders(trailingStopLossSellOrders);
-			case '/cancel':
-				this.cancelTrailingStopLossOrder()
-			case '/destroy':
-				break
-		}
-	}
-
-	async cancelTrailingStopLossOrder(openOrderID) {
-		this.state.storage.put(this.getCancellationRequestToken(openOrderID), true);
-	}
-
-	getCancellationRequestToken(openOrderID) {
-		return `cancellation_request/{openOrderID}`;
-	}
-
-	getSellOrderRequestToken(openOrderID) {
-		return `sell_request/{openOrderID}`;
-	}
-
-	async updateHighestPrices(latestPrice) {
-		/*
-			Update the highest prices (peak prices) across all open trailing stop loss orders (`currentHighestPrices`)
-			Then return which accounts should have their sell orders executed (`trailingStopLossSellOrders`)
-		*/
-
-		// Get a map which has current highest price for the account as the key, list of such accounts as value.
-		const currentHighestPrices = this.state.storage.get('currentHighestPrices');
-
-		/* 
-			Explanation of `currentHighestPrices` map:
-			It is a map of unique current highest prices across all open trailing stop loss orders.
-			If you have...
-			 	6 accounts with current highest price of $3.50
-				2 with current highest price of $2.60
-			You have a Map with two keys:  3.50 and 2.60,
-			whose values are the 6 accounts and 2 accounts, respectively.
-
-			There can be more than one unique highest price because swaps can happen
-			at different points in time, thus the current highest for a swap
-			opened a few seconds ago may be different from the one opened a few hours ago.
-
-			Storing the accounts in this way makes updating current prices fast without looping through all accounts...
-			You just update the keys.
-		*/
-
-
-		// We will build a new highestPrices map.
-		const updatedHighestPrices = new Map();
-
-		// For each unique current highest price...
-		for (const highestPrice of currentHighestPrices) {
-
-			// Get the list of accounts which have that highest price
-			const accountList = currentHighestPrices[highestPrice];
-			
-			// Determine if that highest price needs to be updated, and to what
-			const updatedHighestPrice = (highestPrice < latestPrice) ?  latestPrice : highestPrice;
-			
-			// And create or push to the list of accounts with that highest price
-			// (That way, when two lists of accounts now have the same highest price, the lists get merged!)
-			if (!updatedHighestPrices.has(updatedHighestPrice)) {
-				updatedHighestPrices[updatedHighestPrice] = accountList;
-			}
-			else {
-				updatedHighestPrices[updatedHighestPrice].push(...accountList);
-			}
-		}
-	
-		// update highest prices map in state
-		this.state.storage.put('currentHighestPrices', updatedHighestPrices);
-
-		// Now we have a map of updated unique highest prices, with a list of accounts in each.
-		// So, let's determine which ones have their trigger conditions met.
-
-		const trailingStopLossSellOrders = []
-
-		// TODO: some kind of prioritization?
-		for (const highestPrice of updatedHighestPrices) {
-			const currentTrailingPercentage = (highestPrice - latestPrice)/highestPrice;
-			const accountList = updatedHighestPrices[highestPrice];
-			for (const account of accountList) {
-				if (currentTrailingPercentage >= account.trailingLossPercentage) {
-					trailingStopLossSellOrders.push(account);
-				}
-			}
-		}
-
-		return trailingStopLossSellOrders;
-	}
-}
-
-/**
- * Durable Object
- */
-export class Counter {
-	/**
-	 * @param {DurableObjectState} state
-	 */
-	constructor(state) {
-		this.state = state;
-		
-	}
-
-	/**
-	 * Handle HTTP requests from clients.
-	 * @param {Request} request
-	 */
-	async fetch(request) {
-		// Apply requested action.
-		let url = new URL(request.url);
-
-		// Durable Object storage is automatically cached in-memory, so reading the same key every request is fast.
-		// (That said, you could also store the value in a class member if you prefer.)
-		/** @type {number} */
-		let value = (await this.state.storage.get('value')) || 0;
-
-		switch (url.pathname) {
-			case '/increment':
-				++value;
-				break;
-			case '/decrement':
-				--value;
-				break;
-			case '/':
-				// Just serve the current value.
-				break;
-			default:
-				return new Response('Not found', { status: 404 });
-		}
-
-		// We don't have to worry about a concurrent request having modified the
-		// value in storage because "input gates" will automatically protect against
-		// unwanted concurrency. So, read-modify-write is safe. For more details,
-		// see: https://blog.cloudflare.com/durable-objects-easy-fast-correct-choose-three/
-		await this.state.storage.put('value', value);
-
-		return new Response('' + value);
-	}
-}
