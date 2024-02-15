@@ -1,38 +1,17 @@
 
+/* Durable Objects */
 import { UserDO } from "./user_DO";
-/*import { PositionTrackerDO } from "./position_tracker_DO";
+import { PositionTrackerDO } from "./position_tracker_DO";
 import { PolledTokenListDO } from "./polled_token_list_DO";
-*/
-const ERRORS = Object.freeze({
-	UNHANDLED_EXCEPTION:     "UNHANDLED_EXCEPTION",
-	MISMATCHED_SECRET_TOKEN: "MISMATCHED_SECRET_TOKEN",
-	NO_RESPONSE: "NO_RESPONSE",
-	NOT_A_PRIVATE_CHAT: "NOT_A_PRIVATE_CHAT"
-});
 
-const ERROR_NOS = Object.freeze({
-	UNHANDLED_EXCEPTION: 500,
-	MISMATCHED_SECRET_TOKEN: 1000,
-	NO_RESPONSE: 2000,
-	NOT_A_PRIVATE_CHAT : 3000
-});
+/* Utility Stuff */
+import { Result, ERRORS, ERROR_NOS } from "./common";
+import { FAQ_STRING } from "./faq";
+import { HELP_STRING } from "./help";
 
-class Result {
-	constructor(success,message,value) {
-		this.success = success;
-		this.ok = success;
-		this.message = message;
-		this.value = value;
-	}	
+/* Export of imported DO's (required by wrangler) */
+export { UserDO, PositionTrackerDO, PolledTokenListDO }
 
-	static success(value) {
-		return new Result(true,null,value);
-	}
-
-	static failure(message) {
-		return new Result(false,message,null);
-	}
-}
 
 /**
  * Worker
@@ -61,8 +40,6 @@ export default {
 
 	async _fetch(req, env) {
 
-		const userDO = this.getUserDO(req, env);
-
 		// First, validate that this req is coming from the telegram bot's webhook by checking secret key.
 		const webhookRequestValidation = this.validateRequest(req,env);
 		if (!webhookRequestValidation.ok) {
@@ -79,34 +56,54 @@ export default {
 			return this.makeFailedRequestResponse(400);
 		}
 
-		// If the user clicks a menu button...
-		if (this.isCallbackQuery(content.value)) {
-			// Handle the menu button
-			return await this.handleCallbackQuery(req, env, content.value);
-		}
-		
+		const user = this.getUserInfo(req, env);
+
+		const requestInfo = {
+			req: req,
+			env: env,
+			user: user,
+			content: content?.value
+		};
+
 		// If the user issues a command...
 		if (this.isRecognizedCommand(content.value)) {
 			// Handle the command
-			return await this.handleCommand(req, env, content.value);
+			return await this.handleCommand(requestInfo);
+		}		
+
+		// If the user clicks a menu button...
+		if (this.isCallbackQuery(content.value)) {
+			// Handle the menu button
+			return await this.handleCallbackQuery(requestInfo);
 		}
+		
+
 
 		// If the user sends a message
 		if (this.isMessage(content.value)) {
 			// Handle the message
-			return await this.handleMessage(req, env, content.value);
+			return await this.handleMessage(requestInfo);
 		}
 		
 		// send a 200 if none of these conditions are met - otherwise telegram will keep trying to resend
-		return this.makeSuccessResponse();
+		return this.makeSuccessRequestResponse();
 	},
 
-	getUserDO(req, env) {
-		return null;
+	getUserInfo(req, env) {
+		const userDO = this.getUserDO(req, env, content.value);
+		const user = userDO.fetch("/get");
+		return user;
+	},
+
+	getUserDO(req, env, content) {
+		const userID = this.getUserID(content);
+		const userDurableObjectID = env.UserDO.idFromName(userID);
+		const userDurableObject = env.UserDO.get(userDurableObjectID);
+		return userDurableObject;
 	},
 
 	async handleNewPrivateChat(content) {
-		return this.makeSuccessResponse();
+		return this.makeSuccessRequestResponse();
 	},
 
 	isMessage(content) {
@@ -118,31 +115,33 @@ export default {
 	},
 
 	async handleMessage(req, env, content) {
-		return this.makeSuccessResponse();
+		return this.makeSuccessRequestResponse();
 	},
 
-	async handleCallbackQuery(req, env, content) {
+	async handleCallbackQuery(requestInfo) {
 
-		/* Don't respond if somehow a callback was created in a non-private message */
-		const isPrivateChat = content?.callback_query?.message?.chat?.type === "private";
-		if (!isPrivateChat) {
-			this.logWebhookRequestFailure(req, ERRORS.NOT_A_PRIVATE_CHAT);
-			return this.makeFailedRequestResponse(400);
-		}
-
-		/* Get data from the callback */
+		const content = requestInfo.content;
 		const callbackData = content?.callback_query?.data;
+		const [menuCode,menuArg] = callbackData.split(":");
+		const user    = requestInfo.user;		
+		const menu = await this.getMenu(menuCode, menuArg, user);
+		
 		const chatID = content?.callback_query?.message?.chat?.id;
 		const messageID = content?.callback_query?.message?.message_id; 
-		const userID = content?.callback_query?.from?.id;
+		const success = await this.sendMenuToTelegram(menu, chatID, messageID);
+		if (success) {
+			return this.makeSuccessRequestResponse();
+		}
+		else {
+			return this.makeFailedRequestResponse(500);
+		}
+	},
 
-		/* Synthesize menu */
-		const menu = await this.getMenu(callbackData, userID);
-
-		/* Prepare request to update menu */
+	async sendMenuToTelegram(menu, chatID, messageID) {
+		// == null is true when either null or undefined, but not zero
+		const method = (messageID == null) ? 'sendMessage' : 'editMessageText';
 		const body = { 
 			chat_id: chatID,
-			message_id: messageID,
 			text: menu.text,
 			parse_mode: menu.parse_mode,
 			reply_markup: {
@@ -150,23 +149,24 @@ export default {
 				"resize_keyboard": true
 			}
 		};
+		if (method === 'editMessageText') {
+			body.message_id = messageID;
+		}
 		const init = {
 			method: "POST",
 			headers: {
-			  "Content-Type": "application/json",
+				"Content-Type": "application/json",
 			},			
 			body: JSON.stringify(body),
 		};
-
-		/* Make request and validate response */
-		const url = this.makeTelegramBotUrl("editMessageText", env);
+		const url = this.makeTelegramBotUrl(method, env);
 		const response = await fetch(url, init);
 		if (!response.ok) {
 			const responseText = await response.text();
 			console.error(responseText + "; " + response.status.toString(10) + "; " + response.statusText);
 			return false;
 		}
-		return true;
+		return true;		
 	},
 
 	async getMenu(callbackData, userID) {
@@ -241,57 +241,12 @@ export default {
 	},
 
 	async makeHelpMenu(userData, menuArg) {
-		const helpMessage = `# Bagz Bot How-To Guide
-## Create A Bagz Bot Wallet
-## Send Funds To Your Bagz Bot Wallet 
-## Open A Position
-## Close A Position Early
-## Withdrawal Funds
-## Take Private Ownership of Wallet
-## Invite Friends
-`;
+		const helpMessage = HELP_STRING;
 		return this.withText(helpMessage, [this.makeReturnToMainButtonLine(userData, menuArg)]);
 	},	
 
 	async makeFAQMenu(userData, menuArg) {
-		const faqMessage = `# What is Bagz Bot?
-**Bagz Bot** lets you perform automated crypto trades through a Telegram bot.
-
-# How Does It Work?
-
-The **Bagz Bot** creates a **Bagz Bot Wallet** for you.  After you fund the wallet with USDC, you can 
-place automated trades of your choosing and **Bagz Bot** will do the rest.  
-You can withdrawal funds or manually close your positions any time you like.
-You can also request the **Bagz Bot Wallet** private keys at any time to transfer the wallet to private ownership.
-
-# Does Bagz Bot Cost Anything To Use?
-The **Bagz Bot** keeps 0.5% of any return on a position, or $1.00, whichever is greater.
-You can also include Priority Fees which may help your trade be executed before other trades.
-Priority Fees are completely optional, and are passed onto the DEX rather than kept by the bot.
-
-# What Kind of Positions Can I Open?
-
-## Protecc Ur Long Bagz
-The **Protecc Ur Long Bagz** position automatically closes your position when the current price in USDC 
-drops below "X percent" off the highest price since you opened the position.  You chose the "X".
-For example, if you choose "10 percent",
-	and the token is priced at **$0.50** when you open the position, 
-	rises to a peak of **$1.00**, 
-	and then drops to **$0.90**,
-	then this loss of 10% would trigger the **Bagz Bot** to close the position.
-You can set slippage tolerance levels when you open the trade.  
-If the position is not completely closed due to slippage, the bot will continue to attempt
-to sell the position off at the same level of slippage as long as the X% criteria is still in play.
-
-# Where Can I Find Support?
-
-Check out our official Discord Community.
-
-# Legal
-
-See here for Legal.
-`;
-		return this.withText(faqMessage, [this.makeReturnToMainButtonLine(userData, menuArg)]); 
+		return this.withText(FAQ_STRING, [this.makeReturnToMainButtonLine(userData, menuArg)]); 
 	},
 
 	async makeListPositionsMenu(userData, menuArg) {
@@ -323,23 +278,47 @@ See here for Legal.
 	},
 
 	isRecognizedCommand(content) {
-		const text = content?.text;
-		return ((text === "/start") || (text === "/help") || (text == "/menu"));
+		const commandText = this.getCommandText(content);
+		return ["/start", "/help", "/menu"].includes(commandText)
 	},
 
-	async handleCommand(req, env, content) {
-		const command = content?.text;
+	getCommandText(requestInfo) {
+		const content = requestInfo.content;
+		const text = content?.message?.text || '';
+		const entities = content?.message?.entities;
+		if (!entities) {
+			return false;
+		}
+		for (const entity of entities) {
+			if (entity.type === 'bot_command') {
+				const commandText = text.substring(entity.offset, entity.offset + entity.length);
+				return commandText;
+			}
+		}
+		return null;
+	},
+
+	getUserID(content) {
+		let userID = content?.message?.from?.id;
+		if (!userID) {
+			userID = content?.callback_query?.from?.id;
+		}
+		return userID;
+	},
+
+	async handleCommand(requestInfo) {
+		const command = this.getCommandText(requestInfo);
 		switch(command) {
 			case '/start':
-				break;
+				await this.displayMainMenu();
 			case '/help':
-				break;
+				await this.displayHelpMenu(requestInfo);
 			case '/menu':
-				break;
+				await this.displayMainMenu();
 			default:
 				throw new Error(`Unrecognized command: ${command}`);
 		}
-		return this.makeSuccessResponse();
+		return this.makeSuccessRequestResponse();
 	},
 
 	makeTelegramBotUrl(methodName, env) {
@@ -352,7 +331,7 @@ See here for Legal.
 	},
 
 
-	makeSuccessResponse() {
+	makeSuccessRequestResponse() {
 		return new Response(null, {
 			status: 200,
 			statusText: "200"
@@ -422,30 +401,6 @@ See here for Legal.
 			statusText: "400"
 		});
 		return response;
-	},
-
-	// TODO
-	async createBotAdministeredWallet(req, env) {
-		return;
-	},
-
-	// TODO
-	async createTrailingStopLossOrder(req, env) {
-		return;
-	},
-
-	// TODO
-	async cancelTrailingStopLossOrder(req, env) {
-		return;
-	},
-
-	// TODO
-	async listOpenTrailingStopLossOrderStatuses(req, env) {
-		return;
-	},
-
-	async scheduled(event, env, ctx) {
-		ctx.waitUntil(doSomeTaskOnASchedule());
 	},
 
 };
