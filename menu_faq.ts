@@ -1,4 +1,24 @@
-export const FAQ_STRING = `# What is Bagz Bot?
+import { Menu, MenuCapabilities } from "./menu";
+import { MenuCode, CallbackButton, MenuSpec } from "./common";
+
+export class MenuFAQ extends Menu<undefined> implements MenuCapabilities {
+    renderText(): string {
+        return FAQ_STRING;
+    }
+    renderOptions(): CallbackButton[][] {
+        const options = this.emptyMenu();
+        this.insertReturnToMainButtonOnNewLine(options);
+        return options;
+    }
+    parseMode(): "MarkdownV2" | "HTML" {
+        return 'MarkdownV2';
+    }    
+    forceResponse() : boolean {
+        return true;
+    }
+}
+
+const FAQ_STRING = `# What is Bagz Bot?
 **Bagz Bot** lets you perform automated crypto trades through a Telegram bot.
 
 # How Does It Work?

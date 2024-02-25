@@ -28,3 +28,4 @@ dustbin.js
 archive/
 .vscode/*
 !.vscode/launch.json
+.*/
