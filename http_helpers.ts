@@ -1,7 +1,7 @@
-export function makeJSONRequest<T>(url : string, body : T, method? : 'GET'|'POST') : Request {
+export function makeJSONRequest<T>(url : string, body : T) : Request {
     const json = JSON.stringify(body);
     const request = new Request(url, {
-        method: method,
+        method: "POST",
         headers: {
             'Content-Type': 'application/json'
         },
@@ -26,9 +26,10 @@ export function makeJSONResponse<T>(body: T, status? : number, statusText? : str
     });
 }
 
-export function makeSuccessResponse() : Response {
+export function makeSuccessResponse(description? : string) : Response {
     return new Response(null, {
-        status: 200
+        status: 200,
+        statusText: description||''
     });
 }
 

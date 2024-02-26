@@ -86,7 +86,7 @@ export class TokenPairPositionTrackerDO {
 
     async validateRequest(request : Request) : Promise<[TokenPairPositionTrackerDOFetchMethod,any]> {
         const jsonBody : any = await request.json();
-        const methodName = new URL(request.url).pathname;
+        const methodName = new URL(request.url).pathname.substring(1);
         const method : TokenPairPositionTrackerDOFetchMethod = TokenPairPositionTrackerDOFetchMethod[methodName as keyof typeof TokenPairPositionTrackerDOFetchMethod];
         if (method == null) {
             throw new Error(`Unknown method ${method}`);
@@ -332,7 +332,7 @@ export class TokenPairPositionTrackerDO {
     }
 
     async jsonCallUserDO<T>(userID : number, body : T, method : string) {
-        const request = makeJSONRequest(`http://userDO/${method}`, body, "POST");
+        const request = makeJSONRequest(`http://userDO/${method}`, body);
         const response = await fetch(request);
         // TODO: what if fails?
     }

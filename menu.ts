@@ -15,24 +15,85 @@ export interface MenuCapabilities {
     forceResponse() : boolean
 }
 
-export abstract class Menu<T> {
+export abstract class BaseMenu {
 
     telegramWebhookInfo : TelegramWebhookInfo
+
+    constructor(telegramWebhookInfo : TelegramWebhookInfo) {
+        this.telegramWebhookInfo = telegramWebhookInfo;
+    }
+
+    createMenuDisplayRequest(mode : MenuDisplayMode, env : Env) : Request {
+        // == null is true when either null or undefined, but not zero
+        const menuSpec = BaseMenu.renderMenuSpec(this as unknown as MenuCapabilities, mode);
+        const body : any = { 
+            chat_id: this.telegramWebhookInfo.chatID,
+            text: menuSpec.text,
+            parse_mode: menuSpec.parseMode,
+            reply_markup: {
+                "inline_keyboard": menuSpec.options
+            }
+        };
+        if (menuSpec.mode === MenuDisplayMode.UpdateMenu) {
+            body.message_id = this.telegramWebhookInfo.messageID;
+        }
+        const bodyJSONString = JSON.stringify(body);
+        const init = {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },			
+            body: bodyJSONString,
+        };
+        const method = (menuSpec.mode === MenuDisplayMode.UpdateMenu) ? 'editMessageText' : 'sendMessage';
+        const url = BaseMenu.makeTelegramBotUrl(method, env);
+        return new Request(url, init);
+    }
+
+    private static renderMenuSpec(menu : MenuCapabilities, mode: MenuDisplayMode): MenuSpec {
+        const menuSpec : MenuSpec = {
+            text : BaseMenu.escape(menu.renderText(), menu.parseMode()),
+            options : menu.renderOptions(),
+            parseMode : menu.parseMode(),
+            mode : mode,
+            forceReply : menu.forceResponse()
+        };
+        return menuSpec;
+    } 
+    
+	private static makeTelegramBotUrl(methodName : string, env : Env) {
+		return `${env.TELEGRAM_BOT_SERVER_URL}/bot${env.TELEGRAM_BOT_TOKEN}/${methodName}`;
+	}
+
+    private static escape(text : string, parseMode : 'MarkdownV2'|'HTML') : string {
+        if (parseMode == 'MarkdownV2') {
+            // TODO: replace with regex
+            const pattern = /\[|]|\(|\)|~|`|>|#|\+|-|=|\||{|}|\.|!/g;
+            text = text.replace(pattern, function (substring) {
+                return '\\' + substring;
+            })
+        }
+        return text;
+    }
+}
+
+export abstract class Menu<T> extends BaseMenu {
+
     userData   : UserData
     miscData   : T|undefined
 
     constructor(telegramWebhookInfo : TelegramWebhookInfo, userData : UserData, miscData? : T) {
-        this.telegramWebhookInfo = telegramWebhookInfo;
+        super(telegramWebhookInfo);
         this.userData = userData;
         this.miscData = miscData;
     }
 
     protected insertButton(options : CallbackButton[][], text : string, callbackData : CallbackData, lineNumber : number) {
-        const button : CallbackButton = { text: text, data : callbackData.toString() };
+        const button : CallbackButton = { text: text, callback_data : callbackData.toString() };
         while (options.length < lineNumber) {
             options.push([]);
         }
-        options[lineNumber].push(button);
+        options[lineNumber-1].push(button);
     }
 
     protected insertButtonNextLine(options : CallbackButton[][], text : string, callbackData : CallbackData) {
@@ -60,46 +121,11 @@ export abstract class Menu<T> {
         return new CallbackData(menuCode);
     }
 
-    createMenuDisplayRequest(mode : MenuDisplayMode, env : Env) : Request {
-        // == null is true when either null or undefined, but not zero
-        const menuSpec = Menu.renderMenuSpec(this as unknown as MenuCapabilities, mode);
-        const body : any = { 
-            chat_id: this.telegramWebhookInfo.chatID,
-            text: menuSpec.text,
-            parse_mode: menuSpec.parseMode,
-            reply_markup: {
-                "inline_keyboard": menuSpec.options,
-                "resize_keyboard": true
-            }
-        };
-        if (menuSpec.mode === MenuDisplayMode.NewMenu) {
-            body.message_id = this.telegramWebhookInfo.messageID;
-        }
-        const init = {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-            },			
-            body: JSON.stringify(body),
-        };
-        const method = (menuSpec.mode === MenuDisplayMode.UpdateMenu) ? 'editMessageText' : 'newMessage';
-        const url = Menu.makeTelegramBotUrl(method, env);
-        return new Request(url, init);
-    }
 
-	private static makeTelegramBotUrl(methodName : string, env : Env) {
-		return `${env.TELEGRAM_BOT_SERVER_URL}/bot${env.TELEGRAM_BOT_TOKEN}/${methodName}`;
-	}
+
     
-    private static renderMenuSpec(menu : MenuCapabilities, mode: MenuDisplayMode): MenuSpec {
-        const menuSpec : MenuSpec = {
-            text : menu.renderText(),
-            options : menu.renderOptions(),
-            parseMode : menu.parseMode(),
-            mode : mode,
-            forceReply : menu.forceResponse()
-        };
-        return menuSpec;
-    }      
+     
+
+
 }
 

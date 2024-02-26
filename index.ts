@@ -33,7 +33,10 @@ import {
 	makeUserDOFetchRequest,
 	UserDOFetchMethod,
 	QuantityAndToken,
-	TokenNameAndAddress} from "./common";
+	TokenNameAndAddress,
+	getVsTokenAddress,
+	VsToken,
+	StoreSessionValuesRequest} from "./common";
 import { MenuError } from "./menu_error";
 import { MenuFAQ } from "./menu_faq";
 import { MenuHelp } from "./menu_help";
@@ -49,6 +52,8 @@ import { MenuEditTrailingStopLossPositionRequest } from "./menu_edit_trailing_st
 import { MenuTrailingStopLossAutoRetrySell } from "./menu_trailing_stop_loss_auto_retry_sell";
 import { MenuTrailingStopLossEntryBuyQuantity } from "./menu_trailing_stop_loss_entry_buy_quantity";
 import { MenuTrailingStopLossPickVsToken } from "./menu_trailing_stop_loss_pick_vs_token";
+import { MenuWallet } from "./menu_wallet";
+import { BaseMenu, Menu } from "./menu";
 
 /* Export of imported DO's (required by wrangler) */
 export { UserDO, TokenPairPositionTrackerDO, PolledTokenPairListDO }
@@ -92,8 +97,7 @@ export default {
 		}
 
 		const telegramWebhookInfo = this.getTelegramWebhookInfo(telegramRequestBody);
-
-		const userData = await this.getUserData(telegramWebhookInfo, env);
+		const userData = await this.getAndMaybeInitializeUserData(telegramWebhookInfo, env);
 		
 		// User clicks a menu button
 		if (telegramWebhookInfo.messageType === 'callback') {
@@ -122,6 +126,7 @@ export default {
 		const telegramUserID = this.getTelegramUserID(telegramRequestBody);
 		const telegramUserName = this.getTelegramUserName(telegramRequestBody);
 		const callbackData = this.getCallbackData(telegramRequestBody);
+		const text = this.getMessageText(telegramRequestBody);
 		const telegramWebhookInfo : TelegramWebhookInfo = {
 			telegramUserID : telegramUserID,
 			telegramUserName: telegramUserName,
@@ -129,7 +134,8 @@ export default {
 			messageID: messageID,
 			messageType : messageType,
 			command : command,
-			callbackData : callbackData
+			callbackData : callbackData,
+			text : text
 		};
 		return telegramWebhookInfo;
 	},
@@ -165,6 +171,10 @@ export default {
 		}
 	},
 
+	getMessageText(telegramRequestBody : any) : string|null {
+		return telegramRequestBody.message?.text||null;
+	},
+
 	getCallbackData(telegramRequestBody : any) : CallbackData|null {
 		const callbackDataString = telegramRequestBody?.callback_query?.data;
 		if (!callbackDataString) {
@@ -180,16 +190,16 @@ export default {
 		return commandText;
 	},
 
-	async getUserData(telegramWebhookInfo : TelegramWebhookInfo, env : Env) {
+	async getAndMaybeInitializeUserData(telegramWebhookInfo : TelegramWebhookInfo, env : Env) : Promise<UserData> {
 		const userDO = this.getUserDO(telegramWebhookInfo, env);
-		const userData = await this.getUserDataFromUserDO(userDO, telegramWebhookInfo.messageID);
-		if (userData.initialized) {
-			return userData;	
-		}
-		else {
-			// first-time initialization of UserDO (b/c there's not a compelling 'contructor' pattern for durable objects)
-			return await this.initializeAndReturnUserDO(telegramWebhookInfo, userDO);
-		}
+		return this.getUserDataFromUserDO(userDO, telegramWebhookInfo.messageID).then(async (userData) => {
+			if (userData.initialized) {
+				return userData;
+			}
+			else {
+				return await this.initializeAndReturnUserDO(telegramWebhookInfo, userDO);
+			}
+		});
 	},
 
 	async initializeAndReturnUserDO(telegramWebhookInfo : TelegramWebhookInfo, userDO : any) : Promise<UserData> {		
@@ -198,7 +208,7 @@ export default {
 			telegramUserID : telegramWebhookInfo.telegramUserID,
 			telegramUserName : telegramWebhookInfo.telegramUserName
 		};
-		const initializeResponse = await userDO.fetch(makeJSONRequest("http://userDO/initialize", userInitializeRequest));
+		const initializeResponse = await fetch(makeUserDOFetchRequest(UserDOFetchMethod.initialize, userInitializeRequest));
 		if (!initializeResponse.ok) {
 			throw new Error("Could not initialized user");
 		}
@@ -215,26 +225,56 @@ export default {
 	},
 
 	async getUserDataFromUserDO(userDO : any, messageID : number) : Promise<UserData> {
-		const request = makeJSONRequest<GetUserDataRequest>("http://userDO/get", { messageID : messageID }, "GET");
+		const request = makeUserDOFetchRequest(UserDOFetchMethod.get, { messageID : messageID });
 		const userDOGetResponse = await userDO.fetch(request);
+		if (!userDOGetResponse.ok) {
+			throw new Error("Could not retrieve User Data");
+		}
 		const userData : UserData = await userDOGetResponse.json();
 		return userData;
 	},
 
-	async handleNewPrivateChat(requestBody : any) {
-		return this.makeSuccessRequestResponse();
-	},
-
-	isMessage(requestBody : any) {
-		return false;
-	},
-
-	isCallbackQuery(requestBody : any) {
-		return "callback_query" in requestBody;
-	},
-
 	async handleMessage(telegramWebhookInfo : TelegramWebhookInfo, userData : UserData, env : Env) {
-		return this.makeSuccessRequestResponse();
+		const positionRequest : LongTrailingStopLossPositionRequest = {
+			positionID : crypto.randomUUID(),
+			type: PositionType.LongTrailingStopLoss,
+			token : telegramWebhookInfo.text!!,
+			tokenAddress: 'fakeTokenAddress',
+			vsToken : 'SOL',
+			vsTokenAddress: 'fakeSOLAddress',
+			vsTokenAmt : 1.0,
+			triggerPercent : 5,
+			slippagePercent: 0.5,
+			retrySellIfPartialFill : true
+		}
+		const sessionValues = this.convertLongTrailingStopLossRequestToSessionValues(positionRequest);
+		await this.storeSessionStates(telegramWebhookInfo.messageID, sessionValues, telegramWebhookInfo, env);
+		const menu = this.makeTrailingStopLossRequestEditorMenu(telegramWebhookInfo, userData, positionRequest);
+		const menuDisplayRequest = menu.createMenuDisplayRequest(MenuDisplayMode.NewMenu, env);
+		fetch(menuDisplayRequest).then((response) => {
+			if (!response.ok) {
+				return this.makeFakeFailedRequestResponse(500, 'Failed to display request editor menu');
+			}
+			else {
+				return makeSuccessResponse();
+			}
+		})
+	},
+
+	convertLongTrailingStopLossRequestToSessionValues(positionRequest : LongTrailingStopLossPositionRequest) : Map<SessionKey,boolean|number|string|null> {
+		const sessionValues = new Map<SessionKey,boolean|number|string|null>([
+			[SessionKey.PositionID, positionRequest.positionID],
+			[SessionKey.PositionType, positionRequest.type.toString()],
+			[SessionKey.Token, positionRequest.token],
+			[SessionKey.TokenAddress, positionRequest.tokenAddress],
+			[SessionKey.VsToken, positionRequest.vsToken],
+			[SessionKey.VsTokenAddress, positionRequest.vsTokenAddress],
+			[SessionKey.VsTokenAmt, positionRequest.vsTokenAmt],
+			[SessionKey.TrailingStopLossTriggerPercent, positionRequest.triggerPercent],
+			[SessionKey.TrailingStopLossSlippageTolerance, positionRequest.slippagePercent],
+			[SessionKey.TrailingStopLossRetrySellIfPartialFill, positionRequest.retrySellIfPartialFill]
+		]);
+		return sessionValues;
 	},
 
 	async handleCallbackQuery(telegramWebhookInfo : TelegramWebhookInfo, userData : UserData, env : Env) {
@@ -242,122 +282,160 @@ export default {
 		/* Create menu based on user response and user state */
 		const callbackData = telegramWebhookInfo.callbackData!!;
 
-		let menuDisplayRequest  : Request|null  = null;
-		let menuDisplayResponse : Response|null = null;
+		let menu  : BaseMenu|null  = null;
 
 		switch(callbackData.menuCode) {
 			case MenuCode.Main:
-				menuDisplayRequest = new MenuMain(telegramWebhookInfo, userData).createMenuDisplayRequest(MenuDisplayMode.UpdateMenu, env);
+				menu = new MenuMain(telegramWebhookInfo, userData, userData.hasWallet);
 				break;
 			case MenuCode.CreateWallet:
-				await this.handleCreateWallet(telegramWebhookInfo, env);
-				menuDisplayRequest = new MenuMain(telegramWebhookInfo, userData).createMenuDisplayRequest(MenuDisplayMode.UpdateMenu, env);
+				const createWalletResponse = await this.handleCreateWallet(telegramWebhookInfo, env);
+				if (createWalletResponse.ok) {
+					menu = new MenuMain(telegramWebhookInfo, userData, true);
+				}
+				else {
+					menu = new MenuError(telegramWebhookInfo, userData);
+				}
+				break;
 			case MenuCode.Error:
-				menuDisplayRequest = new MenuError(telegramWebhookInfo, userData).createMenuDisplayRequest(MenuDisplayMode.UpdateMenu, env);
+				menu = new MenuError(telegramWebhookInfo, userData);
 				break;
 			case MenuCode.ExportWallet:
-				menuDisplayRequest = this.TODOstubbedMenuRequest(telegramWebhookInfo, userData, env);	
+				menu = this.TODOstubbedMenu(telegramWebhookInfo, userData, env);	
 				break;
 			case MenuCode.FAQ:
-				menuDisplayRequest = new MenuFAQ(telegramWebhookInfo, userData).createMenuDisplayRequest(MenuDisplayMode.UpdateMenu, env);
+				menu = new MenuFAQ(telegramWebhookInfo, userData);
 				break;
 			case MenuCode.Help:
-				menuDisplayRequest = new MenuHelp(telegramWebhookInfo, userData).createMenuDisplayRequest(MenuDisplayMode.UpdateMenu, env);
+				menu = new MenuHelp(telegramWebhookInfo, userData);
 				break;
 			case MenuCode.Invite:
-				menuDisplayRequest = this.TODOstubbedMenuRequest(telegramWebhookInfo, userData, env);
+				menu = this.TODOstubbedMenu(telegramWebhookInfo, userData, env);
 				break;
 			case MenuCode.PleaseEnterToken:
-				menuDisplayRequest = new MenuPleaseEnterToken(telegramWebhookInfo, userData).createMenuDisplayRequest(MenuDisplayMode.UpdateMenu, env);
+				menu = new MenuPleaseEnterToken(telegramWebhookInfo, userData);
 				break;
 			case MenuCode.ListPositions:
-				menuDisplayRequest = new MenuListPositions(telegramWebhookInfo, userData).createMenuDisplayRequest(MenuDisplayMode.UpdateMenu, env);
+				menu = new MenuListPositions(telegramWebhookInfo, userData);
 				break;
 			case MenuCode.ViewOpenPosition:
 				const viewPositionID = callbackData.menuArg!!;
 				const position = await this.getPosition(viewPositionID, telegramWebhookInfo, env);
-				menuDisplayRequest = new MenuViewOpenPosition(telegramWebhookInfo, userData, position).createMenuDisplayRequest(MenuDisplayMode.UpdateMenu, env);
+				menu = new MenuViewOpenPosition(telegramWebhookInfo, userData, position);
 				break;
 			case MenuCode.ClosePositionManuallyAction:
 				const closePositionID = callbackData.menuArg;
 				if (closePositionID != null) {
 					await this.handleManuallyClosePosition(closePositionID, telegramWebhookInfo, env);
 				}
-				menuDisplayRequest = new MenuMain(telegramWebhookInfo, userData).createMenuDisplayRequest(MenuDisplayMode.UpdateMenu, env);
+				menu = new MenuMain(telegramWebhookInfo, userData, userData.hasWallet);
 				break;
 			case MenuCode.RefreshWallet:
 				const walletData = await this.getWalletData();
-				menuDisplayRequest = new MenuViewWallet(telegramWebhookInfo, userData, walletData).createMenuDisplayRequest(MenuDisplayMode.UpdateMenu, env);
+				menu = new MenuViewWallet(telegramWebhookInfo, userData, walletData);
 				break;
 			case MenuCode.TrailingStopLossCustomSlippageToleranceKeypad:
 				const trailingStopLossCustomSlippageToleranceKeypadEntry = callbackData.menuArg||''; 
 				const trailingStopLossCustomSlippageToleranceKeypad = this.makeTrailingStopLossCustomSlippageToleranceKeypad(trailingStopLossCustomSlippageToleranceKeypadEntry, telegramWebhookInfo, userData, env);
-				menuDisplayRequest = trailingStopLossCustomSlippageToleranceKeypad.createMenuDisplayRequest(MenuDisplayMode.UpdateMenu, env);
+				menu = trailingStopLossCustomSlippageToleranceKeypad;
 				break;
 			case MenuCode.TrailingStopLossCustomSlippageToleranceKeypadSubmit:
 				const trailingStopLossCustomSlippageSubmittedKeypadEntry = callbackData.menuArg!!;
-				await this.storeSessionState(telegramWebhookInfo.messageID, SessionKey.TrailingStopLossSlippageTolerance, trailingStopLossCustomSlippageSubmittedKeypadEntry);
+				await this.storeSessionState(telegramWebhookInfo.messageID, SessionKey.TrailingStopLossSlippageTolerance, trailingStopLossCustomSlippageSubmittedKeypadEntry, telegramWebhookInfo, env);
 				const trailingStopLossPositionRequestToConfirm = await this.getTrailingStopLossPositionRequestFromSession(telegramWebhookInfo, env);
-				menuDisplayRequest = new MenuConfirmTrailingStopLossPositionRequest(telegramWebhookInfo, userData, trailingStopLossPositionRequestToConfirm).createMenuDisplayRequest(MenuDisplayMode.UpdateMenu, env);
+				menu = new MenuConfirmTrailingStopLossPositionRequest(telegramWebhookInfo, userData, trailingStopLossPositionRequestToConfirm);
 				break;
 			case MenuCode.TrailingStopLossEnterBuyQuantityKeypad:
 				const buyTrailingStopLossQuantityKeypadEntry = callbackData.menuArg||'';
 				const trailingStopLossEnterBuyQuantityKeypad = this.makeTrailingStopLossBuyQuantityKeypad(buyTrailingStopLossQuantityKeypadEntry, telegramWebhookInfo, userData, env);
-				menuDisplayRequest = trailingStopLossEnterBuyQuantityKeypad.createMenuDisplayRequest(MenuDisplayMode.UpdateMenu, env);
+				menu = trailingStopLossEnterBuyQuantityKeypad;
 				break;
 			case MenuCode.TrailingStopLossEnterBuyQuantitySubmit:
 				const submittedTrailingStopLossBuyQuantity = callbackData.menuArg!!;
-				await this.storeSessionState(telegramWebhookInfo.messageID, SessionKey.VsTokenAmt, parseFloat(submittedTrailingStopLossBuyQuantity));
+				await this.storeSessionState(telegramWebhookInfo.messageID, SessionKey.VsTokenAmt, parseFloat(submittedTrailingStopLossBuyQuantity), telegramWebhookInfo, env);
 				const trailingStopLossRequestStateAfterBuyQuantityEdited = await this.getTrailingStopLossPositionRequestFromSession(telegramWebhookInfo, env);
-				menuDisplayRequest = this.makeTrailingStopLossRequestEditorMenu(telegramWebhookInfo, userData, trailingStopLossRequestStateAfterBuyQuantityEdited).createMenuDisplayRequest(MenuDisplayMode.UpdateMenu, env);
+				menu = this.makeTrailingStopLossRequestEditorMenu(telegramWebhookInfo, userData, trailingStopLossRequestStateAfterBuyQuantityEdited);
 				break;
 			case MenuCode.TrailingStopLossChooseAutoRetrySellMenu:
-				menuDisplayRequest = new MenuTrailingStopLossAutoRetrySell(telegramWebhookInfo, userData).createMenuDisplayRequest(MenuDisplayMode.UpdateMenu, env);
+				menu = new MenuTrailingStopLossAutoRetrySell(telegramWebhookInfo, userData);
 				break;
 			case MenuCode.TrailingStopLossChooseAutoRetrySellSubmit:
-				await this.storeSessionState(telegramWebhookInfo.messageID, SessionKey.TrailingStopLossRetrySellIfPartialFill, callbackData.menuArg!! === "true");
+				await this.storeSessionState(telegramWebhookInfo.messageID, SessionKey.TrailingStopLossRetrySellIfPartialFill, callbackData.menuArg!! === "true", telegramWebhookInfo, env);
 				const trailingStopLossRequestStateAfterAutoRetrySellEdited = await this.getTrailingStopLossPositionRequestFromSession(telegramWebhookInfo, env);
-				menuDisplayRequest = this.makeTrailingStopLossRequestEditorMenu(telegramWebhookInfo, userData, trailingStopLossRequestStateAfterAutoRetrySellEdited).createMenuDisplayRequest(MenuDisplayMode.UpdateMenu, env);
+				menu = this.makeTrailingStopLossRequestEditorMenu(telegramWebhookInfo, userData, trailingStopLossRequestStateAfterAutoRetrySellEdited);
 				break;
 			case MenuCode.TrailingStopLossConfirmMenu:
 				const trailingStopLossRequestAfterDoneEditing = await this.getTrailingStopLossPositionRequestFromSession(telegramWebhookInfo, env);
-				menuDisplayRequest = new MenuConfirmTrailingStopLossPositionRequest(telegramWebhookInfo, userData, trailingStopLossRequestAfterDoneEditing).createMenuDisplayRequest(MenuDisplayMode.UpdateMenu, env);
+				menu = new MenuConfirmTrailingStopLossPositionRequest(telegramWebhookInfo, userData, trailingStopLossRequestAfterDoneEditing);
 				break;
 			case MenuCode.TrailingStopLossCustomTriggerPercentCustomKeypad:
 				const trailingStopLossTriggerPercentKeypadCurrentEntry = callbackData.menuArg||'';
 				const trailingStopLossCustomTriggerPercentKeypad = this.makeTrailingStopLossCustomTriggerPercentKeypad(telegramWebhookInfo, userData, trailingStopLossTriggerPercentKeypadCurrentEntry)
-				menuDisplayRequest = trailingStopLossCustomTriggerPercentKeypad.createMenuDisplayRequest(MenuDisplayMode.UpdateMenu, env);
+				menu = trailingStopLossCustomTriggerPercentKeypad;
 				break;
 			case MenuCode.TrailingStopLossCustomTriggerPercentCustomKeypadSubmit:
 				const trailingStopLossCustomTriggerPercentSubmission = callbackData.menuArg!!;
-				await this.storeSessionState(telegramWebhookInfo.messageID, SessionKey.TrailingStopLossTriggerPercent, parseFloat(trailingStopLossCustomTriggerPercentSubmission));
+				await this.storeSessionState(telegramWebhookInfo.messageID, SessionKey.TrailingStopLossTriggerPercent, parseFloat(trailingStopLossCustomTriggerPercentSubmission), telegramWebhookInfo, env);
 				const trailingStopLossPositionRequestAfterEditingCustomTriggerPercent = await this.getTrailingStopLossPositionRequestFromSession(telegramWebhookInfo, env);
-				menuDisplayRequest = this.makeTrailingStopLossRequestEditorMenu(telegramWebhookInfo, userData, trailingStopLossPositionRequestAfterEditingCustomTriggerPercent).createMenuDisplayRequest(MenuDisplayMode.UpdateMenu, env);
+				menu = this.makeTrailingStopLossRequestEditorMenu(telegramWebhookInfo, userData, trailingStopLossPositionRequestAfterEditingCustomTriggerPercent);
 				break;
 			case MenuCode.TrailingStopLossEditorFinalSubmit:
 				const trailingStopLossRequestAfterFinalSubmit = await this.getTrailingStopLossPositionRequestFromSession(telegramWebhookInfo, env);
 				await this.sendTrailingStopLossRequestToTokenPairPositionTracker(trailingStopLossRequestAfterFinalSubmit, telegramWebhookInfo, env);
-				menuDisplayRequest = new MenuMain(telegramWebhookInfo, userData).createMenuDisplayRequest(MenuDisplayMode.UpdateMenu, env);
+				menu = new MenuMain(telegramWebhookInfo, userData, userData.hasWallet);
 				break;
 			case MenuCode.TrailingStopLossEntryBuyQuantityMenu:
 				const quantityAndTokenForBuyQuantityMenu : QuantityAndToken = await this.getTrailingStopLossPositionQuantityAndVsTokenFromSession(telegramWebhookInfo, env);
-				menuDisplayRequest = new MenuTrailingStopLossEntryBuyQuantity(telegramWebhookInfo, userData, quantityAndTokenForBuyQuantityMenu).createMenuDisplayRequest(MenuDisplayMode.UpdateMenu, env);
+				menu = new MenuTrailingStopLossEntryBuyQuantity(telegramWebhookInfo, userData, quantityAndTokenForBuyQuantityMenu);
 				break;
 			case MenuCode.TrailingStopLossPickVsTokenMenu:
 				const trailingStopLossVsTokenNameAndAddress : TokenNameAndAddress = await this.getTrailingStopLossPositionVsTokenFromSession(telegramWebhookInfo, env);
-				menuDisplayRequest = new MenuTrailingStopLossPickVsToken(telegramWebhookInfo, userData, trailingStopLossVsTokenNameAndAddress).createMenuDisplayRequest(MenuDisplayMode.UpdateMenu, env);
+				menu = new MenuTrailingStopLossPickVsToken(telegramWebhookInfo, userData, trailingStopLossVsTokenNameAndAddress);
+				break;
+			case MenuCode.TrailingStopLossPickVsTokenMenuSubmit:
+				const trailingStopLossSelectedVsToken = callbackData.menuArg!!;
+				const parsedTrailingStopLossSelectedVsToken = VsToken[trailingStopLossSelectedVsToken as keyof typeof VsToken ]
+				const trailingStopLossSelectedVsTokenAddress = getVsTokenAddress(parsedTrailingStopLossSelectedVsToken);
+				await this.storeSessionStates(telegramWebhookInfo.messageID, new Map<SessionKey,boolean|number|string|null>([
+					[SessionKey.VsToken, trailingStopLossSelectedVsToken],
+					[SessionKey.VsTokenAddress, trailingStopLossSelectedVsTokenAddress]
+				]), telegramWebhookInfo, env);
+				const trailingStopLossPositionRequestAfterSubmittingVsToken = await this.getTrailingStopLossPositionRequestFromSession(telegramWebhookInfo, env);
+				menu = this.makeTrailingStopLossRequestEditorMenu(telegramWebhookInfo, userData, trailingStopLossPositionRequestAfterSubmittingVsToken);
+				break;
+			case MenuCode.TransferFunds:
+				// TODO
+				menu = this.TODOstubbedMenu(telegramWebhookInfo, userData, env);
+				break;
+			case MenuCode.Wallet:
+				const walletDataForWalletMenu = await this.getWalletData();
+				menu = new MenuWallet(telegramWebhookInfo, userData, walletDataForWalletMenu);
 				break;
 			default:
-				menuDisplayRequest = new MenuError(telegramWebhookInfo, userData).createMenuDisplayRequest(MenuDisplayMode.UpdateMenu, env);
+				menu = new MenuError(telegramWebhookInfo, userData);
 				break;
 		}
-		menuDisplayResponse = await fetch(menuDisplayRequest!!);
-		const success = menuDisplayResponse.ok;
-		if (success) {
-			return this.makeSuccessRequestResponse();
+		const menuDisplayRequest = menu.createMenuDisplayRequest(MenuDisplayMode.UpdateMenu, env);
+		return await fetch(menuDisplayRequest!!).then(async (response) => {
+			if (!response.ok) {
+				const tgDescription = await this.tryGetTGDescription(response);
+				return this.makeFakeFailedRequestResponse(500, response.statusText, tgDescription);
+			}
+			else {
+				return makeSuccessResponse();
+			}
+
+		})
+
+	},
+
+	async tryGetTGDescription(response : Response) : Promise<string|undefined> {
+		try {
+			const responseBody : any = await response.json();
+			return responseBody.description;
 		}
-		else {
-			return this.makeFakeFailedRequestResponse(500);
+		catch {
+			return undefined;
 		}
 	},
 
@@ -407,7 +485,7 @@ export default {
 			100);
 	},
 
-	makeTrailingStopLossRequestEditorMenu(telegramWebhookInfo : TelegramWebhookInfo, userData : UserData, positionRequest : LongTrailingStopLossPositionRequest) : MenuEditTrailingStopLossPositionRequest {
+	makeTrailingStopLossRequestEditorMenu(telegramWebhookInfo : TelegramWebhookInfo, userData : UserData, positionRequest : LongTrailingStopLossPositionRequest) : BaseMenu {
 		return new MenuEditTrailingStopLossPositionRequest(telegramWebhookInfo, userData, positionRequest);
 	},
 
@@ -463,8 +541,8 @@ export default {
 		return positionRequest;
 	},
 
-	TODOstubbedMenuRequest(telegramWebhookInfo : TelegramWebhookInfo, userData : UserData, env : Env) : Request {
-		return new MenuTODO(telegramWebhookInfo, userData).createMenuDisplayRequest(MenuDisplayMode.UpdateMenu, env);
+	TODOstubbedMenu(telegramWebhookInfo : TelegramWebhookInfo, userData : UserData, env : Env) : BaseMenu {
+		return new MenuTODO(telegramWebhookInfo, userData);
 	},
 
 	async handleManuallyClosePosition(positionID : string, telegramWebhookInfo : TelegramWebhookInfo, env : Env) : Promise<Response> {
@@ -473,14 +551,13 @@ export default {
 		}
 		const userDO = this.getUserDO(telegramWebhookInfo, env);
 		const closePositionsRequestBody : ClosePositionsRequest = { positionIDs : [positionID] };
-		const url = "http://userDO/closePositions";
-		const closePositionsRequest = makeJSONRequest(url, closePositionsRequestBody);
+		const closePositionsRequest = makeUserDOFetchRequest(UserDOFetchMethod.manuallyClosePosition, closePositionsRequestBody);
 		return await userDO.fetch(closePositionsRequest);
 	},
 
 	async handleCreateWallet(telegramWebhookInfo : TelegramWebhookInfo, env : Env) : Promise<Response> {
 		const userDO = this.getUserDO(telegramWebhookInfo, env);
-		const request = makeRequest("http://userDO/createWallet");
+		const request = makeUserDOFetchRequest(UserDOFetchMethod.generateWallet);
 		return await userDO.fetch(request);
 	},
 
@@ -513,27 +590,48 @@ export default {
 	},
 
 	getTelegramUserName(requestBody : any) : string {
-		let userName : string = requestBody?.message?.from?.name!!;
-		if (!userName) {
-			userName = requestBody?.callback_query?.from?.name!!;
-		}
+		const fromParentObj = requestBody?.message || requestBody?.callback_query
+		const firstName : string = fromParentObj.from?.first_name!!;
+		const lastName : string = fromParentObj.from?.last_name!!;
+		const userName = [firstName, lastName].filter(x => x).join(" ") || 'user';
 		return userName;
 	},
 
-	async handleCommand(telegramWebhookInfo : TelegramWebhookInfo, userData : UserData, env: any) {
-		/*const command = telegramWebhookInfo.command!!;
+	async handleCommand(telegramWebhookInfo : TelegramWebhookInfo, userData : UserData, env: any) : Promise<Response> {
+		const command = telegramWebhookInfo.command!!;
+		let menu : BaseMenu|null = null;// : Request|null = null;
 		switch(command) {
 			case '/start':
-				await this.displayMenu(telegramWebhookInfo, userData, env, 'main');
+				menu = new MenuMain(telegramWebhookInfo, userData, userData.hasWallet);
+				break;
 			case '/help':
-				await this.displayMenu(telegramWebhookInfo, userData, env, 'help');
+				menu = new MenuHelp(telegramWebhookInfo, userData);
+				break;
+			case '/autosell':
+				const positionRequest : LongTrailingStopLossPositionRequest = {
+					positionID : crypto.randomUUID(),
+					type: PositionType.LongTrailingStopLoss,
+					token : 'fakeToken',
+					tokenAddress: 'fakeTokenAddress',
+					vsToken : 'SOL',
+					vsTokenAddress: 'fakeSOLAddress',
+					vsTokenAmt : 1.0,
+					triggerPercent : 5,
+					slippagePercent: 5,
+					retrySellIfPartialFill : true
+				}
+				const sessionValues = this.convertLongTrailingStopLossRequestToSessionValues(positionRequest);
+				await this.storeSessionStates(telegramWebhookInfo.messageID, sessionValues, telegramWebhookInfo, env);
+				menu = this.makeTrailingStopLossRequestEditorMenu(telegramWebhookInfo, userData, positionRequest);
 			case '/menu':
-				await this.displayMenu(telegramWebhookInfo, userData, env, 'main');
+				menu = new MenuMain(telegramWebhookInfo, userData, userData.hasWallet);
+				break;
 			default:
 				throw new Error(`Unrecognized command: ${command}`);
 		}
-		*/
-		return this.makeSuccessRequestResponse();
+		const menuDisplayRequest = menu.createMenuDisplayRequest(MenuDisplayMode.NewMenu, env);
+		fetch(menuDisplayRequest);
+		return makeSuccessResponse();
 	},
 
 
@@ -544,10 +642,10 @@ export default {
 		});
 	},
 
-	makeFakeFailedRequestResponse(status : number) : Response {
+	makeFakeFailedRequestResponse(status : number, statusText? : string, description? : string) : Response {
 		const response = new Response(null, {
 			status: 200, // see comment on retries
-			statusText: status.toString()
+			statusText: status.toString() + ":" + (statusText||"") + ":" + (description||"")
 		});
 		return response;
 	},
@@ -604,7 +702,7 @@ export default {
 
 	async getPosition(positionID : string, telegramWebhookInfo : TelegramWebhookInfo, env : Env) : Promise<Position> {
 		const body : GetPositionRequest = { positionID : positionID };
-		const request = makeJSONRequest("http://userDO/getPosition", body, "GET");
+		const request = makeUserDOFetchRequest(UserDOFetchMethod.getPosition, body);
 		const userDO = this.getUserDO(telegramWebhookInfo, env);
 		const response = await userDO.fetch(request);
 		return await response.json() as Position;
@@ -620,8 +718,33 @@ export default {
 		};
 	},
 
-	async storeSessionState(messageID : number, sessionKey : SessionKey, value : boolean|number|string|null) {
-		
+	async storeSessionState(messageID : number, 
+		sessionKey : SessionKey, value : boolean|number|string|null,
+		telegramWebhookInfo : TelegramWebhookInfo,
+		env : Env) {
+		const sessionValues = new Map<SessionKey,boolean|number|string|null>([[sessionKey,value]]);
+		return await this.storeSessionStates(messageID, sessionValues, telegramWebhookInfo, env);
+	},
+
+	async storeSessionStates(messageID : number, 
+		sessionValues : Map<SessionKey,boolean|number|string|null>,
+		telegramWebhookInfo : TelegramWebhookInfo,
+		env : Env) {
+		const sessionValuesRecord : Record<string,boolean|number|string|null> = {};
+		for (const [sessionKey,value] of sessionValues) {
+			sessionValuesRecord[sessionKey.toString()] = value;
+		}
+		const userDO = this.getUserDO(telegramWebhookInfo, env) as DurableObjectStub;
+		const requestBody : StoreSessionValuesRequest = {
+			messageID: messageID,
+			sessionValues: sessionValuesRecord
+		};
+		const request = makeUserDOFetchRequest(UserDOFetchMethod.storeSessionValues, requestBody);
+		return await userDO.fetch(request).then((response) => {
+			if (!response.ok) {
+				throw new Error("Unable to store session state");
+			}	
+		});
 	},
 
 	async getSessionState(messageID : number, sessionKeys : SessionKey[], telegramWebhookInfo : TelegramWebhookInfo, env : Env) : Promise<Record<string,boolean|number|string|null>> {
@@ -630,7 +753,7 @@ export default {
 			messageID: messageID,
 			sessionKeys: sessionKeys.map(x => { return x.toString()})	
 		};
-		const sessionValuesRequest = makeJSONRequest("http://userDO/getSessionValues", requestBody);
+		const sessionValuesRequest = makeUserDOFetchRequest(UserDOFetchMethod.getSessionValues, requestBody);
 		return await userDO.fetch(sessionValuesRequest).then(async (response) => {
 			if (!response.ok) {
 				throw new Error("Could not retrieve session state");

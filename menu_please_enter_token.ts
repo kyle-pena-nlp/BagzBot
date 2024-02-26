@@ -11,7 +11,7 @@ export class MenuPleaseEnterToken extends Menu<undefined> implements MenuCapabil
         return options;
     }
     parseMode(): "HTML" | "MarkdownV2" {
-        return 'MarkdownV2';
+        return 'HTML';
     }
     forceResponse(): boolean {
         return true;

@@ -7,9 +7,9 @@ export class PositionTracker {
     constructor() {
     }
     initialize(entries : Map<string,any>) {
-        for (const entryKey of Object.keys(entries)) {
+        for (const entryKey of (entries.keys())) {
             const positionIDKey = PositionIDKey.parse(entryKey);
-            if (positionIDKey) {
+            if (positionIDKey != null) {
                 const position = entries.get(positionIDKey.toString());
                 this.positions[positionIDKey.toString()] = position;
             }

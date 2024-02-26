@@ -11,19 +11,27 @@ export class MenuHelp extends Menu<undefined> implements MenuCapabilities {
         return options;
     }
     parseMode(): "MarkdownV2" | "HTML" {
-        return 'MarkdownV2';
+        return 'HTML';
     } 
     forceResponse() : boolean {
         return true;
     }   
 }
 
-export const HELP_STRING = `# Bagz Bot How-To Guide
-## Create A Bagz Bot Wallet
-## Send Funds To Your Bagz Bot Wallet 
-## Open A Position
-## Close A Position Early
-## Withdrawal Funds
-## Take Private Ownership of Wallet
-## Invite Friends
+export const HELP_STRING = `<b>Bagz Bot How-To Guide</b>
+
+<b>Create A Bagz Bot Wallet</b>
+
+<b>Send Funds To Your Bagz Bot Wallet </b>
+
+<b>Open A Position</b>
+
+<b>Close A Position Early</b>
+
+<b>Withdrawal Funds</b>
+
+<b>Take Private Ownership of Wallet</b>
+
+<b>Invite Friends</b>
+
 `;

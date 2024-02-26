@@ -29,7 +29,9 @@ export class PositiveDecimalKeypad extends Menu<string> implements MenuCapabilit
         const values : Record<string,string> = {
             currentValue: this.miscData!!
         };
-        return this.messageFormat.replace(/\$\{(\w+)\}/g, (placeholder, key) => values[key] || placeholder);
+        return this.messageFormat.replace(/\$\{(\w+)\}/g, (placeholder, key) => {
+            return values[key]||''; 
+        });
     }
     
     renderOptions(): CallbackButton[][] {
@@ -60,19 +62,21 @@ export class PositiveDecimalKeypad extends Menu<string> implements MenuCapabilit
         this.maybeInsertKeypadButton(options, "0",  4);
         this.maybeInsertKeypadButton(options, ".",  4);
 
-        const backspaceCallbackData = new CallbackData(this.thisMenuCode, this.miscData!!.slice(0,-1));
+        const backspaceCallbackData = new CallbackData(this.thisMenuCode, (this.miscData||'').slice(0,-1));
         this.insertButton(options, "x", backspaceCallbackData, 4);
 
-        if (this.isValidSubmission(this.miscData!!)) {
-            const submitCallbackData = new CallbackData(this.submitMenuCode, this.miscData!!);
+        if (this.isValidSubmission(this.miscData||'')) {
+            const submitCallbackData = new CallbackData(this.submitMenuCode, this.miscData||'');
             this.insertButton(options, "Submit", submitCallbackData, 5);
         }
+
+        this.insertReturnToMainButtonOnNewLine(options);
         
         return options;
     }
 
     parseMode() : 'MarkdownV2'|'HTML' {
-        return 'MarkdownV2';
+        return 'HTML';
     }
 
     forceResponse() {

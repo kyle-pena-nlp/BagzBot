@@ -18,18 +18,21 @@ export class SessionTracker {
     deletedKeys : Set<string> = new Set<string>();
     constructor() {
     }
-    initialize(entries : Record<string,any>) {
+    initialize(entries : Map<string,any>) {
         // init from storage
-        for (const entryKey of Object.keys(entries)) {
-            const entryValue = entries[entryKey];
+        for (const entryKey of (entries.keys())) {
+            const entryValue = entries.get(entryKey);
             const parsedKey = MessageIDKey.parse(entryKey) || SessionIDKey.parse(entryKey) || SessionKeyKey.parse(entryKey) || NotAKey.parse(entryKey);
             switch(parsedKey.keyType) {
                 case KeyType.MessageID:
                     this.sessionIDs[parsedKey.toString()] = entryValue;
+                    break;
                 case KeyType.SessionID:
                     this.sessionKeys[parsedKey.toString()] = entryValue;
+                    break;
                 case KeyType.SessionKey:
                     this.sessionValues[parsedKey.toString()] = entryValue;
+                    break;
             }
         }
     }

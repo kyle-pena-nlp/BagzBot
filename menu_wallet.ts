@@ -1,9 +1,12 @@
 import { Menu, MenuCapabilities } from "./menu";
-import { MenuCode, CallbackButton, MenuSpec, MenuDisplayMode } from "./common";
+import { MenuCode, CallbackButton, MenuSpec, MenuDisplayMode, WalletData } from "./common";
 
-export class MenuWallet extends Menu<undefined> implements MenuCapabilities {
+export class MenuWallet extends Menu<WalletData> implements MenuCapabilities {
     renderText(): string {
-        return ``; // TODO: balance
+        return `<b>SOL Purchasing Power</b>: ${this.miscData!!.purchasingPowerSOL}
+        <b>USDC Purchasing Power</b>: ${this.miscData!!.purchasingPowerUSDC}
+        <b>Current Value In SOL</b>: ${this.miscData!!.solValue}
+        <b>Current Value In USDC</b>: ${this.miscData!!.usdcValue}`; // TODO: balance
     }
     renderOptions(): CallbackButton[][] {
         const options = this.emptyMenu();
@@ -14,7 +17,7 @@ export class MenuWallet extends Menu<undefined> implements MenuCapabilities {
         return options;
     }
     parseMode(): "MarkdownV2" | "HTML" {
-        return 'MarkdownV2';
+        return 'HTML';
     }    
     forceResponse() : boolean {
         return true;

@@ -11,7 +11,7 @@ export class MenuError extends Menu<undefined> implements MenuCapabilities {
         return options;
     }
     parseMode(): "MarkdownV2" | "HTML" {
-        return 'MarkdownV2';
+        return 'HTML';
     }    
     forceResponse() : boolean {
         return true;

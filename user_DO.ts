@@ -18,17 +18,19 @@ import {
     makeTokenPairPositionTrackerDOFetchRequest,
     TokenPairPositionTrackerDOFetchMethod,
     TokenPairPositionTrackerInitializeRequest,
-    ClosePositionRequest,
     ManuallyClosePositionRequest,
     NotifyPositionsAutoClosedRequest,
     NotifyPositionAutoClosedRequest,
     NotifyPositionAutoClosedInfo,
     GetPositionsFromTokenPairTrackerResponse,
-    GetPositionsFromTokenPairTrackerRequest} from "./common";
-import * as crypto from "node:crypto";
-import { makeSuccessResponse, makeJSONResponse, makeJSONRequest, makeFailureResponse } from "./http_helpers";
+    GetPositionsFromTokenPairTrackerRequest,
+    GetPositionRequest} from "./common";
+
+
+import { makeSuccessResponse, makeJSONResponse, makeFailureResponse } from "./http_helpers";
 import { SessionTracker } from "./session_tracker";
 import { PositionTracker } from "./position_tracker";
+import { generateEd25519Keypair } from "./cryptography";
 
 /* Durable Object storing state of user */
 export class UserDO {
@@ -36,7 +38,6 @@ export class UserDO {
     /* Handles/persists session state management, basic facts about user (like name), and wallet */
     env : Env
     state: DurableObjectState;
-    initialized : boolean;
     durableObjectID : string;
     telegramUserID : number|null;
     telegramUserName : string|null;
@@ -49,7 +50,6 @@ export class UserDO {
         this.env                = env;
         this.state              = state;
         this.durableObjectID    = this.state.id.toString();
-        this.initialized        = false;
         this.telegramUserID     = null;
         this.telegramUserName   = null;
         this.wallet             = null;
@@ -60,11 +60,8 @@ export class UserDO {
 
     async initializeFromPersistence() {
         const storage = await this.state.storage.list();
-        for (const key in Object.keys(storage)) {
+        for (const key of storage.keys()) {
             switch(key) {
-                case 'initialized':
-                    this.initialized = (storage.get(key)||false) as boolean;
-                    break;
                 case 'telegramUserID':
                     this.telegramUserID = storage.get(key) as number|null;
                     break;
@@ -80,56 +77,95 @@ export class UserDO {
         this.positionTracker.initialize(storage);
     }
 
+    initialized() : boolean {
+        return (this.telegramUserID != null) && (this.telegramUserName != null);
+    }
+
     async fetch(request : Request) : Promise<Response> {
+        const [method,jsonRequestBody,response] = await this._fetch(request);
+        return response;
+    }
+
+    async _fetch(request : Request) : Promise<[UserDOFetchMethod,any,Response]> {
 
         const [method,jsonRequestBody] = await this.validateRequest(request);
+        let response : Response|null = null;
 
         switch(method) {
             case UserDOFetchMethod.get:
-                return this.handleGet(jsonRequestBody);            
+                response = await this.handleGet(jsonRequestBody);            
+                break;
             case UserDOFetchMethod.initialize:
-                this.assertUserIsNotInitialized();
-                return await this.handleInitialize(jsonRequestBody)            
+                response = await this.handleInitialize(jsonRequestBody)            
+                break;
             case UserDOFetchMethod.storeSessionValues:
                 this.assertUserIsInitialized();
-                return await this.handleStoreSessionValues(jsonRequestBody);
+                response = await this.handleStoreSessionValues(jsonRequestBody);
+                break;
             case UserDOFetchMethod.getSessionValues:
                 this.assertUserIsInitialized();
-                return await this.handleGetSessionValues(jsonRequestBody);
+                response = await this.handleGetSessionValues(jsonRequestBody);
+                break;
             case UserDOFetchMethod.deleteSession:
                 this.assertUserIsInitialized();
-                return await this.handleDeleteSession(jsonRequestBody);
+                response = await this.handleDeleteSession(jsonRequestBody);
+                break;
             case UserDOFetchMethod.generateWallet:
                 this.assertUserIsInitialized();
-                this.assertUserHasNoWallet();
-                return await this.handleGenerateWallet();
+                response = await this.handleGenerateWallet();
+                break;
             case UserDOFetchMethod.requestNewPosition:
                 this.assertUserIsInitialized();
                 this.assertUserHasWallet();
-                return await this.handleOpenPositionsRequest(jsonRequestBody);
+                response = await this.handleOpenPositionsRequest(jsonRequestBody);
+                break;
+            case UserDOFetchMethod.getPosition:
+                this.assertUserIsInitialized();
+                this.assertUserHasWallet();
+                response = await this.getPosition(jsonRequestBody);
+                break;
             case UserDOFetchMethod.manuallyClosePosition:
                 this.assertUserIsInitialized();
                 this.assertUserHasWallet();
-                return await this.handleManuallyClosePositionRequest(jsonRequestBody);
+                response = await this.handleManuallyClosePositionRequest(jsonRequestBody);
+                break;
             case UserDOFetchMethod.notifyPositionFillSuccess:
                 this.assertUserIsInitialized();
                 this.assertUserHasWallet();
-                return await this.handleNotifyPositionFilledSuccess(jsonRequestBody);
+                response = await this.handleNotifyPositionFilledSuccess(jsonRequestBody);
+                break;
             case UserDOFetchMethod.notifyPositionFillFailure:
                 this.assertUserIsInitialized();
                 this.assertUserHasWallet();
-                return await this.handleNotifyPositionFilledFailure(jsonRequestBody);
+                response = await this.handleNotifyPositionFilledFailure(jsonRequestBody);
+                break;
             case UserDOFetchMethod.notifyPositionAutoClosed:
                 this.assertUserIsInitialized();
                 this.assertUserHasWallet();
-                return await this.handleNotifyPositionAutoClosed(jsonRequestBody);
+                response = await this.handleNotifyPositionAutoClosed(jsonRequestBody);
+                break;
             case UserDOFetchMethod.notifyPositionsAutoClosed:
                 this.assertUserIsInitialized();
                 this.assertUserHasWallet();
-                return await this.handleNotifyPositionsAutoClosed(jsonRequestBody);
+                response = await this.handleNotifyPositionsAutoClosed(jsonRequestBody);
+                break;
             default:
-                throw new Error(`Unrecognized method for UserDO: ${method}`);
+                response = makeFailureResponse('Unknown method: ${method.toString()}');
         }
+
+        return [method,jsonRequestBody,response];
+    }
+
+    /* Handles any exceptions and turns them into failure responses - fine because UserDO doesn't talk directly to TG */
+    async catchResponse(promise : Promise<Response>) : Promise<Response> {
+        return promise.catch((reason) => {
+            return makeFailureResponse(reason.toString());
+        });
+    }
+
+    async getPosition(getPositionRequest: GetPositionRequest) {
+        const position = this.positionTracker.getPosition(getPositionRequest.positionID);
+        return makeJSONResponse(position);
     }
 
     async handleNotifyPositionFilledSuccess(position : Position) : Promise<Response> {
@@ -212,7 +248,7 @@ export class UserDO {
         })
     }
 
-    handleGet(jsonRequestBody : GetUserDataRequest) : Response {
+    async handleGet(jsonRequestBody : GetUserDataRequest) : Promise<Response> {
         const messageID = jsonRequestBody.messageID;
         return makeJSONResponse(this.makeUserData(messageID));
     }
@@ -251,30 +287,35 @@ export class UserDO {
     }
 
     async handleInitialize(userInitializeRequest : UserInitializeRequest) : Promise<Response> {
+        if (this.initialized()) {
+            return makeSuccessResponse("User already initialized");
+        }
         this.telegramUserID = userInitializeRequest.telegramUserID;
         this.telegramUserName = userInitializeRequest.telegramUserName;
         return await this.state.storage.put({ 
             "telegramUserID": this.telegramUserID, 
             "telegramUserName": this.telegramUserName 
         }).then(() => {
-            this.initialized = true;
             return makeSuccessResponse();
         });
     }
 
     async handleGenerateWallet() : Promise<Response> {
-        // TODO: base 54 or whatever instead of pem
-        const { publicKey, privateKey } = crypto.generateKeyPairSync('ed25519');
-        const pubKey = publicKey.export({ type: 'spki', format: 'pem' }).toString('hex');
-        const priKey = privateKey.export({ type: 'pkcs8', format: 'pem' }).toString('hex');
-        this.wallet = {
-            publicKey: pubKey,
-            privateKey: priKey
-        };
-        return await this.state.storage.put("wallet",this.wallet).then(() => {
-            return makeSuccessResponse();
-        });
+        if (!this.wallet) {
+            const { publicKey, privateKey } = await generateEd25519Keypair();
+            this.wallet = {
+                publicKey: publicKey,
+                privateKey: privateKey
+            };
+            return await this.state.storage.put("wallet",this.wallet).then(() => {
+                return makeSuccessResponse();
+            }).catch(() => {
+                return makeFailureResponse("Could not persist wallet");
+            });
+        }
+        return makeSuccessResponse('Wallet already exists');
     }
+
 
     async handleOpenPositionsRequest(newPositionRequest : LongTrailingStopLossPositionRequest) : Promise<Response> {
         const tokenPairPositionTrackerDO = this.getTokenPairPositionTrackerDO(newPositionRequest.tokenAddress, newPositionRequest.vsTokenAddress) as DurableObjectStub;
@@ -332,11 +373,8 @@ export class UserDO {
     }
 
     async validateRequest(request : Request) : Promise<[UserDOFetchMethod,any]> {
-        const jsonBody : any = await request.json();
-        const methodName = new URL(request.url).pathname;
-        if (jsonBody.durableObjectID !== this.durableObjectID) {
-            throw new Error("Mismatched durableObjectID on ${method}");
-        }
+        const jsonBody : any = await this.maybeGetJson(request);
+        const methodName = new URL(request.url).pathname.substring(1);
         const method : UserDOFetchMethod = UserDOFetchMethod[methodName as keyof typeof UserDOFetchMethod];
         if (method == null) {
             throw new Error(`Unknown method ${method}`);
@@ -344,14 +382,23 @@ export class UserDO {
         return [method,jsonBody];
     }
 
+    async maybeGetJson(request : Request) {
+        try {
+            return await request.json();
+        }
+        catch {
+            return {};
+        }
+    }
+
     assertUserIsNotInitialized() {
-        if (this.initialized) {
+        if (this.initialized()) {
             throw new Error("User is already initialized");
         }
     }
 
     assertUserIsInitialized() {
-        if (!this.initialized) {
+        if (!this.initialized()) {
             throw new Error("User is not initialized");
         }
     }
@@ -377,7 +424,8 @@ export class UserDO {
         return {
             durableObjectID: this.durableObjectID,
             hasWallet: !!(this.wallet),
-            initialized: this.initialized,
+            initialized: this.initialized(),
+            telegramUserName : this.telegramUserName||undefined,
             session: session,
             positions: positionDisplayInfos
         };

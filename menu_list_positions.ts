@@ -16,10 +16,10 @@ export class MenuListPositions extends Menu<undefined> implements MenuCapabiliti
         return options;
     }
     parseMode(): "HTML" | "MarkdownV2" {
-        throw new Error("Method not implemented.");
+        return 'HTML';
     }
     forceResponse(): boolean {
-        throw new Error("Method not implemented.");
+        return true;
     }
     
 }

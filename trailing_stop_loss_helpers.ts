@@ -1,9 +1,9 @@
 import {  LongTrailingStopLossPositionRequest } from "./common";
 
 export function renderTrailingStopLossRequestMarkdown(trailingStopLossRequest : LongTrailingStopLossPositionRequest) {
-    return `**Token**: ${trailingStopLossRequest.token}
-        **Buying With**: ${trailingStopLossRequest.vsToken}
-        **Quantity**: ${trailingStopLossRequest.vsTokenAmt} ${trailingStopLossRequest.vsToken}
-        **Auto-Sell Trigger Percent**: ${trailingStopLossRequest.triggerPercent}
-        *Edit these settings using the menu below.*`
+    return `<b>Token</b>: ${trailingStopLossRequest.token}
+        <b>Buying With</b>: ${trailingStopLossRequest.vsToken}
+        <b>Quantity</b>: ${trailingStopLossRequest.vsTokenAmt} ${trailingStopLossRequest.vsToken}
+        <b>Auto-Sell Trigger Percent</b>: ${trailingStopLossRequest.triggerPercent}
+        <i>Edit these settings using the menu below.</i>`
 }

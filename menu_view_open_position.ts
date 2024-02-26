@@ -3,8 +3,8 @@ import { Menu, MenuCapabilities } from "./menu";
 
 export class MenuViewOpenPosition extends Menu<Position> implements MenuCapabilities {
     renderText(): string {
-        const line1 = `**${this.miscData!!.type.toString()}** *${this.miscData!!.token}* position (${this.miscData!!.tokenAmt.toString()})`
-        const line2 = `Current Value in ${this.miscData!!.vsToken}: **${this.miscData!!.vsTokenValue.toString()}** ${this.miscData!!.vsToken}`
+        const line1 = `<b>${this.miscData!!.type.toString()}</b> <i>${this.miscData!!.token}</i> position (${this.miscData!!.tokenAmt.toString()})`
+        const line2 = `Current Value in ${this.miscData!!.vsToken}: <b>${this.miscData!!.vsTokenValue.toString()}</b> ${this.miscData!!.vsToken}`
         return [line1,line2].join("\r\n");
     }
     renderOptions(): CallbackButton[][] {
@@ -21,7 +21,7 @@ export class MenuViewOpenPosition extends Menu<Position> implements MenuCapabili
         return options;
     }
     parseMode(): "HTML" | "MarkdownV2" {
-        return 'MarkdownV2';
+        return 'HTML';
     }
     forceResponse(): boolean {
         return true;

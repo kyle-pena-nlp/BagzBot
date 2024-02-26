@@ -14,7 +14,7 @@ export class MenuTrailingStopLossEntryBuyQuantity extends Menu<QuantityAndToken>
         return options;
     }
     parseMode(): "HTML" | "MarkdownV2" {
-        return 'MarkdownV2';
+        return 'HTML';
     }
     forceResponse(): boolean {
         return true;

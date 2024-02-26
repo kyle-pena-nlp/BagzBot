@@ -3,11 +3,11 @@ import { Menu, MenuCapabilities } from "./menu";
 
 export class MenuViewWallet extends Menu<WalletData> implements MenuCapabilities {
     renderText(): string {
-        const line1 = `**Your Wallet Financials**`;
-        const line2 = `*USDC Purchasing Power*: ${this.miscData!!.purchasingPowerUSDC.toString()}`;
-        const line3 = `*SOL Purchasing Power*: ${this.miscData!!.purchasingPowerSOL.toString()}`;
-        const line4 = `*USDC Value*: ${this.miscData!!.usdcValue.toString()}`;
-        const line5 = `*SOL Value*: ${this.miscData!!.solValue.toString()}`;
+        const line1 = `<b>Your Wallet Financials</b>`;
+        const line2 = `<i>USDC Purchasing Power</i>: ${this.miscData!!.purchasingPowerUSDC.toString()}`;
+        const line3 = `<i>SOL Purchasing Power</i>: ${this.miscData!!.purchasingPowerSOL.toString()}`;
+        const line4 = `<i>USDC Value</i>: ${this.miscData!!.usdcValue.toString()}`;
+        const line5 = `<i>SOL Value</i>: ${this.miscData!!.solValue.toString()}`;
         return [line1,line2,line3,line4,line5].join("\r\n");
     }
     renderOptions(): CallbackButton[][] {
@@ -16,7 +16,7 @@ export class MenuViewWallet extends Menu<WalletData> implements MenuCapabilities
         return options;
     }
     parseMode(): "HTML" | "MarkdownV2" {
-        return 'MarkdownV2';
+        return 'HTML';
     }
     forceResponse(): boolean {
         return true;

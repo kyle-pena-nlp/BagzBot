@@ -12,7 +12,7 @@ export class MenuTrailingStopLossPickVsToken extends Menu<TokenNameAndAddress> i
         return options;
     }
     parseMode(): "HTML" | "MarkdownV2" {
-        return 'MarkdownV2';
+        return 'HTML';
     }
     forceResponse(): boolean {
         return true;

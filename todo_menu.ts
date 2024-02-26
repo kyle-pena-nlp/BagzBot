@@ -11,7 +11,7 @@ export class MenuTODO extends Menu<undefined> implements MenuCapabilities {
         return options;
     }
     parseMode(): "HTML" | "MarkdownV2" {
-        return 'MarkdownV2';
+        return 'HTML';
     }
     forceResponse(): boolean {
         return true;

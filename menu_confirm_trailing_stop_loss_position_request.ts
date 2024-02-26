@@ -5,7 +5,7 @@ import { renderTrailingStopLossRequestMarkdown } from "./trailing_stop_loss_help
 export class MenuConfirmTrailingStopLossPositionRequest extends Menu<LongTrailingStopLossPositionRequest> implements MenuCapabilities {
     renderText(): string {
         return [ 
-            "# Confirm Your Auto-Sell Position Request",
+            "<b>Confirm Your Auto-Sell Position Request</b>",
             renderTrailingStopLossRequestMarkdown(this.miscData!!) 
         ].join("\r\n");
     }
@@ -16,7 +16,7 @@ export class MenuConfirmTrailingStopLossPositionRequest extends Menu<LongTrailin
         return options;
     }
     parseMode(): "HTML" | "MarkdownV2" {
-        return 'MarkdownV2';
+        return 'HTML';
     }
     forceResponse(): boolean {
         return true;

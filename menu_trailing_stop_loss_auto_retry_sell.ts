@@ -3,7 +3,7 @@ import { Menu, MenuCapabilities } from "./menu";
 
 export class MenuTrailingStopLossAutoRetrySell extends Menu<undefined> implements MenuCapabilities {
     renderText(): string {
-        throw new Error("Method not implemented.");
+        return "Should we retry selling the position if only part of the sell was executed due to slippage tolerance exceeded?"
     }
     renderOptions(): CallbackButton[][] {
         const options = this.emptyMenu();
@@ -12,7 +12,7 @@ export class MenuTrailingStopLossAutoRetrySell extends Menu<undefined> implement
         return options;
     }
     parseMode(): "HTML" | "MarkdownV2" {
-        return 'MarkdownV2';
+        return 'HTML';
     }
     forceResponse(): boolean {
         return true;

@@ -246,11 +246,12 @@ export interface TelegramWebhookInfo {
 	messageType : 'callback'|'message'|'command'|null
 	command: string|null
 	callbackData : CallbackData|null
+	text : string|null
 };
 
 export interface CallbackButton {
 	text: string,
-	data : string
+	callback_data : string
 };
 
 export class CallbackData {
@@ -261,7 +262,7 @@ export class CallbackData {
 		this.menuArg = menuArg;		
 	}
 	static parse(callbackDataString : string) : CallbackData {
-		const tokens = callbackDataString.split(":");
+		const tokens = callbackDataString.split(":").filter(x => !!x);
         if (tokens.length == 1) {
             return new CallbackData(MenuCode[tokens[0] as keyof typeof MenuCode], undefined);
         }
@@ -354,6 +355,7 @@ export enum UserDOFetchMethod {
 	deleteSession = "deleteSession",
 	generateWallet = "generateWallet",
 	requestNewPosition = "requestNewPosition",
+	getPosition = "getPosition",
 	manuallyClosePosition = "manuallyClosePosition",
 	notifyPositionFillSuccess = "notifyPositionFillSuccess",
 	notifyPositionFillFailure = "notifyPositionFillFailure",
@@ -363,8 +365,8 @@ export enum UserDOFetchMethod {
 
 export function makeUserDOFetchRequest<T>(method : UserDOFetchMethod, body?: T, httpMethod? : 'GET'|'POST') : Request {
 	const url = `http://userDO/${method.toString()}`
-	if (body == null) {
-		return makeJSONRequest(url, body, httpMethod);
+	if (body != null) {
+		return makeJSONRequest(url, body);
 	}
 	else {
 		return makeRequest(url, httpMethod);
@@ -382,7 +384,7 @@ export enum TokenPairPositionTrackerDOFetchMethod {
 export function makeTokenPairPositionTrackerDOFetchRequest<T>(method : TokenPairPositionTrackerDOFetchMethod, body?: T, httpMethod? : 'GET'|'POST') : Request {
 	const url = `http://tokenPairPositionTrackerDO/${method.toString()}`
 	if (body == null) {
-		return makeJSONRequest(url, body, httpMethod);
+		return makeJSONRequest(url, body);
 	}
 	else {
 		return makeRequest(url, httpMethod);
@@ -396,7 +398,7 @@ export enum PolledTokenPairListDOFetchMethod {
 export function makePolledTokenPairListDOFetchRequest<T>(method : PolledTokenPairListDOFetchMethod, body?: T, httpMethod? : 'GET'|'POST') : Request {
 	const url = `http://polledTokenPairListDO/${method.toString()}`
 	if (body == null) {
-		return makeJSONRequest(url, body, httpMethod);
+		return makeJSONRequest(url, body);
 	}
 	else {
 		return makeRequest(url, httpMethod);

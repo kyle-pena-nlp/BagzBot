@@ -4,7 +4,7 @@ import { Menu, MenuCapabilities } from "./menu";
 export class MenuOpenPosition extends Menu<undefined> implements MenuCapabilities {
     renderText(): string {
         const tokenName = this.userData.session["tokenName"];
-        return `Buy ${tokenName}`;
+        return `Buy <b>${tokenName}</b>`;
     }
     renderOptions(): CallbackButton[][] {
         const options = this.emptyMenu();
@@ -15,10 +15,10 @@ export class MenuOpenPosition extends Menu<undefined> implements MenuCapabilitie
         return options;
     }
     parseMode(): "HTML" | "MarkdownV2" {
-        throw new Error("Method not implemented.");
+        return 'HTML';
     }
     forceResponse(): boolean {
-        throw new Error("Method not implemented.");
+        return true;
     }
     
 }
