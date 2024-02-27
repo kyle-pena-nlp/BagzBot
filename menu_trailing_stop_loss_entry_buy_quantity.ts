@@ -1,5 +1,6 @@
-import { CallbackButton, CallbackData, MenuCode, QuantityAndToken } from "./common";
-import { Menu, MenuCapabilities } from "./menu";
+import { CallbackData } from "./callback_data";
+import { QuantityAndToken } from "./common";
+import { Menu, MenuCapabilities, CallbackButton, MenuCode } from "./menu";
 
 export class MenuTrailingStopLossEntryBuyQuantity extends Menu<QuantityAndToken> implements MenuCapabilities {
     renderText(): string {

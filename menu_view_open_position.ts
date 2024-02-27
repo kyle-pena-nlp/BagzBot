@@ -1,5 +1,6 @@
-import { CallbackButton, CallbackData, MenuCode, Position } from "./common";
-import { Menu, MenuCapabilities } from "./menu";
+import { CallbackData } from "./callback_data";
+import { Position } from "./common";
+import { CallbackButton, Menu, MenuCapabilities, MenuCode } from "./menu";
 
 export class MenuViewOpenPosition extends Menu<Position> implements MenuCapabilities {
     renderText(): string {

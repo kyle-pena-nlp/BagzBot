@@ -1,3 +1,12 @@
+export async function maybeGetJson<T>(x : Request|Response) : Promise<T|null> {
+    try {
+        return await x.json();
+    }
+    catch {
+        return null;
+    }
+}
+
 export function makeJSONRequest<T>(url : string, body : T) : Request {
     const json = JSON.stringify(body);
     const request = new Request(url, {

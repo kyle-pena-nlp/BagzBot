@@ -1,5 +1,3 @@
-import { makeJSONRequest, makeRequest } from "./http_helpers"
-
 export enum ERRORS {
  	UNHANDLED_EXCEPTION = 500,
 	MISMATCHED_SECRET_TOKEN = 1000,
@@ -105,8 +103,6 @@ export interface Wallet {
 	privateKey : string
 }
 
-export const COMMANDS = ["/start", "/help", "/menu"];
-
 export class Result<T> {
 
 	success: boolean
@@ -169,7 +165,7 @@ export interface SessionValuesResponse {
 	sessionValues : Record<string,boolean|number|string|null>
 }
 
-export interface EvictSessionRequest {
+export interface DeleteSessionRequest {
 	messageID : number
 };
 
@@ -238,101 +234,6 @@ export interface TokenNameAndAddress {
 	tokenAddress : string
 };
 
-export interface TelegramWebhookInfo {
-	telegramUserID : number
-	telegramUserName : string
-	chatID : number /* The Telegram chat ID */
-	messageID : number /* The telegram message ID */
-	messageType : 'callback'|'message'|'command'|null
-	command: string|null
-	callbackData : CallbackData|null
-	text : string|null
-};
-
-export interface CallbackButton {
-	text: string,
-	callback_data : string
-};
-
-export class CallbackData {
-	menuCode : MenuCode
-	menuArg? : string
-	constructor(menuCode : MenuCode, menuArg ?: string) {
-		this.menuCode = menuCode;
-		this.menuArg = menuArg;		
-	}
-	static parse(callbackDataString : string) : CallbackData {
-		const tokens = callbackDataString.split(":").filter(x => !!x);
-        if (tokens.length == 1) {
-            return new CallbackData(MenuCode[tokens[0] as keyof typeof MenuCode], undefined);
-        }
-        else {
-            return new CallbackData(MenuCode[tokens[0] as keyof typeof MenuCode], tokens[1]);
-        }
-	}
-	toString() : string {
-		return [this.menuCode, this.menuArg||''].join(":");
-	}
-};
-
-export enum MenuDisplayMode {
-	UpdateMenu,
-	NewMenu
-};
-
-export interface MenuSpec {
-	text: string,
-	options : Array<Array<CallbackButton>>
-	parseMode : 'HTML'|'MarkdownV2'
-	mode : MenuDisplayMode
-	forceReply : boolean
-};
-
-export enum MenuCode {
-	Main = "Main",
-	CreateWallet = "CreateWallet",
-	Wallet = "Wallet",
-	ListPositions = "ListPositions",
-	Invite = "Invite",
-	FAQ = "FAQ",
-	Help = "Help",
-	Error = "Error",
-	
-	PleaseEnterToken = "PleaseEnterToken",
-	TransferFunds = "TransferFunds",
-	RefreshWallet = "RefreshWallet",
-	ExportWallet = "ExportWallet",
-	ViewOpenPosition = "ViewOpenPosition",
-	ClosePositionManuallyAction = "ClosePositionManuallyAction",
-
-	// Trailing Stop Loss: set buy quantity in vsToken units
-	TrailingStopLossEntryBuyQuantityMenu = "TrailingStopLossEntryBuyQuantityMenu",
-	TrailingStopLossEnterBuyQuantityKeypad = "TrailingStopLossEnterBuyQuantityKeypad",
-	TrailingStopLossEnterBuyQuantitySubmit = "TrailingStopLossEnterBuyQuantitySubmit",
-
-	// Trailing Stop Loss: set vsToken UI
-	TrailingStopLossPickVsTokenMenu = "TrailingStopLossPickVsToken",
-	TrailingStopLossPickVsTokenMenuSubmit = "TrailingStopLossPickVsTokenMenuSubmit",
-	
-	// Trailing Stop Loss: set slippage tolerance UI
-	TrailingStopLossSlippageToleranceMenu = "TrailingStopLossSlippageToleranceMenu",
-	TrailingStopLossCustomSlippageToleranceKeypad = "TrailingStopLossCustomSlippageToleranceKeypad",
-	TrailingStopLossCustomSlippageToleranceKeypadSubmit = "TrailingStopLossCustomSlippageToleranceKeypad",
-
-	// Trailing Stop Loss: set trigger percent UI
-	TrailingStopLossTriggerPercentMenu = "TrailingStopLossTriggerPercentMenu",
-	TrailingStopLossCustomTriggerPercentCustomKeypad = "TrailingStopLossCustomTriggerPercentCustomKeypad", 
-	TrailingStopLossCustomTriggerPercentCustomKeypadSubmit = "TrailingStopLossCustomTriggerPercentCustomKeypadSubmit", 
-
-	// Trailing Stop Loss: auto-retry sell if slippage tolerance exceeded?
-	TrailingStopLossChooseAutoRetrySellMenu = "TrailingStopLossChooseAutoRetrySellMenu",
-	TrailingStopLossChooseAutoRetrySellSubmit = "TrailingStopLossChooseAutoRetrySellSubmit",
-
-	
-	TrailingStopLossConfirmMenu = "TrailingStopLossConfirmMenu",
-	TrailingStopLossEditorFinalSubmit = "TrailingStopLossEditorFinalSubmit",
-};
-
 export enum SessionKey {
 	PositionID = "positionID",
 	Token = "token",
@@ -341,66 +242,9 @@ export enum SessionKey {
 	VsTokenAddress = "vsTokenAddress",
 	VsTokenAmt = "vsTokenAmt",
 	PositionType = "positionType",
-	TrailingStopLossSlippageTolerance = "trailingStopLossSlippageTolerance",
+	TrailingStopLossSlippagePct = "trailingStopLossSlippagePct",
 	TrailingStopLossTriggerPercent = "trailingStopLossTriggerPercent",	
 	TrailingStopLossRetrySellIfPartialFill = "trailingStopLossRetrySellIfPartialFill",
-	TrailingStopLossRetrySellIfSlippageToleranceExceeded = "trailingStopLossRetrySellIfSlippageToleranceExceeded"
+	TrailingStopLossRetrySellIfSlippagePctExceeded = "trailingStopLossRetrySellIfSlippagePctExceeded"
 }
 
-export enum UserDOFetchMethod {
-	get = "get",
-	initialize = "initialize",
-	storeSessionValues = "storeSessionValues",
-	getSessionValues = "getSessionValues",
-	deleteSession = "deleteSession",
-	generateWallet = "generateWallet",
-	requestNewPosition = "requestNewPosition",
-	getPosition = "getPosition",
-	manuallyClosePosition = "manuallyClosePosition",
-	notifyPositionFillSuccess = "notifyPositionFillSuccess",
-	notifyPositionFillFailure = "notifyPositionFillFailure",
-	notifyPositionAutoClosed = "notifyPositionAutoClosed",
-	notifyPositionsAutoClosed = "notifyPositionsAutoClosed"
-}
-
-export function makeUserDOFetchRequest<T>(method : UserDOFetchMethod, body?: T, httpMethod? : 'GET'|'POST') : Request {
-	const url = `http://userDO/${method.toString()}`
-	if (body != null) {
-		return makeJSONRequest(url, body);
-	}
-	else {
-		return makeRequest(url, httpMethod);
-	}
-}
-
-export enum TokenPairPositionTrackerDOFetchMethod {
-	initialize  = "initialize",
-	updatePrice = "updatePrice",
-	manuallyClosePosition = "manuallyClosePosition",
-	requestNewPosition = "requestNewPosition",
-	getPositions = "getPositions"
-}
-
-export function makeTokenPairPositionTrackerDOFetchRequest<T>(method : TokenPairPositionTrackerDOFetchMethod, body?: T, httpMethod? : 'GET'|'POST') : Request {
-	const url = `http://tokenPairPositionTrackerDO/${method.toString()}`
-	if (body == null) {
-		return makeJSONRequest(url, body);
-	}
-	else {
-		return makeRequest(url, httpMethod);
-	}
-}
-
-export enum PolledTokenPairListDOFetchMethod {
-	initialize = "initialize"
-}
-
-export function makePolledTokenPairListDOFetchRequest<T>(method : PolledTokenPairListDOFetchMethod, body?: T, httpMethod? : 'GET'|'POST') : Request {
-	const url = `http://polledTokenPairListDO/${method.toString()}`
-	if (body == null) {
-		return makeJSONRequest(url, body);
-	}
-	else {
-		return makeRequest(url, httpMethod);
-	}
-}

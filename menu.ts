@@ -1,12 +1,76 @@
-import { 
-    MenuSpec, 
-    TelegramWebhookInfo, 
-    Env, 
-    UserData, 
-    CallbackButton, 
-    MenuCode,
-    CallbackData, 
-    MenuDisplayMode} from "./common";
+import { CallbackData } from "./callback_data";
+import { Env, UserData } from "./common";
+
+import { makeJSONRequest } from "./http_helpers";
+import { escapeTGText, makeTelegramBotUrl  } from "./telegram_helpers";
+import { TelegramWebhookInfo } from "./telegram_webhook_info";
+
+export enum MenuDisplayMode {
+	UpdateMenu,
+	NewMenu
+};
+
+
+
+export enum MenuCode {
+	Main = "Main",
+	CreateWallet = "CreateWallet",
+	Wallet = "Wallet",
+	ListPositions = "ListPositions",
+	Invite = "Invite",
+	FAQ = "FAQ",
+	Help = "Help",
+	Error = "Error",
+	
+	PleaseEnterToken = "PleaseEnterToken",
+	TransferFunds = "TransferFunds",
+	RefreshWallet = "RefreshWallet",
+	ExportWallet = "ExportWallet",
+	ViewOpenPosition = "ViewOpenPosition",
+	ClosePositionManuallyAction = "ClosePositionManuallyAction",
+
+	// Trailing Stop Loss: set buy quantity in vsToken units
+	TrailingStopLossEntryBuyQuantityMenu = "TSL.EntryBuyQuantityMenu",
+	TrailingStopLossEnterBuyQuantityKeypad = "TSL.EnterBuyQuantityKeypad",
+	TrailingStopLossEnterBuyQuantitySubmit = "TSL.EnterBuyQuantitySubmit",
+
+	// Trailing Stop Loss: set vsToken UI
+	TrailingStopLossPickVsTokenMenu = "TSL.PickVsToken",
+	TrailingStopLossPickVsTokenMenuSubmit = "TSL.PickVsTokenMenuSubmit",
+	
+	// Trailing Stop Loss: set slippage tolerance UI
+	TrailingStopLossSlippagePctMenu = "TSL.SlippagePctMenu",
+	TrailingStopLossCustomSlippagePctKeypad = "TSL.CustomSlippagePctKeypad",
+	TrailingStopLossCustomSlippagePctKeypadSubmit = "TSL.CustomSlippagePctKeypad",
+
+	// Trailing Stop Loss: set trigger percent UI
+	TrailingStopLossTriggerPercentMenu = "TSL.TriggerPercentMenu",
+	TrailingStopLossCustomTriggerPercentKeypad = "TSL.CustomTriggerPercentKeypad", 
+	TrailingStopLossCustomTriggerPercentKeypadSubmit = "TSL.CustomTriggerPercentKeypadSubmit", 
+
+	// Trailing Stop Loss: auto-retry sell if slippage tolerance exceeded?
+	TrailingStopLossChooseAutoRetrySellMenu = "TSL.ChooseAutoRetrySellMenu",
+	TrailingStopLossChooseAutoRetrySellSubmit = "TSL.ChooseAutoRetrySellSubmit",
+
+	
+	TrailingStopLossConfirmMenu = "TSL.ConfirmMenu",
+	TrailingStopLossEditorFinalSubmit = "TSL.EditorFinalSubmit",
+
+	Close = "Close"
+};
+
+export interface MenuSpec {
+	text: string,
+	options : Array<Array<CallbackButton>>
+	parseMode : 'HTML'|'MarkdownV2'
+	mode : MenuDisplayMode
+	forceReply : boolean
+};
+
+export interface CallbackButton {
+	text: string,
+	callback_data : string
+};
 
 export interface MenuCapabilities {
     renderText() : string;
@@ -37,43 +101,21 @@ export abstract class BaseMenu {
         if (menuSpec.mode === MenuDisplayMode.UpdateMenu) {
             body.message_id = this.telegramWebhookInfo.messageID;
         }
-        const bodyJSONString = JSON.stringify(body);
-        const init = {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-            },			
-            body: bodyJSONString,
-        };
         const method = (menuSpec.mode === MenuDisplayMode.UpdateMenu) ? 'editMessageText' : 'sendMessage';
-        const url = BaseMenu.makeTelegramBotUrl(method, env);
-        return new Request(url, init);
+        const url = makeTelegramBotUrl(method, env);
+        const request = makeJSONRequest(url, body);
+        return request;
     }
 
     private static renderMenuSpec(menu : MenuCapabilities, mode: MenuDisplayMode): MenuSpec {
         const menuSpec : MenuSpec = {
-            text : BaseMenu.escape(menu.renderText(), menu.parseMode()),
+            text : escapeTGText(menu.renderText(), menu.parseMode()),
             options : menu.renderOptions(),
             parseMode : menu.parseMode(),
             mode : mode,
             forceReply : menu.forceResponse()
         };
         return menuSpec;
-    } 
-    
-	private static makeTelegramBotUrl(methodName : string, env : Env) {
-		return `${env.TELEGRAM_BOT_SERVER_URL}/bot${env.TELEGRAM_BOT_TOKEN}/${methodName}`;
-	}
-
-    private static escape(text : string, parseMode : 'MarkdownV2'|'HTML') : string {
-        if (parseMode == 'MarkdownV2') {
-            // TODO: replace with regex
-            const pattern = /\[|]|\(|\)|~|`|>|#|\+|-|=|\||{|}|\.|!/g;
-            text = text.replace(pattern, function (substring) {
-                return '\\' + substring;
-            })
-        }
-        return text;
     }
 }
 
@@ -111,6 +153,11 @@ export abstract class Menu<T> extends BaseMenu {
         const lineNumber = options.length + 1;
         this.insertButton(options, 'FAQ',  new CallbackData(MenuCode.FAQ, undefined), lineNumber);
         this.insertButton(options, 'Help', new CallbackData(MenuCode.Help, undefined), lineNumber);
+    }
+
+    protected insertCloseButtonNextLine(options : CallbackButton[][]) {
+        const lineNumber = options.length + 1;
+        this.insertButton(options, "Close", this.menuCallback(MenuCode.Close), lineNumber);
     }
 
     protected emptyMenu() : CallbackButton[][] {

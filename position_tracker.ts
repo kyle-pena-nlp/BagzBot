@@ -16,6 +16,9 @@ export class PositionTracker {
         }
     }
     async flushToStorage(storage : DurableObjectStorage) {
+        if (this.dirtyTracking.size == 0 && this.deletedKeys.size == 0) {
+            return;
+        }
         const dumpRecord : Record<string,Position> = {};
         for (const key of this.dirtyTracking) {
             const value = this.positions[key];

@@ -1,5 +1,6 @@
-import { CallbackButton, CallbackData, LongTrailingStopLossPositionRequest, MenuCode } from "./common";
-import { Menu, MenuCapabilities } from "./menu";
+import { CallbackData } from "./callback_data";
+import { LongTrailingStopLossPositionRequest } from "./common";
+import { CallbackButton, Menu, MenuCapabilities, MenuCode } from "./menu";
 import { renderTrailingStopLossRequestMarkdown } from "./trailing_stop_loss_helpers";
 
 export class MenuConfirmTrailingStopLossPositionRequest extends Menu<LongTrailingStopLossPositionRequest> implements MenuCapabilities {

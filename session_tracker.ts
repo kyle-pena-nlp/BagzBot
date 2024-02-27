@@ -37,17 +37,22 @@ export class SessionTracker {
         }
     }
     async flushToStorage(storage : DurableObjectStorage) {
-        const dumpRecord : Record<string,string[]|boolean|number|string|null> = {};
+
+        if (this.deletedKeys.size == 0 && this.dirtyTracking.size == 0) {
+            return;
+        }
+        
+        const putEntries : Record<string,string[]|boolean|number|string|null> = {};
         for (const record of [this.sessionIDs, this.sessionKeys, this.sessionValues]) {
             for (const key of Object.keys(record)) {
                 if (this.dirtyTracking.has(key)) {
                     const value = record[key];
-                    dumpRecord[key] = value;
+                    putEntries[key] = value;
                 }
             }
         }
 
-        const putPromise = storage.put(dumpRecord);
+        const putPromise = storage.put(putEntries);
         const deletePromise = storage.delete([...this.deletedKeys]);
         await Promise.all([putPromise,deletePromise]).then(() => {
             this.deletedKeys.clear();
@@ -99,7 +104,6 @@ export class SessionTracker {
         return session;
     }
     deleteSession(messageID : number) {
-
         const messageIDKey = new MessageIDKey(messageID);
         if (!(messageIDKey.toString() in this.sessionIDs)) {
             return;

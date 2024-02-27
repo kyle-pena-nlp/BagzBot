@@ -1,5 +1,6 @@
-import { CallbackButton, CallbackData, MenuCode, TokenNameAndAddress, VsToken } from "./common";
-import { Menu, MenuCapabilities } from "./menu";
+import { CallbackData } from "./callback_data";
+import { TokenNameAndAddress, VsToken } from "./common";
+import { Menu, MenuCapabilities, CallbackButton, MenuCode } from "./menu";
 
 export class MenuTrailingStopLossPickVsToken extends Menu<TokenNameAndAddress> implements MenuCapabilities {
     renderText(): string {

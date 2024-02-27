@@ -1,5 +1,5 @@
-import { CallbackButton, CallbackData, MenuCode } from "./common";
-import { Menu, MenuCapabilities } from "./menu";
+import { CallbackData } from "./callback_data";
+import { CallbackButton, Menu, MenuCapabilities, MenuCode } from "./menu";
 
 export class MenuTrailingStopLossAutoRetrySell extends Menu<undefined> implements MenuCapabilities {
     renderText(): string {

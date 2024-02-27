@@ -1,5 +1,4 @@
-import { CallbackButton } from "./common";
-import { Menu, MenuCapabilities } from "./menu";
+import { Menu, MenuCapabilities, CallbackButton } from "./menu";
 
 export class MenuPleaseEnterToken extends Menu<undefined> implements MenuCapabilities {
     renderText(): string {

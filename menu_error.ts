@@ -1,5 +1,4 @@
-import { CallbackButton } from "./common";
-import { Menu, MenuCapabilities } from "./menu";
+import { CallbackButton, Menu, MenuCapabilities } from "./menu";
 
 export class MenuError extends Menu<undefined> implements MenuCapabilities {
     renderText(): string {

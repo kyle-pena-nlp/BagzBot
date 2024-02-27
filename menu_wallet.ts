@@ -1,5 +1,5 @@
-import { Menu, MenuCapabilities } from "./menu";
-import { MenuCode, CallbackButton, MenuSpec, MenuDisplayMode, WalletData } from "./common";
+import { CallbackButton, Menu, MenuCapabilities, MenuCode } from "./menu";
+import { WalletData } from "./common";
 
 export class MenuWallet extends Menu<WalletData> implements MenuCapabilities {
     renderText(): string {

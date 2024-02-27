@@ -2,10 +2,9 @@ import { DurableObjectState } from "@cloudflare/workers-types";
 import { 
     Wallet, 
     UserInitializeRequest, 
-    ClosePositionsRequest,
     UserData,
     GetUserDataRequest, 
-    EvictSessionRequest,
+    DeleteSessionRequest,
     Position,
     PositionDisplayInfo,
     StoreSessionValuesRequest,
@@ -14,9 +13,6 @@ import {
     Env,
     GetSessionValuesRequest,
     SessionValuesResponse,
-    UserDOFetchMethod,
-    makeTokenPairPositionTrackerDOFetchRequest,
-    TokenPairPositionTrackerDOFetchMethod,
     TokenPairPositionTrackerInitializeRequest,
     ManuallyClosePositionRequest,
     NotifyPositionsAutoClosedRequest,
@@ -27,10 +23,12 @@ import {
     GetPositionRequest} from "./common";
 
 
-import { makeSuccessResponse, makeJSONResponse, makeFailureResponse } from "./http_helpers";
+import { makeSuccessResponse, makeJSONResponse, makeFailureResponse, maybeGetJson } from "./http_helpers";
 import { SessionTracker } from "./session_tracker";
 import { PositionTracker } from "./position_tracker";
 import { generateEd25519Keypair } from "./cryptography";
+import { UserDOFetchMethod } from "./userDO_interop";
+import { TokenPairPositionTrackerDOFetchMethod, makeTokenPairPositionTrackerDOFetchRequest } from "./token_pair_position_tracker_DO_interop";
 
 /* Durable Object storing state of user */
 export class UserDO {
@@ -253,7 +251,7 @@ export class UserDO {
         return makeJSONResponse(this.makeUserData(messageID));
     }
 
-    async handleDeleteSession(jsonRequestBody : EvictSessionRequest) : Promise<Response> {
+    async handleDeleteSession(jsonRequestBody : DeleteSessionRequest) : Promise<Response> {
         const messageID = jsonRequestBody.messageID;
         this.sessionTracker.deleteSession(messageID);
         return await this.sessionTracker.flushToStorage(this.state.storage).then(() => {
@@ -373,22 +371,13 @@ export class UserDO {
     }
 
     async validateRequest(request : Request) : Promise<[UserDOFetchMethod,any]> {
-        const jsonBody : any = await this.maybeGetJson(request);
+        const jsonBody : any = await maybeGetJson(request);
         const methodName = new URL(request.url).pathname.substring(1);
         const method : UserDOFetchMethod = UserDOFetchMethod[methodName as keyof typeof UserDOFetchMethod];
         if (method == null) {
             throw new Error(`Unknown method ${method}`);
         }
         return [method,jsonBody];
-    }
-
-    async maybeGetJson(request : Request) {
-        try {
-            return await request.json();
-        }
-        catch {
-            return {};
-        }
     }
 
     assertUserIsNotInitialized() {

@@ -8,9 +8,9 @@ import {
     PriceUpdate, 
     PositionType,
     LongTrailingStopLossPosition, 
-    TokenPairPositionTrackerDOFetchMethod,
     TokenPairPositionTrackerInitializeRequest} from "./common";
 import { makeJSONRequest } from "./http_helpers";
+import { TokenPairPositionTrackerDOFetchMethod } from "./token_pair_position_tracker_DO_interop";
 
 
 

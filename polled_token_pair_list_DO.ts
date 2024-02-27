@@ -1,6 +1,10 @@
 import { DurableObjectState } from "@cloudflare/workers-types";
+import { PolledTokenPairListDOFetchMethod, ValidateTokenRequest, ValidateTokenResponse } from "./polled_token_pair_list_DO_interop";
+import { makeFailureResponse, makeJSONResponse, makeSuccessResponse, maybeGetJson } from "./http_helpers";
+import { Env } from "./common";
+import { TokenInfo, TokenTracker } from "./token_tracker";
+import { PolledTokenPairTracker } from "./polled_token_pair_tracker";
 
-type TokenPair = [string,string];
 type TokensByVsToken = Map<string,string[]>;
 interface PriceAPIRequestSpec {
     vsToken : string
@@ -14,19 +18,125 @@ export class PolledTokenPairListDO {
     */
 
     state: DurableObjectState
-    polledTokenPairList : TokenPair[]
-    durableObjectStubs : any[]
-    jupiter_price_api_url : string
+    env : Env
+    polledTokenPairTracker : PolledTokenPairTracker
+    tokenTracker : TokenTracker
 
-    constructor(state : DurableObjectState, env : any) {
+    constructor(state : DurableObjectState, env : Env) {
         this.state = state;
-        this.polledTokenPairList = [];
-        this.durableObjectStubs  = [];
-        this.jupiter_price_api_url = env.JUPITER_PRICE_API_URL;
+        this.env = env;
+        this.polledTokenPairTracker = new PolledTokenPairTracker();
+        this.tokenTracker = new TokenTracker();
+        this.state.blockConcurrencyWhile(async () => {
+            await this.initializeFromStorage(this.state.storage);
+        })
+    }
+
+    async initializeFromStorage(storage : DurableObjectStorage) {
+        const storageEntries = await storage.list();
+        this.polledTokenPairTracker.initialize(storageEntries);
+        this.tokenTracker.initialize(storageEntries);        
     }
 
     async fetch(request : Request) : Promise<Response> {
-        return new Response("Hello World");
+        const [method,jsonRequestBody] = await this.validateRequest(request);
+        switch(method) {
+            case PolledTokenPairListDOFetchMethod.initialize:
+                return makeSuccessResponse();
+            case PolledTokenPairListDOFetchMethod.validateToken:
+                const validateTokenResponse = await this.handleValidateToken(jsonRequestBody);
+                return makeJSONResponse(validateTokenResponse);
+            default:
+                return makeFailureResponse("Unknown method.");
+        }
+    }
+
+    async handleValidateToken(request: ValidateTokenRequest) : Promise<ValidateTokenResponse> {
+        
+        const tokenAddress = request.tokenAddress;
+
+        // crude check to filter out obviously not token addresses entered by the user
+        if (!this.looksLikeATokenAddress(tokenAddress)) {
+            return {
+                type: 'invalid'
+            };
+        }
+
+        // if the token is already in the tracker, respond with the token info
+        const tokenInfo = this.tokenTracker.get(tokenAddress);
+        if (tokenInfo) {
+            return {
+                type : 'valid',
+                token: tokenInfo.token,
+                tokenAddress: tokenInfo.tokenAddress,
+                logoURI : tokenInfo.logoURI
+            };
+        }
+
+        // If the token isn't in the tracker, re-fetch all tokens list from jupiter.  
+        const allTokens = await this.getAllTokensFromJupiter();
+        if (!allTokens) {
+            return {
+                type: 'tryagain'
+            };
+        }
+        if (tokenAddress in allTokens) {
+            const tokenInfo = allTokens[tokenAddress];
+            this.tokenTracker.addToken(tokenInfo);
+            this.tokenTracker.flushToStorage(this.state.storage); // fire and forget
+            return {
+                type : 'valid',
+                token: tokenInfo.token,
+                tokenAddress: tokenInfo.tokenAddress,
+                logoURI : tokenInfo.logoURI
+            };
+        }
+        else {
+            return {
+                type: 'invalid'
+            }
+        }
+    }
+
+    
+    looksLikeATokenAddress(tokenAddress : string) : boolean {
+        const length = tokenAddress.length;
+        if (length < 32 || length > 44) {
+            return false;
+        }
+        return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(tokenAddress);
+    }
+
+    // implement rate-limiting and return null if rate limited
+    async getAllTokensFromJupiter() : Promise<Record<string,TokenInfo>|null> {
+        const url = "https://token.jup.ag/all";
+        const response = await fetch(url);
+        if (!response.ok) {
+            return null;
+        }
+        else {
+            const allTokensJSON = await response.json() as any[];
+            const tokenInfos : Record<string,TokenInfo> = {};
+            for (const tokenJSON of allTokensJSON) {
+                const tokenInfo : TokenInfo = { 
+                    tokenAddress: tokenJSON.address as string,
+                    token: tokenJSON.name as string,
+                    logoURI: tokenJSON.logoURI as string
+                };
+                tokenInfos[tokenInfo.tokenAddress] = tokenInfo;
+            }
+            return tokenInfos;
+        }
+    }
+
+    async validateRequest(request : Request) {
+        const jsonBody : any = await maybeGetJson<any>(request);
+        const methodName = new URL(request.url).pathname.substring(1);
+        const method : PolledTokenPairListDOFetchMethod = PolledTokenPairListDOFetchMethod[methodName as keyof typeof PolledTokenPairListDOFetchMethod];
+        if (method == null) {
+            throw new Error(`Unknown method ${method}`);
+        }
+        return [method,jsonBody];
     }
 
     doScheduledUpdate(env : any) {
@@ -79,8 +189,7 @@ export class PolledTokenPairListDO {
 
     groupTokensByVsToken() : TokensByVsToken {
         const tokensByVsToken = new Map();
-        const batches = [];
-        for (const [token,vsToken] of this.polledTokenPairList) {
+        for (const [token,vsToken] of this.polledTokenPairTracker.list()) {
             if (!tokensByVsToken.has(vsToken)) {
                 tokensByVsToken.set(vsToken, []);
             }
@@ -91,7 +200,7 @@ export class PolledTokenPairListDO {
     }
 
     toPriceAPIRequests(tokensByVsToken : Map<string,string[]>) {
-        const baseUrl = this.jupiter_price_api_url;        
+        const baseUrl = this.env.JUPITER_PRICE_API_URL;        
         const priceAPIUrls : PriceAPIRequestSpec[] = [];
         for (const [vsToken,tokens] of tokensByVsToken) {
             const tokenBatches = this.divideIntoBatches(tokens, 99); // jupiter API accepts up to 100 at a time - 99 just to be safe.

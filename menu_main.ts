@@ -1,5 +1,4 @@
-import { Menu, MenuCapabilities } from "./menu";
-import { MenuCode, CallbackButton, MenuSpec, MenuDisplayMode } from "./common";
+import { CallbackButton, Menu, MenuCapabilities, MenuCode } from "./menu";
 
 export class MenuMain extends Menu<boolean> implements MenuCapabilities {
     renderText(): string {
@@ -17,6 +16,7 @@ export class MenuMain extends Menu<boolean> implements MenuCapabilities {
             this.insertButtonNextLine(options, 'Create Your Personal Wallet', this.menuCallback(MenuCode.CreateWallet));
             this.createOptionsFAQHelpMenuLine(options);
         }
+        this.insertCloseButtonNextLine(options);
         return options;
     }
     parseMode(): "MarkdownV2" | "HTML" {

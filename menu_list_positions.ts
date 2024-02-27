@@ -1,5 +1,5 @@
-import { CallbackButton, CallbackData, MenuCode, PositionDisplayInfo } from "./common";
-import { Menu, MenuCapabilities } from "./menu";
+import { CallbackData } from "./callback_data";
+import { CallbackButton, Menu, MenuCapabilities, MenuCode } from "./menu";
 
 export class MenuListPositions extends Menu<undefined> implements MenuCapabilities {
     renderText(): string {
