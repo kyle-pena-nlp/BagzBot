@@ -62,6 +62,14 @@ export class PolledTokenPairListDO {
             };
         }
 
+        // TODO: retry of existence check under certain circumstances (which circumstances?)
+        // if the token is already known to not exist, return invalid
+        if (this.tokenTracker.isNonExistent(tokenAddress)) {
+            return {
+                type: 'invalid'
+            }
+        }
+
         // if the token is already in the tracker, respond with the token info
         const tokenInfo = this.tokenTracker.get(tokenAddress);
         if (tokenInfo) {
@@ -75,11 +83,8 @@ export class PolledTokenPairListDO {
 
         // If the token isn't in the tracker, re-fetch all tokens list from jupiter.  
         const allTokens = await this.getAllTokensFromJupiter();
-        if (!allTokens) {
-            return {
-                type: 'tryagain'
-            };
-        }
+
+        // If it's in the list of returned tokens, add it to the token tracker and respond that the token is validated
         if (tokenAddress in allTokens) {
             const tokenInfo = allTokens[tokenAddress];
             this.tokenTracker.addToken(tokenInfo);
@@ -91,7 +96,9 @@ export class PolledTokenPairListDO {
                 logoURI : tokenInfo.logoURI
             };
         }
+        // otherwise, note it doesn't exist. (TODO: periodically flush non-existence list)
         else {
+            this.tokenTracker.markAsNonExistent(tokenAddress);
             return {
                 type: 'invalid'
             }
@@ -108,25 +115,20 @@ export class PolledTokenPairListDO {
     }
 
     // implement rate-limiting and return null if rate limited
-    async getAllTokensFromJupiter() : Promise<Record<string,TokenInfo>|null> {
+    async getAllTokensFromJupiter() : Promise<Record<string,TokenInfo>> {
         const url = "https://token.jup.ag/all";
         const response = await fetch(url);
-        if (!response.ok) {
-            return null;
+        const allTokensJSON = await response.json() as any[];
+        const tokenInfos : Record<string,TokenInfo> = {};
+        for (const tokenJSON of allTokensJSON) {
+            const tokenInfo : TokenInfo = { 
+                tokenAddress: tokenJSON.address as string,
+                token: tokenJSON.name as string,
+                logoURI: tokenJSON.logoURI as string
+            };
+            tokenInfos[tokenInfo.tokenAddress] = tokenInfo;
         }
-        else {
-            const allTokensJSON = await response.json() as any[];
-            const tokenInfos : Record<string,TokenInfo> = {};
-            for (const tokenJSON of allTokensJSON) {
-                const tokenInfo : TokenInfo = { 
-                    tokenAddress: tokenJSON.address as string,
-                    token: tokenJSON.name as string,
-                    logoURI: tokenJSON.logoURI as string
-                };
-                tokenInfos[tokenInfo.tokenAddress] = tokenInfo;
-            }
-            return tokenInfos;
-        }
+        return tokenInfos;   
     }
 
     async validateRequest(request : Request) {

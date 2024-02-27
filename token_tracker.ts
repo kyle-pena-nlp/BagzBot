@@ -5,11 +5,11 @@ export interface TokenInfo {
 }
 
 export class TokenTracker {
-    tokenInfos : Record<string,TokenInfo>
+    tokenInfos : Record<string,TokenInfo> = {};
+    nonExistentTokenAddresses : Record<string,Date> = {};
     dirtyTracking : Set<string> = new Set<string>();
     deletedKeys : Set<string> = new Set<string>();
     constructor() {
-        this.tokenInfos = {};
     }
     initialize(entries : Map<string,any>) {
         for (const [key,value] of entries) {
@@ -21,7 +21,9 @@ export class TokenTracker {
         }
     }
     get(tokenAddress : string) : TokenInfo|null {
-        return this.tokenInfos[new TokenAddressKey(tokenAddress).toString()]||null;
+        const tokenAddressKey = new TokenAddressKey(tokenAddress);
+        const maybeTokenInfo = this.tokenInfos[tokenAddressKey.toString()];
+        return maybeTokenInfo;
     }
     addToken(tokenInfo : TokenInfo) {
         const tokenAddressKey = new TokenAddressKey(tokenInfo.tokenAddress);
@@ -31,6 +33,7 @@ export class TokenTracker {
             this.tokenInfos[tokenAddressKey.toString()] = tokenInfo;
             this.markDirty(tokenAddressKey.toString()); 
         }
+        this.markAsExistent(tokenInfo.tokenAddress);
     }
     removeToken(tokenAddress : string) {
         delete this.tokenInfos[new TokenAddressKey(tokenAddress).toString()];
@@ -63,6 +66,18 @@ export class TokenTracker {
         return a.token === b.token && 
         a.tokenAddress === b.tokenAddress && 
         a.logoURI === b.logoURI;
+    }
+    markAsExistent(tokenAddress : string) {
+        const tokenAddressKey = new TokenAddressKey(tokenAddress);
+        delete this.nonExistentTokenAddresses[tokenAddressKey.toString()];
+    }
+    markAsNonExistent(tokenAddress : string) {
+        const tokenAddressKey = new TokenAddressKey(tokenAddress);
+        this.nonExistentTokenAddresses[tokenAddressKey.toString()] = new Date();
+    }
+    isNonExistent(tokenAddress : string) : Date|null {
+        const tokenAddressKey = new TokenAddressKey(tokenAddress);
+        return this.nonExistentTokenAddresses[tokenAddressKey.toString()]||null;
     }
 }
 

@@ -19,7 +19,7 @@ export enum PolledTokenPairListDOFetchMethod {
 
 export function makePolledTokenPairListDOFetchRequest<T>(method : PolledTokenPairListDOFetchMethod, body?: T, httpMethod? : 'GET'|'POST') : Request {
 	const url = `http://polledTokenPairListDO/${method.toString()}`
-	if (body == null) {
+	if (body != null) {
 		return makeJSONRequest(url, body);
 	}
 	else {

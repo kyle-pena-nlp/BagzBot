@@ -1,7 +1,7 @@
 
 /* Durable Objects */
 import { DurableObjectNamespace } from "@cloudflare/workers-types";
-import { makeJSONRequest, makeSuccessResponse } from "./http_helpers";
+import { makeFakeFailedRequestResponse, makeJSONRequest, makeSuccessResponse } from "./http_helpers";
 import { MenuMain } from "./menu_main";
 
 /* Wrangler requires these to be re-exported for the DO to work */
@@ -50,9 +50,10 @@ import { MenuTrailingStopLossEntryBuyQuantity } from "./menu_trailing_stop_loss_
 import { MenuTrailingStopLossPickVsToken } from "./menu_trailing_stop_loss_pick_vs_token";
 import { MenuWallet } from "./menu_wallet";
 import { BaseMenu, MenuCode, MenuDisplayMode } from "./menu";
-import { makeTelegramBotUrl } from "./telegram_helpers";
+import { makeTelegramBotUrl, makeTelegramSendMessageRequest } from "./telegram_helpers";
 import { TelegramWebhookInfo } from "./telegram_webhook_info";
 import { UserDOFetchMethod, makeUserDOFetchRequest } from "./userDO_interop";
+import { PolledTokenPairListDOFetchMethod, ValidateTokenRequest, ValidateTokenResponse, makePolledTokenPairListDOFetchRequest } from "./polled_token_pair_list_DO_interop";
 
 /* Export of imported DO's (required by wrangler) */
 export { UserDO, TokenPairPositionTrackerDO, PolledTokenPairListDO }
@@ -66,13 +67,13 @@ export default {
 			const response = await this._fetch(req, env);
 			if (!response) {
 				this.logWebhookRequestFailure(req, ERRORS.NO_RESPONSE, {});
-				return this.makeFakeFailedRequestResponse(500);
+				return makeFakeFailedRequestResponse(500);
 			}
 			return response;
 		}
 		catch(e : any) {
 			this.logWebhookRequestFailure(req, ERRORS.UNHANDLED_EXCEPTION, { "e": e.toString() });
-			return this.makeFakeFailedRequestResponse(500); // 500 is stored in statusText, status is still 200
+			return makeFakeFailedRequestResponse(500); // 500 is stored in statusText, status is still 200
 		}
 	},
 
@@ -92,7 +93,7 @@ export default {
 		}
 		catch(e) {
 			this.logWebhookRequestFailure(req, ERRORS.COULDNT_PARSE_REQUEST_BODY_JSON, {});
-			return this.makeFakeFailedRequestResponse(400);
+			return makeFakeFailedRequestResponse(400);
 		}
 
 		// Get some data
@@ -164,7 +165,25 @@ export default {
 	},
 
 	async handleMessage(telegramWebhookInfo : TelegramWebhookInfo, userData : UserData, env : Env) {
-		const positionRequest : LongTrailingStopLossPositionRequest = {
+		const tokenAddress = telegramWebhookInfo.text!!;
+		const tokenValidationRequest : ValidateTokenRequest = { tokenAddress : tokenAddress };
+		const userDORequest = makePolledTokenPairListDOFetchRequest(PolledTokenPairListDOFetchMethod.validateToken, tokenValidationRequest);
+		const response = (await this.getPolledTokenPairListDO(env).fetch(userDORequest)) as Response;
+		const validateTokenResponse : ValidateTokenResponse = (await response.json()) as ValidateTokenResponse;
+		if (validateTokenResponse.type == 'invalid') {
+			await this.sendMessageToTG(telegramWebhookInfo.chatID, `The token address '${tokenAddress}' is not a known token.`, env);
+			return makeFakeFailedRequestResponse(404, "Token does not exist");
+		}
+		else if (validateTokenResponse.type === 'tryagain') {
+			await this.sendMessageToTG(telegramWebhookInfo.chatID, `We could not determine if '${tokenAddress}' is a valid token.  Try again soon.`, env);
+			return makeFakeFailedRequestResponse(500, "Could not determine if token exists");
+		}
+		else  if (validateTokenResponse.type === 'valid') {
+			await this.sendMessageToTG(telegramWebhookInfo.chatID, `Token address '${tokenAddress}' recognized!`, env);
+			return makeSuccessResponse();
+		}
+		return makeSuccessResponse();
+		/*const x ={
 			positionID : crypto.randomUUID(),
 			type: PositionType.LongTrailingStopLoss,
 			token : telegramWebhookInfo.text!!,
@@ -182,12 +201,24 @@ export default {
 		const menuDisplayRequest = menu.createMenuDisplayRequest(MenuDisplayMode.NewMenu, env);
 		fetch(menuDisplayRequest).then((response) => {
 			if (!response.ok) {
-				return this.makeFakeFailedRequestResponse(500, 'Failed to display request editor menu');
+				return makeFakeFailedRequestResponse(500, 'Failed to display request editor menu');
 			}
 			else {
 				return makeSuccessResponse();
 			}
-		})
+		})*/
+	},
+
+	async sendMessageToTG(chatID : number, text : string, env : Env) {
+		const request = makeTelegramSendMessageRequest(chatID, text, env);
+		return await fetch(request);
+	},
+
+	getPolledTokenPairListDO(env : Env) : any {
+		const namespace = env.PolledTokenPairListDO as DurableObjectNamespace;
+		const id = namespace.idFromName('singleton');
+		const durableObject = namespace.get(id);
+		return durableObject;
 	},
 
 	convertLongTrailingStopLossRequestToSessionValues(positionRequest : LongTrailingStopLossPositionRequest) : Map<SessionKey,boolean|number|string|null> {
@@ -354,7 +385,7 @@ export default {
 		return await fetch(request!!).then(async (response) => {
 			if (!response.ok) {
 				const tgDescription = await this.tryGetTGDescription(response);
-				return this.makeFakeFailedRequestResponse(500, response.statusText, tgDescription);
+				return makeFakeFailedRequestResponse(500, response.statusText, tgDescription);
 			}
 			else {
 				return makeSuccessResponse();
@@ -368,12 +399,12 @@ export default {
 		const deleteMessageRequest = this.makeDeleteMessageRequest(messageID, env);
 		return await this.sendRequestToTG(deleteMessageRequest).then(async (deleteMessageResponse) => {
 			if (!deleteMessageResponse.ok) {
-				return this.makeFakeFailedRequestResponse(500, "Could not delete menu");
+				return makeFakeFailedRequestResponse(500, "Could not delete menu");
 			}
 			else {
 				return await this.deleteSessionFromUserDO(messageID).then((deleteSessionResponse) => {
 					if (!deleteSessionResponse.ok) {
-						return this.makeFakeFailedRequestResponse(500, "Could not delete session for message");
+						return makeFakeFailedRequestResponse(500, "Could not delete session for message");
 					}
 					else {
 						return makeSuccessResponse();
@@ -572,13 +603,7 @@ export default {
 		});
 	},
 
-	makeFakeFailedRequestResponse(status : number, statusText? : string, description? : string) : Response {
-		const response = new Response(null, {
-			status: 200, // see comment on retries
-			statusText: status.toString() + ":" + (statusText||"") + ":" + (description||"")
-		});
-		return response;
-	},
+
 
 	async parseRequestBody(req : Request, env : Env) : Promise<any> {
 		const requestBody = await req.json();

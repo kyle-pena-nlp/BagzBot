@@ -49,3 +49,11 @@ export function makeFailureResponse(message : string, status? : number) : Respon
     });
 }
 
+/* A non-200 response for TG will cause it to retry sending the webhook.  So we send a 'fake' failure back to TG instead */
+export function makeFakeFailedRequestResponse(status : number, statusText? : string, description? : string) : Response {
+    const response = new Response(null, {
+        status: 200, // see comment on retries
+        statusText: status.toString() + ":" + (statusText||"") + ":" + (description||"")
+    });
+    return response;
+}
