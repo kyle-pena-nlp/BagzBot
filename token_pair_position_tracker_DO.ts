@@ -8,8 +8,9 @@ import {
     PriceUpdate, 
     PositionType,
     LongTrailingStopLossPosition, 
-    TokenPairPositionTrackerInitializeRequest} from "./common";
-import { makeJSONRequest } from "./http_helpers";
+    TokenPairPositionTrackerInitializeRequest,
+    LongTrailingStopLossPositionRequestResponse} from "./common";
+import { makeJSONRequest, makeJSONResponse } from "./http_helpers";
 import { TokenPairPositionTrackerDOFetchMethod } from "./token_pair_position_tracker_DO_interop";
 
 
@@ -123,7 +124,8 @@ export class TokenPairPositionTrackerDO {
     async handleRequestNewPosition(request : Request) : Promise<Response> {
         const positionRequest : PositionRequest = await request.json();
         this.fillNewPosition(positionRequest);
-        return new Response();
+        const responseBody : LongTrailingStopLossPositionRequestResponse = {};
+        return makeJSONResponse(responseBody);
     }
 
     // this should not block 

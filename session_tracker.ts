@@ -1,5 +1,6 @@
 import { Session } from "inspector";
 import { randomUUID } from "node:crypto";
+import { SessionValue } from "./common";
 
 /*
     This class tracks 'Session State', which is values associated with a message (like a menu).
@@ -13,7 +14,7 @@ import { randomUUID } from "node:crypto";
 export class SessionTracker {
     sessionIDs : Record<string,string> = {};
     sessionKeys : Record<string,string[]> = {};
-    sessionValues : Record<string,boolean|number|string|null> = {};
+    sessionValues : Record<string,SessionValue> = {};
     dirtyTracking : Set<string> = new Set<string>();
     deletedKeys : Set<string> = new Set<string>();
     constructor() {
@@ -42,7 +43,7 @@ export class SessionTracker {
             return;
         }
         
-        const putEntries : Record<string,string[]|boolean|number|string|null> = {};
+        const putEntries : Record<string,string[]|SessionValue> = {};
         for (const record of [this.sessionIDs, this.sessionKeys, this.sessionValues]) {
             for (const key of Object.keys(record)) {
                 if (this.dirtyTracking.has(key)) {
@@ -71,7 +72,7 @@ export class SessionTracker {
             this.markAsDirty(sessionIDKey);
         }
     }
-    storeSessionValue(messageID : number, sessionKey : string, value : boolean|number|string|null) {
+    storeSessionValue(messageID : number, sessionKey : string, value : SessionValue) {
         this.ensureHasSession(messageID);
         const messageIDKey = new MessageIDKey(messageID);
         const sessionIDKey = new SessionIDKey(this.sessionIDs[messageIDKey.toString()]);
@@ -84,7 +85,7 @@ export class SessionTracker {
         this.sessionValues[sessionKeyKey.toString()] = value;
         this.markAsDirty(sessionKeyKey);
     }
-    getSessionValue(messageID : number, sessionKey : string) : boolean|number|string|null {
+    getSessionValue(messageID : number, sessionKey : string) : SessionValue {
         this.ensureHasSession(messageID);
         const messageIDKey  = new MessageIDKey(messageID);
         const sessionIDKey  = new SessionIDKey(this.sessionIDs[messageIDKey.toString()]);
@@ -95,13 +96,27 @@ export class SessionTracker {
         this.ensureHasSession(messageID);
         const sessionID = this.sessionIDs[new MessageIDKey(messageID).toString()];
         const sessionKeys = this.sessionKeys[new SessionIDKey(sessionID).toString()];
-        const session : Record<string,boolean|number|string|null> = {};
+        const session : Record<string,SessionValue> = {};
         for (const sessionKey of sessionKeys) {
             const sessionKeyKey = new SessionKeyKey(new SessionIDKey(sessionID), sessionKey);
             const value = this.sessionValues[sessionKeyKey.toString()];
             session[sessionKey] = value;
         }
         return session;
+    }
+    getSessionValuesWithPrefix(messageID : number, prefix : string) {
+        this.ensureHasSession(messageID);
+        const sessionID = this.sessionIDs[new MessageIDKey(messageID).toString()];
+        const sessionKeys = this.sessionKeys[new SessionIDKey(sessionID).toString()];
+        const sessionValuesMatchingPrefix : Record<string,SessionValue> = {};
+        for (const sessionKey of sessionKeys) {
+            const sessionKeyKey = new SessionKeyKey(new SessionIDKey(sessionID), sessionKey);
+            if (sessionKeyKey.hasPrefix(prefix)) {
+                const value = this.sessionValues[sessionKeyKey.toString()];
+                sessionValuesMatchingPrefix[sessionKey] = value;
+            }
+        }
+        return sessionValuesMatchingPrefix;
     }
     deleteSession(messageID : number) {
         const messageIDKey = new MessageIDKey(messageID);
@@ -197,6 +212,9 @@ class SessionKeyKey {
     }
     toString() : string {
         return `sessionKey:${this.sessionIDKey.sessionID}:${this.sessionKey}`;
+    }
+    hasPrefix(prefix : string) {
+        return this.sessionKey.startsWith(prefix);
     }
     static parse(key : string) : SessionKeyKey|null {
         const tokens = key.split(":");

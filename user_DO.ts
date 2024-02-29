@@ -8,7 +8,6 @@ import {
     Position,
     PositionDisplayInfo,
     StoreSessionValuesRequest,
-    OpenPositionRequest,
     LongTrailingStopLossPositionRequest,
     Env,
     GetSessionValuesRequest,
@@ -20,7 +19,15 @@ import {
     NotifyPositionAutoClosedInfo,
     GetPositionsFromTokenPairTrackerResponse,
     GetPositionsFromTokenPairTrackerRequest,
-    GetPositionRequest} from "./common";
+    GetPositionRequest,
+    StoreSessionValuesResponse,
+    UserInitializeResponse,
+    SessionValue,
+    GetSessionValuesWithPrefixRequest,
+    GetSessionValuesWithPrefixResponse,
+    DefaultTrailingStopLossRequestRequest,
+    PositionType,
+    LongTrailingStopLossPositionRequestResponse} from "./common";
 
 
 import { makeSuccessResponse, makeJSONResponse, makeFailureResponse, maybeGetJson } from "./http_helpers";
@@ -40,6 +47,7 @@ export class UserDO {
     telegramUserID : number|null;
     telegramUserName : string|null;
     wallet : Wallet|null;
+    defaultTrailingStopLossRequest : LongTrailingStopLossPositionRequest;
     sessionTracker : SessionTracker = new SessionTracker();
     positionTracker : PositionTracker = new PositionTracker();
 
@@ -51,6 +59,19 @@ export class UserDO {
         this.telegramUserID     = null;
         this.telegramUserName   = null;
         this.wallet             = null;
+        // TODO: allow user to update defaults in 'Options' menu
+        this.defaultTrailingStopLossRequest = {
+            positionID : "",
+            type : PositionType.LongTrailingStopLoss,
+            token : "USD Coin",
+            tokenAddress : "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            vsToken : "Wrapped SOL",
+            vsTokenAddress : "So11111111111111111111111111111111111111112",
+            vsTokenAmt : 1,
+            slippagePercent : 0.5,
+            triggerPercent : 5,
+            retrySellIfPartialFill : true            
+        };
         this.state.blockConcurrencyWhile(async () => {
             await this.initializeFromPersistence();
         });
@@ -104,11 +125,19 @@ export class UserDO {
                 this.assertUserIsInitialized();
                 response = await this.handleGetSessionValues(jsonRequestBody);
                 break;
+            case UserDOFetchMethod.getSessionValuesWithPrefix:
+                this.assertUserIsInitialized();
+                response = this.handleGetSessionValuesWithPrefix(jsonRequestBody);
+                break;
+            case UserDOFetchMethod.getDefaultTrailingStopLossRequest:
+                this.assertUserIsInitialized();
+                response = this.handleGetDefaultTrailingStopLossRequest(jsonRequestBody);
+                break;
             case UserDOFetchMethod.deleteSession:
                 this.assertUserIsInitialized();
                 response = await this.handleDeleteSession(jsonRequestBody);
                 break;
-            case UserDOFetchMethod.generateWallet:
+            case UserDOFetchMethod.createWallet:
                 this.assertUserIsInitialized();
                 response = await this.handleGenerateWallet();
                 break;
@@ -152,6 +181,25 @@ export class UserDO {
         }
 
         return [method,jsonRequestBody,response];
+    }
+
+    handleGetSessionValuesWithPrefix(request : GetSessionValuesWithPrefixRequest) : Response {
+        const messageID = request.messageID;
+        const prefix = request.prefix;
+        const sessionValues = this.sessionTracker.getSessionValuesWithPrefix(messageID, prefix);
+        const responseBody : GetSessionValuesWithPrefixResponse = {
+            values: sessionValues
+        };
+        return makeJSONResponse(responseBody);
+    }
+
+    handleGetDefaultTrailingStopLossRequest(defaultTrailingStopLossRequestRequest : DefaultTrailingStopLossRequestRequest) {
+        const defaultTrailingStopLossRequest = structuredClone(this.defaultTrailingStopLossRequest);
+        defaultTrailingStopLossRequest.positionID = crypto.randomUUID();
+        defaultTrailingStopLossRequest.token = defaultTrailingStopLossRequestRequest.token;
+        defaultTrailingStopLossRequest.tokenAddress = defaultTrailingStopLossRequestRequest.tokenAddress;
+        const responseBody = defaultTrailingStopLossRequest;
+        return makeJSONResponse(responseBody);
     }
 
     /* Handles any exceptions and turns them into failure responses - fine because UserDO doesn't talk directly to TG */
@@ -266,13 +314,13 @@ export class UserDO {
             this.sessionTracker.storeSessionValue(messageID, sessionKey, value);
         }
         return await this.sessionTracker.flushToStorage(this.state.storage).then(() => {
-            return makeSuccessResponse();
+            return makeJSONResponse<StoreSessionValuesResponse>({});
         })
     }
 
     async handleGetSessionValues(jsonRequestBody : GetSessionValuesRequest) : Promise<Response> {
         const messageID = jsonRequestBody.messageID;
-        const sessionValues : Record<string,boolean|number|string|null> = {};
+        const sessionValues : Record<string,SessionValue> = {};
         for (const sessionKey of jsonRequestBody.sessionKeys) {
             const value = this.sessionTracker.getSessionValue(messageID, sessionKey);
             sessionValues[sessionKey] = value;
@@ -294,7 +342,7 @@ export class UserDO {
             "telegramUserID": this.telegramUserID, 
             "telegramUserName": this.telegramUserName 
         }).then(() => {
-            return makeSuccessResponse();
+            return makeJSONResponse<UserInitializeResponse>({});
         });
     }
 
@@ -323,19 +371,13 @@ export class UserDO {
             newPositionRequest.vsTokenAddress, 
             tokenPairPositionTrackerDO);
         const _openPositionRequest = makeTokenPairPositionTrackerDOFetchRequest(TokenPairPositionTrackerDOFetchMethod.initialize, newPositionRequest);
-        return await tokenPairPositionTrackerDO.fetch(_openPositionRequest).then((response : Response) => {
-            if (response.ok) {
-                return makeSuccessResponse();
-            }
-            else {
-                return makeFailureResponse("Could not fill position request");
-            }
-        });
+        const response = await tokenPairPositionTrackerDO.fetch(_openPositionRequest);
+        const responseBody = await response.json() as LongTrailingStopLossPositionRequestResponse;
+        return makeJSONResponse(responseBody);
     }
 
     async ensureTokenPairPositionTrackerDOIsInitialized(token : string, tokenAddress : string, vsToken : string, vsTokenAddress : string, tokenPairPositionTrackerDO : DurableObjectStub) : Promise<void> {
         const body: TokenPairPositionTrackerInitializeRequest = {
-            durableObjectID : tokenPairPositionTrackerDO.id.toString(),
             token : token,
             vsToken : vsToken,
             tokenAddress: tokenAddress,

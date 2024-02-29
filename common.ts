@@ -24,22 +24,6 @@ export enum PositionType {
 	LongTrailingStopLoss = "Auto-Sell"
 };
 
-export enum VsToken {
-	SOL = "SOL",
-	USDC = "USDC"
-};
-
-export function getVsTokenAddress(vsToken : VsToken) {
-	switch(vsToken) {
-		case VsToken.SOL:
-			return "..."; // TODO
-		case VsToken.USDC:
-			return "..."; // TODO
-		default:
-			throw new Error("Unknown VsToken: ${vsToken.toString()}")
-	}
-}
-
 export enum PositionStatus {
 	Unfilled,
 	Open,
@@ -51,16 +35,7 @@ export interface ClosePositionRequest {
     positionID : string
 };
 
-export interface PositionRequest {
-	positionID : string
-	type : PositionType
-	token : string
-	tokenAddress : string
-	vsToken : string
-	vsTokenAddress : string
-	vsTokenAmt : number
-	slippagePercent : number
-}
+
 
 export interface Position {
 	userID : number
@@ -81,9 +56,36 @@ export interface LongTrailingStopLossPosition extends Position {
 	retrySellIfPartialFill : boolean
 }
 
+export interface PositionRequest {
+	positionID : string
+	type : PositionType
+	tokenAddress : string
+	vsTokenAddress : string
+	vsTokenAmt : number
+	slippagePercent : number
+}
+
 export interface LongTrailingStopLossPositionRequest extends PositionRequest {
+	[ key : string ] : any
 	triggerPercent : number
 	retrySellIfPartialFill : boolean
+}
+
+export interface LongTrailingStopLossPositionRequestResponse {
+	
+}
+
+export interface DefaultTrailingStopLossRequestRequest {
+	token : string
+	tokenAddress : string
+}
+
+export interface CreateWalletRequest {
+
+}
+
+export interface CreateWalletResponse {
+
 }
 
 export interface PriceUpdate {
@@ -132,7 +134,7 @@ export interface UserData {
 	telegramUserID? : number
 	telegramUserName?: string
 	hasWallet: boolean
-	session : Record<string,boolean|number|string|null>
+	session : Record<string,SessionValue>
 	positions : PositionDisplayInfo[]
 };
 
@@ -153,7 +155,10 @@ export interface GetPositionRequest {
 
 export interface StoreSessionValuesRequest {
 	messageID: number
-	sessionValues : Record<string,boolean|number|string|null>
+	sessionValues : Record<string,SessionValue>
+};
+
+export interface StoreSessionValuesResponse {
 };
 
 export interface GetSessionValuesRequest {
@@ -162,7 +167,7 @@ export interface GetSessionValuesRequest {
 }
 
 export interface SessionValuesResponse {
-	sessionValues : Record<string,boolean|number|string|null>
+	sessionValues : Record<string,SessionValue>
 }
 
 export interface DeleteSessionRequest {
@@ -170,13 +175,14 @@ export interface DeleteSessionRequest {
 };
 
 export interface UserInitializeRequest {
-	durableObjectID : string
 	telegramUserID : number
 	telegramUserName : string
 };
 
+export interface UserInitializeResponse {
+};
+
 export interface TokenPairPositionTrackerInitializeRequest {
-	durableObjectID : string
 	token : string
 	vsToken : string
 	tokenAddress : string
@@ -192,8 +198,15 @@ export interface ClosePositionsRequest {
 	positionIDs : string[]
 };
 
+export interface ClosePositionsResponse {
+}
+
 export interface ManuallyClosePositionRequest {
 	positionID : string
+}
+
+export interface ManuallyClosePositionResponse {
+
 }
 
 export interface NotifyPositionAutoClosedInfo {
@@ -234,7 +247,18 @@ export interface TokenNameAndAddress {
 	tokenAddress : string
 };
 
-export enum SessionKey {
+export interface GetSessionValuesWithPrefixRequest {
+	messageID : number
+	prefix : string
+};
+
+export interface GetSessionValuesWithPrefixResponse {
+	values : Record<string,SessionValue>
+};
+
+export type SessionKey = string; 
+
+/*{
 	PositionID = "positionID",
 	Token = "token",
 	TokenAddress = "tokenAddress",
@@ -246,5 +270,6 @@ export enum SessionKey {
 	TrailingStopLossTriggerPercent = "trailingStopLossTriggerPercent",	
 	TrailingStopLossRetrySellIfPartialFill = "trailingStopLossRetrySellIfPartialFill",
 	TrailingStopLossRetrySellIfSlippagePctExceeded = "trailingStopLossRetrySellIfSlippagePctExceeded"
-}
+}*/
 
+export type SessionValue = boolean|string|number|null;
