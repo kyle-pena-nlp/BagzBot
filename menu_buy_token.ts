@@ -1,15 +1,16 @@
 import { CallbackData } from "./callback_data";
 import { CallbackButton, Menu, MenuCapabilities, MenuCode } from "./menu";
+import { TokenInfo } from "./token_tracker";
 
-export class MenuOpenPosition extends Menu<undefined> implements MenuCapabilities {
+export class MenuOpenPosition extends Menu<TokenInfo> implements MenuCapabilities {
     renderText(): string {
-        const tokenName = this.userData.session["tokenName"];
+        const tokenName = this.miscData!!.token;
         return `Buy <b>${tokenName}</b>`;
     }
     renderOptions(): CallbackButton[][] {
         const options = this.emptyMenu();
 
-        const buyWithAutoSellCallback = new CallbackData(MenuCode.TrailingStopLossEnterBuyQuantityKeypad);
+        const buyWithAutoSellCallback = new CallbackData(MenuCode.TrailingStopLossEnterBuyQuantityKeypad, this.miscData!!.tokenAddress);
         this.insertButton(options, "Buy With Auto-Sell", buyWithAutoSellCallback, 1);
 
         return options;

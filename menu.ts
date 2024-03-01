@@ -81,27 +81,38 @@ export interface MenuCapabilities {
 
 export abstract class BaseMenu {
 
-    telegramWebhookInfo : TelegramWebhookInfo
-
-    constructor(telegramWebhookInfo : TelegramWebhookInfo) {
-        this.telegramWebhookInfo = telegramWebhookInfo;
+    constructor() {
     }
 
-    createMenuDisplayRequest(mode : MenuDisplayMode, env : Env) : Request {
+    getCreateNewMenuRequest(chatID : number, env:  Env) {
         // == null is true when either null or undefined, but not zero
-        const menuSpec = BaseMenu.renderMenuSpec(this as unknown as MenuCapabilities, mode);
+        const menuSpec = BaseMenu.renderMenuSpec(this as unknown as MenuCapabilities, MenuDisplayMode.NewMenu);
         const body : any = { 
-            chat_id: this.telegramWebhookInfo.chatID,
+            chat_id: chatID,
             text: menuSpec.text,
             parse_mode: menuSpec.parseMode,
             reply_markup: {
                 "inline_keyboard": menuSpec.options
             }
         };
-        if (menuSpec.mode === MenuDisplayMode.UpdateMenu) {
-            body.message_id = this.telegramWebhookInfo.messageID;
-        }
-        const method = (menuSpec.mode === MenuDisplayMode.UpdateMenu) ? 'editMessageText' : 'sendMessage';
+        const method = 'sendMessage';
+        const url = makeTelegramBotUrl(method, env);
+        const request = makeJSONRequest(url, body);
+        return request;        
+    }
+
+    getUpdateExistingMenuRequest(chatID : number, messageID : number, env : Env) {
+        const menuSpec = BaseMenu.renderMenuSpec(this as unknown as MenuCapabilities, MenuDisplayMode.UpdateMenu);
+        const body : any = { 
+            chat_id: chatID,
+            text: menuSpec.text,
+            parse_mode: menuSpec.parseMode,
+            message_id: messageID,
+            reply_markup: {
+                "inline_keyboard": menuSpec.options
+            }
+        };
+        const method = 'editMessageText';
         const url = makeTelegramBotUrl(method, env);
         const request = makeJSONRequest(url, body);
         return request;
@@ -121,12 +132,10 @@ export abstract class BaseMenu {
 
 export abstract class Menu<T> extends BaseMenu {
 
-    userData   : UserData
     miscData   : T|undefined
 
-    constructor(telegramWebhookInfo : TelegramWebhookInfo, userData : UserData, miscData? : T) {
-        super(telegramWebhookInfo);
-        this.userData = userData;
+    constructor(miscData? : T) {
+        super();
         this.miscData = miscData;
     }
 
@@ -167,12 +176,5 @@ export abstract class Menu<T> extends BaseMenu {
     protected menuCallback(menuCode : MenuCode) {
         return new CallbackData(menuCode);
     }
-
-
-
-    
-     
-
-
 }
 

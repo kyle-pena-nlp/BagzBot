@@ -1,6 +1,6 @@
 
 /* Durable Objects */
-import { makeFakeFailedRequestResponse, makeJSONRequest, makeJSONResponse, makeSuccessResponse } from "./http_helpers";
+import { makeFakeFailedRequestResponse, makeJSONResponse, makeSuccessResponse } from "./http_helpers";
 import { MenuMain } from "./menu_main";
 
 /* Wrangler requires these to be re-exported for the DO to work */
@@ -11,16 +11,13 @@ import { PolledTokenPairListDO } from "./polled_token_pair_list_DO";
 /* Utility Stuff */
 import { 
 	Result, 
-	ERRORS, 
-	UserData, 
+	ERRORS,  
 	Env,
 	WalletData,
-	SessionKey,
 	LongTrailingStopLossPositionRequest,
 	QuantityAndToken,
 	TokenNameAndAddress,
-	DeleteSessionRequest,
-	SessionValue
+	DeleteSessionRequest
 } from "./common";
 
 /* Type per menu (that's why there's so many) */
@@ -40,10 +37,10 @@ import { MenuTrailingStopLossAutoRetrySell } from "./menu_trailing_stop_loss_aut
 import { MenuTrailingStopLossEntryBuyQuantity } from "./menu_trailing_stop_loss_entry_buy_quantity";
 import { MenuTrailingStopLossPickVsToken } from "./menu_trailing_stop_loss_pick_vs_token";
 import { MenuWallet } from "./menu_wallet";
-import { BaseMenu, MenuCode, MenuDisplayMode } from "./menu";
-import { deleteTGMessage, sendMessageToTG } from "./telegram_helpers";
-import { TelegramWebhookInfo } from "./telegram_webhook_info";
-import { UserDOFetchMethod, createWallet, getAndMaybeInitializeUserData, getPosition, makeUserDOFetchRequest, manuallyClosePosition, readSessionObj, requestNewPosition, storeSessionObj, storeSessionObjProperty, storeSessionValues } from "./userDO_interop";
+import { BaseMenu, MenuCode } from "./menu";
+import { deleteTGMessage, sendMessageToTG, sendRequestToTG } from "./telegram_helpers";
+import { AutoSellOrderSpec, TelegramWebhookInfo } from "./telegram_webhook_info";
+import { UserDOFetchMethod, createWallet, getAndMaybeInitializeUserData, getDefaultTrailingStopLoss, getPosition, listOpenTrailingStopLossPositions, makeUserDOFetchRequest, manuallyClosePosition, readSessionObj, requestNewPosition, storeSessionObj, storeSessionObjProperty } from "./userDO_interop";
 import { ValidateTokenResponse, validateToken } from "./polled_token_pair_list_DO_interop";
 import { getVsTokenAddress, getVsTokenName } from "./vs_tokens";
 
@@ -89,20 +86,16 @@ export default {
 		}
 
 		const telegramWebhookInfo = new TelegramWebhookInfo(telegramRequestBody);
-		const userData = await getAndMaybeInitializeUserData(telegramWebhookInfo.telegramUserID, 
-			telegramWebhookInfo.telegramUserName, 
-			telegramWebhookInfo.messageID, 
-			env);
 		
 		// User clicks a menu button
 		if (telegramWebhookInfo.messageType === 'callback') {
-			return await this.handleCallbackQuery(telegramWebhookInfo, userData, env);
+			return await this.handleCallbackQuery(telegramWebhookInfo, env);
 		}
 
 		// User issues a command
 		if (telegramWebhookInfo.messageType === 'command') {
-			return await this.handleCommand(telegramWebhookInfo, userData, env);
-		}		
+			return await this.handleCommand(telegramWebhookInfo, env);
+		}
 		
 		// User types a message
 		if (telegramWebhookInfo.messageType === 'message') {
@@ -113,184 +106,150 @@ export default {
 		return makeSuccessResponse();
 	},
 
-	async handleMessage(telegramWebhookInfo : TelegramWebhookInfo, env : Env) {
+	async handleMessage(telegramWebhookInfo : TelegramWebhookInfo, env : Env) : Promise<Response> {
+		const telegramUserID = telegramWebhookInfo.telegramUserID;
+		const chatID = telegramWebhookInfo.chatID;
 		const tokenAddress = telegramWebhookInfo.text!!;
 		const validateTokenResponse : ValidateTokenResponse = await validateToken(tokenAddress, env);
-		if (validateTokenResponse.type == 'invalid') {
-			await sendMessageToTG(telegramWebhookInfo.chatID, `The token address '${tokenAddress}' is not a known token.`, env);
+		if (validateTokenResponse.type === 'invalid') {
+			await sendMessageToTG(chatID, `The token address '${tokenAddress}' is not a known token.`, env);
 			return makeFakeFailedRequestResponse(404, "Token does not exist");
 		}
-		else if (validateTokenResponse.type === 'tryagain') {
-			await sendMessageToTG(telegramWebhookInfo.chatID, `We could not determine if '${tokenAddress}' is a valid token.  Try again soon.`, env);
-			return makeFakeFailedRequestResponse(500, "Could not determine if token exists");
-		}
 		else if (validateTokenResponse.type === 'valid') {
-			await sendMessageToTG(telegramWebhookInfo.chatID, `Token address '${tokenAddress}' recognized!`, env);
-			//await this.sendDefaultTrailingStopLossOrderRequestEditor(validateTokenResponse, telegramWebhookInfo, userData, env);
+			const token = validateTokenResponse.token;
+			const defaultTrailingStopLossRequest = await getDefaultTrailingStopLoss(telegramUserID, validateTokenResponse.token!!, validateTokenResponse.tokenAddress!!, env);
+			// send out a 'stub' message that will be updated as the request editor menu.
+			const tgMessageInfo = await sendMessageToTG(telegramWebhookInfo.chatID, `Token address '${tokenAddress}' (${token}) recognized!`, env);
+			await storeSessionObj<LongTrailingStopLossPositionRequest>(telegramUserID, tgMessageInfo.messageID!!, defaultTrailingStopLossRequest, "LongTrailingStopLossPositionRequest", env);
+			const menu = this.makeTrailingStopLossRequestEditorMenu(defaultTrailingStopLossRequest);
+			const request = menu.getUpdateExistingMenuRequest(chatID, tgMessageInfo.messageID!!, env);
+			await fetch(request);
 			return makeSuccessResponse();
 		}
 		return makeSuccessResponse();
 	},
 
-	async handleCallbackQuery(telegramWebhookInfo : TelegramWebhookInfo, userData : UserData, env : Env) {
+	async handleCallbackQuery(telegramWebhookInfo : TelegramWebhookInfo, env : Env) : Promise<Response> {
+		const menu = await this.handleCallbackQueryInternal(telegramWebhookInfo, env);
+		if (menu != null) {
+			const menuDisplayRequest = menu.getUpdateExistingMenuRequest(telegramWebhookInfo.chatID, telegramWebhookInfo.messageID, env);
+			await sendRequestToTG(menuDisplayRequest!!);
+		}
+		return makeSuccessResponse();
+	},
 
-		/* Create menu based on user response and user state */
-		const callbackData = telegramWebhookInfo.callbackData!!;
-
-		let menu  : BaseMenu|null  = null;
-
+	async handleCallbackQueryInternal(telegramWebhookInfo : TelegramWebhookInfo, env : Env) : Promise<BaseMenu|void> {
 		const telegramUserID = telegramWebhookInfo.telegramUserID;
-		const messageID  = telegramWebhookInfo.messageID;
-
+		const messageID = telegramWebhookInfo.messageID;
+		const callbackData = telegramWebhookInfo.callbackData!!;
 		switch(callbackData.menuCode) {
 			case MenuCode.Main:
-				menu = new MenuMain(telegramWebhookInfo, userData, userData.hasWallet);
-				break;
+				return this.createMainMenu(telegramWebhookInfo, env);
 			case MenuCode.CreateWallet:
-				const createWalletResponse = await this.handleCreateWallet(telegramWebhookInfo, env);
-				if (createWalletResponse.ok) {
-					menu = new MenuMain(telegramWebhookInfo, userData, true);
-				}
-				else {
-					menu = new MenuError(telegramWebhookInfo, userData);
-				}
-				break;
+				await this.handleCreateWallet(telegramWebhookInfo, env);
+				return this.createMainMenu(telegramWebhookInfo, env);
 			case MenuCode.Error:
-				menu = new MenuError(telegramWebhookInfo, userData);
-				break;
+				return new MenuError();
 			case MenuCode.ExportWallet:
-				menu = this.TODOstubbedMenu(telegramWebhookInfo, userData, env);	
-				break;
+				return this.TODOstubbedMenu(env);	
 			case MenuCode.FAQ:
-				menu = new MenuFAQ(telegramWebhookInfo, userData);
-				break;
+				return new MenuFAQ();
 			case MenuCode.Help:
-				menu = new MenuHelp(telegramWebhookInfo, userData);
-				break;
+				return new MenuHelp();
 			case MenuCode.Invite:
-				menu = this.TODOstubbedMenu(telegramWebhookInfo, userData, env);
-				break;
+				return this.TODOstubbedMenu(env);
 			case MenuCode.PleaseEnterToken:
-				menu = new MenuPleaseEnterToken(telegramWebhookInfo, userData);
-				break;
+				return new MenuPleaseEnterToken();
 			case MenuCode.ListPositions:
-				menu = new MenuListPositions(telegramWebhookInfo, userData);
-				break;
+				const positions = await listOpenTrailingStopLossPositions(telegramUserID, env);
+				return new MenuListPositions(positions);
 			case MenuCode.ViewOpenPosition:
 				const viewPositionID = callbackData.menuArg!!;
 				const position = await getPosition(telegramUserID, viewPositionID, env);
-				menu = new MenuViewOpenPosition(telegramWebhookInfo, userData, position);
-				break;
+				return new MenuViewOpenPosition(position);
 			case MenuCode.ClosePositionManuallyAction:
 				const closePositionID = callbackData.menuArg;
 				if (closePositionID != null) {
 					await this.handleManuallyClosePosition(telegramUserID, closePositionID, env);
 				}
-				menu = new MenuMain(telegramWebhookInfo, userData, userData.hasWallet);
-				break;
+				return this.createMainMenu(telegramWebhookInfo, env);
 			case MenuCode.RefreshWallet:
 				const walletData = await this.getWalletData();
-				menu = new MenuViewWallet(telegramWebhookInfo, userData, walletData);
-				break;
+				return new MenuViewWallet(walletData);
 			case MenuCode.TrailingStopLossCustomSlippagePctKeypad:
 				const trailingStopLossCustomSlippagePctKeypadEntry = callbackData.menuArg||''; 
-				const trailingStopLossCustomSlippagePctKeypad = this.makeTrailingStopLossCustomSlippagePctKeypad(trailingStopLossCustomSlippagePctKeypadEntry, telegramWebhookInfo, userData, env);
-				menu = trailingStopLossCustomSlippagePctKeypad;
-				break;
+				const trailingStopLossCustomSlippagePctKeypad = this.makeTrailingStopLossCustomSlippagePctKeypad(trailingStopLossCustomSlippagePctKeypadEntry);
+				return trailingStopLossCustomSlippagePctKeypad;
 			case MenuCode.TrailingStopLossCustomSlippagePctKeypadSubmit:
 				const trailingStopLossCustomSlippageSubmittedKeypadEntry = callbackData.menuArg!!;
 				await storeSessionObjProperty(telegramUserID, messageID, "slippagePercent", trailingStopLossCustomSlippageSubmittedKeypadEntry, "LongTrailingStopLossPositionRequest", env);
 				const trailingStopLossPositionRequestToConfirm = await readSessionObj<LongTrailingStopLossPositionRequest>(telegramUserID, messageID, "LongTrailingStopLossPositionRequest", env);
-				menu = new MenuConfirmTrailingStopLossPositionRequest(telegramWebhookInfo, userData, trailingStopLossPositionRequestToConfirm);
-				break;
+				return new MenuConfirmTrailingStopLossPositionRequest(trailingStopLossPositionRequestToConfirm);
 			case MenuCode.TrailingStopLossEnterBuyQuantityKeypad:
 				const buyTrailingStopLossQuantityKeypadEntry = callbackData.menuArg||'';
-				const trailingStopLossEnterBuyQuantityKeypad = this.makeTrailingStopLossBuyQuantityKeypad(buyTrailingStopLossQuantityKeypadEntry, telegramWebhookInfo, userData, env);
-				menu = trailingStopLossEnterBuyQuantityKeypad;
-				break;
+				const trailingStopLossEnterBuyQuantityKeypad = this.makeTrailingStopLossBuyQuantityKeypad(buyTrailingStopLossQuantityKeypadEntry);
+				return trailingStopLossEnterBuyQuantityKeypad;
 			case MenuCode.TrailingStopLossEnterBuyQuantitySubmit:
 				const submittedTrailingStopLossBuyQuantity = callbackData.menuArg!!;
 				await storeSessionObjProperty(telegramUserID, messageID, "vsTokenAmt", parseFloat(submittedTrailingStopLossBuyQuantity), "LongTrailingStopLossPositionRequest", env);
 				const trailingStopLossRequestStateAfterBuyQuantityEdited = await readSessionObj<LongTrailingStopLossPositionRequest>(telegramUserID, messageID, "LongTrailingStopLossPositionRequest", env);
-				menu = this.makeTrailingStopLossRequestEditorMenu(telegramWebhookInfo, userData, trailingStopLossRequestStateAfterBuyQuantityEdited);
-				break;
+				return this.makeTrailingStopLossRequestEditorMenu(trailingStopLossRequestStateAfterBuyQuantityEdited);
 			case MenuCode.TrailingStopLossChooseAutoRetrySellMenu:
-				menu = new MenuTrailingStopLossAutoRetrySell(telegramWebhookInfo, userData);
-				break;
+				return new MenuTrailingStopLossAutoRetrySell();
 			case MenuCode.TrailingStopLossChooseAutoRetrySellSubmit:
-				await storeSessionObjProperty(telegramUserID, messageID, "retrySellIfPartialFill", callbackData.menuArg!! === "true", "LongTrailingStopLossPositionRequest", env);
+				await storeSessionObjProperty(telegramUserID, messageID, "retrySellIfSlippageExceeded", callbackData.menuArg!! === "true", "LongTrailingStopLossPositionRequest", env);
 				const trailingStopLossRequestStateAfterAutoRetrySellEdited = await readSessionObj<LongTrailingStopLossPositionRequest>(telegramUserID, messageID, "LongTrailingStopLossPositionRequest", env);
-				menu = this.makeTrailingStopLossRequestEditorMenu(telegramWebhookInfo, userData, trailingStopLossRequestStateAfterAutoRetrySellEdited);
-				break;
+				return this.makeTrailingStopLossRequestEditorMenu(trailingStopLossRequestStateAfterAutoRetrySellEdited);
 			case MenuCode.TrailingStopLossConfirmMenu:
 				const trailingStopLossRequestAfterDoneEditing = await readSessionObj<LongTrailingStopLossPositionRequest>(telegramUserID, messageID, "LongTrailingStopLossPositionRequest", env);
-				menu = new MenuConfirmTrailingStopLossPositionRequest(telegramWebhookInfo, userData, trailingStopLossRequestAfterDoneEditing);
-				break;
+				return new MenuConfirmTrailingStopLossPositionRequest(trailingStopLossRequestAfterDoneEditing);
 			case MenuCode.TrailingStopLossCustomTriggerPercentKeypad:
 				const trailingStopLossTriggerPercentKeypadCurrentEntry = callbackData.menuArg||'';
-				const trailingStopLossCustomTriggerPercentKeypad = this.makeTrailingStopLossCustomTriggerPercentKeypad(telegramWebhookInfo, userData, trailingStopLossTriggerPercentKeypadCurrentEntry)
-				menu = trailingStopLossCustomTriggerPercentKeypad;
-				break;
+				const trailingStopLossCustomTriggerPercentKeypad = this.makeTrailingStopLossCustomTriggerPercentKeypad(trailingStopLossTriggerPercentKeypadCurrentEntry)
+				return trailingStopLossCustomTriggerPercentKeypad;
 			case MenuCode.TrailingStopLossCustomTriggerPercentKeypadSubmit:
 				const trailingStopLossCustomTriggerPercentSubmission = callbackData.menuArg!!;
 				await storeSessionObjProperty(telegramUserID, messageID, "triggerPercent", parseFloat(trailingStopLossCustomTriggerPercentSubmission), "LongTrailingStopLossPositionRequest", env);
 				const trailingStopLossPositionRequestAfterEditingCustomTriggerPercent = await readSessionObj<LongTrailingStopLossPositionRequest>(telegramUserID, messageID, "LongTrailingStopLossPositionRequest", env);
-				menu = this.makeTrailingStopLossRequestEditorMenu(telegramWebhookInfo, userData, trailingStopLossPositionRequestAfterEditingCustomTriggerPercent);
-				break;
+				return this.makeTrailingStopLossRequestEditorMenu(trailingStopLossPositionRequestAfterEditingCustomTriggerPercent);
 			case MenuCode.TrailingStopLossEditorFinalSubmit:
 				// TODO: do the read within UserDO to avoid the extra roundtrip
 				const trailingStopLossRequestAfterFinalSubmit = await readSessionObj<LongTrailingStopLossPositionRequest>(telegramUserID, messageID, "LongTrailingStopLossPositionRequest", env);
 				await this.sendTrailingStopLossRequestToTokenPairPositionTracker(telegramUserID, trailingStopLossRequestAfterFinalSubmit, env);
-				menu = new MenuMain(telegramWebhookInfo, userData, userData.hasWallet);
-				break;
+				return this.createMainMenu(telegramWebhookInfo, env);
 			case MenuCode.TrailingStopLossEntryBuyQuantityMenu:
 				const quantityAndTokenForBuyQuantityMenu : QuantityAndToken = await this.getTrailingStopLossPositionQuantityAndVsTokenFromSession(telegramUserID, messageID, env);
-				menu = new MenuTrailingStopLossEntryBuyQuantity(telegramWebhookInfo, userData, quantityAndTokenForBuyQuantityMenu);
-				break;
+				return new MenuTrailingStopLossEntryBuyQuantity(quantityAndTokenForBuyQuantityMenu);
 			case MenuCode.TrailingStopLossPickVsTokenMenu:
 				const trailingStopLossVsTokenNameAndAddress : TokenNameAndAddress = await this.getTrailingStopLossPositionVsTokenFromSession(telegramUserID, messageID, env);
-				menu = new MenuTrailingStopLossPickVsToken(telegramWebhookInfo, userData, trailingStopLossVsTokenNameAndAddress);
-				break;
+				return new MenuTrailingStopLossPickVsToken(trailingStopLossVsTokenNameAndAddress);
 			case MenuCode.TrailingStopLossPickVsTokenMenuSubmit:
 				const trailingStopLossSelectedVsToken = callbackData.menuArg!!;
 				const vsTokenAddress = getVsTokenAddress(trailingStopLossSelectedVsToken);
 				await storeSessionObjProperty(telegramUserID, messageID, "vsTokenAddress", vsTokenAddress, "LongTrailingStopLossPositionRequest", env);
 				const trailingStopLossPositionRequestAfterSubmittingVsToken = await readSessionObj<LongTrailingStopLossPositionRequest>(telegramUserID, messageID, "LongTrailingStopLossPositionRequest", env);
-				menu = this.makeTrailingStopLossRequestEditorMenu(telegramWebhookInfo, userData, trailingStopLossPositionRequestAfterSubmittingVsToken);
-				break;
+				return this.makeTrailingStopLossRequestEditorMenu(trailingStopLossPositionRequestAfterSubmittingVsToken);
 			case MenuCode.TransferFunds:
 				// TODO
-				menu = this.TODOstubbedMenu(telegramWebhookInfo, userData, env);
-				break;
+				return this.TODOstubbedMenu(env);
 			case MenuCode.Wallet:
 				const walletDataForWalletMenu = await this.getWalletData();
-				menu = new MenuWallet(telegramWebhookInfo, userData, walletDataForWalletMenu);
-				break;
+				return new MenuWallet(walletDataForWalletMenu);
 			case MenuCode.Close:
-				return await this.handleMenuClose(telegramWebhookInfo, env);
+				await this.handleMenuClose(telegramWebhookInfo.chatID, telegramWebhookInfo.messageID, env);
+				return;
 			default:
-				menu = new MenuError(telegramWebhookInfo, userData);
-				break;
+				return new MenuError();
 		}
-		const menuDisplayRequest = menu.createMenuDisplayRequest(MenuDisplayMode.UpdateMenu, env);
-		return await this.sendRequestToTG(menuDisplayRequest!!);
 	},
 
-	async sendRequestToTG(request : Request) : Promise<Response> {
-		return await fetch(request!!).then(async (response) => {
-			if (!response.ok) {
-				const tgDescription = await this.tryGetTGDescription(response);
-				return makeFakeFailedRequestResponse(500, response.statusText, tgDescription);
-			}
-			else {
-				return makeSuccessResponse();
-			}
-		})
+	async createMainMenu(telegramWebhookInfo : TelegramWebhookInfo, env : Env) : Promise<BaseMenu> {
+		const userData = await getAndMaybeInitializeUserData(telegramWebhookInfo.telegramUserID, telegramWebhookInfo.telegramUserName, telegramWebhookInfo.messageID, env);
+		return new MenuMain(userData);
 	},
 
-	async handleMenuClose(telegramWebhookInfo : TelegramWebhookInfo, env : Env) : Promise<Response> {
-		const messageID = telegramWebhookInfo.messageID;
-		const result = await deleteTGMessage(messageID, env);
+	async handleMenuClose(chatID : number, messageID : number, env : Env) : Promise<Response> {
+		const result = await deleteTGMessage(messageID, chatID, env);
 		if (!result.success) {
 			return makeFakeFailedRequestResponse(500, "Couldn't delete message");
 		}
@@ -303,17 +262,6 @@ export default {
 		const deleteSessionRequestBody : DeleteSessionRequest = { messageID: messageID };
 		const request = makeUserDOFetchRequest(UserDOFetchMethod.deleteSession, deleteSessionRequestBody);
 		return await fetch(request);
-	},
-
-
-	async tryGetTGDescription(response : Response) : Promise<string|undefined> {
-		try {
-			const responseBody : any = await response.json();
-			return responseBody.description;
-		}
-		catch {
-			return undefined;
-		}
 	},
 
 	async getTrailingStopLossPositionVsTokenFromSession(telegramUserID : number, messageID : number, env : Env) : Promise<TokenNameAndAddress> {
@@ -337,10 +285,8 @@ export default {
 		requestNewPosition(telegramUserID, trailingStopLossPositionRequest, env);
 	},
 
-	makeTrailingStopLossCustomTriggerPercentKeypad(telegramWebhookInfo : TelegramWebhookInfo, userData : UserData, currentValue : string) {
+	makeTrailingStopLossCustomTriggerPercentKeypad(currentValue : string) {
 		return new PositiveIntegerKeypad(
-			telegramWebhookInfo, 
-			userData, 
 			"${currentValue}",
 			MenuCode.TrailingStopLossCustomTriggerPercentKeypad,
 			MenuCode.TrailingStopLossCustomTriggerPercentKeypadSubmit,
@@ -349,15 +295,12 @@ export default {
 			100);
 	},
 
-	makeTrailingStopLossRequestEditorMenu(telegramWebhookInfo : TelegramWebhookInfo, userData : UserData, positionRequest : LongTrailingStopLossPositionRequest) : BaseMenu {
-		return new MenuEditTrailingStopLossPositionRequest(telegramWebhookInfo, userData, positionRequest);
+	makeTrailingStopLossRequestEditorMenu(positionRequest : LongTrailingStopLossPositionRequest) : BaseMenu {
+		return new MenuEditTrailingStopLossPositionRequest(positionRequest);
 	},
 
-	makeTrailingStopLossCustomSlippagePctKeypad(currentEntry : string, telegramWebhookInfo : TelegramWebhookInfo, userData : UserData, env: Env) {
-		return new PositiveIntegerKeypad(
-			telegramWebhookInfo, 
-			userData, 
-			"${currentValue}%",
+	makeTrailingStopLossCustomSlippagePctKeypad(currentEntry : string) {
+		return new PositiveIntegerKeypad("${currentValue}%",
 			MenuCode.TrailingStopLossCustomSlippagePctKeypad,
 			MenuCode.TrailingStopLossCustomSlippagePctKeypadSubmit,
 			currentEntry,
@@ -365,19 +308,16 @@ export default {
 			100);
 	},
 
-	makeTrailingStopLossBuyQuantityKeypad(currentEntry : string, telegramWebhookInfo : TelegramWebhookInfo, userData : UserData, env : Env) {
-		return new PositiveDecimalKeypad(
-			telegramWebhookInfo, 
-			userData, 
-			"${currentValue}", 
+	makeTrailingStopLossBuyQuantityKeypad(currentEntry : string) {
+		return new PositiveDecimalKeypad("${currentValue}", 
 			MenuCode.TrailingStopLossEnterBuyQuantityKeypad, 
 			MenuCode.TrailingStopLossEnterBuyQuantitySubmit, 
 			currentEntry, 
 			0);
 	},
 
-	TODOstubbedMenu(telegramWebhookInfo : TelegramWebhookInfo, userData : UserData, env : Env) : BaseMenu {
-		return new MenuTODO(telegramWebhookInfo, userData);
+	TODOstubbedMenu(env : Env) : BaseMenu {
+		return new MenuTODO();
 	},
 
 	async handleManuallyClosePosition(telegramUserID : number, positionID : string, env : Env) : Promise<Response> {
@@ -390,43 +330,50 @@ export default {
 		return makeJSONResponse(responseBody);
 	},
 
-	async handleCommand(telegramWebhookInfo : TelegramWebhookInfo, userData : UserData, env: any) : Promise<Response> {
+	async handleCommand(telegramWebhookInfo : TelegramWebhookInfo, env: any) : Promise<Response> {
 		const command = telegramWebhookInfo.command!!;
-		const telegramUserID = telegramWebhookInfo.telegramUserID;
-		const messageID = telegramWebhookInfo.messageID;
-		let menu : BaseMenu|null = null;// : Request|null = null;
+		const [commandTextResponse,menu,storeSessionObjectRequest] = await this.handleCommandInternal(command, telegramWebhookInfo, env);
+		const tgMessageInfo = await sendMessageToTG(telegramWebhookInfo.chatID, commandTextResponse, env);
+		if (storeSessionObjectRequest != null) {
+			await storeSessionObj(telegramWebhookInfo.telegramUserID, tgMessageInfo.messageID!!, storeSessionObjectRequest.obj, storeSessionObjectRequest.prefix, env)
+		}
+		if (menu != null) {
+			const menuDisplayRequest = menu.getUpdateExistingMenuRequest(telegramWebhookInfo.chatID, tgMessageInfo.messageID!!, env);
+			fetch(menuDisplayRequest);
+		}
+		return makeSuccessResponse();
+	},
+
+	async handleCommandInternal(command : string, telegramWebhookInfo : TelegramWebhookInfo, env : Env) : Promise<[string,BaseMenu?,{ obj : any, prefix : string }?]> {
 		switch(command) {
 			case '/start':
-				menu = new MenuMain(telegramWebhookInfo, userData, userData.hasWallet);
-				break;
+				const userData = await getAndMaybeInitializeUserData(telegramWebhookInfo.telegramUserID, telegramWebhookInfo.telegramUserName, telegramWebhookInfo.messageID, env);
+				return ["...", new MenuMain(userData)];
 			case '/help':
-				menu = new MenuHelp(telegramWebhookInfo, userData);
-				break;
+				return ["...", new MenuHelp()];
 			case '/autosell':
 				const autoSellOrderSpec = telegramWebhookInfo.parseAutoSellOrder();
 				if (autoSellOrderSpec == null) {
-					await sendMessageToTG(telegramWebhookInfo.chatID, 'Auto-Sell order specification is incorrect.  Correct format is: ${AutoSellOrderSpec.describeFormat()}', env);
-					return makeFakeFailedRequestResponse(400, "Incorrect auto-sell format specified");
+					const autosellBadFormatMsg = `Auto-Sell order specification is incorrect.  Correct format is: ${AutoSellOrderSpec.describeFormat()}`;
+					return [autosellBadFormatMsg];
 				}
 				const tokenAddress = autoSellOrderSpec.tokenAddress;
 				const tokenInfo = await validateToken(tokenAddress, env);
 				if (tokenInfo.type !== 'valid') {
-					await sendMessageToTG(telegramWebhookInfo.chatID, "Could not identify token '${tokenAddress}'", env);
-					return makeFakeFailedRequestResponse(404, 'Unknown token address');
+					const autosellTokenDNEMsg = `Could not identify token '${tokenAddress}'`;
+					return [autosellTokenDNEMsg];
 				}
+				const tokenRecognizedForAutoSellOrderMsg =  `Token address '${tokenAddress}' (${tokenInfo.token!!}) recognized!`;
 				const positionRequest = autoSellOrderSpec.toPositionRequest();
-				const response = await storeSessionObj<LongTrailingStopLossPositionRequest>(telegramUserID, messageID, positionRequest, "LongTrailingStopLossPositionRequest", env);
-				menu = this.makeTrailingStopLossRequestEditorMenu(telegramWebhookInfo, userData, positionRequest);
-				break;
+				return [tokenRecognizedForAutoSellOrderMsg,
+					this.makeTrailingStopLossRequestEditorMenu(positionRequest),
+					{ obj: positionRequest, prefix: "LongTrailingStopLossPositionRequest" }];
 			case '/menu':
-				menu = new MenuMain(telegramWebhookInfo, userData, userData.hasWallet);
-				break;
+				const menuUserData = await getAndMaybeInitializeUserData(telegramWebhookInfo.telegramUserID, telegramWebhookInfo.telegramUserName, telegramWebhookInfo.messageID, env);
+				return ['...', new MenuMain(menuUserData)];
 			default:
 				throw new Error(`Unrecognized command: ${command}`);
 		}
-		const menuDisplayRequest = menu.createMenuDisplayRequest(MenuDisplayMode.NewMenu, env);
-		fetch(menuDisplayRequest);
-		return makeSuccessResponse();
 	},
 
 	async parseRequestBody(req : Request, env : Env) : Promise<any> {

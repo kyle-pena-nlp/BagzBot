@@ -1,5 +1,5 @@
 import { DurableObjectState } from "@cloudflare/workers-types";
-import { PolledTokenPairListDOFetchMethod, ValidateTokenRequest, ValidateTokenResponse } from "./polled_token_pair_list_DO_interop";
+import { PolledTokenPairListDOFetchMethod, ValidateTokenRequest, ValidateTokenResponse, parsePolledTokenPairListDOFetchMethod } from "./polled_token_pair_list_DO_interop";
 import { makeFailureResponse, makeJSONResponse, makeSuccessResponse, maybeGetJson } from "./http_helpers";
 import { Env } from "./common";
 import { TokenInfo, TokenTracker } from "./token_tracker";
@@ -77,7 +77,8 @@ export class PolledTokenPairListDO {
                 type : 'valid',
                 token: tokenInfo.token,
                 tokenAddress: tokenInfo.tokenAddress,
-                logoURI : tokenInfo.logoURI
+                logoURI : tokenInfo.logoURI,
+                decimals : tokenInfo.decimals
             };
         }
 
@@ -124,7 +125,8 @@ export class PolledTokenPairListDO {
             const tokenInfo : TokenInfo = { 
                 tokenAddress: tokenJSON.address as string,
                 token: tokenJSON.name as string,
-                logoURI: tokenJSON.logoURI as string
+                logoURI: tokenJSON.logoURI as string,
+                decimals: tokenJSON.decimals as number
             };
             tokenInfos[tokenInfo.tokenAddress] = tokenInfo;
         }
@@ -134,7 +136,7 @@ export class PolledTokenPairListDO {
     async validateRequest(request : Request) {
         const jsonBody : any = await maybeGetJson<any>(request);
         const methodName = new URL(request.url).pathname.substring(1);
-        const method : PolledTokenPairListDOFetchMethod = PolledTokenPairListDOFetchMethod[methodName as keyof typeof PolledTokenPairListDOFetchMethod];
+        const method : PolledTokenPairListDOFetchMethod|null = parsePolledTokenPairListDOFetchMethod(methodName);
         if (method == null) {
             throw new Error(`Unknown method ${method}`);
         }

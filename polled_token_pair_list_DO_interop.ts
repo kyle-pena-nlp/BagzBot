@@ -6,15 +6,20 @@ export interface ValidateTokenRequest {
 };
 
 export interface ValidateTokenResponse {
-	type : 'valid'|'invalid'|'tryagain'
+	type : 'valid'|'invalid'
 	token? : string
     tokenAddress? : string
 	logoURI? : string
+	decimals? : number
 };
 
 export enum PolledTokenPairListDOFetchMethod {
 	initialize = "initialize",
     validateToken = "validateToken"
+}
+
+export function parsePolledTokenPairListDOFetchMethod(value : string) : PolledTokenPairListDOFetchMethod|null {
+	return Object.values(PolledTokenPairListDOFetchMethod).find(x => x === value)||null;
 }
 
 function makePolledTokenPairListDOFetchRequest<T>(method : PolledTokenPairListDOFetchMethod, body?: T, httpMethod? : 'GET'|'POST') : Request {

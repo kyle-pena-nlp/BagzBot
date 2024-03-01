@@ -1,5 +1,5 @@
 import  { Env } from "./common";
-import { makeJSONRequest, makeJSONResponse } from "./http_helpers";
+import { makeFakeFailedRequestResponse, makeJSONRequest, makeJSONResponse, makeSuccessResponse } from "./http_helpers";
 
 export interface DeleteTGMessageResponse {
     success: boolean
@@ -41,6 +41,12 @@ export enum TGTextEntityType {
     other
 }
 
+export interface TgMessageSentInfo {
+    success: boolean
+    chatID? : number
+    messageID? : number
+}
+
 export function makeTelegramBotUrl(methodName : string, env : Env) {
     return `${env.TELEGRAM_BOT_SERVER_URL}/bot${env.TELEGRAM_BOT_TOKEN}/${methodName}`;
 }
@@ -68,24 +74,61 @@ export function makeTelegramSendMessageRequest(chatID : number, text : string, e
     return request;
 }
 
-export async function sendMessageToTG(chatID : number, text : string, env : Env) {
+export async function sendMessageToTG(chatID : number, text : string, env : Env) : Promise<TgMessageSentInfo> {
     const request = makeTelegramSendMessageRequest(chatID, text, env);
-    return await fetch(request);
-}
-
-export async function deleteTGMessage(messageID : number, env : Env) : Promise<DeleteTGMessageResponse> {
-    const deleteMessageBody : any = { message_id: messageID };
-    const request = makeJSONRequest(makeTelegramBotUrl("deleteMessage", env), deleteMessageBody);
-    const result : DeleteTGMessageResponse = await fetch(request).then((response) => {
-        return {
-            success : true
-        };
-    }).catch(() => {
-        return {
-            success : false
+    return await fetch(request).then(async (response) => {
+        if (response.ok) {
+            const responseJSON : any = await response.json();
+            return {
+                success: true,
+                chatID : responseJSON.result?.chat.id,
+                messageID: responseJSON.result?.message_ID
+            };
         }
+        else {
+            return { success: false };
+        }
+    }).catch(() => {
+        return { success: false};
     });
-    return result;
 }
 
+export async function deleteTGMessage(messageID : number, chatID : number, env : Env) : Promise<DeleteTGMessageResponse> {
+    const deleteMessageBody : any = { message_id: messageID, chat_id: chatID };
+    const request = makeJSONRequest(makeTelegramBotUrl("deleteMessage", env), deleteMessageBody);
+    return await fetch(request).then(async (response) => {
+        if (!response.ok) {
+            const description = await tryGetTGDescription(response);
+            return { success: false }
+        }
+        else {
+            return { success: true }
+        }
+    }).catch((response) => {
+        return { success : false }
+    });
+}
+
+export async function sendRequestToTG(request : Request) : Promise<Response> {
+    return await fetch(request!!).then(async (response) => {
+        if (!response.ok) {
+            const tgDescription = await tryGetTGDescription(response);
+            return makeFakeFailedRequestResponse(500, response.statusText, tgDescription);
+        }
+        else {
+            return makeSuccessResponse();
+        }
+    })
+}
+
+
+async function tryGetTGDescription(response : Response) : Promise<string|undefined> {
+    try {
+        const responseBody : any = await response.json();
+        return responseBody.description;
+    }
+    catch {
+        return undefined;
+    }
+}
 

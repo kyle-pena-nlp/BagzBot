@@ -11,14 +11,13 @@ export class PositiveIntegerKeypad extends Menu<string> implements MenuCapabilit
     thisMenuCode : MenuCode
     submitMenuCode : MenuCode
 
-    constructor(telegramWebhookInfo : TelegramWebhookInfo, userData : UserData,
-        messageFormat: string,
+    constructor(messageFormat: string,
         thisMenuCode : MenuCode,
         submitMenuCode : MenuCode,
         currentValue:string,
         minValue?:number,
         maxValue?:number) {
-        super(telegramWebhookInfo, userData, currentValue);
+        super(currentValue);
         this.messageFormat = messageFormat;
         this.thisMenuCode = thisMenuCode;
         this.submitMenuCode = submitMenuCode;   

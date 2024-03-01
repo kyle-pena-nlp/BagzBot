@@ -1,7 +1,5 @@
-import { CreateWriteStreamOptions } from "fs/promises";
-import { ClosePositionsRequest, ClosePositionsResponse, CreateWalletRequest, CreateWalletResponse, DefaultTrailingStopLossRequestRequest, Env, GetPositionRequest, GetSessionValuesRequest, GetSessionValuesWithPrefixRequest, GetSessionValuesWithPrefixResponse, GetUserDataRequest, LongTrailingStopLossPositionRequest, LongTrailingStopLossPositionRequestResponse, ManuallyClosePositionRequest, ManuallyClosePositionResponse, Position, SessionKey, SessionValue, SessionValuesResponse, StoreSessionValuesRequest, StoreSessionValuesResponse, UserData, UserInitializeRequest, UserInitializeResponse } from "./common";
+import { CreateWalletRequest, CreateWalletResponse, DefaultTrailingStopLossRequestRequest, Env, GetPositionRequest, GetSessionValuesRequest, GetSessionValuesWithPrefixRequest, GetSessionValuesWithPrefixResponse, GetUserDataRequest, ListPositionsRequest, LongTrailingStopLossPositionRequest, LongTrailingStopLossPositionRequestResponse, ManuallyClosePositionRequest, ManuallyClosePositionResponse, Position, SessionKey, SessionValue, SessionValuesResponse, StoreSessionValuesRequest, StoreSessionValuesResponse, UserData, UserInitializeRequest, UserInitializeResponse } from "./common";
 import { makeJSONRequest, makeRequest } from "./http_helpers";
-import { UserDO } from "./user_DO";
 
 export enum UserDOFetchMethod {
 	get = "get",
@@ -13,12 +11,17 @@ export enum UserDOFetchMethod {
 	createWallet = "createWallet",
 	requestNewPosition = "requestNewPosition",
 	getPosition = "getPosition",
+	listPositions = "listPositions",
 	manuallyClosePosition = "manuallyClosePosition",
 	notifyPositionFillSuccess = "notifyPositionFillSuccess",
 	notifyPositionFillFailure = "notifyPositionFillFailure",
 	notifyPositionAutoClosed = "notifyPositionAutoClosed",
 	notifyPositionsAutoClosed = "notifyPositionsAutoClosed",
 	getDefaultTrailingStopLossRequest = "getDefaultTrailingStopLossRequest"
+}
+
+export function parseUserDOFetchMethod(value : string) : UserDOFetchMethod|null {
+	return Object.values(UserDOFetchMethod).find(x => x === value)||null;
 }
 
 export function makeUserDOFetchRequest<T>(method : UserDOFetchMethod, body?: T, httpMethod? : 'GET'|'POST') : Request {
@@ -46,6 +49,12 @@ export function getUserDO(telegramUserID : number, env : Env) : any {
 	return userDO;
 }
 
+export async function listOpenTrailingStopLossPositions(telegramUserID : number, env : Env) : Promise<Position[]> {
+	// TODO: do we need to limit by positions type?  only kind of position currently is LTLS
+	const body  : ListPositionsRequest = {};
+	const positions = await sendJSONRequestToUserDO<ListPositionsRequest,Position[]>(telegramUserID, UserDOFetchMethod.listPositions, body, env);
+	return positions;
+}
 
 export async function getPosition(telegramUserID : number, positionID : string, env : Env) : Promise<Position> {
 	const body : GetPositionRequest = { positionID : positionID };
@@ -84,6 +93,7 @@ async function readSessionValuesWithPrefix(telegramUserID : number, messageID : 
 		prefix: prefix
 	};
 	const response = await sendJSONRequestToUserDO<GetSessionValuesWithPrefixRequest,GetSessionValuesWithPrefixResponse>(telegramUserID, UserDOFetchMethod.getSessionValuesWithPrefix, body, env);
+	return response.values;
 }
 
 export async function storeSessionObj<TObj extends {[key : string] : SessionValue}>(telegramUserID : number, messageID : number, obj : TObj, prefix : string, env : Env) : Promise<StoreSessionValuesResponse> {

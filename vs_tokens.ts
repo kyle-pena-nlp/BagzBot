@@ -51,11 +51,23 @@ export function getVsToken(vsToken : string|VsToken) : VsToken|null {
     }
 }
 
+export function getVsTokenDecimalsMultiplier(vsToken : string|VsToken) : number|null {
+    if (vsToken === VsToken.SOL || vsToken === SOL_ADDRESS || vsToken === SOL_SYMBOL || vsToken === SOL_NAME) {
+        return 1000000000;
+    }
+    else if (vsToken === VsToken.USDC || vsToken === USDC_ADDRESS || vsToken === USDC_SYMBOL || vsToken === USDC_NAME) {
+        return 1000000;
+    }
+    else {
+        return null;
+    }
+}
 
-export const SOL_ADDRESS = ""
-export const SOL_SYMBOL = ""
-export const SOL_NAME = ""
 
-export const USDC_ADDRESS = ""
-export const USDC_SYMBOL = ""
-export const USDC_NAME = ""
+export const SOL_ADDRESS = "So11111111111111111111111111111111111111112"
+export const SOL_SYMBOL = "SOL"
+export const SOL_NAME = "Wrapped SOL"
+
+export const USDC_ADDRESS = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+export const USDC_SYMBOL = "USDC"
+export const USDC_NAME = "USD Coin"

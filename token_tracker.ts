@@ -1,7 +1,9 @@
 export interface TokenInfo {
+    // TODO: symbol vs name
     tokenAddress: string
     token : string /* Name */
     logoURI: string
+    decimals : number
 }
 
 export class TokenTracker {

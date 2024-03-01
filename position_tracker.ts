@@ -45,7 +45,7 @@ export class PositionTracker {
             this.markAsDeleted(positionIDKey);
         }
     }
-    getPositions() : Position[] {
+    listPositions() : Position[] {
         return Object.values(this.positions);
     }
     getPosition(positionID : string) : Position|null {

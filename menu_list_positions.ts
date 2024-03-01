@@ -1,14 +1,15 @@
 import { CallbackData } from "./callback_data";
+import { Position } from "./common";
 import { CallbackButton, Menu, MenuCapabilities, MenuCode } from "./menu";
 
-export class MenuListPositions extends Menu<undefined> implements MenuCapabilities {
+export class MenuListPositions extends Menu<Position[]> implements MenuCapabilities {
     renderText(): string {
-        return `You have ${this.userData.positions.length} open positions`;
+        return `You have ${this.miscData!!.length} open positions`;
     }
     renderOptions(): CallbackButton[][] {
         const options = this.emptyMenu();
-        for (const position of this.userData.positions) {
-            const positionLabel = `${position.token} - ${position.amount.toString()}`
+        for (const position of this.miscData!!) {
+            const positionLabel = `${position.token} - ${position.tokenAmt.toString()}`
             const callbackData = new CallbackData(MenuCode.ViewOpenPosition, position.positionID);
             this.insertButtonNextLine(options, positionLabel, callbackData);
         }

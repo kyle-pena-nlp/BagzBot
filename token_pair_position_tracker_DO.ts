@@ -11,7 +11,7 @@ import {
     TokenPairPositionTrackerInitializeRequest,
     LongTrailingStopLossPositionRequestResponse} from "./common";
 import { makeJSONRequest, makeJSONResponse } from "./http_helpers";
-import { TokenPairPositionTrackerDOFetchMethod } from "./token_pair_position_tracker_DO_interop";
+import { TokenPairPositionTrackerDOFetchMethod, parseTokenPairPositionTrackerDOFetchMethod } from "./token_pair_position_tracker_DO_interop";
 
 
 
@@ -88,7 +88,7 @@ export class TokenPairPositionTrackerDO {
     async validateRequest(request : Request) : Promise<[TokenPairPositionTrackerDOFetchMethod,any]> {
         const jsonBody : any = await request.json();
         const methodName = new URL(request.url).pathname.substring(1);
-        const method : TokenPairPositionTrackerDOFetchMethod = TokenPairPositionTrackerDOFetchMethod[methodName as keyof typeof TokenPairPositionTrackerDOFetchMethod];
+        const method : TokenPairPositionTrackerDOFetchMethod|null = parseTokenPairPositionTrackerDOFetchMethod(methodName);
         if (method == null) {
             throw new Error(`Unknown method ${method}`);
         }
@@ -158,6 +158,7 @@ export class TokenPairPositionTrackerDO {
             vsTokenAddress : positionRequest.vsTokenAddress,
             tokenAmt : 0.0, // TODO
             highestFillPrice : 0.0, // TODO
+            sellSlippagePercent : 0.5,
             token : '', // TODO
             vsToken: '', // TODO
             vsTokenValue : 0.0 // TODO

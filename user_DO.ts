@@ -27,14 +27,15 @@ import {
     GetSessionValuesWithPrefixResponse,
     DefaultTrailingStopLossRequestRequest,
     PositionType,
-    LongTrailingStopLossPositionRequestResponse} from "./common";
+    LongTrailingStopLossPositionRequestResponse,
+    ListPositionsRequest} from "./common";
 
 
 import { makeSuccessResponse, makeJSONResponse, makeFailureResponse, maybeGetJson } from "./http_helpers";
 import { SessionTracker } from "./session_tracker";
 import { PositionTracker } from "./position_tracker";
 import { generateEd25519Keypair } from "./cryptography";
-import { UserDOFetchMethod } from "./userDO_interop";
+import { UserDOFetchMethod, parseUserDOFetchMethod } from "./userDO_interop";
 import { TokenPairPositionTrackerDOFetchMethod, makeTokenPairPositionTrackerDOFetchRequest } from "./token_pair_position_tracker_DO_interop";
 
 /* Durable Object storing state of user */
@@ -70,7 +71,7 @@ export class UserDO {
             vsTokenAmt : 1,
             slippagePercent : 0.5,
             triggerPercent : 5,
-            retrySellIfPartialFill : true            
+            retrySellIfSlippageExceeded : true            
         };
         this.state.blockConcurrencyWhile(async () => {
             await this.initializeFromPersistence();
@@ -151,6 +152,11 @@ export class UserDO {
                 this.assertUserHasWallet();
                 response = await this.getPosition(jsonRequestBody);
                 break;
+            case UserDOFetchMethod.listPositions:
+                this.assertUserIsInitialized();
+                this.assertUserHasWallet();
+                response = await this.handleListPositions(jsonRequestBody);
+                break;
             case UserDOFetchMethod.manuallyClosePosition:
                 this.assertUserIsInitialized();
                 this.assertUserHasWallet();
@@ -202,6 +208,11 @@ export class UserDO {
         return makeJSONResponse(responseBody);
     }
 
+    async handleListPositions(request : ListPositionsRequest) : Promise<Response> {
+        const positions = this.positionTracker.listPositions();
+        return makeJSONResponse(positions);
+    }
+
     /* Handles any exceptions and turns them into failure responses - fine because UserDO doesn't talk directly to TG */
     async catchResponse(promise : Promise<Response>) : Promise<Response> {
         return promise.catch((reason) => {
@@ -233,12 +244,13 @@ export class UserDO {
     async handleNotifyPositionAutoClosed(position : NotifyPositionAutoClosedRequest) : Promise<Response> {
         const positionID = position.notifyPositionAutoClosedInfo.positionID;
         this.positionTracker.deletePosition(positionID);
-        if (position.notifyPositionAutoClosedInfo.retrySellPositionID != null) {
+        /*if (position.notifyPositionAutoClosedInfo.retrySellPositionID != null) {
             const tokenAddress = position.notifyPositionAutoClosedInfo.tokenAddress;
             const vsTokenAddress = position.notifyPositionAutoClosedInfo.vsTokenAddress;
             const retrySellPositions = await this.getRetrySellPositionsFromTokenPairTracker(tokenAddress, vsTokenAddress, [position.notifyPositionAutoClosedInfo]);
             this.positionTracker.storePositions(retrySellPositions);
-        }
+        }*/
+        // TODO: retry logic.
         return await this.positionTracker.flushToStorage(this.state.storage).then(() => {
             // TODO: send confirmatory message to user.
             return makeSuccessResponse();
@@ -258,7 +270,9 @@ export class UserDO {
         }
 
         // In parallel, fetch the retry-sell positions from the appropriate token pair tracker
-        const promises  = [];
+        const promises : Promise<Response>[]  = [];
+        // TODO: retry logic here? or no longer necessary?
+        /*
         for (const tokenPairIdentifier of Object.keys(groupedNotifications)) {
             const infos = groupedNotifications[tokenPairIdentifier];
             const [tokenAddress,vsTokenAddress] = tokenPairIdentifier.split(":");
@@ -268,13 +282,15 @@ export class UserDO {
             promises.push(promise);
         }
         promises.push(this.positionTracker.flushToStorage(this.state.storage));
+        */
         return await Promise.all(promises).then(() => {
             return makeSuccessResponse();
         });
     }
 
+    /*
     async getRetrySellPositionsFromTokenPairTracker(tokenAddress : string, vsTokenAddress : string, infos : NotifyPositionAutoClosedInfo[]) : Promise<Position[]> {
-        const positionIDs = infos.filter(x => { return x.retrySellPositionID != null; }).map(x => { return x.retrySellPositionID!! })
+        const positionIDs = infos.filter(x => { return x.willRetry; }).map(x => { return x.retrySellPositionID!! })
         if (positionIDs.length == 0) {
             return [];
         }
@@ -293,7 +309,7 @@ export class UserDO {
             }
         })
     }
-
+    */
     async handleGet(jsonRequestBody : GetUserDataRequest) : Promise<Response> {
         const messageID = jsonRequestBody.messageID;
         return makeJSONResponse(this.makeUserData(messageID));
@@ -415,7 +431,7 @@ export class UserDO {
     async validateRequest(request : Request) : Promise<[UserDOFetchMethod,any]> {
         const jsonBody : any = await maybeGetJson(request);
         const methodName = new URL(request.url).pathname.substring(1);
-        const method : UserDOFetchMethod = UserDOFetchMethod[methodName as keyof typeof UserDOFetchMethod];
+        const method : UserDOFetchMethod|null = parseUserDOFetchMethod(methodName);
         if (method == null) {
             throw new Error(`Unknown method ${method}`);
         }
@@ -469,7 +485,7 @@ export class UserDO {
     }
 
     makePositionDisplayInfos() : PositionDisplayInfo[] {
-        const positions = this.positionTracker.getPositions();
+        const positions = this.positionTracker.listPositions();
         const positionDisplayInfos : PositionDisplayInfo[] = [];
         for (const position of positions) {
             const positionDisplayInfo : PositionDisplayInfo = {

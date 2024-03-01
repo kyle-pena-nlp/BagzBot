@@ -10,15 +10,15 @@ export class AutoSellOrderSpec {
 	vsTokenAmt : number
 	triggerPct : number
 	slippageTolerancePct : number
-	autoRetrySellIfPartialFill? : boolean
+	autoRetrySellIfSlippageExceeded? : boolean
 	
-	constructor(tokenAddress : string, vsTokenAddress : string, vsTokenAmt : number, triggerPct : number, slippageTolerancePct : number, autoRetrySellIfPartialFill? : boolean) {
+	constructor(tokenAddress : string, vsTokenAddress : string, vsTokenAmt : number, triggerPct : number, slippageTolerancePct : number, autoRetrySellIfSlippageExceeded? : boolean) {
 		this.tokenAddress = tokenAddress;
 		this.vsTokenAddress = vsTokenAddress;
 		this.vsTokenAmt = vsTokenAmt;
 		this.triggerPct = triggerPct;
 		this.slippageTolerancePct = slippageTolerancePct;
-		this.autoRetrySellIfPartialFill = autoRetrySellIfPartialFill;
+		this.autoRetrySellIfSlippageExceeded = autoRetrySellIfSlippageExceeded;
 	}
 
 	toPositionRequest() : LongTrailingStopLossPositionRequest {
@@ -30,7 +30,7 @@ export class AutoSellOrderSpec {
 			vsTokenAmt : this.vsTokenAmt,
 			slippagePercent : this.slippageTolerancePct,
 			triggerPercent : this.triggerPct,
-			retrySellIfPartialFill : this.autoRetrySellIfPartialFill || true
+			retrySellIfSlippageExceeded : this.autoRetrySellIfSlippageExceeded || true
 		};
 		return positionRequest;
 	}

@@ -10,13 +10,16 @@ export class CallbackData {
 	static parse(callbackDataString : string) : CallbackData {
 		const tokens = callbackDataString.split(":").filter(x => !!x);
         if (tokens.length == 1) {
-            return new CallbackData(MenuCode[tokens[0] as keyof typeof MenuCode], undefined);
+            return new CallbackData(CallbackData.parseMenuCode(tokens[0]), undefined);
         }
         else {
-            return new CallbackData(MenuCode[tokens[0] as keyof typeof MenuCode], tokens[1]);
+            return new CallbackData(CallbackData.parseMenuCode(tokens[0]), tokens[1]);
         }
 	}
 	toString() : string {
 		return [this.menuCode, this.menuArg||''].join(":");
+	}
+	private static parseMenuCode(menuCode : string) : MenuCode {
+		return Object.values(MenuCode).find((x) => x === menuCode)!!;
 	}
 };

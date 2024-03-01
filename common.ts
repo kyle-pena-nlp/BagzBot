@@ -15,6 +15,10 @@ export interface Env {
 	TELEGRAM_API_HASH : string
 	RPC_ENDPOINT_URL : string
 	JUPITER_PRICE_API_URL : string
+	JUPITER_QUOTE_API_URL : string
+	JUPITER_SWAP_API_URL : string
+	PLATFORM_FEE_BPS : string
+	FEE_ACCOUNT_PUBLIC_KEY : string
 	UserDO : any // i'd like to strongly type this as DurableObjectNamespace, but can't for technical reasons
 	TokenPairPositionTrackerDO : any // ditto
 	PolledTokenPairListDO : any // ditto
@@ -35,7 +39,8 @@ export interface ClosePositionRequest {
     positionID : string
 };
 
-
+export interface ListPositionsRequest {
+}
 
 export interface Position {
 	userID : number
@@ -49,11 +54,12 @@ export interface Position {
 	vsTokenValue : number
 	tokenAmt : number
 	highestFillPrice : number
+	sellSlippagePercent : number
 }
 
 export interface LongTrailingStopLossPosition extends Position {
 	triggerPercent : number
-	retrySellIfPartialFill : boolean
+	retrySellIfSlippageExceeded : boolean
 }
 
 export interface PositionRequest {
@@ -68,7 +74,7 @@ export interface PositionRequest {
 export interface LongTrailingStopLossPositionRequest extends PositionRequest {
 	[ key : string ] : any
 	triggerPercent : number
-	retrySellIfPartialFill : boolean
+	retrySellIfSlippageExceeded : boolean
 }
 
 export interface LongTrailingStopLossPositionRequestResponse {
@@ -216,7 +222,6 @@ export interface NotifyPositionAutoClosedInfo {
 	amountTokenSold: number
 	amountTokenUnsold: number
 	willRetry : boolean
-	retrySellPositionID : string|null
 };
 
 export interface NotifyPositionsAutoClosedRequest {
