@@ -19,17 +19,18 @@ export class PositionTracker {
         if (this.dirtyTracking.size == 0 && this.deletedKeys.size == 0) {
             return;
         }
-        const dumpRecord : Record<string,Position> = {};
+        const putEntries : Record<string,Position> = {};
         for (const key of this.dirtyTracking) {
             const value = this.positions[key];
-            dumpRecord[key] = value;
+            putEntries[key] = value;
         }
-        const putPromise = storage.put(dumpRecord);
-        const deletePromise = storage.delete([...this.deletedKeys]);
-        await Promise.all([putPromise, deletePromise]).then(() => {
+        const putPromise = storage.put(putEntries).then(() => {
             this.dirtyTracking.clear();
+        })
+        const deletePromise = storage.delete([...this.deletedKeys]).then(() => {
             this.deletedKeys.clear();
-        });
+        })
+        await Promise.all([putPromise, deletePromise]);
     }
     storePositions(positions: Position[]) {
         for (const position of positions) {

@@ -19,7 +19,7 @@ export class MenuEditTrailingStopLossPositionRequest extends Menu<LongTrailingSt
         this.insertButtonNextLine(options, `Slippage Percent: ${this.miscData!!.slippagePercent}%`, new CallbackData(MenuCode.TrailingStopLossSlippagePctMenu, this.miscData!!.slippagePercent.toString()));
         this.insertButtonNextLine(options, `Auto-Retry Sell if Slippage Tolerance Exceed? ${this.miscData!!.retrySellIfSlippageExceeded ? 'Yes': 'No'}`, new CallbackData(MenuCode.TrailingStopLossChooseAutoRetrySellMenu, this.miscData!!.retrySellIfSlippageExceeded.toString()));
         this.insertButtonNextLine(options, `Submit`, new CallbackData(MenuCode.TrailingStopLossConfirmMenu));
-        this.insertButtonNextLine(options, 'Cancel', new CallbackData(MenuCode.Main));
+        this.insertButtonNextLine(options, 'Close', new CallbackData(MenuCode.Close));
         return options;
     }
     parseMode(): "HTML" | "MarkdownV2" {

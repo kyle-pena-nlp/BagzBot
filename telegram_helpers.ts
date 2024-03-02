@@ -82,7 +82,7 @@ export async function sendMessageToTG(chatID : number, text : string, env : Env)
             return {
                 success: true,
                 chatID : responseJSON.result?.chat.id,
-                messageID: responseJSON.result?.message_ID
+                messageID: responseJSON.result?.message_id
             };
         }
         else {

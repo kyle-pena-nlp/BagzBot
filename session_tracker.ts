@@ -53,12 +53,13 @@ export class SessionTracker {
             }
         }
 
-        const putPromise = storage.put(putEntries);
-        const deletePromise = storage.delete([...this.deletedKeys]);
-        await Promise.all([putPromise,deletePromise]).then(() => {
-            this.deletedKeys.clear();
+        const putPromise = storage.put(putEntries).then(() => {
             this.dirtyTracking.clear();
-        });
+        })
+        const deletePromise = storage.delete([...this.deletedKeys]).then(() => {
+            this.deletedKeys.clear();
+        })
+        await Promise.all([putPromise, deletePromise]);
     }
     ensureHasSession(messageID : number) {
         const messageIDKey = new MessageIDKey(messageID);
@@ -214,7 +215,7 @@ class SessionKeyKey {
         return `sessionKey:${this.sessionIDKey.sessionID}:${this.sessionKey}`;
     }
     hasPrefix(prefix : string) {
-        return this.sessionKey.startsWith(prefix);
+        return this.sessionKey.startsWith(`${prefix}/`);
     }
     static parse(key : string) : SessionKeyKey|null {
         const tokens = key.split(":");

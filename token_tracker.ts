@@ -49,12 +49,13 @@ export class TokenTracker {
         for (const key of this.dirtyTracking) {
             putEntries[key] = this.tokenInfos[key];
         }
-        const promise1 = storage.put(putEntries);
-        const promise2 = storage.delete([...this.deletedKeys]);
-        return await Promise.all([promise1,promise2]).then(() => {
+        const putPromise = storage.put(putEntries).then(() => {
             this.dirtyTracking.clear();
+        })
+        const deletePromise = storage.delete([...this.deletedKeys]).then(() => {
             this.deletedKeys.clear();
-        });
+        })
+        await Promise.all([putPromise, deletePromise]);
     }
     markDirty(key : string) {
         this.deletedKeys.delete(key);

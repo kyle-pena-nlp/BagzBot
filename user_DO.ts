@@ -386,7 +386,7 @@ export class UserDO {
             newPositionRequest.vsToken, 
             newPositionRequest.vsTokenAddress, 
             tokenPairPositionTrackerDO);
-        const _openPositionRequest = makeTokenPairPositionTrackerDOFetchRequest(TokenPairPositionTrackerDOFetchMethod.initialize, newPositionRequest);
+        const _openPositionRequest = makeTokenPairPositionTrackerDOFetchRequest(TokenPairPositionTrackerDOFetchMethod.requestNewPosition, newPositionRequest);
         const response = await tokenPairPositionTrackerDO.fetch(_openPositionRequest);
         const responseBody = await response.json() as LongTrailingStopLossPositionRequestResponse;
         return makeJSONResponse(responseBody);

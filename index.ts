@@ -17,7 +17,8 @@ import {
 	LongTrailingStopLossPositionRequest,
 	QuantityAndToken,
 	TokenNameAndAddress,
-	DeleteSessionRequest
+	DeleteSessionRequest,
+	SessionValue
 } from "./common";
 
 /* Type per menu (that's why there's so many) */
@@ -40,9 +41,11 @@ import { MenuWallet } from "./menu_wallet";
 import { BaseMenu, MenuCode } from "./menu";
 import { deleteTGMessage, sendMessageToTG, sendRequestToTG } from "./telegram_helpers";
 import { AutoSellOrderSpec, TelegramWebhookInfo } from "./telegram_webhook_info";
-import { UserDOFetchMethod, createWallet, getAndMaybeInitializeUserData, getDefaultTrailingStopLoss, getPosition, listOpenTrailingStopLossPositions, makeUserDOFetchRequest, manuallyClosePosition, readSessionObj, requestNewPosition, storeSessionObj, storeSessionObjProperty } from "./userDO_interop";
+import { UserDOFetchMethod, createWallet, getAndMaybeInitializeUserData, getDefaultTrailingStopLoss, getPosition, listOpenTrailingStopLossPositions, makeUserDOFetchRequest, manuallyClosePosition, readSessionObj, requestNewPosition, storeSessionObj, storeSessionObjProperty, storeSessionValues } from "./userDO_interop";
 import { ValidateTokenResponse, validateToken } from "./polled_token_pair_list_DO_interop";
 import { getVsTokenAddress, getVsTokenName } from "./vs_tokens";
+import { MenuTrailingStopLossSlippagePercent } from "./menu_trailing_stop_loss_slippage_percent";
+import { MenuTrailingStopLossTriggerPercent } from "./menu_trailing_stop_loss_trigger_percent";
 
 /* Export of imported DO's (required by wrangler) */
 export { UserDO, TokenPairPositionTrackerDO, PolledTokenPairListDO }
@@ -141,8 +144,7 @@ export default {
 	async handleCallbackQueryInternal(telegramWebhookInfo : TelegramWebhookInfo, env : Env) : Promise<BaseMenu|void> {
 		const telegramUserID = telegramWebhookInfo.telegramUserID;
 		const messageID = telegramWebhookInfo.messageID;
-		const callbackData = telegramWebhookInfo.callbackData!!;
-		switch(callbackData.menuCode) {
+		const callbackData = telegramWebhookInfo.callbackData!!;switch(callbackData.menuCode) {
 			case MenuCode.Main:
 				return this.createMainMenu(telegramWebhookInfo, env);
 			case MenuCode.CreateWallet:
@@ -183,8 +185,8 @@ export default {
 			case MenuCode.TrailingStopLossCustomSlippagePctKeypadSubmit:
 				const trailingStopLossCustomSlippageSubmittedKeypadEntry = callbackData.menuArg!!;
 				await storeSessionObjProperty(telegramUserID, messageID, "slippagePercent", trailingStopLossCustomSlippageSubmittedKeypadEntry, "LongTrailingStopLossPositionRequest", env);
-				const trailingStopLossPositionRequestToConfirm = await readSessionObj<LongTrailingStopLossPositionRequest>(telegramUserID, messageID, "LongTrailingStopLossPositionRequest", env);
-				return new MenuConfirmTrailingStopLossPositionRequest(trailingStopLossPositionRequestToConfirm);
+				const positionRequestAfterEditingSlippagePct = await readSessionObj<LongTrailingStopLossPositionRequest>(telegramUserID, messageID, "LongTrailingStopLossPositionRequest", env);
+				return this.makeTrailingStopLossRequestEditorMenu(positionRequestAfterEditingSlippagePct)
 			case MenuCode.TrailingStopLossEnterBuyQuantityKeypad:
 				const buyTrailingStopLossQuantityKeypadEntry = callbackData.menuArg||'';
 				const trailingStopLossEnterBuyQuantityKeypad = this.makeTrailingStopLossBuyQuantityKeypad(buyTrailingStopLossQuantityKeypadEntry);
@@ -216,6 +218,7 @@ export default {
 				// TODO: do the read within UserDO to avoid the extra roundtrip
 				const trailingStopLossRequestAfterFinalSubmit = await readSessionObj<LongTrailingStopLossPositionRequest>(telegramUserID, messageID, "LongTrailingStopLossPositionRequest", env);
 				await this.sendTrailingStopLossRequestToTokenPairPositionTracker(telegramUserID, trailingStopLossRequestAfterFinalSubmit, env);
+				// TODO: post-confirm screen
 				return this.createMainMenu(telegramWebhookInfo, env);
 			case MenuCode.TrailingStopLossEntryBuyQuantityMenu:
 				const quantityAndTokenForBuyQuantityMenu : QuantityAndToken = await this.getTrailingStopLossPositionQuantityAndVsTokenFromSession(telegramUserID, messageID, env);
@@ -226,7 +229,11 @@ export default {
 			case MenuCode.TrailingStopLossPickVsTokenMenuSubmit:
 				const trailingStopLossSelectedVsToken = callbackData.menuArg!!;
 				const vsTokenAddress = getVsTokenAddress(trailingStopLossSelectedVsToken);
-				await storeSessionObjProperty(telegramUserID, messageID, "vsTokenAddress", vsTokenAddress, "LongTrailingStopLossPositionRequest", env);
+				//await storeSessionObjProperty(telegramUserID, messageID, "vsTokenAddress", vsTokenAddress, "LongTrailingStopLossPositionRequest", env);
+				await storeSessionValues(telegramUserID, messageID, new Map<string,SessionValue>([
+					["vsToken", trailingStopLossSelectedVsToken],
+					["vsTokenAddress", vsTokenAddress]
+				]), "LongTrailingStopLossPositionRequest", env);
 				const trailingStopLossPositionRequestAfterSubmittingVsToken = await readSessionObj<LongTrailingStopLossPositionRequest>(telegramUserID, messageID, "LongTrailingStopLossPositionRequest", env);
 				return this.makeTrailingStopLossRequestEditorMenu(trailingStopLossPositionRequestAfterSubmittingVsToken);
 			case MenuCode.TransferFunds:
@@ -238,6 +245,17 @@ export default {
 			case MenuCode.Close:
 				await this.handleMenuClose(telegramWebhookInfo.chatID, telegramWebhookInfo.messageID, env);
 				return;
+			case MenuCode.TrailingStopLossSlippagePctMenu:
+				const x = await readSessionObj<LongTrailingStopLossPositionRequest>(telegramUserID, messageID, "LongTrailingStopLossPositionRequest", env);
+				const slippagePercent = x.slippagePercent;
+				return new MenuTrailingStopLossSlippagePercent(slippagePercent);
+			case MenuCode.TrailingStopLossTriggerPercentMenu:
+				const y = await readSessionObj<LongTrailingStopLossPositionRequest>(telegramUserID, messageID, "LongTrailingStopLossPositionRequest", env);
+				const triggerPercent = y.triggerPercent;
+				return new MenuTrailingStopLossTriggerPercent(triggerPercent);
+			case MenuCode.TrailingStopLossRequestReturnToEditorMenu:
+				const z = await readSessionObj<LongTrailingStopLossPositionRequest>(telegramUserID, messageID, "LongTrailingStopLossPositionRequest", env);
+				return this.makeTrailingStopLossRequestEditorMenu(z);
 			default:
 				return new MenuError();
 		}
@@ -282,7 +300,7 @@ export default {
 	},
 
 	async sendTrailingStopLossRequestToTokenPairPositionTracker(telegramUserID : number, trailingStopLossPositionRequest : LongTrailingStopLossPositionRequest, env : Env) : Promise<void> {
-		requestNewPosition(telegramUserID, trailingStopLossPositionRequest, env);
+		await requestNewPosition(telegramUserID, trailingStopLossPositionRequest, env);
 	},
 
 	makeTrailingStopLossCustomTriggerPercentKeypad(currentValue : string) {
@@ -290,6 +308,7 @@ export default {
 			"${currentValue}",
 			MenuCode.TrailingStopLossCustomTriggerPercentKeypad,
 			MenuCode.TrailingStopLossCustomTriggerPercentKeypadSubmit,
+			MenuCode.TrailingStopLossRequestReturnToEditorMenu,
 			currentValue,
 			1,
 			100);
@@ -303,6 +322,7 @@ export default {
 		return new PositiveIntegerKeypad("${currentValue}%",
 			MenuCode.TrailingStopLossCustomSlippagePctKeypad,
 			MenuCode.TrailingStopLossCustomSlippagePctKeypadSubmit,
+			MenuCode.TrailingStopLossRequestReturnToEditorMenu,
 			currentEntry,
 			0,
 			100);
@@ -312,6 +332,7 @@ export default {
 		return new PositiveDecimalKeypad("${currentValue}", 
 			MenuCode.TrailingStopLossEnterBuyQuantityKeypad, 
 			MenuCode.TrailingStopLossEnterBuyQuantitySubmit, 
+			MenuCode.TrailingStopLossRequestReturnToEditorMenu,
 			currentEntry, 
 			0);
 	},

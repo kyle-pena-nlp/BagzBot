@@ -29,28 +29,30 @@ export enum MenuCode {
 	ViewOpenPosition = "ViewOpenPosition",
 	ClosePositionManuallyAction = "ClosePositionManuallyAction",
 
+    TrailingStopLossRequestReturnToEditorMenu = "TLS.ReturnEditorMenu",
+
 	// Trailing Stop Loss: set buy quantity in vsToken units
-	TrailingStopLossEntryBuyQuantityMenu = "TSL.EntryBuyQuantityMenu",
-	TrailingStopLossEnterBuyQuantityKeypad = "TSL.EnterBuyQuantityKeypad",
-	TrailingStopLossEnterBuyQuantitySubmit = "TSL.EnterBuyQuantitySubmit",
+	TrailingStopLossEntryBuyQuantityMenu = "TSL.BuyQuantityMenu",
+	TrailingStopLossEnterBuyQuantityKeypad = "TSL.BuyQuantityKeypad",
+	TrailingStopLossEnterBuyQuantitySubmit = "TSL.BuyQuantitySubmit",
 
 	// Trailing Stop Loss: set vsToken UI
-	TrailingStopLossPickVsTokenMenu = "TSL.PickVsToken",
-	TrailingStopLossPickVsTokenMenuSubmit = "TSL.PickVsTokenMenuSubmit",
+	TrailingStopLossPickVsTokenMenu = "TSL.VsTokenMenu",
+	TrailingStopLossPickVsTokenMenuSubmit = "TSL.VsTokenMenuSubmit",
 	
 	// Trailing Stop Loss: set slippage tolerance UI
 	TrailingStopLossSlippagePctMenu = "TSL.SlippagePctMenu",
-	TrailingStopLossCustomSlippagePctKeypad = "TSL.CustomSlippagePctKeypad",
-	TrailingStopLossCustomSlippagePctKeypadSubmit = "TSL.CustomSlippagePctKeypad",
+	TrailingStopLossCustomSlippagePctKeypad = "TSL.SlippagePctKeypad",
+	TrailingStopLossCustomSlippagePctKeypadSubmit = "TSL.SlippageSubmit",
 
 	// Trailing Stop Loss: set trigger percent UI
 	TrailingStopLossTriggerPercentMenu = "TSL.TriggerPercentMenu",
-	TrailingStopLossCustomTriggerPercentKeypad = "TSL.CustomTriggerPercentKeypad", 
-	TrailingStopLossCustomTriggerPercentKeypadSubmit = "TSL.CustomTriggerPercentKeypadSubmit", 
+	TrailingStopLossCustomTriggerPercentKeypad = "TSL.TriggerPercentKeypad", 
+	TrailingStopLossCustomTriggerPercentKeypadSubmit = "TSL.TriggerPercentKeypadSubmit", 
 
 	// Trailing Stop Loss: auto-retry sell if slippage tolerance exceeded?
-	TrailingStopLossChooseAutoRetrySellMenu = "TSL.ChooseAutoRetrySellMenu",
-	TrailingStopLossChooseAutoRetrySellSubmit = "TSL.ChooseAutoRetrySellSubmit",
+	TrailingStopLossChooseAutoRetrySellMenu = "TSL.AutoRetrySellMenu",
+	TrailingStopLossChooseAutoRetrySellSubmit = "TSL.AutoRetrySellSubmit",
 
 	
 	TrailingStopLossConfirmMenu = "TSL.ConfirmMenu",

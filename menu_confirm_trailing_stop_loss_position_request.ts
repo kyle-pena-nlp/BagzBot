@@ -12,8 +12,8 @@ export class MenuConfirmTrailingStopLossPositionRequest extends Menu<LongTrailin
     }
     renderOptions(): CallbackButton[][] {
         const options = this.emptyMenu();
-        this.insertButtonNextLine(options, "Confirm", new CallbackData(MenuCode.TrailingStopLossEditorFinalSubmit));
-        this.insertReturnToMainButtonOnNewLine(options);
+        this.insertButtonNextLine(options, "Confirm And Place Trade", new CallbackData(MenuCode.TrailingStopLossEditorFinalSubmit));
+        this.insertButtonNextLine(options, "Cancel", new CallbackData(MenuCode.TrailingStopLossRequestReturnToEditorMenu));
         return options;
     }
     parseMode(): "HTML" | "MarkdownV2" {

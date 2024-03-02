@@ -12,7 +12,8 @@ import {
     LongTrailingStopLossPositionRequestResponse} from "./common";
 import { makeJSONRequest, makeJSONResponse } from "./http_helpers";
 import { TokenPairPositionTrackerDOFetchMethod, parseTokenPairPositionTrackerDOFetchMethod } from "./token_pair_position_tracker_DO_interop";
-
+import { SessionTrackedMap } from "./session_tracked_map";
+import { Session } from "inspector";
 
 
 /* 
@@ -24,20 +25,19 @@ export class TokenPairPositionTrackerDO {
     // persistence for this durable object
     state :   DurableObjectState
 
-    initialized : boolean
-
-    // token and the 'swap-from' vsToken (i.e; USDC)
-    token :   string|null
-    vsToken : string|null
+    // initialized properties - token and the 'swap-from' vsToken (i.e; USDC)
+    tokenAddress :   string|null
+    vsTokenAddress : string|null
     
     // staging of positions
-    unfilledPositions : Map<string,PositionRequest>
-    newOpenPositions :  Map<string,Position>
-    openPositions :     Map<string,Position>
-    closingPositions :  Map<string,Position>
-    closedPositions :   Map<string,Position>
+    unfilledPositions : SessionTrackedMap<PositionRequest> = new SessionTrackedMap<PositionRequest>("positionRequest");
+    newOpenPositions :  SessionTrackedMap<Position> = new SessionTrackedMap<Position>("newOpenPositions");
+    openPositions :     SessionTrackedMap<Position> = new SessionTrackedMap<Position>("openPositions");
+    closingPositions :  SessionTrackedMap<Position> = new SessionTrackedMap<Position>("closingPositions");
+    closedPositions :   SessionTrackedMap<Position> = new SessionTrackedMap<Position>("closedPositions");
 
     // datastructure for quick updating of prices across many positions
+    // TODO: a session-tracked version of this.
     pricePeaks : Map<number,Position[]>
     
     // RPC endpoint for executing token swaps
@@ -46,22 +46,19 @@ export class TokenPairPositionTrackerDO {
     constructor(state : DurableObjectState, env : any) {
 
         this.state       = state; // access to persistent storage (as opposed to in-memory)
-        this.initialized = false;
-        this.token       = null;  // address of token being traded
-        this.vsToken     = null;  // i.e.; USDC or SOL
-
-        /* Queues */
-        this.unfilledPositions   = new Map();  // positions sent to exchange, but not yet filled. {ID->Position}.
-        this.newOpenPositions    = new Map();  // positions open, but not yet incorporated into datastructures. {ID->Position}.
-        this.openPositions       = new Map();  // positions open, incorporated into datastructure.  Refers to same object in datastructure by ref.
-        this.closingPositions    = new Map();  // positions that will be closed
-        this.closedPositions     = new Map();  // positions that are confirmed closed
+        
+        this.tokenAddress       = null;  // address of token being traded
+        this.vsTokenAddress     = null;  // i.e.; USDC or SOL
 
         /* Data Structures */
         this.pricePeaks            = new Map(); // {PeakPrice->List[Open Positions With This Peak Price]}
         
         /* RPC connection */
         this.rpc_endpoint_url = env.RPC_ENDPOINT_URL;
+    }
+
+    initialized() : boolean {
+        return this.vsTokenAddress != null && this.tokenAddress != null;
     }
 
     async fetch(request : Request) : Promise<Response> {
@@ -96,14 +93,16 @@ export class TokenPairPositionTrackerDO {
     }
 
     assertIsInitialized() {
-        if (!this.initialized) {
+        if (!this.initialized()) {
             throw new Error("Must initialized before using");
         }
     }
 
     async handleInitialize(initializeRequest : TokenPairPositionTrackerInitializeRequest) : Promise<Response> {
-        this.token = initializeRequest.token;
-        this.vsToken = initializeRequest.vsToken;
+        if (!this.initialized()) {
+            this.tokenAddress = initializeRequest.tokenAddress;
+            this.vsTokenAddress = initializeRequest.vsTokenAddress;
+        }
         return new Response(null, { status: 200 });
     }
 

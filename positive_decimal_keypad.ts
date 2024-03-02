@@ -11,17 +11,20 @@ export class PositiveDecimalKeypad extends Menu<string> implements MenuCapabilit
     maxValue? : number
     thisMenuCode : MenuCode
     submitMenuCode : MenuCode
+    cancelMenuCode : MenuCode
 
     constructor(messageFormat: string,
         thisMenuCode : MenuCode,
         submitMenuCode : MenuCode,
+        cancelMenuCode : MenuCode,
         currentValue:string,
         minValue?:number,
         maxValue?:number) {
         super(currentValue);
         this.messageFormat = messageFormat;
         this.thisMenuCode = thisMenuCode;
-        this.submitMenuCode = submitMenuCode;       
+        this.submitMenuCode = submitMenuCode;   
+        this.cancelMenuCode = cancelMenuCode;    
         this.minValue = minValue;
         this.maxValue  = maxValue;
     }
@@ -31,7 +34,7 @@ export class PositiveDecimalKeypad extends Menu<string> implements MenuCapabilit
             currentValue: this.miscData!!
         };
         return this.messageFormat.replace(/\$\{(\w+)\}/g, (placeholder, key) => {
-            return values[key]||''; 
+            return values[key]||'[Enter A Number]'; // telegram doesn't like sending empty messages - it errors out 
         });
     }
     
@@ -64,14 +67,16 @@ export class PositiveDecimalKeypad extends Menu<string> implements MenuCapabilit
         this.maybeInsertKeypadButton(options, ".",  4);
 
         const backspaceCallbackData = new CallbackData(this.thisMenuCode, (this.miscData||'').slice(0,-1));
-        this.insertButton(options, "x", backspaceCallbackData, 4);
+        if (this.miscData||'') {
+            this.insertButton(options, "x", backspaceCallbackData, 4);
+        }
 
         if (this.isValidSubmission(this.miscData||'')) {
             const submitCallbackData = new CallbackData(this.submitMenuCode, this.miscData||'');
             this.insertButton(options, "Submit", submitCallbackData, 5);
         }
 
-        this.insertReturnToMainButtonOnNewLine(options);
+        this.insertButtonNextLine(options, "Cancel", new CallbackData(this.cancelMenuCode));
         
         return options;
     }

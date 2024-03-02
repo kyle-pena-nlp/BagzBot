@@ -84,7 +84,18 @@ export async function storeSessionObjProperty(telegramUserID : number, messageID
 
 export async function readSessionObj<TObj extends {[key : string] : SessionValue}>(telegramUserID : number, messageID : number, prefix : string, env : Env) : Promise<TObj> {
 	const record = await readSessionValuesWithPrefix(telegramUserID, messageID, prefix, env);
-	return record as TObj;
+	const obj = stripPrefixFromRecordKeys(record, prefix);
+	return obj as TObj;
+}
+
+function stripPrefixFromRecordKeys<TObj extends {[key : string] : SessionValue}>(record : Record<string,SessionValue>, prefix : string) : TObj {
+	const replacePattern = new RegExp(`^${prefix}/`);
+	const obj : {[key:string]:SessionValue} = {};
+	for (const key of Object.keys(record)) {
+		const prefixFreeKey = key.replace(replacePattern, "");
+		obj[prefixFreeKey] = record[key] as SessionValue;
+	}
+	return obj as TObj;
 }
 
 async function readSessionValuesWithPrefix(telegramUserID : number, messageID : number, prefix : string, env : Env) : Promise<any> {
@@ -111,17 +122,17 @@ export async function manuallyClosePosition(telegramUserID : number, positionID 
 	return response;
 }
 
-export async function storeSessionValues(telegramUserID : number, messageID : number, sessionValues : Map<string,SessionValue>, prefix : string, env : Env) {
+export async function storeSessionValues(telegramUserID : number, messageID : number, sessionValues : Map<string,SessionValue>, prefix : string, env : Env) : Promise<StoreSessionValuesResponse> {
 	const sessionValuesRecord : Record<string,SessionValue> = {};
 	for (const [sessionKey,value] of sessionValues) {
-		const fullSessionKey = `${prefix}:${sessionKey}`;
+		const fullSessionKey = `${prefix}/${sessionKey}`;
 		sessionValuesRecord[fullSessionKey] = value;
 	}
 	const body : StoreSessionValuesRequest = {
 		messageID: messageID,
 		sessionValues: sessionValuesRecord
 	};
-	const response = sendJSONRequestToUserDO<StoreSessionValuesRequest,StoreSessionValuesResponse>(telegramUserID, UserDOFetchMethod.storeSessionValues, body, env);
+	const response = await sendJSONRequestToUserDO<StoreSessionValuesRequest,StoreSessionValuesResponse>(telegramUserID, UserDOFetchMethod.storeSessionValues, body, env);
 	return response;
 }
 
