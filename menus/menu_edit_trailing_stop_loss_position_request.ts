@@ -1,9 +1,9 @@
 import { CallbackData } from "./callback_data";
-import { LongTrailingStopLossPositionRequest } from "../positions/positions";
+import { PositionRequest } from "../positions/positions";
 import { CallbackButton, Menu, MenuCapabilities, MenuCode } from "./menu";
 import { renderTrailingStopLossRequestMarkdown } from "./trailing_stop_loss_helpers";
 
-export class MenuEditTrailingStopLossPositionRequest extends Menu<LongTrailingStopLossPositionRequest> implements MenuCapabilities {
+export class MenuEditTrailingStopLossPositionRequest extends Menu<PositionRequest> implements MenuCapabilities {
     renderText(): string {
         return [
             `<b>Edit Your ${this.miscData!!.token} Auto-Sell Position</b>`,

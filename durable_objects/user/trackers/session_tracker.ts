@@ -1,6 +1,6 @@
 import { Session } from "inspector";
 import { randomUUID } from "node:crypto";
-import { SessionValue } from "../../common";
+import { SessionValue } from "../model/session";
 
 /*
     This class tracks 'Session State', which is values associated with a message (like a menu).

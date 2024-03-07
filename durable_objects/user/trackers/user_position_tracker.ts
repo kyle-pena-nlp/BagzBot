@@ -1,4 +1,4 @@
-import { Position } from "../../positions/positions";
+import { Position } from "../../../positions/positions";
 
 export class UserPositionTracker {
     positions : Record<string,Position> = {};

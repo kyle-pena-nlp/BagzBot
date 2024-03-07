@@ -5,15 +5,15 @@ export enum PositionType {
 };
 
 export enum PositionStatus {
-	Unfilled,
-	Open,
-	Closing,
-	Closed
+	Unfilled = "Unfilled",
+	Open = "Open",
+	Closing = "Closing",
+	Closed = "Closed"
 };
-
 
 export interface Position {
 	[key : string]: any
+
 	userID : number
 	positionID : string
 	type: PositionType
@@ -25,26 +25,25 @@ export interface Position {
 	tokenAmt : number
 	highestFillPrice : number
 	sellSlippagePercent : number
-}
 
-export interface LongTrailingStopLossPosition extends Position {
-	triggerPercent : number
+    /* Relevant if TLS position */
+    triggerPercent : number
 	retrySellIfSlippageExceeded : boolean
-}
+};
 
 export interface PositionRequest {
+    [ key : string ] : any
+
 	userID : number
 	chatID : number
 	positionID : string
 	type : PositionType
-	token : TokenInfo
-	vsToken : TokenInfo
+	tokenAddress : string
+	vsTokenAddress : string
 	vsTokenAmt : number
 	slippagePercent : number
-}
 
-export interface LongTrailingStopLossPositionRequest extends PositionRequest {
-	[ key : string ] : any
+    /* Relevant if TLS position */
 	triggerPercent : number
 	retrySellIfSlippageExceeded : boolean
-}
+};

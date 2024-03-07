@@ -1,46 +1,39 @@
 import { DurableObjectState } from "@cloudflare/workers-types";
 import { 
-    UserInitializeRequest, 
-    UserData,
-    GetUserDataRequest, 
-    DeleteSessionRequest,
-    PositionDisplayInfo,
-    StoreSessionValuesRequest,
-    GetSessionValuesRequest,
-    SessionValuesResponse,
     TokenPairPositionTrackerInitializeRequest,
-    ManuallyClosePositionRequest,
     NotifyPositionsAutoClosedRequest,
     NotifyPositionAutoClosedRequest,
     NotifyPositionAutoClosedInfo,
-    GetPositionsFromTokenPairTrackerResponse,
-    GetPositionsFromTokenPairTrackerRequest,
     GetPositionRequest,
-    StoreSessionValuesResponse,
-    UserInitializeResponse,
-    SessionValue,
-    GetSessionValuesWithPrefixRequest,
-    GetSessionValuesWithPrefixResponse,
     DefaultTrailingStopLossRequestRequest,
     LongTrailingStopLossPositionRequestResponse,
-    ListPositionsRequest,
-    ClosePositionsRequest,
-    ClosePositionsResponse} from "../../common";
+    ListPositionsRequest} from "../../common";
 
+import { UserData } from "./model/user_data";
+import { ManuallyClosePositionRequest, ManuallyClosePositionResponse } from "../../worker/actions/manually_close_position";
+import { UserInitializeRequest, UserInitializeResponse } from "./actions/user_initialize";
+import { GetUserDataRequest } from "./actions/get_user_data";
+import { DeleteSessionRequest } from "./actions/delete_session";
+import { StoreSessionValuesRequest, StoreSessionValuesResponse } from "./actions/store_session_values";
+import { GetSessionValuesRequest, SessionValuesResponse} from "./actions/get_session_values";
+import { GetSessionValuesWithPrefixRequest, GetSessionValuesWithPrefixResponse } from "./actions/get_session_values";
+import { AutomaticallyClosePositionsRequest, AutomaticallyClosePositionsResponse } from "../token_pair_position_tracker/actions/automatically_close_positions";
+
+import { SessionValue } from "./model/session";
 
 import { makeSuccessResponse, makeJSONResponse, makeFailureResponse, maybeGetJson } from "../../util/http_helpers";
-import { SessionTracker } from "./session_tracker";
-import { UserPositionTracker } from "./user_position_tracker";
+import { SessionTracker } from "./trackers/session_tracker";
+import { UserPositionTracker } from "./trackers/user_position_tracker";
 import { generateEd25519Keypair } from "../../crypto/cryptography";
 import { UserDOFetchMethod, parseUserDOFetchMethod } from "./userDO_interop";
 import { TokenPairPositionTrackerDOFetchMethod, makeTokenPairPositionTrackerDOFetchRequest } from "../token_pair_position_tracker/token_pair_position_tracker_DO_interop";
 import {  sellTokenAndParseSwapTransaction, buyTokenAndParseSwapTransaction, SwapResult, isTransactionPreparationFailure, isTransactionExecutionFailure, isTransactionConfirmationFailure, isTransactionParseFailure, isSwapExecutionError } from "../../rpc/rpc_interop";
-import { sendMessageToTG } from "../../telegram/telegram_helpers";
 import { getVsTokenInfo } from "../../tokens/vs_tokens";
 import { Env } from "../../env";
 import { Wallet } from "../../crypto/wallet";
-import { LongTrailingStopLossPositionRequest, Position, PositionRequest, PositionType } from "../../positions/positions";
+import { PositionRequest, Position, PositionType } from "../../positions/positions";
 import { TokenInfo } from "../../tokens/token_info";
+import { PositionDisplayInfo } from "./model/position_display_info";
 
 /* Durable Object storing state of user */
 export class UserDO {
@@ -52,7 +45,7 @@ export class UserDO {
     telegramUserID : number|null;
     telegramUserName : string|null;
     wallet : Wallet|null;
-    defaultTrailingStopLossRequest : LongTrailingStopLossPositionRequest;
+    defaultTrailingStopLossRequest : PositionRequest;
     sessionTracker : SessionTracker = new SessionTracker();
     positionTracker : UserPositionTracker = new UserPositionTracker();
 
@@ -168,10 +161,10 @@ export class UserDO {
                 this.assertUserHasWallet();
                 response = await this.handleManuallyClosePositionRequest(jsonRequestBody);
                 break;
-            case UserDOFetchMethod.closePositions:
+            case UserDOFetchMethod.automaticallyClosePositions:
                 this.assertUserIsInitialized();
                 this.assertUserHasWallet();
-                response = await this.handleClosePositionsRequest(jsonRequestBody);
+                response = await this.handleAutomaticallyClosePositionsRequest(jsonRequestBody);
                 break;
             case UserDOFetchMethod.notifyPositionFillSuccess:
                 this.assertUserIsInitialized();
@@ -369,7 +362,7 @@ export class UserDO {
     }
 
 
-    async handleOpenPositionsRequest(newPositionRequest : LongTrailingStopLossPositionRequest) : Promise<Response> {
+    async handleOpenPositionsRequest(newPositionRequest : PositionRequest) : Promise<Response> {
         const tokenPairPositionTrackerDO = this.getTokenPairPositionTrackerDO(newPositionRequest.token, newPositionRequest.vsToken) as DurableObjectStub;
         const _openPositionRequest = makeTokenPairPositionTrackerDOFetchRequest(TokenPairPositionTrackerDOFetchMethod.requestNewPosition, newPositionRequest);
         const response = await tokenPairPositionTrackerDO.fetch(_openPositionRequest);
@@ -409,7 +402,7 @@ export class UserDO {
         });
     }
 
-    async handleClosePositionsRequest(closePositionsRequest : ClosePositionsRequest) : Promise<Response> {
+    async handleAutomaticallyClosePositionsRequest(closePositionsRequest : AutomaticallyClosePositionsRequest) : Promise<Response> {
         for (const positionID of closePositionsRequest.positionIDs) {
             const position = this.positionTracker.getPosition(positionID);
             if (position == null) {
@@ -422,7 +415,7 @@ export class UserDO {
                 .then(this.handleSellSwapResult);
 
         }
-        const responseBody : ClosePositionsResponse = {};
+        const responseBody : AutomaticallyClosePositionsResponse = {};
         return makeJSONResponse(responseBody);
     }
 

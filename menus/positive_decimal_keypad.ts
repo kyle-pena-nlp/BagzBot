@@ -1,7 +1,5 @@
 
 import { CallbackButton, Menu, MenuCapabilities, MenuCode, MenuDisplayMode, MenuSpec } from "./menu";
-import { UserData } from "../common";
-import { TelegramWebhookInfo } from "../telegram/telegram_webhook_info";
 import { CallbackData } from "./callback_data";
 
 export class PositiveDecimalKeypad extends Menu<string> implements MenuCapabilities {

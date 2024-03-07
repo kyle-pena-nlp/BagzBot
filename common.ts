@@ -1,4 +1,4 @@
-import { LongTrailingStopLossPositionRequest, Position } from "./positions/positions"
+import { PositionRequest, Position } from "./positions/positions"
 import { TokenInfo } from "./tokens/token_info"
 
 export enum ERRORS {
@@ -9,10 +9,6 @@ export enum ERRORS {
 	NOT_A_PRIVATE_CHAT = 3000
 }
 
-
-export interface ClosePositionRequest {
-    positionID : string
-};
 
 export interface ListPositionsRequest {
 }
@@ -72,58 +68,10 @@ export class Result<T> {
 	}
 }
 
-export interface UserData {
-	durableObjectID : string
-	initialized : boolean	
-	telegramUserID? : number
-	telegramUserName?: string
-	hasWallet: boolean
-	session : Record<string,SessionValue>
-	positions : PositionDisplayInfo[]
-};
 
-export interface PositionDisplayInfo {
-	positionID : string
-	token : string
-	amount : number
-	positionTypeName : string
-};
-
-export interface GetUserDataRequest {
-	messageID : number
-};
 
 export interface GetPositionRequest {
 	positionID : string
-};
-
-export interface StoreSessionValuesRequest {
-	messageID: number
-	sessionValues : Record<string,SessionValue>
-};
-
-export interface StoreSessionValuesResponse {
-};
-
-export interface GetSessionValuesRequest {
-	messageID : number
-	sessionKeys : string[]
-}
-
-export interface SessionValuesResponse {
-	sessionValues : Record<string,SessionValue>
-}
-
-export interface DeleteSessionRequest {
-	messageID : number
-};
-
-export interface UserInitializeRequest {
-	telegramUserID : number
-	telegramUserName : string
-};
-
-export interface UserInitializeResponse {
 };
 
 export interface TokenPairPositionTrackerInitializeRequest {
@@ -133,23 +81,9 @@ export interface TokenPairPositionTrackerInitializeRequest {
 
 export interface OpenPositionRequest {
 	durableObjectID : string // UserDO
-	positionRequests : LongTrailingStopLossPositionRequest[]
+	positionRequests : PositionRequest[]
 };
 
-export interface ClosePositionsRequest {
-	positionIDs : string[]
-};
-
-export interface ClosePositionsResponse {
-}
-
-export interface ManuallyClosePositionRequest {
-	positionID : string
-}
-
-export interface ManuallyClosePositionResponse {
-
-}
 
 export interface NotifyPositionAutoClosedInfo {
 	positionID : string
@@ -188,18 +122,8 @@ export interface TokenNameAndAddress {
 	tokenAddress : string
 };
 
-export interface GetSessionValuesWithPrefixRequest {
-	messageID : number
-	prefix : string
-};
 
-export interface GetSessionValuesWithPrefixResponse {
-	values : Record<string,SessionValue>
-};
 
-export type SessionKey = string; 
-
-export type SessionValue = boolean|string|number|null;
 
 export enum CouldNotOpenPositionReason {
 	IsAlreadyBeingFilled = "IsAlreadyBeingFilled",

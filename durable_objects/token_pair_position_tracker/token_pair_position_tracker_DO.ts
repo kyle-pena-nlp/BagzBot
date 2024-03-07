@@ -1,15 +1,14 @@
 import { DurableObjectState } from "@cloudflare/workers-types";
 import { Position, PositionRequest, PositionType, PositionStatus } from "../../positions/positions";
 import { 
-    ClosePositionRequest, 
     PriceUpdate, 
     TokenPairPositionTrackerInitializeRequest,
-    LongTrailingStopLossPositionRequestResponse,
-    ClosePositionsResponse} from "../../common";
+    LongTrailingStopLossPositionRequestResponse} from "../../common";
 import { makeJSONResponse } from "../../util/http_helpers";
 import { TokenPairPositionTrackerDOFetchMethod, parseTokenPairPositionTrackerDOFetchMethod } from "./token_pair_position_tracker_DO_interop";
-import { PositionsToClose, TokenPairPositionTracker } from "./token_pair_position_tracker";
+import { PositionsToClose, TokenPairPositionTracker } from "./trackers/token_pair_position_tracker";
 import { Env } from "../../env";
+import { ManuallyClosePositionRequest, ManuallyClosePositionResponse } from "../../worker/actions/manually_close_position";
 
 /* 
     Durable Object storing all open positions for a single token/vsToken pair.  
@@ -98,43 +97,43 @@ export class TokenPairPositionTrackerDO {
     }
 
     async handleManuallyClosePosition(request : Request) : Promise<Response> {
-        const body : ClosePositionRequest = await request.json();
+        const body : ManuallyClosePositionRequest = await request.json();
         const positionID = body.positionID;
         const actionsToTake = this.tokenPairPositionTracker.manuallyClosePosition(positionID);
-        this.processActionsToTake(actionsToTake);
-        const responseBody : ClosePositionsResponse = {};
+        //this.processActionsToTake(actionsToTake);
+        const responseBody : ManuallyClosePositionResponse = {};
         return makeJSONResponse(responseBody);
     }
 
     async handleRequestNewPosition(request : Request) : Promise<Response> {
         const positionRequest : PositionRequest = await request.json();
         const actionsToTake = this.tokenPairPositionTracker.addPositionRequest(positionRequest);
-        this.processActionsToTake(actionsToTake);
+        //this.processActionsToTake(actionsToTake);
         const responseBody : LongTrailingStopLossPositionRequestResponse = {};
         return makeJSONResponse(responseBody);
     }
 
     async callbackSuccessFillingPosition(position : Position) {
         this.tokenPairPositionTracker.callbackSuccessFilledPosition(position);
-        this.notifyUserPositionFilled(position);
+        //this.notifyUserPositionFilled(position);
     }
 
     async callbackFailureFillingPosition(position : Position) {
         this.tokenPairPositionTracker.callbackFailureFilledPosition(position);
-        this.notifyUserPositionFailedToFill(position);
+        //this.notifyUserPositionFailedToFill(position);
     }
 
     async callbackSuccessClosePositions(positions : Position[]) {
         for (const position of positions) {
-            this.tokenPairPositionTracker.callbackSuccessClosedPosition(position);
-            this.notifyUserPositionClosed(position);
+            //this.tokenPairPositionTracker.callbackSuccessClosedPosition(position);
+            //this.notifyUserPositionClosed(position);
         }
     }
 
     async callbackFailureToClosePositions(positions : Position[]) {
         for (const position of positions) {
-            this.tokenPairPositionTracker.callbackFailureToClosePositions(position);
-            this.notifyUserPositionDidNotClose(position);
+            //this.tokenPairPositionTracker.callbackFailureToClosePositions(position);
+            //this.notifyUserPositionDidNotClose(position);
         }
     }    
 
@@ -145,7 +144,7 @@ export class TokenPairPositionTrackerDO {
         /* 4. (callbacks in event of failure cases handled elsewhere) */
 
         const positionsToClose = this.tokenPairPositionTracker.updatePrice(newPrice);
-        this.sendOrdersToClosePositions(positionsToClose);
+        //this.sendOrdersToClosePositions(positionsToClose);
     }
 
     async sendOrdersToClosePositions(positions : Position[]) {
@@ -156,7 +155,7 @@ export class TokenPairPositionTrackerDO {
     }
 
     sendClosePositionOrdersToUserDO(telegramUserID : number, positionsToClose :Position[]) {
-        closePositions(telegramUserID, positionsToClose);
+        //closePositions(telegramUserID, positionsToClose);
     }
 
     private groupPositionsByUser(positions : Position[]) : Map<number,Position[]> {

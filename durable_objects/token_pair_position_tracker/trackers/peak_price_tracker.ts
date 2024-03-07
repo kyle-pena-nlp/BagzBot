@@ -1,5 +1,5 @@
-import { Position, PositionStatus, PositionType } from "../../common";
-import { setDifference, setIntersection } from "../../util/set_operations";
+import { Position, PositionStatus, PositionType } from "../../../positions/positions";
+import { setDifference, setIntersection } from "../../../util/set_operations";
 
 
 export class PeakPricePositionTracker {

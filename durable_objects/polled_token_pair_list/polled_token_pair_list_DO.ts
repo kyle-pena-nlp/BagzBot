@@ -1,8 +1,8 @@
 import { DurableObjectState } from "@cloudflare/workers-types";
 import { PolledTokenPairListDOFetchMethod, ValidateTokenRequest, ValidateTokenResponse, parsePolledTokenPairListDOFetchMethod } from "./polled_token_pair_list_DO_interop";
 import { makeFailureResponse, makeJSONResponse, makeSuccessResponse, maybeGetJson } from "../../util/http_helpers";
-import { TokenTracker } from "./token_tracker";
-import { PolledTokenPairTracker } from "./polled_token_pair_tracker";
+import { TokenTracker } from "./trackers/token_tracker";
+import { PolledTokenPairTracker } from "./trackers/polled_token_pair_tracker";
 import { Env } from "../../env";
 import { TokenInfo } from "../../tokens/token_info";
 

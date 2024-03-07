@@ -1,10 +1,12 @@
 import { CallbackData } from "../menus/callback_data";
 import { TGTextEntity, TGTextEntityType } from "./telegram_helpers";
 import { getVsTokenAddress } from "../tokens/vs_tokens";
-import { LongTrailingStopLossPositionRequest, PositionType } from "../positions/positions";
+import { PositionRequest, PositionType } from "../positions/positions";
 
 export class AutoSellOrderSpec {
 
+	userID : number
+	chatID : number
 	tokenAddress : string
 	vsTokenAddress : string
 	vsTokenAmt : number
@@ -12,7 +14,17 @@ export class AutoSellOrderSpec {
 	slippageTolerancePct : number
 	autoRetrySellIfSlippageExceeded? : boolean
 	
-	constructor(tokenAddress : string, vsTokenAddress : string, vsTokenAmt : number, triggerPct : number, slippageTolerancePct : number, autoRetrySellIfSlippageExceeded? : boolean) {
+	constructor(
+		userID : number,
+		chatID : number,
+		tokenAddress : string, 
+		vsTokenAddress : string, 
+		vsTokenAmt : number, 
+		triggerPct : number, 
+		slippageTolerancePct : number, 
+		autoRetrySellIfSlippageExceeded? : boolean) {
+		this.userID = userID;
+		this.chatID = chatID;
 		this.tokenAddress = tokenAddress;
 		this.vsTokenAddress = vsTokenAddress;
 		this.vsTokenAmt = vsTokenAmt;
@@ -21,8 +33,10 @@ export class AutoSellOrderSpec {
 		this.autoRetrySellIfSlippageExceeded = autoRetrySellIfSlippageExceeded;
 	}
 
-	toPositionRequest() : LongTrailingStopLossPositionRequest {
-		const positionRequest : LongTrailingStopLossPositionRequest = {
+	toPositionRequest() : PositionRequest {
+		const positionRequest : PositionRequest = {
+			userID : this.userID,
+			chatID : this.chatID,
 			positionID : crypto.randomUUID(),
 			type : PositionType.LongTrailingStopLoss,
 			tokenAddress : this.tokenAddress,
@@ -35,7 +49,7 @@ export class AutoSellOrderSpec {
 		return positionRequest;
 	}
 
-	static parse(entities : TGTextEntity[]) : AutoSellOrderSpec|null {
+	static parse(userID : number, chatID : number, entities : TGTextEntity[]) : AutoSellOrderSpec|null {
 		const tokens = entities;
 
 		const vsTokenAmt : number|null = AutoSellOrderSpec.maybeParseFloat(tokens[1]);
@@ -85,7 +99,7 @@ export class AutoSellOrderSpec {
 			return null;
 		}
 		
-		return new AutoSellOrderSpec(tokenAddress, vsTokenAddress, vsTokenAmt, triggerPercent, slippageTolerancePercent, autoRetry);
+		return new AutoSellOrderSpec(userID, chatID, tokenAddress, vsTokenAddress, vsTokenAmt, triggerPercent, slippageTolerancePercent, autoRetry);
 	}
 
 	static describeFormat() : string {
@@ -195,7 +209,7 @@ export class TelegramWebhookInfo {
 		if (!this.commandTokens) {
 			return null;
 		}
-		const parsedResult = AutoSellOrderSpec.parse(this.commandTokens);
+		const parsedResult = AutoSellOrderSpec.parse(this.telegramUserID, this.chatID, this.commandTokens);
 		return parsedResult;
 	}
 
@@ -325,9 +339,6 @@ export class TelegramWebhookInfo {
 		const userName = [firstName, lastName].filter(x => x).join(" ") || 'user';
 		return userName;
 	}
-
-
-
 }
 
 interface RawTGTextEntity {

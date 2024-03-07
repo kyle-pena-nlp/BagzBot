@@ -1,6 +1,6 @@
-import { LongTrailingStopLossPositionRequest } from "../positions/positions";
+import { PositionRequest } from "../positions/positions";
 
-export function renderTrailingStopLossRequestMarkdown(trailingStopLossRequest : LongTrailingStopLossPositionRequest) {
+export function renderTrailingStopLossRequestMarkdown(trailingStopLossRequest : PositionRequest) {
     return `<b>Token</b>: ${trailingStopLossRequest.token}
 <b>Buying With</b>: ${trailingStopLossRequest.vsToken}
 <b>Quantity</b>: ${trailingStopLossRequest.vsTokenAmt} ${trailingStopLossRequest.vsToken}
