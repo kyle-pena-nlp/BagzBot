@@ -1,3 +1,6 @@
+import { LongTrailingStopLossPositionRequest, Position } from "./positions/positions"
+import { TokenInfo } from "./tokens/token_info"
+
 export enum ERRORS {
  	UNHANDLED_EXCEPTION = 500,
 	MISMATCHED_SECRET_TOKEN = 1000,
@@ -6,34 +9,6 @@ export enum ERRORS {
 	NOT_A_PRIVATE_CHAT = 3000
 }
 
-export interface Env {
-	ENVIRONMENT : string
-	TELEGRAM_BOT_SERVER_URL : string
-	TELEGRAM_BOT_TOKEN : string
-	TELEGRAM_BOT_WEBHOOK_SECRET_TOKEN : string
-	TELEGRAM_API_ID : string
-	TELEGRAM_API_HASH : string
-	RPC_ENDPOINT_URL : string
-	JUPITER_PRICE_API_URL : string
-	JUPITER_QUOTE_API_URL : string
-	JUPITER_SWAP_API_URL : string
-	PLATFORM_FEE_BPS : string
-	FEE_ACCOUNT_PUBLIC_KEY : string
-	UserDO : any // i'd like to strongly type this as DurableObjectNamespace, but can't for technical reasons
-	TokenPairPositionTrackerDO : any // ditto
-	PolledTokenPairListDO : any // ditto
-};
-
-export enum PositionType {
-	LongTrailingStopLoss = "Auto-Sell"
-};
-
-export enum PositionStatus {
-	Unfilled,
-	Open,
-	Closing,
-	Closed
-};
 
 export interface ClosePositionRequest {
     positionID : string
@@ -42,48 +17,15 @@ export interface ClosePositionRequest {
 export interface ListPositionsRequest {
 }
 
-export interface Position {
-	userID : number
-	positionID : string
-	type: PositionType
-	status : PositionStatus
-	token : string
-	tokenAddress: string
-	vsToken : string
-	vsTokenAddress: string
-	vsTokenValue : number
-	tokenAmt : number
-	highestFillPrice : number
-	sellSlippagePercent : number
-}
-
-export interface LongTrailingStopLossPosition extends Position {
-	triggerPercent : number
-	retrySellIfSlippageExceeded : boolean
-}
-
-export interface PositionRequest {
-	positionID : string
-	type : PositionType
-	tokenAddress : string
-	vsTokenAddress : string
-	vsTokenAmt : number
-	slippagePercent : number
-}
-
-export interface LongTrailingStopLossPositionRequest extends PositionRequest {
-	[ key : string ] : any
-	triggerPercent : number
-	retrySellIfSlippageExceeded : boolean
-}
 
 export interface LongTrailingStopLossPositionRequestResponse {
 	
 }
 
 export interface DefaultTrailingStopLossRequestRequest {
-	token : string
-	tokenAddress : string
+	userID : number,
+	chatID: number,
+	token : TokenInfo
 }
 
 export interface CreateWalletRequest {
@@ -106,10 +48,6 @@ export interface QuantityAndToken {
 	quantity : number
 }
 
-export interface Wallet {
-	publicKey : string
-	privateKey : string
-}
 
 export class Result<T> {
 
@@ -189,10 +127,8 @@ export interface UserInitializeResponse {
 };
 
 export interface TokenPairPositionTrackerInitializeRequest {
-	token : string
-	vsToken : string
-	tokenAddress : string
-	vsTokenAddress : string
+	token : TokenInfo
+	vsToken : TokenInfo
 };
 
 export interface OpenPositionRequest {
@@ -263,18 +199,17 @@ export interface GetSessionValuesWithPrefixResponse {
 
 export type SessionKey = string; 
 
-/*{
-	PositionID = "positionID",
-	Token = "token",
-	TokenAddress = "tokenAddress",
-	VsToken = "vsToken",
-	VsTokenAddress = "vsTokenAddress",
-	VsTokenAmt = "vsTokenAmt",
-	PositionType = "positionType",
-	TrailingStopLossSlippagePct = "trailingStopLossSlippagePct",
-	TrailingStopLossTriggerPercent = "trailingStopLossTriggerPercent",	
-	TrailingStopLossRetrySellIfPartialFill = "trailingStopLossRetrySellIfPartialFill",
-	TrailingStopLossRetrySellIfSlippagePctExceeded = "trailingStopLossRetrySellIfSlippagePctExceeded"
-}*/
-
 export type SessionValue = boolean|string|number|null;
+
+export enum CouldNotOpenPositionReason {
+	IsAlreadyBeingFilled = "IsAlreadyBeingFilled",
+	SlippageToleranceExceeded = "SlippageToleranceExceeded",
+	InsufficientFunds = "InsufficientFunds"
+}
+
+export enum CouldNotClosePositionReason {
+	IsCurrentBeingFilled = "IsCurrentBeingFilled",
+	IsAlreadyBeingClosed = "IsAlreadyBeingClosed",
+	IsAlreadyClosed = "IsAlreadyClosed",
+	DoesNotExist = "DoesNotExist"
+}

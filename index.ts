@@ -1,20 +1,18 @@
 
 /* Durable Objects */
-import { makeFakeFailedRequestResponse, makeJSONResponse, makeSuccessResponse } from "./http_helpers";
-import { MenuMain } from "./menu_main";
+import { makeFakeFailedRequestResponse, makeJSONResponse, makeSuccessResponse } from "./util/http_helpers";
+import { MenuMain } from "./menus/menu_main";
 
 /* Wrangler requires these to be re-exported for the DO to work */
-import { UserDO } from "./user_DO";
-import { TokenPairPositionTrackerDO } from "./token_pair_position_tracker_DO";
-import { PolledTokenPairListDO } from "./polled_token_pair_list_DO";
+import { UserDO } from "./durable_objects/user/user_DO";
+import { TokenPairPositionTrackerDO } from "./durable_objects/token_pair_position_tracker/token_pair_position_tracker_DO";
+import { PolledTokenPairListDO } from "./durable_objects/polled_token_pair_list/polled_token_pair_list_DO";
 
 /* Utility Stuff */
 import { 
 	Result, 
 	ERRORS,  
-	Env,
 	WalletData,
-	LongTrailingStopLossPositionRequest,
 	QuantityAndToken,
 	TokenNameAndAddress,
 	DeleteSessionRequest,
@@ -22,30 +20,32 @@ import {
 } from "./common";
 
 /* Type per menu (that's why there's so many) */
-import { MenuError } from "./menu_error";
-import { MenuFAQ } from "./menu_faq";
-import { MenuHelp } from "./menu_help";
-import { MenuPleaseEnterToken } from "./menu_please_enter_token";
-import { MenuListPositions } from "./menu_list_positions";
-import { MenuViewOpenPosition } from "./menu_view_open_position";
-import { MenuViewWallet } from "./menu_view_wallet";
-import { PositiveIntegerKeypad } from "./positive_integer_keypad";
-import { MenuTODO } from "./todo_menu";
-import { MenuConfirmTrailingStopLossPositionRequest } from "./menu_confirm_trailing_stop_loss_position_request";
-import { PositiveDecimalKeypad } from "./positive_decimal_keypad";
-import { MenuEditTrailingStopLossPositionRequest } from "./menu_edit_trailing_stop_loss_position_request";
-import { MenuTrailingStopLossAutoRetrySell } from "./menu_trailing_stop_loss_auto_retry_sell";
-import { MenuTrailingStopLossEntryBuyQuantity } from "./menu_trailing_stop_loss_entry_buy_quantity";
-import { MenuTrailingStopLossPickVsToken } from "./menu_trailing_stop_loss_pick_vs_token";
-import { MenuWallet } from "./menu_wallet";
-import { BaseMenu, MenuCode } from "./menu";
-import { deleteTGMessage, sendMessageToTG, sendRequestToTG } from "./telegram_helpers";
-import { AutoSellOrderSpec, TelegramWebhookInfo } from "./telegram_webhook_info";
-import { UserDOFetchMethod, createWallet, getAndMaybeInitializeUserData, getDefaultTrailingStopLoss, getPosition, listOpenTrailingStopLossPositions, makeUserDOFetchRequest, manuallyClosePosition, readSessionObj, requestNewPosition, storeSessionObj, storeSessionObjProperty, storeSessionValues } from "./userDO_interop";
-import { ValidateTokenResponse, validateToken } from "./polled_token_pair_list_DO_interop";
-import { getVsTokenAddress, getVsTokenName } from "./vs_tokens";
-import { MenuTrailingStopLossSlippagePercent } from "./menu_trailing_stop_loss_slippage_percent";
-import { MenuTrailingStopLossTriggerPercent } from "./menu_trailing_stop_loss_trigger_percent";
+import { MenuError } from "./menus/menu_error";
+import { MenuFAQ } from "./menus/menu_faq";
+import { MenuHelp } from "./menus/menu_help";
+import { MenuPleaseEnterToken } from "./menus/menu_please_enter_token";
+import { MenuListPositions } from "./menus/menu_list_positions";
+import { MenuViewOpenPosition } from "./menus/menu_view_open_position";
+import { MenuViewWallet } from "./menus/menu_view_wallet";
+import { PositiveIntegerKeypad } from "./menus/positive_integer_keypad";
+import { MenuTODO } from "./menus/todo_menu";
+import { MenuConfirmTrailingStopLossPositionRequest } from "./menus/menu_confirm_trailing_stop_loss_position_request";
+import { PositiveDecimalKeypad } from "./menus/positive_decimal_keypad";
+import { MenuEditTrailingStopLossPositionRequest } from "./menus/menu_edit_trailing_stop_loss_position_request";
+import { MenuTrailingStopLossAutoRetrySell } from "./menus/menu_trailing_stop_loss_auto_retry_sell";
+import { MenuTrailingStopLossEntryBuyQuantity } from "./menus/menu_trailing_stop_loss_entry_buy_quantity";
+import { MenuTrailingStopLossPickVsToken } from "./menus/menu_trailing_stop_loss_pick_vs_token";
+import { MenuWallet } from "./menus/menu_wallet";
+import { BaseMenu, MenuCode } from "./menus/menu";
+import { deleteTGMessage, sendMessageToTG, sendRequestToTG } from "./telegram/telegram_helpers";
+import { AutoSellOrderSpec, TelegramWebhookInfo } from "./telegram/telegram_webhook_info";
+import { UserDOFetchMethod, createWallet, getAndMaybeInitializeUserData, getDefaultTrailingStopLoss, getPosition, listOpenTrailingStopLossPositions, makeUserDOFetchRequest, manuallyClosePosition, readSessionObj, requestNewPosition, storeSessionObj, storeSessionObjProperty, storeSessionValues } from "./durable_objects/user/userDO_interop";
+import { ValidateTokenResponse, validateToken } from "./durable_objects/polled_token_pair_list/polled_token_pair_list_DO_interop";
+import { getVsTokenAddress, getVsTokenName } from "./tokens/vs_tokens";
+import { MenuTrailingStopLossSlippagePercent } from "./menus/menu_trailing_stop_loss_slippage_percent";
+import { MenuTrailingStopLossTriggerPercent } from "./menus/menu_trailing_stop_loss_trigger_percent";
+import { Env } from "./env";
+import { LongTrailingStopLossPositionRequest } from "./positions/positions";
 
 /* Export of imported DO's (required by wrangler) */
 export { UserDO, TokenPairPositionTrackerDO, PolledTokenPairListDO }
@@ -72,7 +72,7 @@ export default {
 	async _fetch(req : Request, env : Env) : Promise<Response> {
 
 		// First, validate that this req is coming from the telegram bot's webhook by checking secret key.
-		const webhookRequestValidation = this.validateRequest(req,env);
+		const webhookRequestValidation = this.validateFetchRequest(req,env);
 		if (!webhookRequestValidation.ok) {
 			this.logWebhookRequestFailure(req,webhookRequestValidation.message, {});
 			return this.makeResponseToSuspiciousWebhookRequest();
@@ -119,10 +119,11 @@ export default {
 			return makeFakeFailedRequestResponse(404, "Token does not exist");
 		}
 		else if (validateTokenResponse.type === 'valid') {
-			const token = validateTokenResponse.token;
-			const defaultTrailingStopLossRequest = await getDefaultTrailingStopLoss(telegramUserID, validateTokenResponse.token!!, validateTokenResponse.tokenAddress!!, env);
+			const defaultTrailingStopLossRequest = await getDefaultTrailingStopLoss(telegramUserID, chatID, validateTokenResponse.tokenInfo!!, env);
 			// send out a 'stub' message that will be updated as the request editor menu.
-			const tgMessageInfo = await sendMessageToTG(telegramWebhookInfo.chatID, `Token address '${tokenAddress}' (${token}) recognized!`, env);
+			const tokenAddress = validateTokenResponse.tokenInfo!!.address;
+			const tokenSymbol  = validateTokenResponse.tokenInfo!!.symbol;
+			const tgMessageInfo = await sendMessageToTG(telegramWebhookInfo.chatID, `Token address '${tokenAddress}' (${tokenSymbol}) recognized!`, env);
 			await storeSessionObj<LongTrailingStopLossPositionRequest>(telegramUserID, tgMessageInfo.messageID!!, defaultTrailingStopLossRequest, "LongTrailingStopLossPositionRequest", env);
 			const menu = this.makeTrailingStopLossRequestEditorMenu(defaultTrailingStopLossRequest);
 			const request = menu.getUpdateExistingMenuRequest(chatID, tgMessageInfo.messageID!!, env);
@@ -217,7 +218,7 @@ export default {
 			case MenuCode.TrailingStopLossEditorFinalSubmit:
 				// TODO: do the read within UserDO to avoid the extra roundtrip
 				const trailingStopLossRequestAfterFinalSubmit = await readSessionObj<LongTrailingStopLossPositionRequest>(telegramUserID, messageID, "LongTrailingStopLossPositionRequest", env);
-				await this.sendTrailingStopLossRequestToTokenPairPositionTracker(telegramUserID, trailingStopLossRequestAfterFinalSubmit, env);
+				await requestNewPosition(telegramUserID, trailingStopLossRequestAfterFinalSubmit, env);
 				// TODO: post-confirm screen
 				return this.createMainMenu(telegramWebhookInfo, env);
 			case MenuCode.TrailingStopLossEntryBuyQuantityMenu:
@@ -276,12 +277,6 @@ export default {
 		}
 	},
 
-	async deleteSessionFromUserDO(messageID : number) : Promise<Response> {
-		const deleteSessionRequestBody : DeleteSessionRequest = { messageID: messageID };
-		const request = makeUserDOFetchRequest(UserDOFetchMethod.deleteSession, deleteSessionRequestBody);
-		return await fetch(request);
-	},
-
 	async getTrailingStopLossPositionVsTokenFromSession(telegramUserID : number, messageID : number, env : Env) : Promise<TokenNameAndAddress> {
 		const positionRequest = await readSessionObj<LongTrailingStopLossPositionRequest>(telegramUserID, messageID, "LongTrailingStopLossPositionRequest", env);
 		return {
@@ -293,7 +288,7 @@ export default {
 	async getTrailingStopLossPositionQuantityAndVsTokenFromSession(telegramUserID : number, messageID : number, env: Env) : Promise<QuantityAndToken> {
 		const positionRequest = await readSessionObj<LongTrailingStopLossPositionRequest>(telegramUserID, messageID, "LongTrailingStopLossPositionRequest", env);
 		return {
-			thisToken:  getVsTokenName(positionRequest.vsToken)!!,
+			thisToken:  getVsTokenName(positionRequest.vsToken.address)!!,
 			thisTokenAddress: positionRequest.vsTokenAddress,
 			quantity: positionRequest.vsTokenAmt
 		};
@@ -379,12 +374,13 @@ export default {
 					return [autosellBadFormatMsg];
 				}
 				const tokenAddress = autoSellOrderSpec.tokenAddress;
-				const tokenInfo = await validateToken(tokenAddress, env);
-				if (tokenInfo.type !== 'valid') {
+				const validateTokenResponse = await validateToken(tokenAddress, env);
+				if (validateTokenResponse.type !== 'valid') {
 					const autosellTokenDNEMsg = `Could not identify token '${tokenAddress}'`;
 					return [autosellTokenDNEMsg];
 				}
-				const tokenRecognizedForAutoSellOrderMsg =  `Token address '${tokenAddress}' (${tokenInfo.token!!}) recognized!`;
+				const tokenInfo = validateTokenResponse.tokenInfo!!;
+				const tokenRecognizedForAutoSellOrderMsg =  `Token address '${tokenAddress}' (${tokenInfo.symbol!!}) recognized!`;
 				const positionRequest = autoSellOrderSpec.toPositionRequest();
 				return [tokenRecognizedForAutoSellOrderMsg,
 					this.makeTrailingStopLossRequestEditorMenu(positionRequest),
@@ -402,7 +398,7 @@ export default {
 		return requestBody;
 	},
 
-	validateRequest(req : Request, env : Env) : Result<boolean> {
+	validateFetchRequest(req : Request, env : Env) : Result<boolean> {
 		const requestSecretToken = req.headers.get('X-Telegram-Bot-Api-Secret-Token');
 		const secretTokensMatch = (requestSecretToken === env.TELEGRAM_BOT_WEBHOOK_SECRET_TOKEN);
 		if (!secretTokensMatch) {
