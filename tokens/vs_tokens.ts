@@ -1,4 +1,4 @@
-import { TokenInfo } from "../common";
+import { TokenInfo } from "./token_info";
 
 export enum VsToken {
 	SOL = "SOL",

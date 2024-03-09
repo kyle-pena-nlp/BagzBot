@@ -1,4 +1,4 @@
-import { UserData } from "../common";
+import { UserData } from "../durable_objects/user/model/user_data";
 import { CallbackButton, Menu, MenuCapabilities, MenuCode } from "./menu";
 
 export class MenuMain extends Menu<UserData> implements MenuCapabilities {

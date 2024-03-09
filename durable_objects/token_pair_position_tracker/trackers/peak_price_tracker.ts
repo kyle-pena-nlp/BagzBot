@@ -1,37 +1,43 @@
 import { Position, PositionStatus, PositionType } from "../../../positions/positions";
+import { DecimalizedAmount, fromKey, fromNumber, toKey } from "../../../positions/decimalized_amount";
+import { DecimalizedAmountMap } from "./decimalized_amount_map";
+import { DecimalizedAmountSet } from "./decimalized_amount_set";
+import * as dMath from "../../../positions/decimalized_math";
 import { setDifference, setIntersection } from "../../../util/set_operations";
 
+const MATH_DECIMAL_PLACES = 6;
 
 export class PeakPricePositionTracker {
 
     /* positions grouped by peakPrice, and a buffer for diffing purposes since last flush to storage */
-    _buffer : Map<number,Position[]> = new Map<number,Position[]>();
-    itemsByPeakPrice : Map<number,Position[]> = new Map<number,Position[]>();
+    _buffer : DecimalizedAmountMap<Position[]> = new DecimalizedAmountMap<Position[]>();
+    itemsByPeakPrice : DecimalizedAmountMap<Position[]> = new DecimalizedAmountMap<Position[]>();
     pricePeakSessionKeyPrefix : string    
     
     // TODO: implement these: has, set, entries, get, keys
 
     // this will need to track value-level changes in TPosition as well as push, replace, etc., TPosition must implement equality
     // or.... maybe I could do a double-buffer on itemsByPeakPrice and diff-based solution?
-    dirtyTracking : Map<number,boolean[]> = new Map<number,boolean[]>();
+    dirtyTracking : DecimalizedAmountMap<boolean[]> = new DecimalizedAmountMap<boolean[]>();
     deletedKeys : Set<number> = new Set<number>();
 
     constructor(pricePeakSessionKeyPrefix : string) {
         this.pricePeakSessionKeyPrefix = pricePeakSessionKeyPrefix;
     }
-    push(price : number, position : Position) {
+    push(price : DecimalizedAmount, position : Position) {
         if (!this.itemsByPeakPrice.has(price)) {
             this.itemsByPeakPrice.set(price, []);
         }
         this.itemsByPeakPrice.get(price)!!.push(position);
     }
-    update(newPrice : number) {
+    update(newPrice : DecimalizedAmount) {
         const peaks = [...this.itemsByPeakPrice.keys()];
-        peaks.sort();
+        peaks.sort(dMath.compare);
         const mergedPeaks = [];
         const mergedPositions = [];
         for (const peak of peaks) {
-            if (peak < newPrice) {
+            // if the new price is greater than this peak, roll in this peak to the merged peak
+            if (dMath.compare(peak, newPrice) <0) {
                 mergedPeaks.push(peak)
                 mergedPositions.push(...this.itemsByPeakPrice.get(peak)!!);
             }
@@ -47,11 +53,11 @@ export class PeakPricePositionTracker {
         }
     }
     // TODO
-    collectTrailingStopLossesToClose(newPrice : number) : Position[] {
+    collectTrailingStopLossesToClose(newPrice : DecimalizedAmount) : Position[] {
         const positionsToClose = [];
         for (const peakPrice of this.itemsByPeakPrice.keys()) {
             // TODO: arbitrary precision arithmetic?
-            const priceDecreaseFrac = (peakPrice - newPrice) / peakPrice;
+            const priceDecreaseFrac = dMath.dDiv(dMath.dSub(peakPrice, newPrice), peakPrice, MATH_DECIMAL_PLACES);
             const positionsWithThisPeakPrice = this.itemsByPeakPrice.get(peakPrice)!!;
             for (const position of positionsWithThisPeakPrice) {
                 // If it is not an open, long trailing stop loss, continue.
@@ -61,7 +67,7 @@ export class PeakPricePositionTracker {
                 }
                 if (position.type === PositionType.LongTrailingStopLoss) {
                     // And the newPrice doesn't trigger the selloff of the position, continue.
-                    const tradeIsTriggered = priceDecreaseFrac >= position.triggerPercent;
+                    const tradeIsTriggered = dMath.compare(priceDecreaseFrac, fromNumber(position.triggerPercent, MATH_DECIMAL_PLACES)) >= 0;
                     if (!tradeIsTriggered) {
                         continue;
                     }
@@ -93,25 +99,26 @@ export class PeakPricePositionTracker {
             this.itemsByPeakPrice.set(key, Array.from(sparseArray))
         }
         // when done initializing, copy state to _buffer to avoid writing back fresh state to storage
-        this.copyItemsToBuffer();
+        this.overwriteBufferWithCurrentState();
     }
     async flushToStorage(storage : DurableObjectStorage) {
         const [putEntries,deletedKeys] = this.generateDiffFromItemsBuffer();        
         const putPromise = storage.put(putEntries);
         const deletePromise = storage.delete([...deletedKeys]);
         await Promise.all([putPromise,deletePromise]).then(() => {
-            this.copyItemsToBuffer();
-        })
+            this.overwriteBufferWithCurrentState();
+        });
     }
     private generateDiffFromItemsBuffer() : [Record<string,Position>,Set<string>] {
-        const currentPriceSet = new Set<number>(this.itemsByPeakPrice.keys());
-        const oldPriceSet = new Set<number>(this._buffer.keys());
+
+        const currentPriceSet = new DecimalizedAmountSet(this.itemsByPeakPrice.keys());
+        const oldPriceSet = new DecimalizedAmountSet(this._buffer.keys());
 
         const putEntries : Record<string,Position> = {};
         const deletedKeys : Set<string> = new Set<string>();
 
         // add new entries for new price keys
-        const newPrices = setDifference(currentPriceSet, oldPriceSet);
+        const newPrices = setDifference(currentPriceSet, oldPriceSet, DecimalizedAmountSet);
         for (const newPrice of newPrices) {
             this.itemsByPeakPrice.get(newPrice)!!.forEach((position, index) => {
                 putEntries[this.makeStorageKey(newPrice,index)] = position;
@@ -119,7 +126,7 @@ export class PeakPricePositionTracker {
         }
 
         // for each price in common between here and last persistence, compare by array position
-        const commonPrices = setIntersection(currentPriceSet, oldPriceSet);
+        const commonPrices = setIntersection(currentPriceSet, oldPriceSet, DecimalizedAmountSet);
         for (const commonPrice of commonPrices) {
             const oldArray = this._buffer.get(commonPrice)!!;
             const newArray = this.itemsByPeakPrice.get(commonPrice)!!;
@@ -144,9 +151,10 @@ export class PeakPricePositionTracker {
             }
         }
 
-        const deletedPrices = setDifference(oldPriceSet, currentPriceSet);
+        // for each price in the buffer, no longer in the items, mark it as deleted.
+        const deletedPrices = setDifference(oldPriceSet, currentPriceSet, DecimalizedAmountSet);
         for (const deletedPrice of deletedPrices) {
-            this._buffer.forEach((element, index) => {
+            this._buffer.get(deletedPrice)!!.forEach((element, index) => {
                 const storageKey = this.makeStorageKey(deletedPrice, index);
                 deletedKeys.add(storageKey);
             });
@@ -157,15 +165,15 @@ export class PeakPricePositionTracker {
     private prefixRegex() : RegExp {
         return new RegExp(`^${this.pricePeakSessionKeyPrefix}:`);
     }
-    private parseStorageKey(key : string) : [number,number] {
+    private parseStorageKey(key : string) : [DecimalizedAmount,number] {
         const [prefix,priceString,indexString] = key.split(":");
-        return [parseFloat(priceString), parseInt(indexString,10)];
+        return [fromKey(priceString), parseInt(indexString,10)];
     }
-    private makeStorageKey(price : number, index : number) : string {
+    private makeStorageKey(price : DecimalizedAmount, index : number) : string {
         // TODO: make decimalized prices the law of the land in this codebase
-        return `${this.pricePeakSessionKeyPrefix}:${price.toString()}:${index.toString()}`
+        return `${this.pricePeakSessionKeyPrefix}:${toKey(price)}:${index.toString()}`
     }
-    private copyItemsToBuffer() {
+    private overwriteBufferWithCurrentState() {
         this._buffer.clear();
         for (const key of this.itemsByPeakPrice.keys()) {
             this._buffer.set(key, []);

@@ -8,5 +8,4 @@ export interface UserData {
 	telegramUserName?: string
 	hasWallet: boolean
 	session : Record<string,SessionValue>
-	positions : PositionDisplayInfo[]
 };

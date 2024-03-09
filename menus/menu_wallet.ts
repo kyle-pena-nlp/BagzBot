@@ -1,5 +1,5 @@
 import { CallbackButton, Menu, MenuCapabilities, MenuCode } from "./menu";
-import { WalletData } from "../common";
+import { WalletData } from "../durable_objects/user/model/wallet_data";
 
 export class MenuWallet extends Menu<WalletData> implements MenuCapabilities {
     renderText(): string {

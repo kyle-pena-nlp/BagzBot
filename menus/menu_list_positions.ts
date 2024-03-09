@@ -1,5 +1,5 @@
+import { Position } from "../positions/positions";
 import { CallbackData } from "./callback_data";
-import { Position } from "../common";
 import { CallbackButton, Menu, MenuCapabilities, MenuCode } from "./menu";
 
 export class MenuListPositions extends Menu<Position[]> implements MenuCapabilities {

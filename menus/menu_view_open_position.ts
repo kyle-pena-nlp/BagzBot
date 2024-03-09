@@ -1,11 +1,11 @@
+import { Position } from "../positions/positions";
 import { CallbackData } from "./callback_data";
-import { Position } from "../common";
 import { CallbackButton, Menu, MenuCapabilities, MenuCode } from "./menu";
 
 export class MenuViewOpenPosition extends Menu<Position> implements MenuCapabilities {
     renderText(): string {
         const line1 = `<b>${this.miscData!!.type.toString()}</b> <i>${this.miscData!!.token}</i> position (${this.miscData!!.tokenAmt.toString()})`
-        const line2 = `Current Value in ${this.miscData!!.vsToken}: <b>${this.miscData!!.vsTokenValue.toString()}</b> ${this.miscData!!.vsToken}`
+        const line2 = ``;//`Current Value in ${this.miscData!!.vsToken}: <b>${this.miscData!!.vsTokenValue.toString()}</b> ${this.miscData!!.vsToken}`
         return [line1,line2].join("\r\n");
     }
     renderOptions(): CallbackButton[][] {

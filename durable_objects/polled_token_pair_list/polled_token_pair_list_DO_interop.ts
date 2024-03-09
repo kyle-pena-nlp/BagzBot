@@ -1,19 +1,10 @@
-import { TokenInfo } from "../../common";
 import { Env } from "../../env";
 import { makeJSONRequest, makeRequest } from "../../util/http_helpers";
-
-export interface ValidateTokenRequest {
-    tokenAddress: string
-};
-
-export interface ValidateTokenResponse {
-	type : 'valid'|'invalid'
-	tokenInfo? : TokenInfo
-};
+import { GetTokenInfoRequest, GetTokenInfoResponse } from "./actions/get_token_info";
 
 export enum PolledTokenPairListDOFetchMethod {
 	initialize = "initialize",
-    validateToken = "validateToken"
+    getTokenInfo = "getTokenInfo"
 }
 
 export function parsePolledTokenPairListDOFetchMethod(value : string) : PolledTokenPairListDOFetchMethod|null {
@@ -45,8 +36,8 @@ async function sendJSONRequestToDO<TRequest,TResponse>(method : PolledTokenPairL
 	return jsonResponse as TResponse;
 }
 
-export async function validateToken(tokenAddress : string, env : Env) : Promise<ValidateTokenResponse> {
-	const body : ValidateTokenRequest = { tokenAddress : tokenAddress };
-	const response = sendJSONRequestToDO<ValidateTokenRequest,ValidateTokenResponse>(PolledTokenPairListDOFetchMethod.validateToken, body, env);
+export async function getTokenInfo(tokenAddress : string, env : Env) : Promise<GetTokenInfoResponse> {
+	const body : GetTokenInfoRequest = { tokenAddress : tokenAddress };
+	const response = sendJSONRequestToDO<GetTokenInfoRequest,GetTokenInfoResponse>(PolledTokenPairListDOFetchMethod.getTokenInfo, body, env);
 	return response;
 }

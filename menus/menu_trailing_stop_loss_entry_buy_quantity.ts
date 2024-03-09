@@ -1,5 +1,5 @@
+import { QuantityAndToken } from "../durable_objects/user/model/quantity_and_token";
 import { CallbackData } from "./callback_data";
-import { QuantityAndToken } from "../common";
 import { Menu, MenuCapabilities, CallbackButton, MenuCode } from "./menu";
 
 export class MenuTrailingStopLossEntryBuyQuantity extends Menu<QuantityAndToken> implements MenuCapabilities {

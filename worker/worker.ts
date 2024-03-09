@@ -1,5 +1,5 @@
-import { QuantityAndToken, TokenNameAndAddress, WalletData } from "../common";
-import { ValidateTokenResponse, validateToken } from "../durable_objects/polled_token_pair_list/polled_token_pair_list_DO_interop";
+import { TokenNameAndAddress } from "../durable_objects/user/model/token_name_and_address";
+import { getTokenInfo } from "../durable_objects/polled_token_pair_list/polled_token_pair_list_DO_interop";
 import { SessionValue } from "../durable_objects/user/model/session";
 import { createWallet, getAndMaybeInitializeUserData, getDefaultTrailingStopLoss, getPosition, listOpenTrailingStopLossPositions, manuallyClosePosition, readSessionObj, requestNewPosition, storeSessionObj, storeSessionObjProperty, storeSessionValues } from "../durable_objects/user/userDO_interop";
 import { Env } from "../env";
@@ -9,15 +9,18 @@ import { AutoSellOrderSpec, TelegramWebhookInfo } from "../telegram/telegram_web
 import { getVsTokenAddress, getVsTokenName } from "../tokens/vs_tokens";
 import { makeFakeFailedRequestResponse, makeJSONResponse, makeSuccessResponse } from "../util/http_helpers";
 import { BaseMenu, MenuCode, MenuConfirmTrailingStopLossPositionRequest, MenuEditTrailingStopLossPositionRequest, MenuError, MenuFAQ, MenuHelp, MenuListPositions, MenuMain, MenuPleaseEnterToken, MenuTODO, MenuTrailingStopLossAutoRetrySell, MenuTrailingStopLossEntryBuyQuantity, MenuTrailingStopLossPickVsToken, MenuTrailingStopLossSlippagePercent, MenuTrailingStopLossTriggerPercent, MenuViewOpenPosition, MenuViewWallet, MenuWallet, PositiveDecimalKeypad, PositiveIntegerKeypad } from "../menus";
+import { WalletData } from "../durable_objects/user/model/wallet_data";
+import { QuantityAndToken } from "../durable_objects/user/model/quantity_and_token";
+import { PositionRequestRequest } from "./actions/request_new_position";
+import { GetTokenInfoResponse } from "../durable_objects/polled_token_pair_list/actions/get_token_info";
 
 export class Worker {
-
 
     async handleMessage(telegramWebhookInfo : TelegramWebhookInfo, env : Env) : Promise<Response> {
         const telegramUserID = telegramWebhookInfo.telegramUserID;
         const chatID = telegramWebhookInfo.chatID;
         const tokenAddress = telegramWebhookInfo.text!!;
-        const validateTokenResponse : ValidateTokenResponse = await validateToken(tokenAddress, env);
+        const validateTokenResponse : GetTokenInfoResponse = await getTokenInfo(tokenAddress, env);
         if (validateTokenResponse.type === 'invalid') {
             await sendMessageToTG(chatID, `The token address '${tokenAddress}' is not a known token.`, env);
             return makeFakeFailedRequestResponse(404, "Token does not exist");
@@ -49,6 +52,7 @@ export class Worker {
     async handleCallbackQueryInternal(telegramWebhookInfo : TelegramWebhookInfo, env : Env) : Promise<BaseMenu|void> {
         const telegramUserID = telegramWebhookInfo.telegramUserID;
         const messageID = telegramWebhookInfo.messageID;
+        const chatID = telegramWebhookInfo.chatID;
         const callbackData = telegramWebhookInfo.callbackData!!;switch(callbackData.menuCode) {
             case MenuCode.Main:
                 return this.createMainMenu(telegramWebhookInfo, env);
@@ -121,8 +125,9 @@ export class Worker {
                 return this.makeTrailingStopLossRequestEditorMenu(trailingStopLossPositionRequestAfterEditingCustomTriggerPercent);
             case MenuCode.TrailingStopLossEditorFinalSubmit:
                 // TODO: do the read within UserDO to avoid the extra roundtrip
-                const trailingStopLossRequestAfterFinalSubmit = await readSessionObj<PositionRequest>(telegramUserID, messageID, "PositionRequest", env);
-                await requestNewPosition(telegramUserID, trailingStopLossRequestAfterFinalSubmit, env);
+                const positionRequestAfterFinalSubmit = await readSessionObj<PositionRequest>(telegramUserID, messageID, "PositionRequest", env);
+                const positionRequestRequest : PositionRequestRequest = { chatID: chatID, userID: telegramUserID, positionRequest: positionRequestAfterFinalSubmit };
+                await requestNewPosition(telegramUserID, positionRequestRequest, env);
                 // TODO: post-confirm screen
                 return this.createMainMenu(telegramWebhookInfo, env);
             case MenuCode.TrailingStopLossEntryBuyQuantityMenu:
@@ -134,7 +139,6 @@ export class Worker {
             case MenuCode.TrailingStopLossPickVsTokenMenuSubmit:
                 const trailingStopLossSelectedVsToken = callbackData.menuArg!!;
                 const vsTokenAddress = getVsTokenAddress(trailingStopLossSelectedVsToken);
-                //await storeSessionObjProperty(telegramUserID, messageID, "vsTokenAddress", vsTokenAddress, "PositionRequest", env);
                 await storeSessionValues(telegramUserID, messageID, new Map<string,SessionValue>([
                     ["vsToken", trailingStopLossSelectedVsToken],
                     ["vsTokenAddress", vsTokenAddress]
@@ -198,7 +202,7 @@ export class Worker {
         };
     }
 
-    async sendTrailingStopLossRequestToTokenPairPositionTracker(telegramUserID : number, trailingStopLossPositionRequest : PositionRequest, env : Env) : Promise<void> {
+    async sendTrailingStopLossRequestToTokenPairPositionTracker(telegramUserID : number, trailingStopLossPositionRequest : PositionRequestRequest, env : Env) : Promise<void> {
         await requestNewPosition(telegramUserID, trailingStopLossPositionRequest, env);
     }
 
@@ -278,12 +282,12 @@ export class Worker {
                     return [autosellBadFormatMsg];
                 }
                 const tokenAddress = autoSellOrderSpec.tokenAddress;
-                const validateTokenResponse = await validateToken(tokenAddress, env);
-                if (validateTokenResponse.type !== 'valid') {
+                const getTokenResponse = await getTokenInfo(tokenAddress, env);
+                if (getTokenResponse.type !== 'valid') {
                     const autosellTokenDNEMsg = `Could not identify token '${tokenAddress}'`;
                     return [autosellTokenDNEMsg];
                 }
-                const tokenInfo = validateTokenResponse.tokenInfo!!;
+                const tokenInfo = getTokenResponse.tokenInfo!!;
                 const tokenRecognizedForAutoSellOrderMsg =  `Token address '${tokenAddress}' (${tokenInfo.symbol!!}) recognized!`;
                 const positionRequest = autoSellOrderSpec.toPositionRequest();
                 return [tokenRecognizedForAutoSellOrderMsg,

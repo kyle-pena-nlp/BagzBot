@@ -75,7 +75,7 @@ export class TokenTracker {
         const tokenAddressKey = new TokenAddressKey(tokenAddress);
         this.nonExistentTokenAddresses[tokenAddressKey.toString()] = new Date();
     }
-    isNonExistent(tokenAddress : string) : Date|null {
+    isRepeatedlyNonExistent(tokenAddress : string) : Date|null {
         const tokenAddressKey = new TokenAddressKey(tokenAddress);
         return this.nonExistentTokenAddresses[tokenAddressKey.toString()]||null;
     }

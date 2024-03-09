@@ -1,4 +1,5 @@
 import { TokenInfo } from "../tokens/token_info"
+import { DecimalizedAmount } from "./decimalized_amount";
 
 export enum PositionType {
 	LongTrailingStopLoss = "Auto-Sell"
@@ -11,6 +12,7 @@ export enum PositionStatus {
 	Closed = "Closed"
 };
 
+
 export interface Position {
 	[key : string]: any
 
@@ -20,10 +22,9 @@ export interface Position {
 	status : PositionStatus
 	token: TokenInfo
 	vsToken: TokenInfo
-	vsTokenAmt: number // TODO: switch to RawTokenAmount (decimalized)
-	vsTokenValue : number
-	tokenAmt : number
-	highestFillPrice : number
+	vsTokenAmt: DecimalizedAmount // TODO: switch to RawTokenAmount (decimalized)
+	tokenAmt : DecimalizedAmount
+	fillPrice : DecimalizedAmount
 	sellSlippagePercent : number
 
     /* Relevant if TLS position */
@@ -35,7 +36,6 @@ export interface PositionRequest {
     [ key : string ] : any
 
 	userID : number
-	chatID : number
 	positionID : string
 	type : PositionType
 	tokenAddress : string

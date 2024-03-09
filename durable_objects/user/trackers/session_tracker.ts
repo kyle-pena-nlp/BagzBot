@@ -1,4 +1,3 @@
-import { Session } from "inspector";
 import { randomUUID } from "node:crypto";
 import { SessionValue } from "../model/session";
 

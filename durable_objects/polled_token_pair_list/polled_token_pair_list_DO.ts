@@ -1,10 +1,11 @@
 import { DurableObjectState } from "@cloudflare/workers-types";
-import { PolledTokenPairListDOFetchMethod, ValidateTokenRequest, ValidateTokenResponse, parsePolledTokenPairListDOFetchMethod } from "./polled_token_pair_list_DO_interop";
+import { PolledTokenPairListDOFetchMethod, parsePolledTokenPairListDOFetchMethod } from "./polled_token_pair_list_DO_interop";
 import { makeFailureResponse, makeJSONResponse, makeSuccessResponse, maybeGetJson } from "../../util/http_helpers";
 import { TokenTracker } from "./trackers/token_tracker";
 import { PolledTokenPairTracker } from "./trackers/polled_token_pair_tracker";
 import { Env } from "../../env";
 import { TokenInfo } from "../../tokens/token_info";
+import { GetTokenInfoRequest, GetTokenInfoResponse } from "./actions/get_token_info";
 
 type TokensByVsToken = Map<string,string[]>;
 interface PriceAPIRequestSpec {
@@ -44,7 +45,7 @@ export class PolledTokenPairListDO {
         switch(method) {
             case PolledTokenPairListDOFetchMethod.initialize:
                 return makeSuccessResponse();
-            case PolledTokenPairListDOFetchMethod.validateToken:
+            case PolledTokenPairListDOFetchMethod.getTokenInfo:
                 const validateTokenResponse = await this.handleValidateToken(jsonRequestBody);
                 return makeJSONResponse(validateTokenResponse);
             default:
@@ -52,7 +53,7 @@ export class PolledTokenPairListDO {
         }
     }
 
-    async handleValidateToken(request: ValidateTokenRequest) : Promise<ValidateTokenResponse> {
+    async handleValidateToken(request: GetTokenInfoRequest) : Promise<GetTokenInfoResponse> {
         
         const tokenAddress = request.tokenAddress;
 
@@ -65,7 +66,7 @@ export class PolledTokenPairListDO {
 
         // TODO: retry of existence check under certain circumstances (which circumstances?)
         // if the token is already known to not exist, return invalid
-        if (this.tokenTracker.isNonExistent(tokenAddress)) {
+        if (this.tokenTracker.isRepeatedlyNonExistent(tokenAddress)) {
             return {
                 type: 'invalid'
             }

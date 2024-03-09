@@ -1,5 +1,5 @@
 import { CallbackData } from "./callback_data";
-import { TokenNameAndAddress } from "../common";
+import { TokenNameAndAddress } from "../durable_objects/user/model/token_name_and_address";
 import { Menu, MenuCapabilities, CallbackButton, MenuCode } from "./menu";
 import { VsToken } from "../tokens/vs_tokens";
 

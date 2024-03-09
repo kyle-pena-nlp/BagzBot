@@ -3,8 +3,9 @@ import { makeJSONRequest } from "../util/http_helpers";
 import { getVsTokenDecimalsMultiplier } from "../tokens/vs_tokens";
 import { Connection, PublicKey, Signer, VersionedTransaction } from '@solana/web3.js';
 import * as bs58 from "bs58";
-import { Position, PositionRequest } from "../positions/positions";
+import { Position, PositionRequest, DecimalizedAmount } from "../positions/positions";
 import { Wallet } from "../crypto/wallet";
+import { dDiv } from "../positions/decimalized_math";
 
 // TODO: careful analysis of failure modes and their mitigations
 // TODO: https://solanacookbook.com/guides/retrying-transactions.html#how-rpc-nodes-broadcast-transactions
@@ -26,7 +27,6 @@ export enum TransactionExecutionError {
 
 // transaction sent, but couldn't be confirmed
 export enum TransactionConfirmationFailure {
-    FailedToExecuteTransaction = "FailedToExecuteTransaction",
     FailedToGetLatestBlockhash = "FailedToGetLatestBlockhash",
     FailedToConfirmTransaction = "FailedToConfirmTransaction",
 };
@@ -44,6 +44,16 @@ export interface SwapResult {
     successfulSwapSummary ?: SuccessfulSwapSummary
 };
 
+export interface SuccessfulSwapSummary {
+    inTokenAddress : string,
+    inTokenAmt : DecimalizedAmount,
+    outTokenAddress: string,
+    outTokenAmt: DecimalizedAmount,
+    fees: number
+    fillPrice : DecimalizedAmount
+};
+
+
 // transaction finalized, but couldn't parse it
 export enum TransactionParseFailure {
     BadRequest = "BadRequest",
@@ -58,13 +68,6 @@ export enum SwapExecutionError {
     OtherError = "OtherError"
 }
 
-export interface SuccessfulSwapSummary {
-    inTokenAddress : string,
-    inTokenAmt : RawTokenAmount,
-    outTokenAddress: string,
-    outTokenAmt: RawTokenAmount,
-    fees: number
-};
 
 export interface SwapRoute {
     route : object
@@ -84,6 +87,10 @@ export function isTransactionExecutionFailure<T>(obj : T|TransactionExecutionErr
 
 export function isTransactionConfirmationFailure<T>(obj : T|TransactionConfirmationFailure) : obj is TransactionConfirmationFailure {
     return typeof obj === 'object' && obj != null && Object.values(obj).includes(TransactionConfirmationFailure.FailedToConfirmTransaction);
+}
+
+export function isRetryableTransactionParseFailure<T>(obj : T | TransactionParseFailure) : obj is TransactionParseFailure.RateLimited|TransactionParseFailure.InternalError {
+    return obj === TransactionParseFailure.RateLimited || obj === TransactionParseFailure.InternalError;
 }
 
 export function isTransactionParseFailure<T>(obj : T |TransactionParseFailure) : obj is TransactionParseFailure {
@@ -135,7 +142,7 @@ async function getRawSignedTransaction(swapRoute : SwapRoute|TransactionPreparat
 export async function getSellTokenSwapRoute(position : Position, env : Env) : Promise<SwapRoute|TransactionPreparationFailure> {
     const tokenAddress = position.tokenAddress;
     const vsTokenAddress = position.vsTokenAddress;
-    const decimalizedTokenAmount = position.tokenAmt * Math.pow(10, position.vsToken.decimals);
+    const decimalizedTokenAmount = position.tokenAmt.tokenAmount;
     const slippageBps = position.sellSlippagePercent * 100;
     const platformFeeBps = parseInt(env.PLATFORM_FEE_BPS,10);
     const quote_api_parameterized_url = makeQuoteAPIURL(tokenAddress, vsTokenAddress, decimalizedTokenAmount, slippageBps, platformFeeBps, env);
@@ -154,7 +161,7 @@ async function getBuyTokenSwapRoute(positionRequest : PositionRequest, env : Env
     const tokenAddress = positionRequest.token.address;
     const slippageBps = positionRequest.slippagePercent * 100;
     const vsTokenDecimalsMultiplier = getVsTokenDecimalsMultiplier(vsTokenAddress)!!;
-    const decimalizedVsTokenAmount = positionRequest.vsTokenAmt * vsTokenDecimalsMultiplier;
+    const decimalizedVsTokenAmount = (positionRequest.vsTokenAmt * vsTokenDecimalsMultiplier).toString();
     const platformFeeBps = parseInt(env.PLATFORM_FEE_BPS,10);
     const quote_api_parameterized_url = makeQuoteAPIURL(vsTokenAddress, tokenAddress, decimalizedVsTokenAmount, slippageBps, platformFeeBps, env);
     try {
@@ -167,7 +174,7 @@ async function getBuyTokenSwapRoute(positionRequest : PositionRequest, env : Env
     }
 }
 
-function makeQuoteAPIURL(inputTokenAddress : string, outputTokenAddress : string, decimalizedAmount : number, slippageBps : number, platformFeeBps : number, env : Env) {
+function makeQuoteAPIURL(inputTokenAddress : string, outputTokenAddress : string, decimalizedAmount : string, slippageBps : number, platformFeeBps : number, env : Env) {
     return `${env.JUPITER_QUOTE_API_URL}?inputMint=${inputTokenAddress}\
     &outputMint=${outputTokenAddress}\
     &amount=${decimalizedAmount}\
@@ -231,6 +238,15 @@ async function executeRawSignedTransaction(
         return { positionID : positionID, status: txID };
     }
 
+    return await confirmTransaction(txID, positionID, env, connection);
+}
+
+export async function confirmTransaction(txID : string, positionID : string, env : Env, connection?: Connection) : Promise<PreparseSwapResult> {
+
+    if (connection == null) {
+        connection = new Connection(env.RPC_ENDPOINT_URL);
+    }
+
     const latestBlockhash = await connection.getLatestBlockhash('finalized').catch(reason => TransactionConfirmationFailure.FailedToGetLatestBlockhash);
 
     if (isTransactionConfirmationFailure(latestBlockhash)) {
@@ -256,17 +272,12 @@ async function executeRawSignedTransaction(
     return { positionID : positionID, status: 'transaction-confirmed', txID : txID };
 }
 
-interface RawTokenAmount {
-    tokenAmount : string, 
-    decimals : number
-}
-
 interface HeliusParsedTokenInputOutput {
-    rawTokenAmount : RawTokenAmount
+    rawTokenAmount : DecimalizedAmount
     mint : string
 }
 
-async function parseSwapTransaction(positionID : string, transactionResult : PreparseSwapResult, env : Env) : Promise<SwapResult> {
+export async function parseSwapTransaction(positionID : string, transactionResult : PreparseSwapResult, env : Env) : Promise<SwapResult> {
     
     const status = transactionResult.status;
 
@@ -349,14 +360,20 @@ function summarizeParsedSwapTransaction(summarizeMe : { parsed: any }, env : Env
         const tokenOutputs = swapEvent.tokenOutputs[0] as HeliusParsedTokenInputOutput;
         const decimalizedFees = parsedTransaction.fee as number;
         const solFee = decimalizedFees / getVsTokenDecimalsMultiplier('SOL')!!;
+        const fillPrice = calculateFillPrice(tokenInputs, tokenOutputs);
         return {
             inTokenAddress : tokenInputs.mint,
             inTokenAmt : tokenInputs.rawTokenAmount,
             outTokenAddress: tokenOutputs.mint,
             outTokenAmt: tokenOutputs.rawTokenAmount,
-            fees: solFee
+            fees: solFee,
+            fillPrice: fillPrice
         };
     }
+}
+
+function calculateFillPrice(tokenInput : HeliusParsedTokenInputOutput, tokenOutput : HeliusParsedTokenInputOutput) {
+    return dDiv(tokenOutput.rawTokenAmount, tokenInput.rawTokenAmount)
 }
 
 function parseTransactionError(parsedTransaction : any, env : Env) : SwapExecutionError {

@@ -1,22 +1,26 @@
 
+import { Env } from "./env";
+import { makeFakeFailedRequestResponse, makeSuccessResponse } from "./util/http_helpers";
+import { TelegramWebhookInfo } from "./telegram/telegram_webhook_info";
+import { Worker } from "./worker/worker";
+import { Result } from "./util/result";
+
 /* Durable Objects */
 import { UserDO } from "./durable_objects/user/user_DO";
 import { TokenPairPositionTrackerDO } from "./durable_objects/token_pair_position_tracker/token_pair_position_tracker_DO";
 import { PolledTokenPairListDO } from "./durable_objects/polled_token_pair_list/polled_token_pair_list_DO";
 
-/* CloudFlare environment */
-import { Env } from "./env";
-
-/* Misc */
-import { ERRORS, Result } from "./common";
-import { makeFakeFailedRequestResponse, makeSuccessResponse } from "./util/http_helpers";
-import { TelegramWebhookInfo } from "./telegram/telegram_webhook_info";
-
-/* This has the logic for the worker */
-import { Worker } from "./worker/worker";
 
 /* Export of imported DO's (required by wrangler) */
 export { UserDO, TokenPairPositionTrackerDO, PolledTokenPairListDO }
+
+enum ERRORS {
+    UNHANDLED_EXCEPTION = 500,
+   MISMATCHED_SECRET_TOKEN = 1000,
+   COULDNT_PARSE_REQUEST_BODY_JSON = 1500,
+   NO_RESPONSE = 2000,
+   NOT_A_PRIVATE_CHAT = 3000
+}
 
 /**
  * Worker
@@ -91,7 +95,7 @@ export default {
         const requestSecretToken = req.headers.get('X-Telegram-Bot-Api-Secret-Token');
         const secretTokensMatch = (requestSecretToken === env.TELEGRAM_BOT_WEBHOOK_SECRET_TOKEN);
         if (!secretTokensMatch) {
-            return Result.failure(ERRORS.MISMATCHED_SECRET_TOKEN);
+            return Result.failure(ERRORS.MISMATCHED_SECRET_TOKEN.toString());
         }
         return Result.success(true);
     },
@@ -123,7 +127,7 @@ export default {
 		});
 		return response;
 	},
-	
+
     logWebhookRequestFailure(req : Request, error_code : ERRORS | string | undefined, addl_info_obj : any) {
         const ip_address = this.ip_address_of(req);
         const addl_info = JSON.stringify(addl_info_obj || {}, null, 0);

@@ -1,4 +1,4 @@
-import { Session } from "inspector";
+import { DecimalizedAmount } from "../../../positions/decimalized_amount";
 import { Position, PositionRequest, PositionStatus } from "../../../positions/positions";
 import { PeakPricePositionTracker } from "./peak_price_tracker";
 import { SessionTrackedMap } from "./session_tracked_map";
@@ -30,6 +30,12 @@ export class TokenPairPositionTracker {
     constructor() {
     }
 
+    importNewOpenPositions(positions : Position[]) {
+        for (const position of positions) {
+            this.newOpenPositions.set(position.positionID, position);
+        }
+    }
+
     addPositionRequest(positionRequest : PositionRequest) {
         this.sentPositionRequests.set(positionRequest.positionID, positionRequest);
     }
@@ -43,14 +49,14 @@ export class TokenPairPositionTracker {
         this.sentPositionRequests.delete(position.positionID);
     }
 
-    updatePrice(newPrice : number) : PositionsToClose {
+    updatePrice(newPrice : DecimalizedAmount) : PositionsToClose {
 
         // take new open positions out of staging and into the data structure(s)
         for (const [positionID,newOpenPosition] of this.newOpenPositions) {
             // add it to set of all open positions
             this.openPositions.set(newOpenPosition.positionID, newOpenPosition);            
             // add it to peak price tracking
-            this.pricePeaks.push(newOpenPosition.highestFillPrice, newOpenPosition);
+            this.pricePeaks.push(newOpenPosition.fillPrice, newOpenPosition);
         }
         this.newOpenPositions.clear();
 

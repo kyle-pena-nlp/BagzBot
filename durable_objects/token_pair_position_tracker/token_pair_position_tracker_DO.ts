@@ -1,14 +1,15 @@
 import { DurableObjectState } from "@cloudflare/workers-types";
-import { Position, PositionRequest, PositionType, PositionStatus } from "../../positions/positions";
-import { 
-    PriceUpdate, 
-    TokenPairPositionTrackerInitializeRequest,
-    LongTrailingStopLossPositionRequestResponse} from "../../common";
+import { Position, PositionRequest } from "../../positions/positions";
 import { makeJSONResponse } from "../../util/http_helpers";
 import { TokenPairPositionTrackerDOFetchMethod, parseTokenPairPositionTrackerDOFetchMethod } from "./token_pair_position_tracker_DO_interop";
-import { PositionsToClose, TokenPairPositionTracker } from "./trackers/token_pair_position_tracker";
+import { TokenPairPositionTracker } from "./trackers/token_pair_position_tracker";
 import { Env } from "../../env";
 import { ManuallyClosePositionRequest, ManuallyClosePositionResponse } from "../../worker/actions/manually_close_position";
+import { PositionRequestResponse } from "../../worker/actions/request_new_position";
+import { PriceUpdate } from "./model/price_update";
+import { TokenPairPositionTrackerInitializeRequest } from "../user/actions/initialize_token_pair_position_tracker";
+import { ImportNewPositionsRequest, ImportNewPositionsResponse } from "./actions/import_new_positions";
+import { DecimalizedAmount } from "../../positions/decimalized_amount";
 
 /* 
     Durable Object storing all open positions for a single token/vsToken pair.  
@@ -60,9 +61,18 @@ export class TokenPairPositionTrackerDO {
             case TokenPairPositionTrackerDOFetchMethod.requestNewPosition:
                 this.assertIsInitialized();
                 return await this.handleRequestNewPosition(body);
+            case TokenPairPositionTrackerDOFetchMethod.importNewOpenPositions:
+                this.assertIsInitialized();
+                return await this.handleImportNewOpenPositions(body);
             default:
                 throw new Error(`Unknown method ${method}`);
         }
+    }
+
+    async handleImportNewOpenPositions(body : ImportNewPositionsRequest) {
+        const responseBody : ImportNewPositionsResponse = {};
+        this.tokenPairPositionTracker.importNewOpenPositions(body.positions);
+        return makeJSONResponse(responseBody);
     }
 
     async validateFetchRequest(request : Request) : Promise<[TokenPairPositionTrackerDOFetchMethod,any]> {
@@ -109,7 +119,7 @@ export class TokenPairPositionTrackerDO {
         const positionRequest : PositionRequest = await request.json();
         const actionsToTake = this.tokenPairPositionTracker.addPositionRequest(positionRequest);
         //this.processActionsToTake(actionsToTake);
-        const responseBody : LongTrailingStopLossPositionRequestResponse = {};
+        const responseBody : PositionRequestResponse = {};
         return makeJSONResponse(responseBody);
     }
 
@@ -137,7 +147,7 @@ export class TokenPairPositionTrackerDO {
         }
     }    
 
-    async updatePrice(newPrice : number) {
+    async updatePrice(newPrice : DecimalizedAmount) {
         /* 1. Incorporate new open positions since last tick into price data structures */
         /* 2. Update price data structures with new price */
         /* 3. Collect trades to execute, execute them.    */

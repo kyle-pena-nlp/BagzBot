@@ -1,4 +1,3 @@
-import { CreateWalletRequest, CreateWalletResponse, DefaultTrailingStopLossRequestRequest, GetPositionRequest, ListPositionsRequest,  LongTrailingStopLossPositionRequestResponse } from "../../common";
 import { Env } from "../../env";
 import { Position, PositionRequest } from "../../positions/positions";
 import { TokenInfo } from "../../tokens/token_info";
@@ -11,6 +10,11 @@ import { StoreSessionValuesRequest, StoreSessionValuesResponse } from "./actions
 import { UserInitializeRequest, UserInitializeResponse } from "./actions/user_initialize";
 import { SessionKey, SessionValue } from "./model/session";
 import { UserData } from "./model/user_data";
+import { ListPositionsRequest } from "../../worker/actions/list_positions";
+import { DefaultTrailingStopLossRequestRequest } from "../../worker/actions/request_default_position_request";
+import { PositionRequestRequest, PositionRequestResponse } from "../../worker/actions/request_new_position";
+import { CreateWalletRequest, CreateWalletResponse } from "../../worker/actions/create_wallet";
+import { GetPositionRequest } from "../../worker/actions/get_position";
 
 export enum UserDOFetchMethod {
 	get = "get",
@@ -186,7 +190,7 @@ export async function createWallet(telegramUserID : number, env : Env) : Promise
 	return response;
 }
 
-export async function requestNewPosition(telegramUserID : number, positionRequest : PositionRequest, env : Env) : Promise<LongTrailingStopLossPositionRequestResponse> {
-	const response = await sendJSONRequestToUserDO<PositionRequest,LongTrailingStopLossPositionRequestResponse>(telegramUserID, UserDOFetchMethod.requestNewPosition, positionRequest, env);
+export async function requestNewPosition(telegramUserID : number, positionRequestRequest : PositionRequestRequest, env : Env) : Promise<PositionRequestResponse> {
+	const response = await sendJSONRequestToUserDO<PositionRequestRequest,PositionRequestResponse>(telegramUserID, UserDOFetchMethod.requestNewPosition, positionRequestRequest, env);
 	return response;
 }
