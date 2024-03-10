@@ -1,6 +1,5 @@
 import { TokenInfo } from "../../../tokens/token_info";
 
-
 export class TokenTracker {
     tokenInfos : Record<string,TokenInfo> = {};
     nonExistentTokenAddresses : Record<string,Date> = {};

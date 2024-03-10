@@ -1,23 +1,27 @@
 import { Position, PositionStatus, PositionType } from "../../../positions/positions";
-import { DecimalizedAmount, fromKey, fromNumber, toKey } from "../../../positions/decimalized_amount";
-import { DecimalizedAmountMap } from "./decimalized_amount_map";
-import { DecimalizedAmountSet } from "./decimalized_amount_set";
-import * as dMath from "../../../positions/decimalized_math";
+import { DecimalizedAmount, fromKey, fromNumber, toKey, MATH_DECIMAL_PLACES } from "../../../decimalized/decimalized_amount";
+import { DecimalizedAmountMap } from "../../../decimalized/decimalized_amount_map";
+import { DecimalizedAmountSet } from "../../../decimalized/decimalized_amount_set";
 import { setDifference, setIntersection } from "../../../util/set_operations";
+import { PositionsAssociatedWithPeakPrices } from "./positions_associated_with_peak_prices";
+import * as dMath from "../../../positions/decimalized_math";
 
-const MATH_DECIMAL_PLACES = 6;
-
+/* 
+    This class maintains lists of positions grouped by peak price thus far
+        (Which is a function of when the position was opened)
+    Flushing to storage is achived by diffing from a buffer of internal state 
+        and writing changes.
+    The update method determines which TLS positions should be closed based on the latest prices.
+    Positions can also be marked as closing (which excludes them from being sent to be sold off)
+    And positions can be removed from tracking
+*/
 export class PeakPricePositionTracker {
 
     /* positions grouped by peakPrice, and a buffer for diffing purposes since last flush to storage */
-    _buffer : DecimalizedAmountMap<Position[]> = new DecimalizedAmountMap<Position[]>();
-    itemsByPeakPrice : DecimalizedAmountMap<Position[]> = new DecimalizedAmountMap<Position[]>();
+    _buffer : PositionsAssociatedWithPeakPrices = new PositionsAssociatedWithPeakPrices();
+    itemsByPeakPrice : PositionsAssociatedWithPeakPrices = new PositionsAssociatedWithPeakPrices();
     pricePeakSessionKeyPrefix : string    
     
-    // TODO: implement these: has, set, entries, get, keys
-
-    // this will need to track value-level changes in TPosition as well as push, replace, etc., TPosition must implement equality
-    // or.... maybe I could do a double-buffer on itemsByPeakPrice and diff-based solution?
     dirtyTracking : DecimalizedAmountMap<boolean[]> = new DecimalizedAmountMap<boolean[]>();
     deletedKeys : Set<number> = new Set<number>();
 
@@ -28,7 +32,8 @@ export class PeakPricePositionTracker {
         if (!this.itemsByPeakPrice.has(price)) {
             this.itemsByPeakPrice.set(price, []);
         }
-        this.itemsByPeakPrice.get(price)!!.push(position);
+        this.itemsByPeakPrice.push(price, position);
+        //this.itemsByPeakPrice.get(price)!!.push(position);
     }
     update(newPrice : DecimalizedAmount) {
         const peaks = [...this.itemsByPeakPrice.keys()];
@@ -37,7 +42,7 @@ export class PeakPricePositionTracker {
         const mergedPositions = [];
         for (const peak of peaks) {
             // if the new price is greater than this peak, roll in this peak to the merged peak
-            if (dMath.compare(peak, newPrice) <0) {
+            if (dMath.compare(peak, newPrice) < 0) {
                 mergedPeaks.push(peak)
                 mergedPositions.push(...this.itemsByPeakPrice.get(peak)!!);
             }
@@ -52,15 +57,13 @@ export class PeakPricePositionTracker {
             this.itemsByPeakPrice.set(newPrice, mergedPositions);
         }
     }
-    // TODO
     collectTrailingStopLossesToClose(newPrice : DecimalizedAmount) : Position[] {
         const positionsToClose = [];
         for (const peakPrice of this.itemsByPeakPrice.keys()) {
-            // TODO: arbitrary precision arithmetic?
             const priceDecreaseFrac = dMath.dDiv(dMath.dSub(peakPrice, newPrice), peakPrice, MATH_DECIMAL_PLACES);
             const positionsWithThisPeakPrice = this.itemsByPeakPrice.get(peakPrice)!!;
             for (const position of positionsWithThisPeakPrice) {
-                // If it is not an open, long trailing stop loss, continue.
+                // If it is not an open, long trailing stop loss, continue (don't try to sell a position that is already closing).
                 const isOpenPosition = position.status === PositionStatus.Open; // this is super critical.
                 if (!isOpenPosition) {
                     continue;
@@ -78,9 +81,6 @@ export class PeakPricePositionTracker {
         }
         return positionsToClose;
     }
-    /*ingestNewOpenPositions() {
-    
-    }*/
     initialize(entries : Map<string,any>) {
         // find storage itemsByPeakPrice prefixed with proper prefix, get price key, get array index, and set on this.itemsByPeakPrice at that index.
         const prefixRegex = this.prefixRegex();
@@ -90,7 +90,8 @@ export class PeakPricePositionTracker {
                 if (!this.itemsByPeakPrice.has(price)) {
                     this.itemsByPeakPrice.set(price,[]);
                 }
-                this.itemsByPeakPrice.get(price)!![index] = value; // JS seems forgiving about out-of-order initialization by index
+                this.itemsByPeakPrice.setAtIndex(price, index, value);
+                //this.itemsByPeakPrice.get(price)!![index] = value; // JS seems forgiving about out-of-order initialization by index
             }
         }
         // denseify the arrays (out-of-order initialization causes arrays to be sparse arrays behind the scene)
@@ -179,7 +180,8 @@ export class PeakPricePositionTracker {
             this._buffer.set(key, []);
             for (const position of this.itemsByPeakPrice.get(key)!!) {
                 const clonedPositionObject = structuredClone(position);
-                this._buffer.get(key)!!.push(clonedPositionObject);
+                this._buffer.push(key, clonedPositionObject);
+                //this._buffer.get(key)!!.push(clonedPositionObject);
             }
         }
     }

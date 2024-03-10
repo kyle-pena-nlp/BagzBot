@@ -1,4 +1,4 @@
-import { DecimalizedAmount, toKey, fromKey } from "../../../positions/decimalized_amount";
+import { DecimalizedAmount, toKey, fromKey } from "./decimalized_amount";
 export class DecimalizedAmountMap<V> {
     inner : Map<string,V> = new Map<string,V>();
     constructor() {
@@ -9,7 +9,8 @@ export class DecimalizedAmountMap<V> {
     }
     set(decimalizedAmount : DecimalizedAmount, value : V) {
         const key = toKey(decimalizedAmount);
-        return this.inner.set(key, value);
+        this.inner.set(key, value);
+        return this;
     }
     clear() {
         this.inner.clear();

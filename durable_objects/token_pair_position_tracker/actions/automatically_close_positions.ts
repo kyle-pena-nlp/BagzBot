@@ -1,10 +1,12 @@
-// UserDO -->
+import { Position } from "../../../positions/positions"
+
+
 export interface AutomaticallyClosePositionRequest {
     positionID : string
 };
 
 export interface AutomaticallyClosePositionsRequest {
-    positionIDs : string[]
+    positions : Position[]
 };
 
 

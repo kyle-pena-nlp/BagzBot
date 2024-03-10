@@ -1,4 +1,4 @@
-import { DecimalizedAmount, toKey, fromKey } from "../../../positions/decimalized_amount";
+import { DecimalizedAmount, toKey, fromKey } from "./decimalized_amount";
 
 export class DecimalizedAmountSet {
     inner : Set<string> = new Set<string>();

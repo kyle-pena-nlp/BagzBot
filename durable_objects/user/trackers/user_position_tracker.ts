@@ -1,4 +1,4 @@
-import { Position } from "../../../positions/positions";
+import { Position, PositionStatus } from "../../../positions/positions";
 
 export class UserPositionTracker {
     positions : Record<string,Position> = {};
@@ -39,7 +39,8 @@ export class UserPositionTracker {
             this.markAsDirty(positionIDKey);
         }
     }
-    deletePosition(positionID : string) {
+    closePosition(positionID : string) {
+        // TODO: maybe, keep in list and mark status as closed???
         if (positionID in Object.keys(this.positions)) {
             const positionIDKey = new PositionIDKey(positionID);
             delete this.positions[positionIDKey.toString()];
@@ -52,6 +53,22 @@ export class UserPositionTracker {
     getPosition(positionID : string) : Position|null {
         const positionIDKey = new PositionIDKey(positionID);
         return this.positions[positionIDKey.toString()]||null;
+    }
+    setAsClosing(positionID : string) {
+        const positionIDKey = new PositionIDKey(positionID);
+        const position = this.positions[positionIDKey.toString()];
+        if (position) {
+            position.status = PositionStatus.Closing;
+            this.markAsDirty(positionIDKey);
+        }
+    }
+    setAsOpen(positionID : string) {
+        const positionIDKey = new PositionIDKey(positionID);
+        const position = this.positions[positionIDKey.toString()];
+        if (position) {
+            position.status = PositionStatus.Open;
+            this.markAsDirty(positionIDKey);
+        }
     }
     private markAsDirty(key : PositionIDKey) {
         this.deletedKeys.delete(key.toString());

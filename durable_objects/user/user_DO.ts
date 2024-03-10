@@ -1,6 +1,6 @@
 import { DurableObjectState } from "@cloudflare/workers-types";
 import { UserData } from "./model/user_data";
-import { ManuallyClosePositionRequest, ManuallyClosePositionResponse } from "../../worker/actions/manually_close_position";
+import { ManuallyClosePositionRequest, ManuallyClosePositionResponse } from "./actions/manually_close_position";
 import { UserInitializeRequest, UserInitializeResponse } from "./actions/user_initialize";
 import { GetUserDataRequest } from "./actions/get_user_data";
 import { DeleteSessionRequest } from "./actions/delete_session";
@@ -8,49 +8,60 @@ import { StoreSessionValuesRequest, StoreSessionValuesResponse } from "./actions
 import { GetSessionValuesRequest, SessionValuesResponse} from "./actions/get_session_values";
 import { GetSessionValuesWithPrefixRequest, GetSessionValuesWithPrefixResponse } from "./actions/get_session_values";
 import { AutomaticallyClosePositionsRequest, AutomaticallyClosePositionsResponse } from "../token_pair_position_tracker/actions/automatically_close_positions";
-import { DefaultTrailingStopLossRequestRequest } from "../../worker/actions/request_default_position_request";
+import { DefaultTrailingStopLossRequestRequest } from "./actions/request_default_position_request";
 import { SessionValue } from "./model/session";
-import { PositionRequestRequest, PositionRequestResponse } from "../../worker/actions/request_new_position";
+import { OpenPositionRequest, OpenPositionResponse } from "./actions/open_new_position";
 import { makeSuccessResponse, makeJSONResponse, makeFailureResponse, maybeGetJson } from "../../util/http_helpers";
 import { SessionTracker } from "./trackers/session_tracker";
 import { UserPositionTracker } from "./trackers/user_position_tracker";
 import { generateEd25519Keypair } from "../../crypto/cryptography";
 import { UserDOFetchMethod, parseUserDOFetchMethod } from "./userDO_interop";
-import { TokenPairPositionTrackerDOFetchMethod, importNewPosition, makeTokenPairPositionTrackerDOFetchRequest } from "../token_pair_position_tracker/token_pair_position_tracker_DO_interop";
-import {  sellTokenAndParseSwapTransaction, buyTokenAndParseSwapTransaction, SwapResult, isTransactionPreparationFailure, isTransactionExecutionFailure, isTransactionConfirmationFailure, isTransactionParseFailure, isSwapExecutionError, confirmTransaction, PreparseSwapResult, parseSwapTransaction, isRetryableTransactionParseFailure, SuccessfulSwapSummary } from "../../rpc/rpc_interop";
+import { TokenPairPositionTrackerDOFetchMethod, importNewPosition, makeTokenPairPositionTrackerDOFetchRequest, markPositionAsClosedInTokenPairPositionTracker, markPositionAsClosingInTokenPairPositionTracker } from "../token_pair_position_tracker/token_pair_position_tracker_DO_interop";
+import { sellTokenAndParseSwapTransaction, buyTokenAndParseSwapTransaction, SwapResult, isTransactionPreparationFailure, isTransactionExecutionFailure, isTransactionConfirmationFailure, isTransactionParseFailure, isSwapExecutionError, confirmTransaction, PreparseSwapResult, parseSwapTransaction, isRetryableTransactionParseFailure, SuccessfulSwapSummary } from "../../rpc/rpc_interop";
 import { getVsTokenInfo } from "../../tokens/vs_tokens";
 import { Env } from "../../env";
 import { Wallet } from "../../crypto/wallet";
 import { PositionRequest, Position, PositionType, PositionStatus } from "../../positions/positions";
 import { TokenInfo } from "../../tokens/token_info";
-import { ListPositionsRequest } from "../../worker/actions/list_positions";
-import { NotifyPositionAutoClosedInfo, NotifyPositionAutoClosedRequest, NotifyPositionsAutoClosedRequest } from "./actions/notify_position_auto_closed";
-import { TokenPairPositionTrackerInitializeRequest } from "./actions/initialize_token_pair_position_tracker";
-import { GetPositionRequest } from "../../worker/actions/get_position";
+import { ListPositionsRequest } from "./actions/list_positions";
+import { TokenPairPositionTrackerInitializeRequest } from "../token_pair_position_tracker/actions/initialize_token_pair_position_tracker";
+import { GetPositionRequest } from "./actions/get_position";
 import { sendMessageToTG } from "../../telegram/telegram_helpers";
 import { expBackoff } from "../../util/exp_backoff";
 import { getTokenInfo } from "../polled_token_pair_list/polled_token_pair_list_DO_interop";
 import { ImportNewPositionsResponse } from "../token_pair_position_tracker/actions/import_new_positions";
+import { MarkPositionAsClosedRequest } from "../token_pair_position_tracker/actions/mark_position_as_closed";
+import { MarkPositionAsClosingRequest } from "../token_pair_position_tracker/actions/mark_position_as_closing";
 
 /* Durable Object storing state of user */
 export class UserDO {
 
-    /* Handles/persists session state management, basic facts about user (like name), and wallet */
+    // boilerplate DO stuff
     env : Env
     state: DurableObjectState;
-    durableObjectID : string;
+
+    // user's ID
     telegramUserID : number|null;
+
+    // user's name
     telegramUserName : string|null;
+
+    // the user's wallet.  TODO: encrypt private keys
     wallet : Wallet|null;
+
+    // the default values for a trailing sotp loss
     defaultTrailingStopLossRequest : PositionRequest;
+
+    // tracks variable values associated with the current messageID
     sessionTracker : SessionTracker = new SessionTracker();
-    positionTracker : UserPositionTracker = new UserPositionTracker();
+
+    // tracks the positions currently open (or closing but not confirmed closed) for this user
+    userPositionTracker : UserPositionTracker = new UserPositionTracker();
 
     constructor(state : DurableObjectState, env : any) {
         // persistent state object which reaches eventual consistency
         this.env                = env;
         this.state              = state;
-        this.durableObjectID    = this.state.id.toString();
         this.telegramUserID     = null;
         this.telegramUserName   = null;
         this.wallet             = null;
@@ -90,7 +101,7 @@ export class UserDO {
             }
         }
         this.sessionTracker.initialize(storage);
-        this.positionTracker.initialize(storage);
+        this.userPositionTracker.initialize(storage);
     }
 
     initialized() : boolean {
@@ -138,15 +149,15 @@ export class UserDO {
                 this.assertUserIsInitialized();
                 response = await this.handleGenerateWallet();
                 break;
-            case UserDOFetchMethod.requestNewPosition:
+            case UserDOFetchMethod.openNewPosition:
                 this.assertUserIsInitialized();
                 this.assertUserHasWallet();
-                response = await this.handleRequestNewPosition(jsonRequestBody);
+                response = await this.handleOpenNewPosition(jsonRequestBody);
                 break;
             case UserDOFetchMethod.getPosition:
                 this.assertUserIsInitialized();
                 this.assertUserHasWallet();
-                response = await this.getPosition(jsonRequestBody);
+                response = await this.handleGetPosition(jsonRequestBody);
                 break;
             case UserDOFetchMethod.listPositions:
                 this.assertUserIsInitialized();
@@ -162,26 +173,6 @@ export class UserDO {
                 this.assertUserIsInitialized();
                 this.assertUserHasWallet();
                 response = await this.handleAutomaticallyClosePositionsRequest(jsonRequestBody);
-                break;
-            case UserDOFetchMethod.notifyPositionFillSuccess:
-                this.assertUserIsInitialized();
-                this.assertUserHasWallet();
-                response = await this.handleNotifyPositionFilledSuccess(jsonRequestBody);
-                break;
-            case UserDOFetchMethod.notifyPositionFillFailure:
-                this.assertUserIsInitialized();
-                this.assertUserHasWallet();
-                response = await this.handleNotifyPositionFilledFailure(jsonRequestBody);
-                break;
-            case UserDOFetchMethod.notifyPositionAutoClosed:
-                this.assertUserIsInitialized();
-                this.assertUserHasWallet();
-                response = await this.handleNotifyPositionAutoClosed(jsonRequestBody);
-                break;
-            case UserDOFetchMethod.notifyPositionsAutoClosed:
-                this.assertUserIsInitialized();
-                this.assertUserHasWallet();
-                response = await this.handleNotifyPositionsAutoClosed(jsonRequestBody);
                 break;
             default:
                 response = makeFailureResponse('Unknown method: ${method.toString()}');
@@ -211,7 +202,7 @@ export class UserDO {
     }
 
     async handleListPositions(request : ListPositionsRequest) : Promise<Response> {
-        const positions = this.positionTracker.listPositions();
+        const positions = this.userPositionTracker.listPositions();
         return makeJSONResponse(positions);
     }
 
@@ -222,72 +213,9 @@ export class UserDO {
         });
     }
 
-    async getPosition(getPositionRequest: GetPositionRequest) {
-        const position = this.positionTracker.getPosition(getPositionRequest.positionID);
+    async handleGetPosition(getPositionRequest: GetPositionRequest) {
+        const position = this.userPositionTracker.getPosition(getPositionRequest.positionID);
         return makeJSONResponse(position);
-    }
-
-    async handleNotifyPositionFilledSuccess(position : Position) : Promise<Response> {
-        this.positionTracker.storePositions([position]);
-        return await this.positionTracker.flushToStorage(this.state.storage).then(() => {
-            // TODO: send confirmatory message to user
-            return makeSuccessResponse();
-        });
-    }
-
-    async handleNotifyPositionFilledFailure(position : Position) : Promise<Response> {
-        this.positionTracker.storePositions([position]);
-        return await this.positionTracker.flushToStorage(this.state.storage).then(() => {
-            // TODO: send confirmatory message to user
-            return makeSuccessResponse();
-        });
-    }    
-
-    async handleNotifyPositionAutoClosed(position : NotifyPositionAutoClosedRequest) : Promise<Response> {
-        const positionID = position.notifyPositionAutoClosedInfo.positionID;
-        this.positionTracker.deletePosition(positionID);
-        /*if (position.notifyPositionAutoClosedInfo.retrySellPositionID != null) {
-            const tokenAddress = position.notifyPositionAutoClosedInfo.tokenAddress;
-            const vsTokenAddress = position.notifyPositionAutoClosedInfo.vsTokenAddress;
-            const retrySellPositions = await this.getRetrySellPositionsFromTokenPairTracker(tokenAddress, vsTokenAddress, [position.notifyPositionAutoClosedInfo]);
-            this.positionTracker.storePositions(retrySellPositions);
-        }*/
-        // TODO: retry logic.
-        return await this.positionTracker.flushToStorage(this.state.storage).then(() => {
-            // TODO: send confirmatory message to user.
-            return makeSuccessResponse();
-        });
-    }
-
-    async handleNotifyPositionsAutoClosed(notification : NotifyPositionsAutoClosedRequest) : Promise<Response> {
-        
-        // group the notifications by token pair
-        const groupedNotifications : Record<string,NotifyPositionAutoClosedInfo[]> = {};
-        for (const info of notification.notifyPositionAutoClosedInfos) {
-            const tokenPairIdentifier = `${info.tokenAddress}:${info.vsTokenAddress}`;
-            if (!(tokenPairIdentifier in groupedNotifications)) {
-                groupedNotifications[tokenPairIdentifier] = [];
-            }
-            groupedNotifications[tokenPairIdentifier].push(info);
-        }
-
-        // In parallel, fetch the retry-sell positions from the appropriate token pair tracker
-        const promises : Promise<Response>[]  = [];
-        // TODO: retry logic here? or no longer necessary?
-        /*
-        for (const tokenPairIdentifier of Object.keys(groupedNotifications)) {
-            const infos = groupedNotifications[tokenPairIdentifier];
-            const [tokenAddress,vsTokenAddress] = tokenPairIdentifier.split(":");
-            const promise = this.getRetrySellPositionsFromTokenPairTracker(tokenAddress, vsTokenAddress, infos).then(async (positions) => {
-                this.positionTracker.storePositions(positions);
-            });
-            promises.push(promise);
-        }
-        promises.push(this.positionTracker.flushToStorage(this.state.storage));
-        */
-        return await Promise.all(promises).then(() => {
-            return makeSuccessResponse();
-        });
     }
 
     async handleGet(jsonRequestBody : GetUserDataRequest) : Promise<Response> {
@@ -359,13 +287,14 @@ export class UserDO {
     }
 
 
-    async handleRequestNewPosition(positionRequestRequest : PositionRequestRequest) : Promise<Response> {
+    async handleOpenNewPosition(openPositionRequest : OpenPositionRequest) : Promise<Response> {
         // fire and forget (async callback will handle success and failure cases for swap)
-        const positionRequest = positionRequestRequest.positionRequest;
-        const buyTokenSwap = buyTokenAndParseSwapTransaction(positionRequest, this.wallet!!, this.env);
-        const chatID = positionRequestRequest.chatID;
-        const tokenInfo = (await getTokenInfo(positionRequest.tokenAddress, this.env)).tokenInfo!!;
-        buyTokenSwap.then(swapResult => this.handleBuyTokenSwap(positionRequest, swapResult, tokenInfo, chatID));
+        const positionRequest = openPositionRequest.positionRequest;
+        const chatID = openPositionRequest.chatID;
+        const tokenInfo = (await getTokenInfo(positionRequest.tokenAddress, this.env)).tokenInfo!!;        
+        // deliberate fire-and-forget.  callbacks will handle state management.
+        buyTokenAndParseSwapTransaction(positionRequest, this.wallet!!, this.env)
+            .then(swapResult => this.handleBuyTokenSwap(positionRequest, swapResult, tokenInfo, chatID));
         await sendMessageToTG(positionRequest.chatID, "Order sent to exchange.", this.env);
         return makeSuccessResponse();
     }
@@ -388,38 +317,38 @@ export class UserDO {
 
     async handleManuallyClosePositionRequest(manuallyClosePositionRequest : ManuallyClosePositionRequest) : Promise<Response> {
         
-        const position = this.positionTracker.getPosition(manuallyClosePositionRequest.positionID);
+        const positionID = manuallyClosePositionRequest.positionID;
+        const position = this.userPositionTracker.getPosition(positionID);
         if (position == null) {
-            return makeFailureResponse('Position no longer exists');
+            return makeSuccessResponse();
         }
-        const tokenPairPositionTrackerDO : DurableObjectStub = this.getTokenPairPositionTrackerDO(position.tokenAddress, position.vsTokenAddress)
-        await this.ensureTokenPairPositionTrackerDOIsInitialized(position.token, 
-            position.vsToken,  
-            tokenPairPositionTrackerDO);
-        const request = makeTokenPairPositionTrackerDOFetchRequest(TokenPairPositionTrackerDOFetchMethod.manuallyClosePosition, manuallyClosePositionRequest);
-        return await tokenPairPositionTrackerDO.fetch(request).then((response) => {
-            return response;
-        });
+        this.userPositionTracker.setAsClosing(positionID);
+        const markPositionAsClosingRequest : MarkPositionAsClosingRequest = {
+            positionID : positionID,
+            tokenAddress : position.token.address,
+            vsTokenAddress : position.vsToken.address
+        };
+        markPositionAsClosingInTokenPairPositionTracker(markPositionAsClosingRequest, this.env);
+        // deliberate fire-and-forget.  callbacks will handle state changes.
+        sellTokenAndParseSwapTransaction(position, this.wallet!!, this.env)
+            .then((swapResult) => this.handleSellSwapResult(swapResult, position));
+        const manuallyClosePositionResponse : ManuallyClosePositionResponse = {};
+        return makeJSONResponse(manuallyClosePositionResponse);
     }
 
     async handleAutomaticallyClosePositionsRequest(closePositionsRequest : AutomaticallyClosePositionsRequest) : Promise<Response> {
-        for (const positionID of closePositionsRequest.positionIDs) {
-            const position = this.positionTracker.getPosition(positionID);
-            if (position == null) {
-                // TODO: how to handle?
-                continue;
-            }
-
+        const positions = closePositionsRequest.positions;
+        for (const position of positions) {
             // fire and forget.  callbacks will handle state changes / user notifications.
             sellTokenAndParseSwapTransaction(position, this.wallet!!, this.env)
-                .then(this.handleSellSwapResult);
+                .then((swapResult) => this.handleSellSwapResult(swapResult, position));
 
         }
         const responseBody : AutomaticallyClosePositionsResponse = {};
         return makeJSONResponse(responseBody);
     }
 
-    async handleOpenPositionRequest(positionRequestRequest: PositionRequestRequest) : Promise<Response> {
+    async handleOpenPositionRequest(positionRequestRequest: OpenPositionRequest) : Promise<Response> {
 
         // fire and forget.  callbacks will handle state changes / user notifications.
         const positionRequest = positionRequestRequest.positionRequest;
@@ -430,25 +359,32 @@ export class UserDO {
     }
 
     // this is the callback from executing a sell
-    async handleSellSwapResult(swapResult : SwapResult) {
+    async handleSellSwapResult(swapResult : SwapResult, position : Position) {
         const status = swapResult.status;
         if (isTransactionPreparationFailure(status)) {
-            
+            // TODO: mark position as open again
         }
         else if (isTransactionExecutionFailure(status)) {
-
+            // TODO: mark position as open again
         }
         else if (isTransactionConfirmationFailure(status)) {
-
+            // TODO: retry confirmation until confirmed failure
         }
         else if (isTransactionParseFailure(status)) {
-
+            // TODO: retry transaction parse
         }
         else if (isSwapExecutionError(status)) {
-
+            // TODO: mark position as open again
         }
-        else {
-            
+        else if (status === 'swap-successful') {
+            const summary = swapResult.successfulSwapSummary;
+            this.userPositionTracker.closePosition(swapResult.positionID);
+            const markPositionAsClosedRequest : MarkPositionAsClosedRequest = {
+                positionID : position.positionID,
+                tokenAddress : position.token.address,
+                vsTokenAddress : position.vsToken.address,
+            };
+            await markPositionAsClosedInTokenPairPositionTracker(markPositionAsClosedRequest, this.env);
         }
     }
 
@@ -488,7 +424,7 @@ export class UserDO {
     }
 
     async addPositionToTracking(position : Position) : Promise<ImportNewPositionsResponse> {
-        this.positionTracker.storePositions([position]);
+        this.userPositionTracker.storePositions([position]);
         const response = await importNewPosition(position, this.env);
         return response;
     }
@@ -575,7 +511,6 @@ export class UserDO {
         
         const session = this.sessionTracker.getSessionValues(messageID);
         return {
-            durableObjectID: this.durableObjectID,
             hasWallet: !!(this.wallet),
             initialized: this.initialized(),
             telegramUserName : this.telegramUserName||undefined,

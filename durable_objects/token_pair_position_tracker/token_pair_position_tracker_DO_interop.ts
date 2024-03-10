@@ -1,15 +1,19 @@
 import { Position } from "../../positions/positions";
 import { ImportNewPositionsRequest, ImportNewPositionsResponse } from "./actions/import_new_positions";
+import { MarkPositionAsClosedRequest, MarkPositionAsClosedResponse } from "./actions/mark_position_as_closed";
 import { makeJSONRequest, makeRequest } from "../../util/http_helpers";
 import { Env } from "../../env";
+import { MarkPositionAsClosingRequest, MarkPositionAsClosingResponse } from "./actions/mark_position_as_closing";
+
 
 export enum TokenPairPositionTrackerDOFetchMethod {
 	initialize  = "initialize",
 	updatePrice = "updatePrice",
-	manuallyClosePosition = "manuallyClosePosition",
 	requestNewPosition = "requestNewPosition",
 	getPositions = "getPositions",
-	importNewOpenPositions = "importNewOpenPositions"
+	importNewOpenPositions = "importNewOpenPositions",
+	markPositionAsClosing = "markPositionAsClosing",
+	markPositionAsClosed = "markPositionAsClosed"
 }
 
 export function parseTokenPairPositionTrackerDOFetchMethod(value : string) : TokenPairPositionTrackerDOFetchMethod|null {
@@ -24,6 +28,26 @@ export function makeTokenPairPositionTrackerDOFetchRequest<T>(method : TokenPair
 	else {
 		return makeRequest(url, httpMethod);
 	}
+}
+
+export async function markPositionAsClosedInTokenPairPositionTracker(request : MarkPositionAsClosedRequest, env : Env) : Promise<MarkPositionAsClosedResponse> {
+	const method = TokenPairPositionTrackerDOFetchMethod.markPositionAsClosed;
+	return await sendJSONRequestToTokenPairPositionTracker<MarkPositionAsClosedRequest,MarkPositionAsClosedResponse>(
+		method, 
+		request, 
+		request.tokenAddress, 
+		request.vsTokenAddress, 
+		env);
+}
+
+export async function markPositionAsClosingInTokenPairPositionTracker(request : MarkPositionAsClosingRequest, env : Env) : Promise<MarkPositionAsClosingResponse> {
+	const method = TokenPairPositionTrackerDOFetchMethod.markPositionAsClosing;
+	return await sendJSONRequestToTokenPairPositionTracker<MarkPositionAsClosingRequest,MarkPositionAsClosingResponse>(
+		method,
+		request,
+		request.tokenAddress,
+		request.tokenAddress,
+		env);
 }
 
 export async function importNewPosition(position : Position, env : Env) : Promise<ImportNewPositionsResponse> {

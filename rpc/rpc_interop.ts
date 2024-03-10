@@ -3,9 +3,12 @@ import { makeJSONRequest } from "../util/http_helpers";
 import { getVsTokenDecimalsMultiplier } from "../tokens/vs_tokens";
 import { Connection, PublicKey, Signer, VersionedTransaction } from '@solana/web3.js';
 import * as bs58 from "bs58";
-import { Position, PositionRequest, DecimalizedAmount } from "../positions/positions";
+import { Position, PositionRequest } from "../positions/positions";
 import { Wallet } from "../crypto/wallet";
 import { dDiv } from "../positions/decimalized_math";
+import { DecimalizedAmount, MATH_DECIMAL_PLACES } from "../decimalized/decimalized_amount";
+
+
 
 // TODO: careful analysis of failure modes and their mitigations
 // TODO: https://solanacookbook.com/guides/retrying-transactions.html#how-rpc-nodes-broadcast-transactions
@@ -373,7 +376,7 @@ function summarizeParsedSwapTransaction(summarizeMe : { parsed: any }, env : Env
 }
 
 function calculateFillPrice(tokenInput : HeliusParsedTokenInputOutput, tokenOutput : HeliusParsedTokenInputOutput) {
-    return dDiv(tokenOutput.rawTokenAmount, tokenInput.rawTokenAmount)
+    return dDiv(tokenOutput.rawTokenAmount, tokenInput.rawTokenAmount, MATH_DECIMAL_PLACES)
 }
 
 function parseTransactionError(parsedTransaction : any, env : Env) : SwapExecutionError {

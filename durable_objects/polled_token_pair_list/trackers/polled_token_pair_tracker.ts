@@ -1,9 +1,3 @@
-export interface PolledTokenPairInfo {
-    tokenAddress : string
-    vsTokenAddress : string
-    // TODO: other properties.  also add these in this.tokenPairInfosEqual
-}
-
 export class PolledTokenPairTracker {
     polledTokenPairs : Record<string,PolledTokenPairInfo>
     dirtyTracking : Set<string>
@@ -94,4 +88,10 @@ export class PolledTokenPairKey {
             return null;
         }
     }
+}
+
+interface PolledTokenPairInfo {
+    tokenAddress : string
+    vsTokenAddress : string
+    // TODO: other properties.  also add these in this.tokenPairInfosEqual
 }

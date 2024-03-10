@@ -11,7 +11,7 @@ import { makeFakeFailedRequestResponse, makeJSONResponse, makeSuccessResponse } 
 import { BaseMenu, MenuCode, MenuConfirmTrailingStopLossPositionRequest, MenuEditTrailingStopLossPositionRequest, MenuError, MenuFAQ, MenuHelp, MenuListPositions, MenuMain, MenuPleaseEnterToken, MenuTODO, MenuTrailingStopLossAutoRetrySell, MenuTrailingStopLossEntryBuyQuantity, MenuTrailingStopLossPickVsToken, MenuTrailingStopLossSlippagePercent, MenuTrailingStopLossTriggerPercent, MenuViewOpenPosition, MenuViewWallet, MenuWallet, PositiveDecimalKeypad, PositiveIntegerKeypad } from "../menus";
 import { WalletData } from "../durable_objects/user/model/wallet_data";
 import { QuantityAndToken } from "../durable_objects/user/model/quantity_and_token";
-import { PositionRequestRequest } from "./actions/request_new_position";
+import { OpenPositionRequest } from "../durable_objects/user/actions/open_new_position";
 import { GetTokenInfoResponse } from "../durable_objects/polled_token_pair_list/actions/get_token_info";
 
 export class Worker {
@@ -126,7 +126,7 @@ export class Worker {
             case MenuCode.TrailingStopLossEditorFinalSubmit:
                 // TODO: do the read within UserDO to avoid the extra roundtrip
                 const positionRequestAfterFinalSubmit = await readSessionObj<PositionRequest>(telegramUserID, messageID, "PositionRequest", env);
-                const positionRequestRequest : PositionRequestRequest = { chatID: chatID, userID: telegramUserID, positionRequest: positionRequestAfterFinalSubmit };
+                const positionRequestRequest : OpenPositionRequest = { chatID: chatID, userID: telegramUserID, positionRequest: positionRequestAfterFinalSubmit };
                 await requestNewPosition(telegramUserID, positionRequestRequest, env);
                 // TODO: post-confirm screen
                 return this.createMainMenu(telegramWebhookInfo, env);
@@ -202,7 +202,7 @@ export class Worker {
         };
     }
 
-    async sendTrailingStopLossRequestToTokenPairPositionTracker(telegramUserID : number, trailingStopLossPositionRequest : PositionRequestRequest, env : Env) : Promise<void> {
+    async sendTrailingStopLossRequestToTokenPairPositionTracker(telegramUserID : number, trailingStopLossPositionRequest : OpenPositionRequest, env : Env) : Promise<void> {
         await requestNewPosition(telegramUserID, trailingStopLossPositionRequest, env);
     }
 

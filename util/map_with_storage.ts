@@ -1,10 +1,10 @@
-export class SessionTrackedMap<TValue> {
-    sessionKeyPrefix : string
+export class MapWithStorage<TValue> {
+    storageKeyPrefix : string
     items : Map<string,TValue> = new Map<string,TValue>();
     dirtyTracking : Set<string> = new Set<string>();
     deletedKeys : Set<string> = new Set<string>();
-    constructor(sessionKeyPrefix : string) {
-        this.sessionKeyPrefix = sessionKeyPrefix;
+    constructor(storageKeyPrefix : string) {
+        this.storageKeyPrefix = storageKeyPrefix;
     }
     get(key : string) : TValue|undefined {
         return this.items.get(this.addPrefix(key));
@@ -83,12 +83,12 @@ export class SessionTrackedMap<TValue> {
         await Promise.all([putPromise, deletePromise]);
     }
     private addPrefix(key : string) {
-        return `${this.sessionKeyPrefix}:${key}`
+        return `${this.storageKeyPrefix}:${key}`
     }
     private prefixMatches(key : string) {
         return this.prefixRegex().test(key);
     }
     private prefixRegex() {
-        return new RegExp(`^${this.sessionKeyPrefix}:`);
+        return new RegExp(`^${this.storageKeyPrefix}:`);
     }
 }

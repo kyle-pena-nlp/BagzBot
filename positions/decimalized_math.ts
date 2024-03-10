@@ -1,4 +1,4 @@
-import { DecimalizedAmount } from "./decimalized_amount";
+import { DecimalizedAmount } from "../decimalized/decimalized_amount";
 
 export function dAdd(a : DecimalizedAmount, b : DecimalizedAmount) : DecimalizedAmount {
     const decimals = Math.max(a.decimals, b.decimals);

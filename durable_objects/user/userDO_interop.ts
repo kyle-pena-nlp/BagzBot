@@ -5,16 +5,18 @@ import { makeJSONRequest, makeRequest } from "../../util/http_helpers";
 import { DeleteSessionRequest } from "./actions/delete_session";
 import { GetSessionValuesRequest, GetSessionValuesWithPrefixRequest, GetSessionValuesWithPrefixResponse, SessionValuesResponse } from "./actions/get_session_values";
 import { GetUserDataRequest } from "./actions/get_user_data";
-import { ManuallyClosePositionRequest, ManuallyClosePositionResponse } from "../../worker/actions/manually_close_position";
+import { ManuallyClosePositionRequest, ManuallyClosePositionResponse } from "./actions/manually_close_position";
 import { StoreSessionValuesRequest, StoreSessionValuesResponse } from "./actions/store_session_values";
 import { UserInitializeRequest, UserInitializeResponse } from "./actions/user_initialize";
 import { SessionKey, SessionValue } from "./model/session";
 import { UserData } from "./model/user_data";
-import { ListPositionsRequest } from "../../worker/actions/list_positions";
-import { DefaultTrailingStopLossRequestRequest } from "../../worker/actions/request_default_position_request";
-import { PositionRequestRequest, PositionRequestResponse } from "../../worker/actions/request_new_position";
-import { CreateWalletRequest, CreateWalletResponse } from "../../worker/actions/create_wallet";
-import { GetPositionRequest } from "../../worker/actions/get_position";
+import { ListPositionsRequest } from "./actions/list_positions";
+import { DefaultTrailingStopLossRequestRequest } from "./actions/request_default_position_request";
+import { OpenPositionRequest, OpenPositionResponse } from "./actions/open_new_position";
+import { CreateWalletRequest, CreateWalletResponse } from "./actions/create_wallet";
+import { GetPositionRequest } from "./actions/get_position";
+import { AutomaticallyClosePositionsRequest, AutomaticallyClosePositionsResponse } from "../token_pair_position_tracker/actions/automatically_close_positions";
+import { groupIntoMap } from "../../util/collections";
 
 export enum UserDOFetchMethod {
 	get = "get",
@@ -24,16 +26,25 @@ export enum UserDOFetchMethod {
 	getSessionValuesWithPrefix = "getSessionValuesWithPrefix",
 	deleteSession = "deleteSession",
 	createWallet = "createWallet",
-	requestNewPosition = "requestNewPosition",
+	openNewPosition = "openNewPosition",
 	getPosition = "getPosition",
 	listPositions = "listPositions",
 	manuallyClosePosition = "manuallyClosePosition", // user initiated close position
 	automaticallyClosePositions = "automaticallyClosePositions", // system-initiated close position
-	notifyPositionFillSuccess = "notifyPositionFillSuccess",
-	notifyPositionFillFailure = "notifyPositionFillFailure",
-	notifyPositionAutoClosed = "notifyPositionAutoClosed",
-	notifyPositionsAutoClosed = "notifyPositionsAutoClosed",
 	getDefaultTrailingStopLossRequest = "getDefaultTrailingStopLossRequest"
+}
+
+export function sendClosePositionOrdersToUserDOs(request: AutomaticallyClosePositionsRequest, env : Env) {
+	const positionsGroupedByUser = groupIntoMap(request.positions, (p : Position) => p.userID);
+	const promises = [];
+	const method = UserDOFetchMethod.automaticallyClosePositions;
+	for (const userID of positionsGroupedByUser.keys()) {
+		const positions = positionsGroupedByUser.get(userID)||[];
+		const individualRequestForUserDO : AutomaticallyClosePositionsRequest = { positions: positions };
+		const promise = sendJSONRequestToUserDO<AutomaticallyClosePositionsRequest,AutomaticallyClosePositionsResponse>(userID, method, individualRequestForUserDO, env);
+		promises.push(promise);
+	}
+	return Promise.allSettled(promises);
 }
 
 export function parseUserDOFetchMethod(value : string) : UserDOFetchMethod|null {
@@ -190,7 +201,7 @@ export async function createWallet(telegramUserID : number, env : Env) : Promise
 	return response;
 }
 
-export async function requestNewPosition(telegramUserID : number, positionRequestRequest : PositionRequestRequest, env : Env) : Promise<PositionRequestResponse> {
-	const response = await sendJSONRequestToUserDO<PositionRequestRequest,PositionRequestResponse>(telegramUserID, UserDOFetchMethod.requestNewPosition, positionRequestRequest, env);
+export async function requestNewPosition(telegramUserID : number, positionRequestRequest : OpenPositionRequest, env : Env) : Promise<OpenPositionResponse> {
+	const response = await sendJSONRequestToUserDO<OpenPositionRequest,OpenPositionResponse>(telegramUserID, UserDOFetchMethod.openNewPosition, positionRequestRequest, env);
 	return response;
 }

@@ -4,12 +4,16 @@ import { makeJSONResponse } from "../../util/http_helpers";
 import { TokenPairPositionTrackerDOFetchMethod, parseTokenPairPositionTrackerDOFetchMethod } from "./token_pair_position_tracker_DO_interop";
 import { TokenPairPositionTracker } from "./trackers/token_pair_position_tracker";
 import { Env } from "../../env";
-import { ManuallyClosePositionRequest, ManuallyClosePositionResponse } from "../../worker/actions/manually_close_position";
-import { PositionRequestResponse } from "../../worker/actions/request_new_position";
-import { PriceUpdate } from "./model/price_update";
-import { TokenPairPositionTrackerInitializeRequest } from "../user/actions/initialize_token_pair_position_tracker";
+import { ManuallyClosePositionRequest, ManuallyClosePositionResponse } from "../user/actions/manually_close_position";
+import { OpenPositionResponse } from "../user/actions/open_new_position";
+import { TokenPairPositionTrackerInitializeRequest } from "./actions/initialize_token_pair_position_tracker";
 import { ImportNewPositionsRequest, ImportNewPositionsResponse } from "./actions/import_new_positions";
-import { DecimalizedAmount } from "../../positions/decimalized_amount";
+import { UpdatePriceRequest, UpdatePriceResponse  } from "./actions/update_price";
+import { DecimalizedAmount } from "../../decimalized/decimalized_amount";
+import { sendClosePositionOrdersToUserDOs } from "../user/userDO_interop";
+import { AutomaticallyClosePositionRequest, AutomaticallyClosePositionsRequest } from "./actions/automatically_close_positions";
+import { MarkPositionAsClosedRequest, MarkPositionAsClosedResponse } from "./actions/mark_position_as_closed";
+import { MarkPositionAsClosingRequest, MarkPositionAsClosingResponse } from "./actions/mark_position_as_closing";
 
 /* 
     Durable Object storing all open positions for a single token/vsToken pair.  
@@ -55,15 +59,18 @@ export class TokenPairPositionTrackerDO {
             case TokenPairPositionTrackerDOFetchMethod.updatePrice:
                 this.assertIsInitialized();
                 return await this.handleUpdatePrice(body);
-            case TokenPairPositionTrackerDOFetchMethod.manuallyClosePosition:
-                this.assertIsInitialized();
-                return await this.handleManuallyClosePosition(body);
             case TokenPairPositionTrackerDOFetchMethod.requestNewPosition:
                 this.assertIsInitialized();
                 return await this.handleRequestNewPosition(body);
             case TokenPairPositionTrackerDOFetchMethod.importNewOpenPositions:
                 this.assertIsInitialized();
                 return await this.handleImportNewOpenPositions(body);
+            case TokenPairPositionTrackerDOFetchMethod.markPositionAsClosing:
+                this.assertIsInitialized();
+                return await this.handleMarkPositionAsClosing(body);
+            case TokenPairPositionTrackerDOFetchMethod.markPositionAsClosed:
+                this.assertIsInitialized();
+                return await this.handleMarkPositionAsClosed(body);
             default:
                 throw new Error(`Unknown method ${method}`);
         }
@@ -72,6 +79,18 @@ export class TokenPairPositionTrackerDO {
     async handleImportNewOpenPositions(body : ImportNewPositionsRequest) {
         const responseBody : ImportNewPositionsResponse = {};
         this.tokenPairPositionTracker.importNewOpenPositions(body.positions);
+        return makeJSONResponse(responseBody);
+    }
+
+    async handleMarkPositionAsClosed(body: MarkPositionAsClosedRequest) : Promise<Response> {
+        this.tokenPairPositionTracker.closePosition(body.positionID);
+        const responseBody : MarkPositionAsClosedResponse = {};
+        return makeJSONResponse(responseBody)
+    }
+
+    async handleMarkPositionAsClosing(body : MarkPositionAsClosingRequest): Promise<Response> {
+        this.tokenPairPositionTracker.markPositionAsClosing(body.positionID);
+        const responseBody : MarkPositionAsClosingResponse = {};
         return makeJSONResponse(responseBody);
     }
 
@@ -99,27 +118,18 @@ export class TokenPairPositionTrackerDO {
         return new Response(null, { status: 200 });
     }
 
-    async handleUpdatePrice(request : Request) : Promise<Response> {
-        const body : PriceUpdate = await request.json();
-        const newPrice = body.price;
+    async handleUpdatePrice(request : UpdatePriceRequest) : Promise<Response> {
+        const newPrice = request.price;
         this.updatePrice(newPrice);
-        return new Response();
-    }
-
-    async handleManuallyClosePosition(request : Request) : Promise<Response> {
-        const body : ManuallyClosePositionRequest = await request.json();
-        const positionID = body.positionID;
-        const actionsToTake = this.tokenPairPositionTracker.manuallyClosePosition(positionID);
-        //this.processActionsToTake(actionsToTake);
-        const responseBody : ManuallyClosePositionResponse = {};
+        const responseBody : UpdatePriceResponse = {};
         return makeJSONResponse(responseBody);
     }
-
+    
     async handleRequestNewPosition(request : Request) : Promise<Response> {
         const positionRequest : PositionRequest = await request.json();
         const actionsToTake = this.tokenPairPositionTracker.addPositionRequest(positionRequest);
         //this.processActionsToTake(actionsToTake);
-        const responseBody : PositionRequestResponse = {};
+        const responseBody : OpenPositionResponse = {};
         return makeJSONResponse(responseBody);
     }
 
@@ -148,13 +158,10 @@ export class TokenPairPositionTrackerDO {
     }    
 
     async updatePrice(newPrice : DecimalizedAmount) {
-        /* 1. Incorporate new open positions since last tick into price data structures */
-        /* 2. Update price data structures with new price */
-        /* 3. Collect trades to execute, execute them.    */
-        /* 4. (callbacks in event of failure cases handled elsewhere) */
-
+        // fire and forget so we don't block subsequent update-price ticks
         const positionsToClose = this.tokenPairPositionTracker.updatePrice(newPrice);
-        //this.sendOrdersToClosePositions(positionsToClose);
+        const request : AutomaticallyClosePositionsRequest = { positions: positionsToClose.positionsToClose }
+        sendClosePositionOrdersToUserDOs(request, this.env);
     }
 
     async sendOrdersToClosePositions(positions : Position[]) {
