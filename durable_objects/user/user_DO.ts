@@ -3,7 +3,7 @@ import { UserData } from "./model/user_data";
 import { ManuallyClosePositionRequest, ManuallyClosePositionResponse } from "./actions/manually_close_position";
 import { UserInitializeRequest, UserInitializeResponse } from "./actions/user_initialize";
 import { GetUserDataRequest } from "./actions/get_user_data";
-import { DeleteSessionRequest } from "./actions/delete_session";
+import { DeleteSessionRequest, DeleteSessionResponse } from "./actions/delete_session";
 import { StoreSessionValuesRequest, StoreSessionValuesResponse } from "./actions/store_session_values";
 import { GetSessionValuesRequest, SessionValuesResponse} from "./actions/get_session_values";
 import { GetSessionValuesWithPrefixRequest, GetSessionValuesWithPrefixResponse } from "./actions/get_session_values";
@@ -21,6 +21,7 @@ import { sellTokenAndParseSwapTransaction, buyTokenAndParseSwapTransaction, Swap
 import { getVsTokenInfo } from "../../tokens/vs_tokens";
 import { Env } from "../../env";
 import { Wallet } from "../../crypto/wallet";
+import { GenerateWalletRequest, GenerateWalletResponse } from "./actions/generate_wallet";
 import { PositionRequest, Position, PositionType, PositionStatus } from "../../positions/positions";
 import { TokenInfo } from "../../tokens/token_info";
 import { ListPositionsRequest } from "./actions/list_positions";
@@ -32,6 +33,7 @@ import { getTokenInfo } from "../polled_token_pair_list/polled_token_pair_list_D
 import { ImportNewPositionsResponse } from "../token_pair_position_tracker/actions/import_new_positions";
 import { MarkPositionAsClosedRequest } from "../token_pair_position_tracker/actions/mark_position_as_closed";
 import { MarkPositionAsClosingRequest } from "../token_pair_position_tracker/actions/mark_position_as_closing";
+import { GetWalletDataRequest, GetWalletDataResponse } from "./actions/get_wallet_data";
 
 /* Durable Object storing state of user */
 export class UserDO {
@@ -75,7 +77,7 @@ export class UserDO {
             tokenAddress : "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
             vsToken : getVsTokenInfo('SOL')!!,
             vsTokenAddress : "So11111111111111111111111111111111111111112",
-            vsTokenAmt : 1,
+            vsTokenAmt : parseFloat(env.DEFAULT_TLS_VS_TOKEN_FRACTION),
             slippagePercent : 0.5,
             triggerPercent : 5,
             retrySellIfSlippageExceeded : true            
@@ -147,7 +149,12 @@ export class UserDO {
                 break;
             case UserDOFetchMethod.createWallet:
                 this.assertUserIsInitialized();
-                response = await this.handleGenerateWallet();
+                response = await this.handleGenerateWallet({});
+                break;
+            case UserDOFetchMethod.getWalletData:
+                this.assertUserIsInitialized();
+                this.assertUserHasWallet();
+                response = await this.handleGetWalletData(jsonRequestBody);
                 break;
             case UserDOFetchMethod.openNewPosition:
                 this.assertUserIsInitialized();
@@ -227,7 +234,7 @@ export class UserDO {
         const messageID = jsonRequestBody.messageID;
         this.sessionTracker.deleteSession(messageID);
         return await this.sessionTracker.flushToStorage(this.state.storage).then(() => {
-            return makeSuccessResponse();
+            return makeJSONResponse<DeleteSessionResponse>({});
         })
     }
 
@@ -249,10 +256,9 @@ export class UserDO {
             const value = this.sessionTracker.getSessionValue(messageID, sessionKey);
             sessionValues[sessionKey] = value;
         }
-        const sessionValuesResponseBody : SessionValuesResponse = {
+        const response = makeJSONResponse({
             sessionValues: sessionValues
-        };
-        const response = makeJSONResponse(sessionValuesResponseBody);
+        });
         return response;
     }
 
@@ -270,7 +276,7 @@ export class UserDO {
         });
     }
 
-    async handleGenerateWallet() : Promise<Response> {
+    async handleGenerateWallet(generateWalletRequest : GenerateWalletRequest) : Promise<Response> {
         if (!this.wallet) {
             const { publicKey, privateKey } = await generateEd25519Keypair();
             this.wallet = {
@@ -278,14 +284,19 @@ export class UserDO {
                 privateKey: privateKey
             };
             return await this.state.storage.put("wallet",this.wallet).then(() => {
-                return makeSuccessResponse();
+                return makeJSONResponse<GenerateWalletResponse>({ success: true });
             }).catch(() => {
-                return makeFailureResponse("Could not persist wallet");
+                return makeJSONResponse<GenerateWalletResponse>({ success: false });
             });
         }
-        return makeSuccessResponse('Wallet already exists');
+        return makeJSONResponse<GenerateWalletResponse>({ success: true });
     }
 
+    async handleGetWalletData(request : GetWalletDataRequest) : Promise<Response> {
+        return makeJSONResponse<GetWalletDataResponse>({
+            address : this.wallet!!.publicKey
+        });
+    }
 
     async handleOpenNewPosition(openPositionRequest : OpenPositionRequest) : Promise<Response> {
         // fire and forget (async callback will handle success and failure cases for swap)
@@ -294,9 +305,8 @@ export class UserDO {
         const tokenInfo = (await getTokenInfo(positionRequest.tokenAddress, this.env)).tokenInfo!!;        
         // deliberate fire-and-forget.  callbacks will handle state management.
         buyTokenAndParseSwapTransaction(positionRequest, this.wallet!!, this.env)
-            .then(swapResult => this.handleBuyTokenSwap(positionRequest, swapResult, tokenInfo, chatID));
-        await sendMessageToTG(positionRequest.chatID, "Order sent to exchange.", this.env);
-        return makeSuccessResponse();
+            .then(swapResult => this.buySwapCallback(positionRequest, swapResult, tokenInfo, chatID));
+        return makeJSONResponse<OpenPositionResponse>({});
     }
 
     async ensureTokenPairPositionTrackerDOIsInitialized(token : TokenInfo, vsToken : TokenInfo, tokenPairPositionTrackerDO : DurableObjectStub) : Promise<void> {
@@ -331,9 +341,8 @@ export class UserDO {
         markPositionAsClosingInTokenPairPositionTracker(markPositionAsClosingRequest, this.env);
         // deliberate fire-and-forget.  callbacks will handle state changes.
         sellTokenAndParseSwapTransaction(position, this.wallet!!, this.env)
-            .then((swapResult) => this.handleSellSwapResult(swapResult, position));
-        const manuallyClosePositionResponse : ManuallyClosePositionResponse = {};
-        return makeJSONResponse(manuallyClosePositionResponse);
+            .then((swapResult) => this.sellSwapCallback(swapResult, position));
+        return makeJSONResponse<ManuallyClosePositionResponse>({});
     }
 
     async handleAutomaticallyClosePositionsRequest(closePositionsRequest : AutomaticallyClosePositionsRequest) : Promise<Response> {
@@ -341,11 +350,10 @@ export class UserDO {
         for (const position of positions) {
             // fire and forget.  callbacks will handle state changes / user notifications.
             sellTokenAndParseSwapTransaction(position, this.wallet!!, this.env)
-                .then((swapResult) => this.handleSellSwapResult(swapResult, position));
+                .then((swapResult) => this.sellSwapCallback(swapResult, position));
 
         }
-        const responseBody : AutomaticallyClosePositionsResponse = {};
-        return makeJSONResponse(responseBody);
+        return makeJSONResponse<AutomaticallyClosePositionsResponse>({});
     }
 
     async handleOpenPositionRequest(positionRequestRequest: OpenPositionRequest) : Promise<Response> {
@@ -354,12 +362,12 @@ export class UserDO {
         const positionRequest = positionRequestRequest.positionRequest;
         const tokenInfo = (await getTokenInfo(positionRequest.tokenAddress, this.env)).tokenInfo!!;
         buyTokenAndParseSwapTransaction(positionRequest, this.wallet!!, this.env)
-            .then((swapResult) => this.handleBuyTokenSwap(positionRequest, swapResult, tokenInfo, positionRequest.chatID));
-        return makeSuccessResponse();
+            .then((swapResult) => this.buySwapCallback(positionRequest, swapResult, tokenInfo, positionRequest.chatID));
+        return makeJSONResponse<OpenPositionResponse>({});
     }
 
     // this is the callback from executing a sell
-    async handleSellSwapResult(swapResult : SwapResult, position : Position) {
+    async sellSwapCallback(swapResult : SwapResult, position : Position) {
         const status = swapResult.status;
         if (isTransactionPreparationFailure(status)) {
             // TODO: mark position as open again
@@ -389,7 +397,7 @@ export class UserDO {
     }
 
     // this is the callback from executing a buy
-    async handleBuyTokenSwap(positionRequest: PositionRequest, swapResult : SwapResult, tokenInfo : TokenInfo, chatID : number) {
+    async buySwapCallback(positionRequest: PositionRequest, swapResult : SwapResult, tokenInfo : TokenInfo, chatID : number) {
         const status = swapResult.status;
         // TODO: 1. these error message may be wrong.
         // TODO: 2. appropriate retries.
@@ -461,7 +469,7 @@ export class UserDO {
     }
 
     async retryConfirmationExpBackoffAndContinue(swapResult : SwapResult, chatID : number, tokenSymbol : string) : Promise<SwapResult|null> {
-        const confirmation = await expBackoff(() => confirmTransaction(swapResult.txID!!, swapResult.positionID, this.env))
+        const confirmation = await expBackoff(() => confirmTransaction(swapResult.signature!!, swapResult.positionID, this.env))
             .catch(async (reason) => {
                 await sendMessageToTG(chatID, `We couldn't successfully confirm the purchase of ${tokenSymbol}`,this.env);
                 return null;
@@ -516,13 +524,5 @@ export class UserDO {
             telegramUserName : this.telegramUserName||undefined,
             session: session
         };
-    }
-
-    getTokenPairPositionTrackerDO(token : TokenInfo, vsToken : TokenInfo) : any {
-        const namespace : DurableObjectNamespace = this.env.TokenPairPositionTrackerDO;
-        const id = namespace.idFromName(`${token.address}:${vsToken.address}`);
-        const stub = namespace.get(id);
-        this.ensureTokenPairPositionTrackerDOIsInitialized(token, vsToken, stub)
-        return stub;
     }
 }

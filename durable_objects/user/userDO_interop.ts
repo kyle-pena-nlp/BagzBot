@@ -13,10 +13,11 @@ import { UserData } from "./model/user_data";
 import { ListPositionsRequest } from "./actions/list_positions";
 import { DefaultTrailingStopLossRequestRequest } from "./actions/request_default_position_request";
 import { OpenPositionRequest, OpenPositionResponse } from "./actions/open_new_position";
-import { CreateWalletRequest, CreateWalletResponse } from "./actions/create_wallet";
 import { GetPositionRequest } from "./actions/get_position";
 import { AutomaticallyClosePositionsRequest, AutomaticallyClosePositionsResponse } from "../token_pair_position_tracker/actions/automatically_close_positions";
 import { groupIntoMap } from "../../util/collections";
+import { GenerateWalletRequest, GenerateWalletResponse } from "./actions/generate_wallet";
+import { GetWalletDataRequest, GetWalletDataResponse } from "./actions/get_wallet_data";
 
 export enum UserDOFetchMethod {
 	get = "get",
@@ -26,12 +27,17 @@ export enum UserDOFetchMethod {
 	getSessionValuesWithPrefix = "getSessionValuesWithPrefix",
 	deleteSession = "deleteSession",
 	createWallet = "createWallet",
+	getWalletData = "getWalletData",
 	openNewPosition = "openNewPosition",
 	getPosition = "getPosition",
 	listPositions = "listPositions",
 	manuallyClosePosition = "manuallyClosePosition", // user initiated close position
 	automaticallyClosePositions = "automaticallyClosePositions", // system-initiated close position
 	getDefaultTrailingStopLossRequest = "getDefaultTrailingStopLossRequest"
+}
+
+export async function getWalletData(userID : number, env: Env) : Promise<GetWalletDataResponse> {
+	return await sendJSONRequestToUserDO<GetWalletDataRequest,GetWalletDataResponse>(userID, UserDOFetchMethod.getWalletData, {}, env);
 }
 
 export function sendClosePositionOrdersToUserDOs(request: AutomaticallyClosePositionsRequest, env : Env) {
@@ -195,9 +201,9 @@ async function initializeUserData(telegramUserID : number, telegramUserName : st
 	return response;
 }
 
-export async function createWallet(telegramUserID : number, env : Env) : Promise<CreateWalletResponse> {
-	const body: CreateWalletRequest = {};
-	const response = await sendJSONRequestToUserDO<CreateWalletRequest,CreateWalletResponse>(telegramUserID, UserDOFetchMethod.createWallet, body, env);
+export async function generateWallet(telegramUserID : number, env : Env) : Promise<GenerateWalletResponse> {
+	const body: GenerateWalletRequest = {};
+	const response = await sendJSONRequestToUserDO<GenerateWalletRequest,GenerateWalletResponse>(telegramUserID, UserDOFetchMethod.createWallet, body, env);
 	return response;
 }
 

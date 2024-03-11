@@ -16,7 +16,9 @@ export interface Env {
 	JUPITER_SWAP_PROGRAM_SLIPPAGE_ERROR_CODE : string
 	PLATFORM_FEE_BPS : string
 	FEE_ACCOUNT_PUBLIC_KEY : string
+	DEFAULT_TLS_VS_TOKEN_FRACTION : string
 	UserDO : any // i'd like to strongly type this as DurableObjectNamespace, but can't for technical reasons
 	TokenPairPositionTrackerDO : any // ditto
 	PolledTokenPairListDO : any // ditto
+	
 };

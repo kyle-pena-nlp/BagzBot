@@ -9,7 +9,7 @@ export class MenuListPositions extends Menu<Position[]> implements MenuCapabilit
     renderOptions(): CallbackButton[][] {
         const options = this.emptyMenu();
         for (const position of this.miscData!!) {
-            const positionLabel = `${position.token} - ${position.tokenAmt.toString()}`
+            const positionLabel = `${position.token.symbol} - ${position.tokenAmt.toString()}`
             const callbackData = new CallbackData(MenuCode.ViewOpenPosition, position.positionID);
             this.insertButtonNextLine(options, positionLabel, callbackData);
         }
