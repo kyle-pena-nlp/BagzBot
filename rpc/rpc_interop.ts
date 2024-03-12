@@ -1,13 +1,14 @@
 import { Env } from "../env";
 import { makeJSONRequest, tryReadResponseBody } from "../util/http_helpers";
 import { getVsTokenDecimalsMultiplier } from "../tokens/vs_tokens";
-import { Connection, PublicKey, Signer, VersionedTransaction } from '@solana/web3.js';
+import { BlockhashWithExpiryBlockHeight, ConfirmOptions, Connection, PublicKey, SendOptions, SignatureStatus, Signer, TransactionConfirmationStrategy, VersionedTransaction, sendAndConfirmRawTransaction } from '@solana/web3.js';
 import * as bs58 from "bs58";
 import { Position, PositionRequest } from "../positions/positions";
 import { Wallet } from "../crypto/wallet";
 import { dDiv } from "../positions/decimalized_math";
 import { DecimalizedAmount, MATH_DECIMAL_PLACES } from "../decimalized/decimalized_amount";
 import { Buffer } from 'node:buffer';
+import { sleep } from "../util/sleep";
 
 // TODO: re-org this into a class, and have callbacks for different lifecycle elements.
 
@@ -46,26 +47,15 @@ export enum TransactionPreparationFailure {
     FailedToSignTransaction = "FailedToSignTransaction"
 };
 
-// transaction sent, but wasn't executed
-export enum TransactionExecutionError {
-    TransactionExecutionError = "TransactionExecutionError" 
-};
-
-// transaction sent, but couldn't be confirmed
-export enum TransactionConfirmationFailure {
-    FailedToGetLatestBlockhash = "FailedToGetLatestBlockhash",
-    FailedToConfirmTransaction = "FailedToConfirmTransaction",
-};
-
 export interface PreparseSwapResult {
     positionID : string
-    status: TransactionPreparationFailure|TransactionExecutionError|TransactionConfirmationFailure|'transaction-confirmed'
+    status: TransactionPreparationFailure|TransactionExecutionError|TransactionExecutionError|'transaction-confirmed'
     signature ?: string
 }
 
 export interface SwapResult {
     positionID : string
-    status: TransactionPreparationFailure|TransactionExecutionError|TransactionConfirmationFailure|TransactionParseFailure|SwapExecutionError|'swap-successful'
+    status: TransactionPreparationFailure|TransactionExecutionError|TransactionParseFailure|SwapExecutionError|'swap-successful'
     signature ?: string
     successfulSwapSummary ?: SuccessfulSwapSummary
 };
@@ -80,7 +70,6 @@ export interface SuccessfulSwapSummary {
 };
 
 
-// transaction finalized, but couldn't parse it
 export enum TransactionParseFailure {
     BadRequest = "BadRequest",
     RateLimited = "RateLimited",
@@ -122,11 +111,6 @@ export function isTransactionExecutionFailure<T>(obj : T|TransactionExecutionErr
     //return typeof obj === 'string' && obj != null && (Object.values(TransactionExecutionError) as any[]).includes(obj);
 }
 
-export function isTransactionConfirmationFailure<T>(obj : T|TransactionConfirmationFailure) : obj is TransactionConfirmationFailure {
-    return isEnumValue(obj, TransactionConfirmationFailure);
-    //return typeof obj === 'string' && obj != null && Object.values(obj).includes(TransactionConfirmationFailure.FailedToConfirmTransaction);
-}
-
 export function isRetryableTransactionParseFailure<T>(obj : T | TransactionParseFailure) : obj is TransactionParseFailure.RateLimited|TransactionParseFailure.InternalError {
     return obj === TransactionParseFailure.RateLimited || obj === TransactionParseFailure.InternalError;
 }
@@ -158,7 +142,7 @@ export async function buyToken(positionRequest: PositionRequest, wallet : Wallet
     const positionID = positionRequest.positionID;
     return getBuyTokenSwapRoute(positionRequest, env) 
         .then(swapRoute => getRawSignedTransaction(swapRoute, wallet, env))
-        .then(rawSignedTx => executeRawSignedTransaction(positionID, rawSignedTx, env));
+        .then(rawSignedTxOrError => executeRawSignedTransaction(positionID, rawSignedTxOrError, env));
 }
 
 export async function sellToken(position : Position, wallet: Wallet, env : Env) : Promise<PreparseSwapResult> {
@@ -169,7 +153,7 @@ export async function sellToken(position : Position, wallet: Wallet, env : Env) 
 }
 
 
-async function getRawSignedTransaction(swapRoute : SwapRoute|TransactionPreparationFailure, wallet : Wallet, env : Env) : Promise<Uint8Array|TransactionPreparationFailure> {
+async function getRawSignedTransaction(swapRoute : SwapRoute|TransactionPreparationFailure, wallet : Wallet, env : Env) : Promise<VersionedTransaction|TransactionPreparationFailure> {
     if (isTransactionPreparationFailure(swapRoute)) {
         return swapRoute;
     }
@@ -317,7 +301,7 @@ async function serializeSwapRouteTransaction(swapRoute : SwapRoute|TransactionPr
     }
 }
 
-async function signTransaction(swapTransaction : Buffer|TransactionPreparationFailure, wallet : Wallet, env : Env) : Promise<Uint8Array|TransactionPreparationFailure> {
+async function signTransaction(swapTransaction : Buffer|TransactionPreparationFailure, wallet : Wallet, env : Env) : Promise<VersionedTransaction|TransactionPreparationFailure> {
     if (isTransactionPreparationFailure(swapTransaction)) {
         return swapTransaction;
     }
@@ -327,8 +311,7 @@ async function signTransaction(swapTransaction : Buffer|TransactionPreparationFa
         transaction.message.recentBlockhash = await getRecentBlockhash(env);
         const signer = toSigner(wallet);
         transaction.sign([signer]);
-        const rawSignedTransaction = transaction.serialize();
-        return rawSignedTransaction;
+        return transaction;
     }
     catch {
         return TransactionPreparationFailure.FailedToSignTransaction;
@@ -340,76 +323,212 @@ async function getRecentBlockhash(env : Env) : Promise<string> {
     return (await connection.getLatestBlockhash('confirmed')).blockhash;
 }
 
+enum TransactionExecutionError {
+    CouldNotPollBlockheight = "CouldNotPollBlockheight",
+    BlockheightExceeded = "BlockheightExceeded",
+    TransactionDropped = "TransactionDropped",
+    TransactionFailed = "TransactionFailed",
+    CouldNotConfirmTooManyExceptions = "CouldNotConfirmTooManyExceptions",
+    TimeoutCouldNotConfirm = "TimeoutCouldNotConfirm",
+    OtherError = "OtherError"
+};
+
 // TODO: https://solanacookbook.com/guides/retrying-transactions.html#customizing-rebroadcast-logic
 async function executeRawSignedTransaction(
     positionID : string,
-    rawSignedTransaction : Uint8Array|TransactionPreparationFailure, 
-    env : Env) : Promise<PreparseSwapResult> {
+    rawSignedTx : VersionedTransaction|TransactionPreparationFailure, 
+    env : Env,
+    logHandler? : (msg: string, error : any) => Promise<void>) : Promise<PreparseSwapResult> {
     
-    if (isTransactionPreparationFailure(rawSignedTransaction)) {
-        return { positionID : positionID, status: rawSignedTransaction };
+    // no-op the logHandler if one is not provided
+    if (logHandler == null) {
+        logHandler = async (msg:string, error: any) => {};
+    }
+
+    // early-out if the tx is really just an error code
+    if (isTransactionPreparationFailure(rawSignedTx)) {
+        return { positionID : positionID, status: rawSignedTx };
     }
     
+    // Define some settings
+    const rpcSendTxMaxRetries = parseInt(env.EXECUTE_TRANSACTION_RPC_MAX_RETRIES,10);
+    const maxConfirmExceptions = 10; // TODO: from env.
+    const REBROADCAST_DELAY_MS = 300;
+    const REATTEMPT_CONFIRM_DELAY = 300;
+    const confirmTimeoutMS = 60 * 1000;
+
+    // create cxn to RPC
     const connection = new Connection(env.RPC_ENDPOINT_URL);
-    
-    const signature = await connection.sendRawTransaction(rawSignedTransaction, {
-        skipPreflight: false,
-        maxRetries: 4,
-        preflightCommitment: 'processed'
-    }).catch((reason) => {
-        return TransactionExecutionError.TransactionExecutionError
-    });
 
-    if (isTransactionExecutionFailure(signature)) {
-        return { positionID : positionID, status: signature };
-    }
-
-    return await confirmTransaction(signature, positionID, env, connection);
+    // transform tx to buffer, extract signature yo damn self
+    const txBuffer = Buffer.from(rawSignedTx.serialize());
+    const signature = bs58.encode(rawSignedTx.signatures[0]);
     
+    /*
+        We are going to set up two async loops ;
+            One for resending the tx until blockheight exceeded
+            One for confirming until timeout or signature not found and blockheight exceeded
+    */
+
+    // The loops can signal eachother to stop by setting these flags.
+    let stopSendingSignal = false;
+    let stopConfirmingSignal = false;
+
+    // if the current blockheight exceeds this, the transaction will never execute.
+    const lastValidBlockheight = await getLastValidBlockheight(connection);
+
+    const resendTxTask = (async () => {
+
+        // The current blockheight (will be repolled after every send attempt)
+        let blockheight : number = -1;
+
+        // Whether or not at least one tx got successfully sent to RPC
+        let anyTxSent = false;
+        
+        // Until this loop is signalled to stop
+        while(!stopSendingSignal) {
+
+            /* Attempt to send transaction.  If sent, note that there is something to confirm. */
+            try {
+                await connection.sendRawTransaction(txBuffer, {
+                    skipPreflight : true,
+                    maxRetries: 0
+                });
+                anyTxSent = true;
+            }
+            catch(e) {
+                await logHandler("sendRawTransaction threw an exception", e);
+            }
+
+            // Sleep to avoid spamming RPC.
+            await sleep(REBROADCAST_DELAY_MS);
+
+            /* 
+                Poll the RPC for current blockheight.
+                If polling for blockheight fails:
+                    - Stop this loop. We must be able to poll for blockheight.
+                    - Additionally, stop confirmTx loop if no sent transactions.
+            */
+            try {
+                blockheight = await getLatestBlockheight(connection);
+            }
+            catch(e) {
+                await logHandler("getBlockHeight threw an exception", e);
+                if (!anyTxSent) {
+                    stopConfirmingSignal = true;
+                }
+                return TransactionExecutionError.CouldNotPollBlockheight; // 'could-not-poll-blockheight';
+            }
+
+            /*
+                If lastValidBlockheight exceeded, stop resending - it will never confirm or finalize.
+                And if no tx ever sent successfully, signal confirmTx loop top stop trying to confirm.
+            */
+            if (blockheight >= lastValidBlockheight) {
+                // If the current blockheight exceeds last valid blockheight, stop sending
+                if (!anyTxSent) {
+                    // and don't bother confirming if nothing was ever sent
+                    stopConfirmingSignal = true;
+                }
+                return TransactionExecutionError.BlockheightExceeded;// 'transaction-blockheight-exceeded';
+            }
+        }
+        return;
+    })();
+
+    /*
+        Async loop: re-attempt confirmation until:
+            (A) signature is confirmed or finalized
+            (B) transaction itself has an error
+            (C) send-transaction task tells us to stop trying to confirm
+    */
+    const confirmTransactionTask = (async () => {
+
+        let confirmExceptions = 0;
+        const startConfirmMS = Date.now();
+        
+        while(!stopConfirmingSignal) {
+            
+            /* Check the status on the signature */
+            let result : SignatureStatus|null = null;
+            try {
+                
+                // get signature status
+                result = (await connection.getSignatureStatuses([signature], {
+                    searchTransactionHistory: false
+                })).value[0];
+
+                // if the tx doesn't exist yet
+                const txDoesNotExistYet = result == null;
+                if (txDoesNotExistYet) {
+                    // if tx DNE and blockheight exceeded, tx was dropped (TODO: is this certainly true?)
+                    const currentBlockheight = await getLatestBlockheight(connection).catch((reason) => null);
+                    if (currentBlockheight && (currentBlockheight > lastValidBlockheight)) {
+                        await logHandler("No transaction found", {});
+                        return TransactionExecutionError.TransactionDropped;// 'transaction-dropped';
+                    }
+                    if (!currentBlockheight) {
+                        await logHandler('Could not poll currentBlockheight', {});
+                    } 
+                }
+            }
+            catch(e) {
+                confirmExceptions++;
+                await logHandler('getSignatureStatuses threw an exception', e);
+            }
+
+            /* If the transaction itself failed, exit confirmation loop with 'transaction-failed'. */
+            const err = result?.err;
+            if (err) {
+                await logHandler("Transaction failed", err);
+                stopSendingSignal = true;
+                return TransactionExecutionError.TransactionFailed; // 'transaction-failed';
+            }
+            /* If the transaction itself was confirmed or finalized, exit confirmation loop with 'transaction-confirmed' */
+            const status = result?.confirmationStatus;
+            const hasConfirmations = (result?.confirmations || 0) > 0;
+            if ((hasConfirmations || (status === 'confirmed' || status === 'finalized'))) {
+                stopSendingSignal = true;
+                return 'transaction-confirmed';
+            }
+
+            await sleep(REATTEMPT_CONFIRM_DELAY);
+
+            /* i.e.; RPC is down. */
+            if (confirmExceptions >= maxConfirmExceptions) {
+                return TransactionExecutionError.CouldNotConfirmTooManyExceptions; //'confirmation-too-many-exceptions';
+            }
+
+            // this is a failsafe to prevent infinite looping.
+            const confirmTimedOut = (Date.now() - startConfirmMS) > confirmTimeoutMS;
+            if (confirmTimedOut) {
+                stopSendingSignal = true;
+                return TransactionExecutionError.TimeoutCouldNotConfirm;
+            }
+        }
+        return;
+    })();
+
+    const confirmStatus = await confirmTransactionTask;
+    const sendStatus = await resendTxTask;
+
+
+    const finalStatus = determineTxConfirmationFinalStatus(sendStatus, confirmStatus);
+
+
+    return { positionID : positionID, status: finalStatus, signature: signature };
 }
 
-export async function confirmTransaction(signature : string, positionID : string, env : Env, connection?: Connection) : Promise<PreparseSwapResult> {
+function determineTxConfirmationFinalStatus(sendStatus : TransactionExecutionError|undefined, confirmStatus : TransactionExecutionError|'transaction-confirmed'|undefined) : TransactionExecutionError | 'transaction-confirmed' {
+    return confirmStatus || sendStatus || TransactionExecutionError.OtherError;
+}
 
-    if (connection == null) {
-        connection = new Connection(env.RPC_ENDPOINT_URL);
-    }
+async function getLatestBlockheight(connection : Connection) : Promise<number> {
+    return (await connection.getBlockHeight());
+}
 
-
-
-    try {
-
-        const latestBlockhash = await (connection.getLatestBlockhash('confirmed').catch(reason => {
-            return TransactionConfirmationFailure.FailedToGetLatestBlockhash
-        }));
-    
-        if (isTransactionConfirmationFailure(latestBlockhash)) {
-            return { positionID : positionID, status: latestBlockhash, signature : signature };
-        }
-
-        const confirmationResponse = await (connection.confirmTransaction({
-            blockhash: latestBlockhash.blockhash,
-            lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,  
-            signature: signature
-        }, 'confirmed').catch((reason) => {
-            return TransactionConfirmationFailure.FailedToConfirmTransaction
-        }));
-        
-        if (isTransactionConfirmationFailure(confirmationResponse)) {
-            return { positionID : positionID, status: TransactionConfirmationFailure.FailedToConfirmTransaction, signature : signature };
-        }
-    
-        const confirmationErr = confirmationResponse.value.err;
-    
-        if (confirmationErr && typeof confirmationErr === 'string') {
-            return { positionID : positionID, status: TransactionConfirmationFailure.FailedToConfirmTransaction, signature : signature };
-        }
-    
-        return { positionID : positionID, status: 'transaction-confirmed', signature : signature };
-    }
-    catch(e) {
-        return { positionID : positionID, status: TransactionConfirmationFailure.FailedToConfirmTransaction, signature : signature };
-    }
-
+async function getLastValidBlockheight(connection : Connection) {
+    return (await connection.getLatestBlockhash('confirmed')).lastValidBlockHeight;
 }
 
 interface HeliusParsedTokenInputOutput {
@@ -426,9 +545,6 @@ export async function parseSwapTransaction(positionID : string, transactionResul
     }
     else if (isTransactionExecutionFailure(status)) {
         return { positionID : positionID, status: status };
-    }
-    else if (isTransactionConfirmationFailure(status)) {
-        return { positionID : positionID, status: status, signature: transactionResult.signature };
     }
 
     const signature = transactionResult.signature!!;
@@ -449,14 +565,20 @@ export async function parseSwapTransaction(positionID : string, transactionResul
 
 async function useJupiterAPIToParseSwapTransaction(signature : string, env : Env) : Promise<TransactionParseFailure|{ parsed: any }> {
     
-    const url = `${env.V0_HELIUS_RPC_TRANSACTION_PARSING_URL}?api-key=${env.HELIUS_API_KEY}&commitment=finalized`
+    const url = `${env.V0_HELIUS_RPC_TRANSACTION_PARSING_URL}?api-key=${env.HELIUS_API_KEY}&commitment=confirmed`
     
     const body = {
         "transactions": [signature]
     };
 
     const request = makeJSONRequest(url, body);
-    const response = await fetch(request);   
+    const response = await fetch(request).catch((reason) => {
+        return null;
+    });
+    
+    if (!response) {
+        return TransactionParseFailure.BadRequest;
+    }
     
     // Unauthorized
     if (response.status == 400) {

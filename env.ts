@@ -17,8 +17,23 @@ export interface Env {
 	PLATFORM_FEE_BPS : string
 	FEE_ACCOUNT_PUBLIC_KEY : string
 	DEFAULT_TLS_VS_TOKEN_FRACTION : string
+	EXECUTE_TRANSACTION_RPC_MAX_RETRIES : string,
 	UserDO : any // i'd like to strongly type this as DurableObjectNamespace, but can't for technical reasons
 	TokenPairPositionTrackerDO : any // ditto
 	PolledTokenPairListDO : any // ditto
-	
 };
+
+/*
+// TODO: this, with errors if parses are wrong
+export class ParsedEnv {
+	env: Env
+	environment : string
+	telegramBotServerUrl : string
+	telegramBotToken : string
+	te
+	constructor (env : Env) {
+		this.env = env;
+
+	}
+}
+*/

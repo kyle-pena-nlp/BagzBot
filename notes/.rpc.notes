@@ -1,0 +1,17 @@
+    /*
+        We have two async loops (tasks) which, in 'parallel':
+            (A) resend the transaction until blockheight exceeded
+            (B) check the statuses of the signatures until tx failed or confirmed/finalized
+        
+ 
+        References for the following code:
+            Solana cookbook, which doesn't have an early out:  https://solanacookbook.com/guides/retrying-transactions.html#customizing-rebroadcast-logic 
+            Mango, which isn't blockheight based: https://github.com/blockworks-foundation/mango-ui/blob/b6abfc6c13b71fc17ebbe766f50b8215fa1ec54f/src/utils/send.tsx#L713 
+            API doc: https://www.quicknode.com/docs/solana/getSignatureStatuses
+            When sendTransactin raises exceptions:
+                - https://github.com/solana-labs/solana-web3.js/blob/f886f55535cf0954ef8fe3630f8d44fc63566438/packages/library-legacy/src/connection.ts#L5916
+                - https://github.com/solana-labs/solana-web3.js/blob/f886f55535cf0954ef8fe3630f8d44fc63566438/packages/library-legacy/src/connection.ts#L1659
+
+        This code is based on ideas from the Solana cookbook (polling blockheight)
+        and from ideas in Mango (async tasks).
+    */

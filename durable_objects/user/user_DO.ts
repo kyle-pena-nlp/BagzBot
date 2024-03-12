@@ -17,7 +17,7 @@ import { UserPositionTracker } from "./trackers/user_position_tracker";
 import { generateEd25519Keypair } from "../../crypto/cryptography";
 import { UserDOFetchMethod, parseUserDOFetchMethod } from "./userDO_interop";
 import { TokenPairPositionTrackerDOFetchMethod, importNewPosition, makeTokenPairPositionTrackerDOFetchRequest, markPositionAsClosedInTokenPairPositionTracker, markPositionAsClosingInTokenPairPositionTracker } from "../token_pair_position_tracker/token_pair_position_tracker_DO_interop";
-import { sellTokenAndParseSwapTransaction, buyTokenAndParseSwapTransaction, SwapResult, isTransactionPreparationFailure, isTransactionExecutionFailure, isTransactionConfirmationFailure, isTransactionParseFailure, isSwapExecutionError, confirmTransaction, PreparseSwapResult, parseSwapTransaction, isRetryableTransactionParseFailure, SuccessfulSwapSummary } from "../../rpc/rpc_interop";
+import { sellTokenAndParseSwapTransaction, buyTokenAndParseSwapTransaction, SwapResult, isTransactionPreparationFailure, isTransactionExecutionFailure, isTransactionParseFailure, isSwapExecutionError, isRetryableTransactionParseFailure, SuccessfulSwapSummary } from "../../rpc/rpc_interop";
 import { getVsTokenInfo } from "../../tokens/vs_tokens";
 import { Env } from "../../env";
 import { Wallet } from "../../crypto/wallet";
@@ -375,9 +375,6 @@ export class UserDO {
         else if (isTransactionExecutionFailure(status)) {
             // TODO: mark position as open again
         }
-        else if (isTransactionConfirmationFailure(status)) {
-            // TODO: retry confirmation until confirmed failure
-        }
         else if (isTransactionParseFailure(status)) {
             // TODO: retry transaction parse
         }
@@ -405,9 +402,6 @@ export class UserDO {
             await sendMessageToTG(chatID, `Purchase failed.`, this.env);
         }
         else if (isTransactionExecutionFailure(status)) {
-            await sendMessageToTG(chatID, `Purchase failed.`, this.env);
-        }
-        else if (isTransactionConfirmationFailure(status)) {
             await sendMessageToTG(chatID, `Purchase failed.`, this.env);
         }
         else if (isRetryableTransactionParseFailure(status)) {
@@ -466,19 +460,6 @@ export class UserDO {
         else {
             // TODO: log errors
         }
-    }
-
-    async retryConfirmationExpBackoffAndContinue(swapResult : SwapResult, chatID : number, tokenSymbol : string) : Promise<SwapResult|null> {
-        const confirmation = await expBackoff(() => confirmTransaction(swapResult.signature!!, swapResult.positionID, this.env))
-            .catch(async (reason) => {
-                await sendMessageToTG(chatID, `We couldn't successfully confirm the purchase of ${tokenSymbol}`,this.env);
-                return null;
-            });
-        if (confirmation == null) {
-            return null;
-        }
-        const positionID = confirmation.positionID;
-        return await parseSwapTransaction(positionID, confirmation, this.env);
     }
 
     async validateFetchRequest(request : Request) : Promise<[UserDOFetchMethod,any]> {
