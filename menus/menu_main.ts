@@ -3,11 +3,11 @@ import { CallbackButton, Menu, MenuCapabilities, MenuCode } from "./menu";
 
 export class MenuMain extends Menu<UserData> implements MenuCapabilities {
     renderText(): string {
-        return `Welcome ${this.miscData!!.telegramUserName || 'new user'}!`;
+        return `Welcome ${this.menuData.telegramUserName || 'new user'}!`;
     }
     renderOptions(): CallbackButton[][] {
         const options = this.emptyMenu();
-        const hasWallet = this.miscData!!.hasWallet;
+        const hasWallet = this.menuData.hasWallet;
         if (hasWallet) {
             this.insertButtonNextLine(options, 'Wallet', this.menuCallback(MenuCode.Wallet));
             this.insertButtonNextLine(options, 'Positions', this.menuCallback(MenuCode.ListPositions));

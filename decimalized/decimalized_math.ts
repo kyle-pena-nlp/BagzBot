@@ -1,4 +1,4 @@
-import { DecimalizedAmount } from "../decimalized/decimalized_amount";
+import { DecimalizedAmount, moveDecimalLeftInString } from "./decimalized_amount";
 
 export function dAdd(a : DecimalizedAmount, b : DecimalizedAmount) : DecimalizedAmount {
     const decimals = Math.max(a.decimals, b.decimals);
@@ -85,14 +85,3 @@ function dAsNumber(a : DecimalizedAmount) : number {
     return parseFloat(stringAmount);
 }
 
-function moveDecimalLeftInString(tokenAmount : string, decimals : number) : string {
-    if (decimals >= tokenAmount.length) {
-        const leadingZeros = decimals - tokenAmount.length;
-        return "0." + ("0".repeat(leadingZeros)) + tokenAmount;
-    }
-    else {
-        const beforeDecimalPoint = tokenAmount.substring(0, tokenAmount.length - decimals);
-        const afterDecimalPoint = tokenAmount.substring(tokenAmount.length - decimals);
-        return beforeDecimalPoint + "." + afterDecimalPoint;
-    }
-}

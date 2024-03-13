@@ -28,7 +28,7 @@ export class PositiveIntegerKeypad extends Menu<string> implements MenuCapabilit
 
     renderText(): string {
         const values : Record<string,string> = {
-            currentValue: this.miscData!!
+            currentValue: this.menuData
         };
         return this.messageFormat.replace(/\$\{(\w+)\}/g, (placeholder, key) => 
         { 
@@ -63,13 +63,13 @@ export class PositiveIntegerKeypad extends Menu<string> implements MenuCapabilit
         
         this.maybeInsertKeypadButton(options, "0",  4);
 
-        const backspaceCallbackData = new CallbackData(this.thisMenuCode, (this.miscData||'').slice(0,-1));
-        if (this.miscData||'') {
+        const backspaceCallbackData = new CallbackData(this.thisMenuCode, (this.menuData||'').slice(0,-1));
+        if (this.menuData||'') {
             this.insertButton(options, "x", backspaceCallbackData,  4);
         }
 
-        if (this.isValidSubmission(this.miscData||'')) {
-            const submitCallbackData = new CallbackData(this.submitMenuCode, this.miscData||'');
+        if (this.isValidSubmission(this.menuData||'')) {
+            const submitCallbackData = new CallbackData(this.submitMenuCode, this.menuData||'');
             this.insertButton(options, "Submit", submitCallbackData, 5);
         }
         
@@ -98,7 +98,7 @@ export class PositiveIntegerKeypad extends Menu<string> implements MenuCapabilit
     }
 
     private maybeInsertKeypadButton(options : CallbackButton[][], character : string, lineNumber : number) {
-        const newEntry = this.miscData + character;
+        const newEntry = this.menuData + character;
         const parses = this.doesItParse(newEntry);
         if (parses) {
             const callbackData = new CallbackData(this.thisMenuCode, newEntry);

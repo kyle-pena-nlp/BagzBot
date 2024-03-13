@@ -4,11 +4,11 @@ import { CallbackButton, Menu, MenuCapabilities, MenuCode } from "./menu";
 
 export class MenuListPositions extends Menu<Position[]> implements MenuCapabilities {
     renderText(): string {
-        return `You have ${this.miscData!!.length} open positions`;
+        return `You have ${this.menuData.length} open positions`;
     }
     renderOptions(): CallbackButton[][] {
         const options = this.emptyMenu();
-        for (const position of this.miscData!!) {
+        for (const position of this.menuData) {
             const positionLabel = `${position.token.symbol} - ${position.tokenAmt.toString()}`
             const callbackData = new CallbackData(MenuCode.ViewOpenPosition, position.positionID);
             this.insertButtonNextLine(options, positionLabel, callbackData);

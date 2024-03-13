@@ -1,3 +1,6 @@
+import { TokenAmount } from "@solana/web3.js";
+import { tryParseFloat } from "../util/numbers";
+
 export const MATH_DECIMAL_PLACES = 6;
 
 /* See decimalized_math.ts for operations on this type */
@@ -8,6 +11,40 @@ export interface DecimalizedAmount {
 
 export function toKey(x : DecimalizedAmount) : string {
     return `${x.tokenAmount}~${x.decimals.toString()}`;
+}
+
+const subscriptDigits = ['₀', '₁', '₂', '₃', '₄', '₅', '₆', '₇', '₈', '₉'];
+
+export function toFriendlyString(x : DecimalizedAmount, maxSigFigs : number) : string {
+    const longDecimalRepr = moveDecimalLeftInString(x.tokenAmount, x.decimals);
+    const numberParts = longDecimalRepr.split(".");
+    if (numberParts.length == 1) {
+        return numberParts[0];
+    }
+    else {
+        const [wholePart,fractionalPart] = longDecimalRepr.split(".");
+        let { zeros, rest } = /^(?<zeros>0*)(?<rest>.*)$/.exec(fractionalPart)?.groups!!;
+        if (zeros.length > 1) {
+            zeros = "0" + subscriptDigits[zeros.length];
+        }
+        if (rest.length > maxSigFigs) {
+            rest = Math.round(parseFloat(rest.substring(maxSigFigs + 1))/10).toString();
+        }
+        return wholePart + "." + zeros + rest;
+    }
+}
+
+function countLeadingZeros(fractionalPart : string) : number {
+    let count = 0;
+    for (const character of fractionalPart) {
+        if (character === '0') {
+            count++;
+        }
+        else {
+            break;
+        }
+    }
+    return count;
 }
 
 export function fromKey(key : string) : DecimalizedAmount {
@@ -33,6 +70,28 @@ export function fromNumber(x : number, decimalPlaces? : number) : DecimalizedAmo
         tokenAmount : scaledNumber,
         decimals : decimals
     };
+}
+
+export function fromTokenAmount(tokenAmount : TokenAmount|null|undefined) : DecimalizedAmount|null {
+    if (tokenAmount == null) {
+        return null;
+    }
+    return {
+        tokenAmount: tokenAmount.amount,
+        decimals: tokenAmount.decimals
+    }
+}
+
+export function moveDecimalLeftInString(tokenAmount : string, decimals : number) : string {
+    if (decimals >= tokenAmount.length) {
+        const leadingZeros = decimals - tokenAmount.length;
+        return "0." + ("0".repeat(leadingZeros)) + tokenAmount;
+    }
+    else {
+        const beforeDecimalPoint = tokenAmount.substring(0, tokenAmount.length - decimals);
+        const afterDecimalPoint = tokenAmount.substring(tokenAmount.length - decimals);
+        return beforeDecimalPoint + "." + afterDecimalPoint;
+    }
 }
 
 function splitNumberStringIntoParts(xString : string) : [string,string] {

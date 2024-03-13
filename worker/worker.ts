@@ -13,6 +13,8 @@ import { QuantityAndToken } from "../durable_objects/user/model/quantity_and_tok
 import { OpenPositionRequest } from "../durable_objects/user/actions/open_new_position";
 import { GetTokenInfoResponse } from "../durable_objects/polled_token_pair_list/actions/get_token_info";
 import { tryParseFloat } from "../util/numbers";
+import { quoteBuy } from "../rpc/rpc_interop";
+import { PositionRequestAndQuote } from "../positions/position_request_and_quote";
 
 export class Worker {
 
@@ -32,7 +34,7 @@ export class Worker {
             const tokenSymbol  = validateTokenResponse.tokenInfo!!.symbol;
             const tgMessageInfo = await sendMessageToTG(telegramWebhookInfo.chatID, `Token address '${tokenAddress}' (${tokenSymbol}) recognized!`, env);
             await storeSessionObj<PositionRequest>(telegramUserID, tgMessageInfo.messageID!!, defaultTrailingStopLossRequest, "PositionRequest", env);
-            const menu = this.makeTrailingStopLossRequestEditorMenu(defaultTrailingStopLossRequest);
+            const menu = await this.getQuoteAndMakeStopLossRequestEditorMenu(defaultTrailingStopLossRequest, env);
             const request = menu.getUpdateExistingMenuRequest(chatID, tgMessageInfo.messageID!!, env);
             await fetch(request);
             return makeSuccessResponse();
@@ -60,17 +62,17 @@ export class Worker {
                 await this.handleCreateWallet(telegramWebhookInfo, env);
                 return this.createMainMenu(telegramWebhookInfo, env);
             case MenuCode.Error:
-                return new MenuError();
+                return new MenuError(undefined);
             case MenuCode.ExportWallet:
                 return this.TODOstubbedMenu(env);	
             case MenuCode.FAQ:
-                return new MenuFAQ();
+                return new MenuFAQ(undefined);
             case MenuCode.Help:
-                return new MenuHelp();
+                return new MenuHelp(undefined);
             case MenuCode.Invite:
                 return this.TODOstubbedMenu(env);
             case MenuCode.PleaseEnterToken:
-                return new MenuPleaseEnterToken();
+                return new MenuPleaseEnterToken(undefined);
             case MenuCode.ListPositions:
                 const positions = await listOpenTrailingStopLossPositions(telegramUserID, env);
                 return new MenuListPositions(positions);
@@ -96,7 +98,7 @@ export class Worker {
                 if (trailingStopLossCustomSlippageSubmittedKeypadEntry) {
                     await storeSessionObjProperty(telegramUserID, messageID, "slippagePercent", trailingStopLossCustomSlippageSubmittedKeypadEntry, "PositionRequest", env);
                     const positionRequestAfterEditingSlippagePct = await readSessionObj<PositionRequest>(telegramUserID, messageID, "PositionRequest", env);
-                    return this.makeTrailingStopLossRequestEditorMenu(positionRequestAfterEditingSlippagePct);
+                    return await this.getQuoteAndMakeStopLossRequestEditorMenu(positionRequestAfterEditingSlippagePct, env);
                 }
             case MenuCode.TrailingStopLossEnterBuyQuantityKeypad:
                 const buyTrailingStopLossQuantityKeypadEntry = callbackData.menuArg||'';
@@ -107,17 +109,17 @@ export class Worker {
                 if (submittedTrailingStopLossBuyQuantity) {
                     await storeSessionObjProperty(telegramUserID, messageID, "vsTokenAmt", submittedTrailingStopLossBuyQuantity, "PositionRequest", env);
                     const trailingStopLossRequestStateAfterBuyQuantityEdited = await readSessionObj<PositionRequest>(telegramUserID, messageID, "PositionRequest", env);
-                    return this.makeTrailingStopLossRequestEditorMenu(trailingStopLossRequestStateAfterBuyQuantityEdited);
+                    return await this.getQuoteAndMakeStopLossRequestEditorMenu(trailingStopLossRequestStateAfterBuyQuantityEdited, env);
                 }
             case MenuCode.TrailingStopLossChooseAutoRetrySellMenu:
-                return new MenuTrailingStopLossAutoRetrySell();
+                return new MenuTrailingStopLossAutoRetrySell(undefined);
             case MenuCode.TrailingStopLossChooseAutoRetrySellSubmit:
                 await storeSessionObjProperty(telegramUserID, messageID, "retrySellIfSlippageExceeded", callbackData.menuArg!! === "true", "PositionRequest", env);
                 const trailingStopLossRequestStateAfterAutoRetrySellEdited = await readSessionObj<PositionRequest>(telegramUserID, messageID, "PositionRequest", env);
-                return this.makeTrailingStopLossRequestEditorMenu(trailingStopLossRequestStateAfterAutoRetrySellEdited);
+                return await this.getQuoteAndMakeStopLossRequestEditorMenu(trailingStopLossRequestStateAfterAutoRetrySellEdited, env);
             case MenuCode.TrailingStopLossConfirmMenu:
                 const trailingStopLossRequestAfterDoneEditing = await readSessionObj<PositionRequest>(telegramUserID, messageID, "PositionRequest", env);
-                return new MenuConfirmTrailingStopLossPositionRequest(trailingStopLossRequestAfterDoneEditing);
+                return await this.getQuoteAndMakeStopLossConfirmMenu(trailingStopLossRequestAfterDoneEditing, env);
             case MenuCode.TrailingStopLossCustomTriggerPercentKeypad:
                 const trailingStopLossTriggerPercentKeypadCurrentEntry = callbackData.menuArg||'';
                 const trailingStopLossCustomTriggerPercentKeypad = this.makeTrailingStopLossCustomTriggerPercentKeypad(trailingStopLossTriggerPercentKeypadCurrentEntry)
@@ -127,7 +129,7 @@ export class Worker {
                 if (trailingStopLossCustomTriggerPercentSubmission) {
                     await storeSessionObjProperty(telegramUserID, messageID, "triggerPercent", trailingStopLossCustomTriggerPercentSubmission, "PositionRequest", env);
                     const trailingStopLossPositionRequestAfterEditingCustomTriggerPercent = await readSessionObj<PositionRequest>(telegramUserID, messageID, "PositionRequest", env);
-                    return this.makeTrailingStopLossRequestEditorMenu(trailingStopLossPositionRequestAfterEditingCustomTriggerPercent);
+                    return await this.getQuoteAndMakeStopLossRequestEditorMenu(trailingStopLossPositionRequestAfterEditingCustomTriggerPercent, env);
                 }
             case MenuCode.TrailingStopLossEditorFinalSubmit:
                 // TODO: do the read within UserDO to avoid the extra roundtrip
@@ -150,7 +152,7 @@ export class Worker {
                     ["vsTokenAddress", vsTokenAddress]
                 ]), "PositionRequest", env);
                 const trailingStopLossPositionRequestAfterSubmittingVsToken = await readSessionObj<PositionRequest>(telegramUserID, messageID, "PositionRequest", env);
-                return this.makeTrailingStopLossRequestEditorMenu(trailingStopLossPositionRequestAfterSubmittingVsToken);
+                return await this.getQuoteAndMakeStopLossRequestEditorMenu(trailingStopLossPositionRequestAfterSubmittingVsToken, env);
             case MenuCode.TransferFunds:
                 // TODO
                 return this.TODOstubbedMenu(env);
@@ -170,9 +172,9 @@ export class Worker {
                 return new MenuTrailingStopLossTriggerPercent(triggerPercent);
             case MenuCode.TrailingStopLossRequestReturnToEditorMenu:
                 const z = await readSessionObj<PositionRequest>(telegramUserID, messageID, "PositionRequest", env);
-                return this.makeTrailingStopLossRequestEditorMenu(z);
+                return await this.getQuoteAndMakeStopLossRequestEditorMenu(z, env);
             default:
-                return new MenuError();
+                return new MenuError(undefined);
         }
     }
 
@@ -223,8 +225,20 @@ export class Worker {
             100);
     }
 
-    makeTrailingStopLossRequestEditorMenu(positionRequest : PositionRequest) : BaseMenu {
-        return new MenuEditTrailingStopLossPositionRequest(positionRequest);
+    async getQuoteAndMakeStopLossRequestEditorMenu(positionRequest : PositionRequest, env : Env) : Promise<BaseMenu> {
+        const quote = await quoteBuy(positionRequest, env);
+        const positionRequestAndQuote : PositionRequestAndQuote = { positionRequest: positionRequest, quote : quote };
+        return await this.makeTrailingStopLossRequestEditorMenu(positionRequestAndQuote);
+    }
+
+    makeTrailingStopLossRequestEditorMenu(positionRequestAndQuote : PositionRequestAndQuote) : BaseMenu {
+        return new MenuEditTrailingStopLossPositionRequest(positionRequestAndQuote);
+    }
+
+    async getQuoteAndMakeStopLossConfirmMenu(positionRequest: PositionRequest, env : Env) : Promise<BaseMenu> {
+        const quote = await quoteBuy(positionRequest, env);
+        const positionRequestAndQuote : PositionRequestAndQuote = { positionRequest: positionRequest, quote : quote };
+        return new MenuConfirmTrailingStopLossPositionRequest(positionRequestAndQuote)
     }
 
     makeTrailingStopLossCustomSlippagePctKeypad(currentEntry : string) {
@@ -247,7 +261,7 @@ export class Worker {
     }
 
     TODOstubbedMenu(env : Env) : BaseMenu {
-        return new MenuTODO();
+        return new MenuTODO(undefined);
     }
 
     async handleManuallyClosePosition(telegramUserID : number, positionID : string, env : Env) : Promise<Response> {
@@ -280,7 +294,7 @@ export class Worker {
                 const userData = await getAndMaybeInitializeUserData(telegramWebhookInfo.telegramUserID, telegramWebhookInfo.telegramUserName, telegramWebhookInfo.messageID, env);
                 return ["...", new MenuMain(userData)];
             case '/help':
-                return ["...", new MenuHelp()];
+                return ["...", new MenuHelp(undefined)];
             case '/autosell':
                 const autoSellOrderSpec = telegramWebhookInfo.parseAutoSellOrder();
                 if (autoSellOrderSpec == null) {
@@ -295,10 +309,11 @@ export class Worker {
                 }
                 const tokenInfo = getTokenResponse.tokenInfo!!;
                 const tokenRecognizedForAutoSellOrderMsg =  `Token address '${tokenAddress}' (${tokenInfo.symbol!!}) recognized!`;
-                const positionRequest = autoSellOrderSpec.toPositionRequest();
+                const positionPrerequest = autoSellOrderSpec.toPositionPreRequest();
+                const positionRequest = convertPreRequestToRequest(positionPrerequest, tokenInfo);
                 return [tokenRecognizedForAutoSellOrderMsg,
-                    this.makeTrailingStopLossRequestEditorMenu(positionRequest),
-                    { obj: positionRequest, prefix: "PositionRequest" }];
+                    await this.getQuoteAndMakeStopLossRequestEditorMenu(positionRequest, env),
+                    { obj: positionPrerequest, prefix: "PositionRequest" }];
             case '/menu':
                 const menuUserData = await getAndMaybeInitializeUserData(telegramWebhookInfo.telegramUserID, telegramWebhookInfo.telegramUserName, telegramWebhookInfo.messageID, env);
                 return ['...', new MenuMain(menuUserData)];

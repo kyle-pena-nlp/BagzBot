@@ -1,7 +1,7 @@
 import { CallbackData } from "../menus/callback_data";
 import { TGTextEntity, TGTextEntityType } from "./telegram_helpers";
 import { getVsTokenAddress } from "../tokens/vs_tokens";
-import { PositionRequest, PositionType } from "../positions/positions";
+import { PositionPreRequest, PositionRequest, PositionType } from "../positions/positions";
 
 export class AutoSellOrderSpec {
 
@@ -33,8 +33,8 @@ export class AutoSellOrderSpec {
 		this.autoRetrySellIfSlippageExceeded = autoRetrySellIfSlippageExceeded;
 	}
 
-	toPositionRequest() : PositionRequest {
-		const positionRequest : PositionRequest = {
+	toPositionPreRequest() : PositionPreRequest {
+		const positionRequest : PositionPreRequest = {
 			userID : this.userID,
 			chatID : this.chatID,
 			positionID : crypto.randomUUID(),

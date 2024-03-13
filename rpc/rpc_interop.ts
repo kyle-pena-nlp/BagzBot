@@ -1,14 +1,16 @@
 import { Env } from "../env";
 import { makeJSONRequest, tryReadResponseBody } from "../util/http_helpers";
-import { getVsTokenDecimalsMultiplier } from "../tokens/vs_tokens";
-import { BlockhashWithExpiryBlockHeight, ConfirmOptions, Connection, PublicKey, SendOptions, SignatureStatus, Signer, TransactionConfirmationStrategy, VersionedTransaction, sendAndConfirmRawTransaction } from '@solana/web3.js';
+import { getVsToken, getVsTokenDecimalsMultiplier, getVsTokenInfo } from "../tokens/vs_tokens";
+import { Connection, PublicKey, SignatureStatus, Signer, TokenBalance, VersionedTransaction } from '@solana/web3.js';
 import * as bs58 from "bs58";
 import { Position, PositionRequest } from "../positions/positions";
 import { Wallet } from "../crypto/wallet";
-import { dDiv } from "../positions/decimalized_math";
-import { DecimalizedAmount, MATH_DECIMAL_PLACES } from "../decimalized/decimalized_amount";
+import { dDiv, dAdd, dMult, dSub } from "../decimalized/decimalized_math";
+import { DecimalizedAmount, MATH_DECIMAL_PLACES, fromTokenAmount } from "../decimalized/decimalized_amount";
 import { Buffer } from 'node:buffer';
 import { sleep } from "../util/sleep";
+import { TokenInfo } from "../tokens/token_info";
+import { Quote } from "../positions/quote";
 
 // TODO: re-org this into a class, and have callbacks for different lifecycle elements.
 
@@ -21,7 +23,6 @@ import { sleep } from "../util/sleep";
 */
 
 const JUPITER_REFERRAL_PROGRAM = "REFER4ZgmyYx9c6He5XfaTMiGfdLwRnkV4RPp9t9iF3";
-
 /*
     These are chosen very carefully.
     When SwapMode is ExactOut, the platform fee is collected from the InToken of the swap
@@ -31,31 +32,59 @@ const JUPITER_REFERRAL_PROGRAM = "REFER4ZgmyYx9c6He5XfaTMiGfdLwRnkV4RPp9t9iF3";
     That way, we don't have to convert a bunch of random sh**coins before they lose value,
     or create a bunch of random token accounts for the referral program.
 */
-const JUPITER_BUY_TOKEN_SWAP_MODE = 'ExactOut';
-const JUPITER_SELL_TOKEN_SWAP_MODE = 'ExactIn';
 
 // TODO: careful analysis of failure modes and their mitigations
 // TODO: https://solanacookbook.com/guides/retrying-transactions.html#how-rpc-nodes-broadcast-transactions
 // specifically: https://solanacookbook.com/guides/retrying-transactions.html#customizing-rebroadcast-logic 
 // https://github.com/solana-labs/solana-program-library/blob/ea354ab358021aa08f774e2d4028b33ec56d4180/token/program/src/error.rs#L16
 
+export enum GetQuoteFailure {
+    FailedToDetermineSwapRoute = "FailedToDetermineSwapRoute"
+}
 
 // couldn't even send the transaction
 export enum TransactionPreparationFailure {
-    FailedToDetermineSwapRoute = "FailedToDetermineSwapRoute",
     FailedToSerializeTransaction = "FailedToSerializeTransaction",
     FailedToSignTransaction = "FailedToSignTransaction"
 };
 
+export enum TransactionParseFailure {
+    BadRequest = "BadRequest",
+    RateLimited = "RateLimited",
+    UnknownTransaction = "UnknownTransaction",
+    InternalError = "InternalError",
+    CouldNotDetermineAmountsSpent = "CouldNotDetermineAmountsSpent"
+};
+
+enum TransactionExecutionError {
+    CouldNotPollBlockheight = "CouldNotPollBlockheight",
+    BlockheightExceeded = "BlockheightExceeded",
+    TransactionDropped = "TransactionDropped",
+    TransactionFailedOtherReason = "TransactionFailedOtherReason",
+    CouldNotConfirmTooManyExceptions = "CouldNotConfirmTooManyExceptions",
+    TimeoutCouldNotConfirm = "TimeoutCouldNotConfirm",
+    Unknown = "Unknown",
+    SlippageToleranceExceeded = "SlippageToleranceExceeded",
+    InsufficientNativeTokensError = "InsufficientNativeTokensError",
+    InsufficientFundsError = "InsufficientFundsError"
+};
+
+export enum SwapExecutionError {
+    InsufficientBalance = "InsufficientBalance",
+    SlippageToleranceExceeded = "SlippageToleranceExceeded",
+    OtherSwapExecutionError = "OtherSwapExecutionError"
+};
+
+
 export interface PreparseSwapResult {
     positionID : string
-    status: TransactionPreparationFailure|TransactionExecutionError|TransactionExecutionError|'transaction-confirmed'
+    status: GetQuoteFailure|TransactionPreparationFailure|TransactionExecutionError|TransactionExecutionError|'transaction-confirmed'
     signature ?: string
 }
 
 export interface SwapResult {
     positionID : string
-    status: TransactionPreparationFailure|TransactionExecutionError|TransactionParseFailure|SwapExecutionError|'swap-successful'
+    status: GetQuoteFailure|TransactionPreparationFailure|TransactionExecutionError|TransactionParseFailure|SwapExecutionError|'swap-successful'
     signature ?: string
     successfulSwapSummary ?: SuccessfulSwapSummary
 };
@@ -69,26 +98,11 @@ export interface SuccessfulSwapSummary {
     fillPrice : DecimalizedAmount
 };
 
-
-export enum TransactionParseFailure {
-    BadRequest = "BadRequest",
-    RateLimited = "RateLimited",
-    UnknownTransaction = "UnknownTransaction",
-    InternalError = "InternalError"
-}
-
-export enum SwapExecutionError {
-    InsufficientBalance = "InsufficientBalance",
-    SlippageToleranceExceeded = "SlippageToleranceExceeded",
-    OtherSwapExecutionError = "OtherSwapExecutionError"
-}
-
-
 export interface SwapRoute {
     inTokenAddress : string,
     outTokenAddress : string,
     swapMode : 'ExactIn'|'ExactOut'
-    route : object
+    route : any
 };
 
 export interface ConfirmationErr {
@@ -96,14 +110,18 @@ export interface ConfirmationErr {
 };
 
 
+
 function isEnumValue<T extends Record<string,string|number>>(value: any, enumType: T): value is T[keyof T] {
     return Object.values(enumType).includes(value);
 }
 
-
 export function isTransactionPreparationFailure<T>(obj : T|TransactionPreparationFailure) : obj is TransactionPreparationFailure {
     return isEnumValue(obj, TransactionPreparationFailure);
     //return typeof obj === 'string' && obj != null && Object.values(obj).includes(TransactionPreparationFailure.FailedToDetermineSwapRoute);
+}
+
+export function isGetQuoteFailure<T>(obj : T|GetQuoteFailure) : obj is GetQuoteFailure {
+    return isEnumValue(obj, GetQuoteFailure);
 }
 
 export function isTransactionExecutionFailure<T>(obj : T|TransactionExecutionError) : obj is TransactionExecutionError {
@@ -123,6 +141,41 @@ export function isTransactionParseFailure<T>(obj : T |TransactionParseFailure) :
 export function isSwapExecutionError<T>(obj: T | SwapExecutionError): obj is SwapExecutionError {
     return isEnumValue(obj, SwapExecutionError);
     //return typeof obj === 'string' && obj != null && Object.values(obj).includes(SwapExecutionError.OtherError);
+}
+
+export async function quoteBuy(positionRequest : PositionRequest,  env : Env) : Promise<GetQuoteFailure|Quote> {
+    const swapRoute = await getBuyTokenSwapRoute(positionRequest, env);
+    if (isGetQuoteFailure(swapRoute)) {
+        return swapRoute;
+    }
+    const outTokenInfo = positionRequest.token;
+    const solTokenInfo = getVsTokenInfo('SOL')!!;
+    const inTokenInfo = getVsTokenInfo(positionRequest.vsTokenAddress)!!;
+    const route = swapRoute.route;
+    const inTokenAmount = route.inAmount as string;
+    const outTokenAmount = route.outAmount as string;
+    const priceImpactPct = parseFloat(route.priceImpactPct||'0' as string);
+    const botFee : DecimalizedAmount = { tokenAmount: route?.platformFee?.amount || '0', decimals: outTokenInfo.decimals };
+    const botFeeToken = outTokenInfo; // fees are charged in units of what token you are buying
+    const slippageBps = route.slippageBps as number;
+    // TODO: compute this for real - this is just the fee cap.
+    const estimatedFee : DecimalizedAmount = {
+        tokenAmount: "5000000",
+        decimals: solTokenInfo.decimals
+    };
+    const quote : Quote = {
+        inToken: inTokenInfo,
+        inTokenAmt: { tokenAmount : inTokenAmount, decimals : inTokenInfo.decimals },
+        outToken : outTokenInfo,
+        outTokenAmt: { tokenAmount : outTokenAmount, decimals : outTokenInfo.decimals },
+        fee : estimatedFee,
+        feeToken : solTokenInfo,
+        botFee: botFee,
+        botFeeToken: botFeeToken,
+        priceImpactPct: priceImpactPct,
+        slippageBps: slippageBps
+    };
+    return quote;
 }
 
 export async function buyTokenAndParseSwapTransaction(positionRequest : PositionRequest, wallet : Wallet, env: Env) : Promise<SwapResult>
@@ -153,8 +206,8 @@ export async function sellToken(position : Position, wallet: Wallet, env : Env) 
 }
 
 
-async function getRawSignedTransaction(swapRoute : SwapRoute|TransactionPreparationFailure, wallet : Wallet, env : Env) : Promise<VersionedTransaction|TransactionPreparationFailure> {
-    if (isTransactionPreparationFailure(swapRoute)) {
+async function getRawSignedTransaction(swapRoute : SwapRoute|GetQuoteFailure, wallet : Wallet, env : Env) : Promise<VersionedTransaction|GetQuoteFailure|TransactionPreparationFailure> {
+    if (isGetQuoteFailure(swapRoute)) {
         return swapRoute;
     }
     return serializeSwapRouteTransaction(swapRoute, wallet.publicKey, env)
@@ -163,7 +216,7 @@ async function getRawSignedTransaction(swapRoute : SwapRoute|TransactionPreparat
 }
 
 
-export async function getSellTokenSwapRoute(position : Position, env : Env) : Promise<SwapRoute|TransactionPreparationFailure> {
+export async function getSellTokenSwapRoute(position : Position, env : Env) : Promise<SwapRoute|GetQuoteFailure> {
     const tokenAddress = position.token.address;
     const vsTokenAddress = position.vsToken.address;
     const decimalizedTokenAmount = position.tokenAmt.tokenAmount;
@@ -175,13 +228,13 @@ export async function getSellTokenSwapRoute(position : Position, env : Env) : Pr
         decimalizedAmount: decimalizedTokenAmount, 
         slippageBps: slippageBps, 
         platformFeeBps: platformFeeBps, 
-        swapMode: JUPITER_SELL_TOKEN_SWAP_MODE
+        swapMode: 'ExactIn'
     };
     const quote_api_parameterized_url = makeJupiterQuoteAPIURL(quoteAPIParams, env);
     try {
         const quoteResponse = await fetch(quote_api_parameterized_url);
         if (!quoteResponse.ok) {
-            return TransactionPreparationFailure.FailedToDetermineSwapRoute;
+            return GetQuoteFailure.FailedToDetermineSwapRoute;
         }
         const quoteResponseJSON = await quoteResponse.json();
         return { 
@@ -192,12 +245,13 @@ export async function getSellTokenSwapRoute(position : Position, env : Env) : Pr
         };
     }
     catch {
-        return TransactionPreparationFailure.FailedToDetermineSwapRoute;
+        return GetQuoteFailure.FailedToDetermineSwapRoute;
     }
 }
 
+
 // TODO: unify the buy/sell method somehow to reduce code duplication
-async function getBuyTokenSwapRoute(positionRequest : PositionRequest, env : Env) : Promise<SwapRoute|TransactionPreparationFailure> {
+async function getBuyTokenSwapRoute(positionRequest : PositionRequest, env : Env) : Promise<SwapRoute|GetQuoteFailure> {
     const vsTokenAddress = positionRequest.vsToken.address;
     const tokenAddress = positionRequest.token.address;
     const slippageBps = positionRequest.slippagePercent * 100;
@@ -210,13 +264,13 @@ async function getBuyTokenSwapRoute(positionRequest : PositionRequest, env : Env
         decimalizedAmount: decimalizedVsTokenAmount, 
         slippageBps: slippageBps, 
         platformFeeBps: platformFeeBps, 
-        swapMode: JUPITER_BUY_TOKEN_SWAP_MODE 
+        swapMode: 'ExactIn' 
     };
     const quote_api_parameterized_url = makeJupiterQuoteAPIURL(quoteAPIParams, env);
     try {
         const quoteResponse = await fetch(quote_api_parameterized_url);
         if (!quoteResponse.ok) {
-            return TransactionPreparationFailure.FailedToDetermineSwapRoute;
+            return GetQuoteFailure.FailedToDetermineSwapRoute;
         }
         const quoteResponseJSON = await quoteResponse.json();
         return { 
@@ -227,7 +281,7 @@ async function getBuyTokenSwapRoute(positionRequest : PositionRequest, env : Env
         };
     }
     catch (e : any) {
-        return TransactionPreparationFailure.FailedToDetermineSwapRoute;
+        return GetQuoteFailure.FailedToDetermineSwapRoute;
     }
 }
 
@@ -323,20 +377,11 @@ async function getRecentBlockhash(env : Env) : Promise<string> {
     return (await connection.getLatestBlockhash('confirmed')).blockhash;
 }
 
-enum TransactionExecutionError {
-    CouldNotPollBlockheight = "CouldNotPollBlockheight",
-    BlockheightExceeded = "BlockheightExceeded",
-    TransactionDropped = "TransactionDropped",
-    TransactionFailed = "TransactionFailed",
-    CouldNotConfirmTooManyExceptions = "CouldNotConfirmTooManyExceptions",
-    TimeoutCouldNotConfirm = "TimeoutCouldNotConfirm",
-    OtherError = "OtherError"
-};
 
 // TODO: https://solanacookbook.com/guides/retrying-transactions.html#customizing-rebroadcast-logic
 async function executeRawSignedTransaction(
     positionID : string,
-    rawSignedTx : VersionedTransaction|TransactionPreparationFailure, 
+    rawSignedTx : VersionedTransaction|GetQuoteFailure|TransactionPreparationFailure, 
     env : Env,
     logHandler? : (msg: string, error : any) => Promise<void>) : Promise<PreparseSwapResult> {
     
@@ -345,17 +390,20 @@ async function executeRawSignedTransaction(
         logHandler = async (msg:string, error: any) => {};
     }
 
+    if (isGetQuoteFailure(rawSignedTx)) {
+        return { positionID : positionID, status: rawSignedTx };
+    }
+
     // early-out if the tx is really just an error code
     if (isTransactionPreparationFailure(rawSignedTx)) {
         return { positionID : positionID, status: rawSignedTx };
     }
     
     // Define some settings
-    const rpcSendTxMaxRetries = parseInt(env.EXECUTE_TRANSACTION_RPC_MAX_RETRIES,10);
-    const maxConfirmExceptions = 10; // TODO: from env.
-    const REBROADCAST_DELAY_MS = 300;
-    const REATTEMPT_CONFIRM_DELAY = 300;
-    const confirmTimeoutMS = 60 * 1000;
+    const maxConfirmExceptions = parseInt(env.RPC_MAX_CONFIRM_EXCEPTIONS,10);
+    const REBROADCAST_DELAY_MS = parseInt(env.RPC_REBROADCAST_DELAY_MS, 10);
+    const REATTEMPT_CONFIRM_DELAY = parseInt(env.RPC_REATTEMPT_CONFIRM_DELAY, 10);
+    const confirmTimeoutMS = parseInt(env.RPC_CONFIRM_TIMEOUT_MS, 10);
 
     // create cxn to RPC
     const connection = new Connection(env.RPC_ENDPOINT_URL);
@@ -388,7 +436,7 @@ async function executeRawSignedTransaction(
         // Until this loop is signalled to stop
         while(!stopSendingSignal) {
 
-            /* Attempt to send transaction.  If sent, note that there is something to confirm. */
+            /* Attempt to send transaction.  If sent, note that there is something to confirm (`anyTxSent`). */
             try {
                 await connection.sendRawTransaction(txBuffer, {
                     skipPreflight : true,
@@ -398,6 +446,16 @@ async function executeRawSignedTransaction(
             }
             catch(e) {
                 await logHandler("sendRawTransaction threw an exception", e);
+                const exceptionKind = getSendTransactionErrorKind(e);
+                if (exceptionKind === 'InsufficientNativeTokensError') {
+                    stopConfirmingSignal = true;
+                    return TransactionExecutionError.InsufficientNativeTokensError; 
+
+                }
+                else if (exceptionKind === 'InsufficientFundsError') {
+                    stopConfirmingSignal = true;
+                    return TransactionExecutionError.InsufficientFundsError;
+                }
             }
 
             // Sleep to avoid spamming RPC.
@@ -482,7 +540,7 @@ async function executeRawSignedTransaction(
             if (err) {
                 await logHandler("Transaction failed", err);
                 stopSendingSignal = true;
-                return TransactionExecutionError.TransactionFailed; // 'transaction-failed';
+                return parseSwapExecutionError(err, rawSignedTx, env);
             }
             /* If the transaction itself was confirmed or finalized, exit confirmation loop with 'transaction-confirmed' */
             const status = result?.confirmationStatus;
@@ -511,16 +569,35 @@ async function executeRawSignedTransaction(
 
     const confirmStatus = await confirmTransactionTask;
     const sendStatus = await resendTxTask;
-
-
     const finalStatus = determineTxConfirmationFinalStatus(sendStatus, confirmStatus);
-
 
     return { positionID : positionID, status: finalStatus, signature: signature };
 }
 
+function getSendTransactionErrorKind(e : any) : string|null {
+    // TODO: detect insufficient funds correctly
+    return null;
+}
+
+function parseSwapExecutionError(err : any, rawSignedTx : VersionedTransaction, env : Env) : TransactionExecutionError {
+    const instructionError = err?.InstructionError;
+    if (instructionError) {
+        try {
+            const errorCode = instructionError[1].Custom;
+            if(errorCode === parseInt(env.JUPITER_SWAP_PROGRAM_SLIPPAGE_ERROR_CODE,10)) {
+                return TransactionExecutionError.SlippageToleranceExceeded;
+            }
+        }
+        catch {
+            return TransactionExecutionError.TransactionFailedOtherReason;
+        }
+    }
+
+    return TransactionExecutionError.TransactionFailedOtherReason;
+}
+
 function determineTxConfirmationFinalStatus(sendStatus : TransactionExecutionError|undefined, confirmStatus : TransactionExecutionError|'transaction-confirmed'|undefined) : TransactionExecutionError | 'transaction-confirmed' {
-    return confirmStatus || sendStatus || TransactionExecutionError.OtherError;
+    return confirmStatus || sendStatus || TransactionExecutionError.Unknown;
 }
 
 async function getLatestBlockheight(connection : Connection) : Promise<number> {
@@ -561,6 +638,35 @@ export async function parseSwapTransaction(positionID : string, transactionResul
     }
 
     return { positionID : positionID, status: 'swap-successful', signature : signature, successfulSwapSummary: summary };
+}
+
+async function useRPCToParseSwapTransaction(signature : string, 
+    inTokenAddress : string, 
+    outTokenAddress : string, 
+    connection : Connection) {
+    
+    const parsedTransaction = await connection.getParsedTransaction(signature, 'confirmed');
+    if (!parsedTransaction) {
+        return TransactionParseFailure.UnknownTransaction;
+    }
+
+    const preTxTokenBalances = (parsedTransaction.meta?.preTokenBalances||[]);
+    const postTxTokenBalances = (parsedTransaction.meta?.postTokenBalances||[]);
+    const isToken = (address : string) => { return (balance : TokenBalance) => { balance.mint === address }};
+    const getTokenAmt = (tokenBalances : TokenBalance[], address : string) => fromTokenAmount(tokenBalances.find(isToken(address))?.uiTokenAmount);
+    const inTokenPreAmt = getTokenAmt(preTxTokenBalances, inTokenAddress);
+    const inTokenPostAmt = getTokenAmt(postTxTokenBalances, inTokenAddress);
+    const outTokenPreAmt = getTokenAmt(preTxTokenBalances, outTokenAddress);
+    const outTokenPostAmt = getTokenAmt(postTxTokenBalances, outTokenAddress);
+    if (inTokenPreAmt && inTokenPostAmt && outTokenPreAmt && outTokenPostAmt) {
+        const spentAmt = dSub(inTokenPostAmt, inTokenPreAmt);
+        const receivedAmt = dSub(outTokenPostAmt, outTokenPreAmt);
+        const fillPrice = dDiv(receivedAmt, spentAmt, MATH_DECIMAL_PLACES);
+    }
+    else {
+        return TransactionParseFailure.CouldNotDetermineAmountsSpent;
+    }
+
 }
 
 async function useJupiterAPIToParseSwapTransaction(signature : string, env : Env) : Promise<TransactionParseFailure|{ parsed: any }> {
@@ -604,9 +710,9 @@ async function useJupiterAPIToParseSwapTransaction(signature : string, env : Env
         return TransactionParseFailure.InternalError;
     }
 
-    const datas = (await response.json()) as any[];
+    const datas = (await response.json().catch(reason => null)) as any[]|null;
 
-    return { 'parsed': datas[0] };
+    return { 'parsed': (datas||[{}])[0] };
 }
 
 function summarizeParsedSwapTransaction(summarizeMe : { parsed: any }, env : Env) : SwapExecutionError|SuccessfulSwapSummary {

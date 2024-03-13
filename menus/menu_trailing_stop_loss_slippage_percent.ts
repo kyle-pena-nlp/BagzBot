@@ -7,7 +7,7 @@ export class MenuTrailingStopLossSlippagePercent extends Menu<number> implements
     }
     renderOptions(): CallbackButton[][] {
         const options = this.emptyMenu();
-        const defaultCustomSlippagePercentage = this.miscData!!;
+        const defaultCustomSlippagePercentage = this.menuData;
         const submitValueCode = MenuCode.TrailingStopLossCustomSlippagePctKeypadSubmit;
         this.insertButton(options, "0.5%", new CallbackData(submitValueCode, "0.5"), 1);
         this.insertButton(options, "1.0%", new CallbackData(submitValueCode, "1.0"), 1);

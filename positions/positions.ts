@@ -32,7 +32,7 @@ export interface Position {
 	retrySellIfSlippageExceeded : boolean
 };
 
-export interface PositionRequest {
+export interface PositionPreRequest {
     [ key : string ] : any
 
 	userID : number
@@ -46,4 +46,16 @@ export interface PositionRequest {
     /* Relevant if TLS position */
 	triggerPercent : number
 	retrySellIfSlippageExceeded : boolean
+}
+
+export interface PositionRequest extends PositionPreRequest {
+	token : TokenInfo
+	vsToken : TokenInfo
 };
+
+export function convertPreRequestToRequest(r : PositionPreRequest, token : TokenInfo) {
+	const positionRequest : PositionRequest = {
+
+	};
+	return positionRequest;
+}

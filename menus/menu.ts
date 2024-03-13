@@ -131,11 +131,11 @@ export abstract class BaseMenu {
 
 export abstract class Menu<T> extends BaseMenu {
 
-    miscData   : T|undefined
+    menuData   : T
 
-    constructor(miscData? : T) {
+    constructor(miscData : T) {
         super();
-        this.miscData = miscData;
+        this.menuData = miscData;
     }
 
     protected insertButton(options : CallbackButton[][], text : string, callbackData : CallbackData, lineNumber : number) {

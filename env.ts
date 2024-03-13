@@ -17,7 +17,10 @@ export interface Env {
 	PLATFORM_FEE_BPS : string
 	FEE_ACCOUNT_PUBLIC_KEY : string
 	DEFAULT_TLS_VS_TOKEN_FRACTION : string
-	EXECUTE_TRANSACTION_RPC_MAX_RETRIES : string,
+	RPC_REBROADCAST_DELAY_MS : string
+	RPC_REATTEMPT_CONFIRM_DELAY : string
+	RPC_CONFIRM_TIMEOUT_MS : string
+	RPC_MAX_CONFIRM_EXCEPTIONS : string
 	UserDO : any // i'd like to strongly type this as DurableObjectNamespace, but can't for technical reasons
 	TokenPairPositionTrackerDO : any // ditto
 	PolledTokenPairListDO : any // ditto

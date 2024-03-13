@@ -3,7 +3,7 @@ import { GetWalletDataResponse } from "../durable_objects/user/actions/get_walle
 
 export class MenuWallet extends Menu<GetWalletDataResponse> implements MenuCapabilities {
     renderText(): string {
-        return `Address: ${this.miscData!!.address}`; // TODO: balance
+        return `Address: ${this.menuData.address}`; // TODO: balance
     }
     renderOptions(): CallbackButton[][] {
         const options = this.emptyMenu();

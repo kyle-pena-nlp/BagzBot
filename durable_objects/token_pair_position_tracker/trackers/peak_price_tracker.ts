@@ -4,7 +4,7 @@ import { DecimalizedAmountMap } from "../../../decimalized/decimalized_amount_ma
 import { DecimalizedAmountSet } from "../../../decimalized/decimalized_amount_set";
 import { setDifference, setIntersection } from "../../../util/set_operations";
 import { PositionsAssociatedWithPeakPrices } from "./positions_associated_with_peak_prices";
-import * as dMath from "../../../positions/decimalized_math";
+import * as dMath from "../../../decimalized/decimalized_math";
 
 /* 
     This class maintains lists of positions grouped by peak price thus far
