@@ -1,5 +1,6 @@
 import { TokenInfo } from "../tokens/token_info"
 import { DecimalizedAmount } from "../decimalized/decimalized_amount";
+import { getVsTokenInfo } from "../tokens/vs_tokens";
 
 export enum PositionType {
 	LongTrailingStopLoss = "Auto-Sell"
@@ -55,7 +56,9 @@ export interface PositionRequest extends PositionPreRequest {
 
 export function convertPreRequestToRequest(r : PositionPreRequest, token : TokenInfo) {
 	const positionRequest : PositionRequest = {
-
+		...r,
+		token: token,
+		vsToken: getVsTokenInfo(r.vsTokenAddress)!!
 	};
 	return positionRequest;
 }

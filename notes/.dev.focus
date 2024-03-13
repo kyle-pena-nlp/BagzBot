@@ -1,0 +1,11 @@
+1. walk through callbacks / confirms for:
+    token address for referral thing DNE
+    insufficient lamports / funds
+
+2. automate creation of referral token accounts
+
+3. fix menu bugs
+
+AM
+
+4. implement proper callback / messaging flow for rpc_interop

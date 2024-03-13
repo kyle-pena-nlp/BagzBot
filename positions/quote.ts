@@ -12,4 +12,5 @@ export interface Quote {
     botFeeToken: TokenInfo    
     priceImpactPct : number
     slippageBps : number
+    platformFeeBps: number
 }

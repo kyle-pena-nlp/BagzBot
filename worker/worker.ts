@@ -3,7 +3,7 @@ import { getTokenInfo } from "../durable_objects/polled_token_pair_list/polled_t
 import { SessionValue } from "../durable_objects/user/model/session";
 import { generateWallet, getAndMaybeInitializeUserData, getDefaultTrailingStopLoss, getPosition, getWalletData, listOpenTrailingStopLossPositions, manuallyClosePosition, readSessionObj, requestNewPosition, storeSessionObj, storeSessionObjProperty, storeSessionValues } from "../durable_objects/user/userDO_interop";
 import { Env } from "../env";
-import { PositionRequest } from "../positions/positions";
+import { PositionRequest, convertPreRequestToRequest } from "../positions/positions";
 import { deleteTGMessage, sendMessageToTG, sendRequestToTG } from "../telegram/telegram_helpers";
 import { AutoSellOrderSpec, TelegramWebhookInfo } from "../telegram/telegram_webhook_info";
 import { getVsTokenAddress, getVsTokenName } from "../tokens/vs_tokens";

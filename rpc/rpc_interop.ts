@@ -158,6 +158,7 @@ export async function quoteBuy(positionRequest : PositionRequest,  env : Env) : 
     const botFee : DecimalizedAmount = { tokenAmount: route?.platformFee?.amount || '0', decimals: outTokenInfo.decimals };
     const botFeeToken = outTokenInfo; // fees are charged in units of what token you are buying
     const slippageBps = route.slippageBps as number;
+    const platformFeeBps = route.platformFee?.feeBps || 0;
     // TODO: compute this for real - this is just the fee cap.
     const estimatedFee : DecimalizedAmount = {
         tokenAmount: "5000000",
@@ -173,7 +174,8 @@ export async function quoteBuy(positionRequest : PositionRequest,  env : Env) : 
         botFee: botFee,
         botFeeToken: botFeeToken,
         priceImpactPct: priceImpactPct,
-        slippageBps: slippageBps
+        slippageBps: slippageBps,
+        platformFeeBps: platformFeeBps
     };
     return quote;
 }

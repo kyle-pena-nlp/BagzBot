@@ -24,13 +24,15 @@ export function toFriendlyString(x : DecimalizedAmount, maxSigFigs : number) : s
     else {
         const [wholePart,fractionalPart] = longDecimalRepr.split(".");
         let { zeros, rest } = /^(?<zeros>0*)(?<rest>.*)$/.exec(fractionalPart)?.groups!!;
-        if (zeros.length > 1) {
+        if (zeros.length > 1 && (wholePart == '0'||wholePart == '')) {
             zeros = "0" + subscriptDigits[zeros.length];
         }
+        rest = rest.replace(/0+$/, '');
         if (rest.length > maxSigFigs) {
-            rest = Math.round(parseFloat(rest.substring(maxSigFigs + 1))/10).toString();
+            rest = Math.round(parseFloat(rest.substring(0, maxSigFigs + 1))/10).toString();
         }
-        return wholePart + "." + zeros + rest;
+        const localizedWholePart = parseFloat(wholePart).toLocaleString();
+        return localizedWholePart + "." + zeros + rest;
     }
 }
 
