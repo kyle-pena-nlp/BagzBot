@@ -24,8 +24,11 @@ export function toFriendlyString(x : DecimalizedAmount, maxSigFigs : number) : s
     else {
         const [wholePart,fractionalPart] = longDecimalRepr.split(".");
         let { zeros, rest } = /^(?<zeros>0*)(?<rest>.*)$/.exec(fractionalPart)?.groups!!;
-        if (zeros.length > 1 && (wholePart == '0'||wholePart == '')) {
+        if (zeros.length > 1 && (wholePart == '0'||wholePart == '') && rest.length > 0) {
             zeros = "0" + subscriptDigits[zeros.length];
+        }
+        if (zeros.length > 1 && rest.length === 0) {
+            zeros = "0";
         }
         rest = rest.replace(/0+$/, '');
         if (rest.length > maxSigFigs) {
@@ -34,19 +37,6 @@ export function toFriendlyString(x : DecimalizedAmount, maxSigFigs : number) : s
         const localizedWholePart = parseFloat(wholePart).toLocaleString();
         return localizedWholePart + "." + zeros + rest;
     }
-}
-
-function countLeadingZeros(fractionalPart : string) : number {
-    let count = 0;
-    for (const character of fractionalPart) {
-        if (character === '0') {
-            count++;
-        }
-        else {
-            break;
-        }
-    }
-    return count;
 }
 
 export function fromKey(key : string) : DecimalizedAmount {

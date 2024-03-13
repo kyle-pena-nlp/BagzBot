@@ -13,6 +13,7 @@ export class MenuTrailingStopLossTriggerPercent extends Menu<number> implements 
         this.insertButton(options, "5%", new CallbackData(submitCode,  "5"), 1);
         this.insertButton(options, "10%", new CallbackData(submitCode, "10"), 1);
         this.insertButtonNextLine(options, "Custom", new CallbackData(MenuCode.TrailingStopLossCustomTriggerPercentKeypad, defaultCustomTriggerPercent.toString()));
+        this.insertButtonNextLine(options, "Back", new CallbackData(MenuCode.TrailingStopLossRequestReturnToEditorMenu));
         return options;
     }
     parseMode(): "HTML" | "MarkdownV2" {

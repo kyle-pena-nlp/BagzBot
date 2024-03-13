@@ -9,6 +9,7 @@ export class MenuTrailingStopLossAutoRetrySell extends Menu<undefined> implement
         const options = this.emptyMenu();
         this.insertButtonNextLine(options, "Yes", new CallbackData(MenuCode.TrailingStopLossChooseAutoRetrySellSubmit, "true"));
         this.insertButtonNextLine(options, "No", new CallbackData(MenuCode.TrailingStopLossChooseAutoRetrySellSubmit, "false"));
+        this.insertButtonNextLine(options, "Back", new CallbackData(MenuCode.TrailingStopLossRequestReturnToEditorMenu));
         return options;
     }
     parseMode(): "HTML" | "MarkdownV2" {

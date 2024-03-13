@@ -1,7 +1,7 @@
 import { CallbackData } from "./callback_data";
 import { TokenNameAndAddress } from "../durable_objects/user/model/token_name_and_address";
 import { Menu, MenuCapabilities, CallbackButton, MenuCode } from "./menu";
-import { VsToken } from "../tokens/vs_tokens";
+import { getVsTokenInfo } from "../tokens/vs_tokens";
 
 export class MenuTrailingStopLossPickVsToken extends Menu<TokenNameAndAddress> implements MenuCapabilities {
     renderText(): string {
@@ -9,8 +9,11 @@ export class MenuTrailingStopLossPickVsToken extends Menu<TokenNameAndAddress> i
     }
     renderOptions(): CallbackButton[][] {
         const options = this.emptyMenu();
-        this.insertButtonNextLine(options, VsToken.SOL.toString(),  new CallbackData(MenuCode.TrailingStopLossPickVsTokenMenuSubmit, VsToken.SOL.toString()));
-        this.insertButtonNextLine(options, VsToken.USDC.toString(), new CallbackData(MenuCode.TrailingStopLossPickVsTokenMenuSubmit, VsToken.USDC.toString()));
+        const SOL = getVsTokenInfo('SOL')!!;
+        const USDC = getVsTokenInfo('USDC')!!;
+        this.insertButtonNextLine(options, SOL.symbol,  new CallbackData(MenuCode.TrailingStopLossPickVsTokenMenuSubmit, SOL.symbol));
+        this.insertButtonNextLine(options, USDC.symbol, new CallbackData(MenuCode.TrailingStopLossPickVsTokenMenuSubmit, USDC.symbol));
+        this.insertButtonNextLine(options, "Back", new CallbackData(MenuCode.TrailingStopLossRequestReturnToEditorMenu))
         return options;
     }
     parseMode(): "HTML" | "MarkdownV2" {

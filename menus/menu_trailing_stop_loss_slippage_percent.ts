@@ -14,6 +14,7 @@ export class MenuTrailingStopLossSlippagePercent extends Menu<number> implements
         this.insertButton(options, "2.0%", new CallbackData(submitValueCode, "2.0"), 1);
         this.insertButton(options, "5.0%", new CallbackData(submitValueCode, "5.0"), 1);
         this.insertButtonNextLine(options, "Custom", new CallbackData(MenuCode.TrailingStopLossCustomSlippagePctKeypad, defaultCustomSlippagePercentage.toString()))
+        this.insertButtonNextLine(options, "Back", new CallbackData(MenuCode.TrailingStopLossRequestReturnToEditorMenu));
         return options;
     }
     parseMode(): "HTML" | "MarkdownV2" {

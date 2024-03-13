@@ -13,8 +13,8 @@ export class MenuConfirmTrailingStopLossPositionRequest extends Menu<PositionReq
     }
     renderOptions(): CallbackButton[][] {
         const options = this.emptyMenu();
-        this.insertButtonNextLine(options, "Confirm And Place Trade", new CallbackData(MenuCode.TrailingStopLossEditorFinalSubmit));
-        this.insertButtonNextLine(options, "Cancel", new CallbackData(MenuCode.TrailingStopLossRequestReturnToEditorMenu));
+        this.insertButtonNextLine(options, "[[EXECUTE THE TRADE]]", new CallbackData(MenuCode.TrailingStopLossEditorFinalSubmit));
+        this.insertButtonNextLine(options, "Back", new CallbackData(MenuCode.TrailingStopLossRequestReturnToEditorMenu));
         return options;
     }
     parseMode(): "HTML" | "MarkdownV2" {

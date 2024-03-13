@@ -12,6 +12,7 @@ export class MenuTrailingStopLossEntryBuyQuantity extends Menu<QuantityAndToken>
         this.insertButtonNextLine(options, "5%", new CallbackData(MenuCode.TrailingStopLossEnterBuyQuantitySubmit, "5"));
         this.insertButtonNextLine(options, "10%", new CallbackData(MenuCode.TrailingStopLossEnterBuyQuantitySubmit, "10"));
         this.insertButtonNextLine(options, "Custom Percent", new CallbackData(MenuCode.TrailingStopLossEnterBuyQuantityKeypad, this.menuData.quantity.toString()));
+        this.insertButtonNextLine(options, "Back", new CallbackData(MenuCode.TrailingStopLossRequestReturnToEditorMenu));
         return options;
     }
     parseMode(): "HTML" | "MarkdownV2" {

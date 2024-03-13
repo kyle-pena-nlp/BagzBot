@@ -64,16 +64,18 @@ export class PositiveIntegerKeypad extends Menu<string> implements MenuCapabilit
         this.maybeInsertKeypadButton(options, "0",  4);
 
         const backspaceCallbackData = new CallbackData(this.thisMenuCode, (this.menuData||'').slice(0,-1));
-        if (this.menuData||'') {
-            this.insertButton(options, "x", backspaceCallbackData,  4);
-        }
+        this.insertButton(options, "x", backspaceCallbackData,  4);
 
         if (this.isValidSubmission(this.menuData||'')) {
             const submitCallbackData = new CallbackData(this.submitMenuCode, this.menuData||'');
             this.insertButton(options, "Submit", submitCallbackData, 5);
         }
+        else {
+            const submitCallbackData = new CallbackData(this.thisMenuCode, this.menuData||'');
+            this.insertButton(options, "Invalid Entry", submitCallbackData, 5);
+        }
         
-        this.insertButtonNextLine(options, "Cancel", new CallbackData(this.cancelMenuCode));
+        this.insertButtonNextLine(options, "Back", new CallbackData(this.cancelMenuCode));
 
         return options;
     }
@@ -99,7 +101,7 @@ export class PositiveIntegerKeypad extends Menu<string> implements MenuCapabilit
 
     private maybeInsertKeypadButton(options : CallbackButton[][], character : string, lineNumber : number) {
         const newEntry = this.menuData + character;
-        const parses = this.doesItParse(newEntry);
+        const parses = true; //this.doesItParse(newEntry);
         if (parses) {
             const callbackData = new CallbackData(this.thisMenuCode, newEntry);
             this.insertButton(options, character, callbackData, lineNumber);

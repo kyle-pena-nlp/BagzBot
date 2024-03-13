@@ -65,16 +65,18 @@ export class PositiveDecimalKeypad extends Menu<string> implements MenuCapabilit
         this.maybeInsertKeypadButton(options, ".",  4);
 
         const backspaceCallbackData = new CallbackData(this.thisMenuCode, (this.menuData||'').slice(0,-1));
-        if (this.menuData||'') {
-            this.insertButton(options, "x", backspaceCallbackData, 4);
-        }
+        this.insertButton(options, "x", backspaceCallbackData, 4);
 
         if (this.isValidSubmission(this.menuData||'')) {
             const submitCallbackData = new CallbackData(this.submitMenuCode, this.menuData||'');
             this.insertButton(options, "Submit", submitCallbackData, 5);
         }
+        else {
+            const submitCallbackData = new CallbackData(this.thisMenuCode, this.menuData||'');
+            this.insertButton(options, "Invalid Entry", submitCallbackData, 5);
+        }
 
-        this.insertButtonNextLine(options, "Cancel", new CallbackData(this.cancelMenuCode));
+        this.insertButtonNextLine(options, "Back", new CallbackData(this.cancelMenuCode));
         
         return options;
     }

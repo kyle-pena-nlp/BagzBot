@@ -6,7 +6,7 @@ import { Env } from "../env";
 import { PositionRequest, convertPreRequestToRequest } from "../positions/positions";
 import { deleteTGMessage, sendMessageToTG, sendRequestToTG } from "../telegram/telegram_helpers";
 import { AutoSellOrderSpec, TelegramWebhookInfo } from "../telegram/telegram_webhook_info";
-import { getVsTokenAddress, getVsTokenName } from "../tokens/vs_tokens";
+import { getVsTokenAddress, getVsTokenInfo, getVsTokenName } from "../tokens/vs_tokens";
 import { makeFakeFailedRequestResponse, makeJSONResponse, makeSuccessResponse } from "../util/http_helpers";
 import { BaseMenu, MenuCode, MenuConfirmTrailingStopLossPositionRequest, MenuEditTrailingStopLossPositionRequest, MenuError, MenuFAQ, MenuHelp, MenuListPositions, MenuMain, MenuPleaseEnterToken, MenuTODO, MenuTrailingStopLossAutoRetrySell, MenuTrailingStopLossEntryBuyQuantity, MenuTrailingStopLossPickVsToken, MenuTrailingStopLossSlippagePercent, MenuTrailingStopLossTriggerPercent, MenuViewOpenPosition, MenuViewWallet, MenuWallet, PositiveDecimalKeypad, PositiveIntegerKeypad } from "../menus";
 import { QuantityAndToken } from "../durable_objects/user/model/quantity_and_token";
@@ -147,8 +147,9 @@ export class Worker {
             case MenuCode.TrailingStopLossPickVsTokenMenuSubmit:
                 const trailingStopLossSelectedVsToken = callbackData.menuArg!!;
                 const vsTokenAddress = getVsTokenAddress(trailingStopLossSelectedVsToken);
+                const vsToken = getVsTokenInfo(trailingStopLossSelectedVsToken);
                 await storeSessionValues(telegramUserID, messageID, new Map<string,SessionValue>([
-                    ["vsToken", trailingStopLossSelectedVsToken],
+                    ["vsToken", vsToken],
                     ["vsTokenAddress", vsTokenAddress]
                 ]), "PositionRequest", env);
                 const trailingStopLossPositionRequestAfterSubmittingVsToken = await readSessionObj<PositionRequest>(telegramUserID, messageID, "PositionRequest", env);
