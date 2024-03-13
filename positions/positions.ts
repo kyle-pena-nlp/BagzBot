@@ -1,6 +1,7 @@
 import { TokenInfo } from "../tokens/token_info"
 import { DecimalizedAmount } from "../decimalized/decimalized_amount";
 import { getVsTokenInfo } from "../tokens/vs_tokens";
+import { SessionValue } from "../durable_objects/user/model/session";
 
 export enum PositionType {
 	LongTrailingStopLoss = "Auto-Sell"
@@ -15,9 +16,9 @@ export enum PositionStatus {
 
 
 export interface Position {
-	[key : string]: any
 
 	userID : number
+	chatID : number
 	positionID : string
 	type: PositionType
 	status : PositionStatus
@@ -33,14 +34,13 @@ export interface Position {
 	retrySellIfSlippageExceeded : boolean
 };
 
-export interface PositionPreRequest {
-    [ key : string ] : any
+export interface BasePositionRequest {
 
 	userID : number
+	chatID : number
 	positionID : string
 	type : PositionType
-	tokenAddress : string
-	vsTokenAddress : string
+
 	vsTokenAmt : number
 	slippagePercent : number
 
@@ -49,14 +49,27 @@ export interface PositionPreRequest {
 	retrySellIfSlippageExceeded : boolean
 }
 
-export interface PositionRequest extends PositionPreRequest {
+export interface PositionPreRequest extends BasePositionRequest {
+	tokenAddress : string
+	vsTokenAddress : string
+}
+
+export interface PositionRequest extends BasePositionRequest {
+	[ key : string ] : SessionValue
 	token : TokenInfo
 	vsToken : TokenInfo
 };
 
 export function convertPreRequestToRequest(r : PositionPreRequest, token : TokenInfo) {
 	const positionRequest : PositionRequest = {
-		...r,
+		userID : r.userID,
+		chatID : r.chatID,
+		positionID : r.positionID,
+		type: r.type,
+		vsTokenAmt: r.vsTokenAmt,
+		slippagePercent: r.slippagePercent,
+		triggerPercent: r.triggerPercent,
+		retrySellIfSlippageExceeded: r.retrySellIfSlippageExceeded,
 		token: token,
 		vsToken: getVsTokenInfo(r.vsTokenAddress)!!
 	};

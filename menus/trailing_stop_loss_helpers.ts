@@ -12,6 +12,7 @@ export function renderTrailingStopLossRequestMarkdown(requestAndQuote : Position
     }
     else {
         const lines = [
+            `<b>AUTO-SELL</b> when ${positionRequest.token.symbol} price dips <b>${positionRequest.triggerPercent}%</b> from position's peak price`,
             `Buying <b>${toFriendlyString(quote.outTokenAmt, SIG_FIGS)} ${positionRequest.token.symbol}</b> with <b>${toFriendlyString(quote.inTokenAmt, SIG_FIGS)} ${positionRequest.vsToken.symbol}</b>`,
             `<b>Estimated Price Impact</b>: ${quote.priceImpactPct}%`,
             `<b>Estimated ${quote.feeToken.symbol} fees</b>: ${toFriendlyString(quote.fee,4)}`,

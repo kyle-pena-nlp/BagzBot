@@ -74,9 +74,7 @@ export class UserDO {
             positionID : "",
             type : PositionType.LongTrailingStopLoss,
             token : getVsTokenInfo('USDC')!!,
-            tokenAddress : "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
             vsToken : getVsTokenInfo('SOL')!!,
-            vsTokenAddress : "So11111111111111111111111111111111111111112",
             vsTokenAmt : parseFloat(env.DEFAULT_TLS_VS_TOKEN_FRACTION),
             slippagePercent : 0.5,
             triggerPercent : 5,
@@ -302,10 +300,10 @@ export class UserDO {
         // fire and forget (async callback will handle success and failure cases for swap)
         const positionRequest = openPositionRequest.positionRequest;
         const chatID = openPositionRequest.chatID;
-        const tokenInfo = (await getTokenInfo(positionRequest.tokenAddress, this.env)).tokenInfo!!;        
+        const tokenInfo = (await getTokenInfo(positionRequest.token.address, this.env)).tokenInfo!!;        
         // deliberate fire-and-forget.  callbacks will handle state management.
         buyTokenAndParseSwapTransaction(positionRequest, this.wallet!!, this.env)
-            .then(swapResult => this.buySwapCallback(positionRequest, swapResult, tokenInfo, chatID));
+            .then(swapResult => this.buySwapCallback(positionRequest, swapResult, tokenInfo));
         return makeJSONResponse<OpenPositionResponse>({});
     }
 
@@ -360,9 +358,9 @@ export class UserDO {
 
         // fire and forget.  callbacks will handle state changes / user notifications.
         const positionRequest = positionRequestRequest.positionRequest;
-        const tokenInfo = (await getTokenInfo(positionRequest.tokenAddress, this.env)).tokenInfo!!;
+        const tokenInfo = (await getTokenInfo(positionRequest.token.address, this.env)).tokenInfo!!;
         buyTokenAndParseSwapTransaction(positionRequest, this.wallet!!, this.env)
-            .then((swapResult) => this.buySwapCallback(positionRequest, swapResult, tokenInfo, positionRequest.chatID));
+            .then((swapResult) => this.buySwapCallback(positionRequest, swapResult, tokenInfo));
         return makeJSONResponse<OpenPositionResponse>({});
     }
 
@@ -394,24 +392,24 @@ export class UserDO {
     }
 
     // this is the callback from executing a buy
-    async buySwapCallback(positionRequest: PositionRequest, swapResult : SwapResult, tokenInfo : TokenInfo, chatID : number) {
+    async buySwapCallback(positionRequest: PositionRequest, swapResult : SwapResult, tokenInfo : TokenInfo) {
         const status = swapResult.status;
         // TODO: 1. these error message may be wrong.
         // TODO: 2. appropriate retries.
         if (isTransactionPreparationFailure(status)) {
-            await sendMessageToTG(chatID, `Purchase failed.`, this.env);
+            await sendMessageToTG(positionRequest.chatID, `Purchase failed.`, this.env);
         }
         else if (isTransactionExecutionFailure(status)) {
-            await sendMessageToTG(chatID, `Purchase failed.`, this.env);
+            await sendMessageToTG(positionRequest.chatID, `Purchase failed.`, this.env);
         }
         else if (isRetryableTransactionParseFailure(status)) {
-            await sendMessageToTG(chatID, `Purchase failed.`, this.env);
+            await sendMessageToTG(positionRequest.chatID, `Purchase failed.`, this.env);
         }
         else if (isTransactionParseFailure(status)) {
-            await sendMessageToTG(chatID, `Purchase failed.`, this.env);
+            await sendMessageToTG(positionRequest.chatID, `Purchase failed.`, this.env);
         }
         else if (isSwapExecutionError(status)) {
-            await sendMessageToTG(chatID, `Purchase failed.`, this.env);
+            await sendMessageToTG(positionRequest.chatID, `Purchase failed.`, this.env);
         }
         else {
             const swapSummary = swapResult.successfulSwapSummary!!;
@@ -419,7 +417,7 @@ export class UserDO {
             const position = this.convertToPosition(positionRequest, swapSummary, tokenInfo);
 
             // should be non-blocking, so fire-and-forget
-            this.sendBuyTokenSwapSummaryToUser(chatID, swapSummary);
+            this.sendBuyTokenSwapSummaryToUser(positionRequest.chatID, swapSummary);
 
             await this.addPositionToTracking(position);
         }
@@ -432,9 +430,10 @@ export class UserDO {
     }
 
     convertToPosition(positionRequest: PositionRequest, swapSummary : SuccessfulSwapSummary, tokenInfo : TokenInfo) : Position {
-        const vsTokenInfo = getVsTokenInfo(positionRequest.vsTokenAddress)!!;
+        const vsTokenInfo = getVsTokenInfo(positionRequest.vsToken.address)!!;
         const position : Position = {
             userID: positionRequest.userID,
+            chatID : positionRequest.chatID,
             positionID : positionRequest.positionID,
             type: positionRequest.type,
             status: PositionStatus.Open,

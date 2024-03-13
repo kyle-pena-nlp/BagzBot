@@ -150,7 +150,7 @@ export async function quoteBuy(positionRequest : PositionRequest,  env : Env) : 
     }
     const outTokenInfo = positionRequest.token;
     const solTokenInfo = getVsTokenInfo('SOL')!!;
-    const inTokenInfo = getVsTokenInfo(positionRequest.vsTokenAddress)!!;
+    const inTokenInfo = getVsTokenInfo(positionRequest.vsToken.address)!!;
     const route = swapRoute.route;
     const inTokenAmount = route.inAmount as string;
     const outTokenAmount = route.outAmount as string;

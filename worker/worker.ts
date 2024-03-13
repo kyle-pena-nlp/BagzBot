@@ -197,8 +197,8 @@ export class Worker {
     async getTrailingStopLossPositionVsTokenFromSession(telegramUserID : number, messageID : number, env : Env) : Promise<TokenNameAndAddress> {
         const positionRequest = await readSessionObj<PositionRequest>(telegramUserID, messageID, "PositionRequest", env);
         return {
-            token: getVsTokenName(positionRequest.vsTokenAddress)!!,
-            tokenAddress: positionRequest.vsTokenAddress
+            token: getVsTokenName(positionRequest.vsToken.address)!!,
+            tokenAddress: positionRequest.vsToken.address
         };
     }
 
@@ -206,7 +206,7 @@ export class Worker {
         const positionRequest = await readSessionObj<PositionRequest>(telegramUserID, messageID, "PositionRequest", env);
         return {
             thisToken:  getVsTokenName(positionRequest.vsToken.address)!!,
-            thisTokenAddress: positionRequest.vsTokenAddress,
+            thisTokenAddress: positionRequest.vsToken.address,
             quantity: positionRequest.vsTokenAmt
         };
     }

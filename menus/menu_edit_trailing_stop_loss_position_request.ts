@@ -8,7 +8,7 @@ export class MenuEditTrailingStopLossPositionRequest extends Menu<PositionReques
     renderText(): string {
         const positionRequest = this.menuData.positionRequest;
         return [
-            `<b>Edit Your ${positionRequest.token.symbol} Auto-Sell Position</b>`,
+            `<b>[[NEW AUTO-SELL POSITION]]</b>`,
             renderTrailingStopLossRequestMarkdown(this.menuData),
             '<i>Click on any setting below to edit before Submitting</i>'
         ].join("\r\n");
