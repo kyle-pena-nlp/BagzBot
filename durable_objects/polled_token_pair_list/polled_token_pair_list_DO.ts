@@ -4,7 +4,7 @@ import { makeFailureResponse, makeJSONResponse, makeSuccessResponse, maybeGetJso
 import { TokenTracker } from "./trackers/token_tracker";
 import { PolledTokenPairTracker } from "./trackers/polled_token_pair_tracker";
 import { Env } from "../../env";
-import { TokenInfo } from "../../tokens/token_info";
+import { StagedTokenInfo, TokenInfo, deriveFeeAccount } from "../../tokens/token_info";
 import { GetTokenInfoRequest, GetTokenInfoResponse } from "./actions/get_token_info";
 
 type TokensByVsToken = Map<string,string[]>;
@@ -86,7 +86,8 @@ export class PolledTokenPairListDO {
 
         // If it's in the list of returned tokens, add it to the token tracker and respond that the token is validated
         if (tokenAddress in allTokens) {
-            const tokenInfo = allTokens[tokenAddress];
+            const stagedTokenInfo = allTokens[tokenAddress];
+            const tokenInfo = await this.addFeeAccount(stagedTokenInfo);
             this.tokenTracker.addToken(tokenInfo);
             this.tokenTracker.flushToStorage(this.state.storage); // fire and forget
             return {
@@ -103,6 +104,16 @@ export class PolledTokenPairListDO {
         }
     }
 
+    async addFeeAccount(stagedTokenInfo : StagedTokenInfo) : Promise<TokenInfo> {
+        // this calculates what the feeAccount address but doesn't guarantee it is 'registered' or 'exists'
+        const feeAccount = await deriveFeeAccount(stagedTokenInfo.address, this.env);
+        // We use the SDK (https://www.npmjs.com/package/@jup-ag/referral-sdk) to ensure the feeAccount is registered w/ the referals program
+        const tokenInfo : TokenInfo = {
+            ...stagedTokenInfo,
+            feeAccount: feeAccount.toBase58()
+        };
+        return tokenInfo;
+    }
     
     looksLikeATokenAddress(tokenAddress : string) : boolean {
         const length = tokenAddress.length;
@@ -113,13 +124,13 @@ export class PolledTokenPairListDO {
     }
 
     // implement rate-limiting and return null if rate limited
-    async getAllTokensFromJupiter() : Promise<Record<string,TokenInfo>> {
+    async getAllTokensFromJupiter() : Promise<Record<string,StagedTokenInfo>> {
         const url = "https://token.jup.ag/all";
         const response = await fetch(url);
         const allTokensJSON = await response.json() as any[];
-        const tokenInfos : Record<string,TokenInfo> = {};
+        const tokenInfos : Record<string,StagedTokenInfo> = {};
         for (const tokenJSON of allTokensJSON) {
-            const tokenInfo : TokenInfo = { 
+            const tokenInfo : StagedTokenInfo = { 
                 address: tokenJSON.address as string,
                 name: tokenJSON.name as string,
                 symbol: tokenJSON.symbol as string,

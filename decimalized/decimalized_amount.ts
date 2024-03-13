@@ -22,18 +22,26 @@ export function toFriendlyString(x : DecimalizedAmount, maxSigFigs : number) : s
         return numberParts[0];
     }
     else {
-        const [wholePart,fractionalPart] = longDecimalRepr.split(".");
+        const [wholePart,fractionalPart] = numberParts;
         let { zeros, rest } = /^(?<zeros>0*)(?<rest>.*)$/.exec(fractionalPart)?.groups!!;
+        // If there are multiple zeros between the decimal and some non-zero stuff to the right...
         if (zeros.length > 1 && (wholePart == '0'||wholePart == '') && rest.length > 0) {
+            // replace all those zeros with 0₇, for example
             zeros = "0" + subscriptDigits[zeros.length];
         }
+        // If there are multiple zeros after the decimal but nothing to the right of them
         if (zeros.length > 1 && rest.length === 0) {
+            // replace it with a single zero.  (Who cares about 5.000000? Just say '5.0')
             zeros = "0";
         }
+        // If there are trailing zeros, like 5.0340000, replace it with 5.034
         rest = rest.replace(/0+$/, '');
+        // If after all that, there are more places after the decimal (and the 0₇) than 'sigFigs'
         if (rest.length > maxSigFigs) {
+            // Round sig figs - take one extra digit, decided by 10, round, and back to string.
             rest = Math.round(parseFloat(rest.substring(0, maxSigFigs + 1))/10).toString();
         }
+        // Add commas to whole part of number.
         const localizedWholePart = parseFloat(wholePart).toLocaleString();
         return localizedWholePart + "." + zeros + rest;
     }

@@ -4,7 +4,8 @@
 	"private": true,
 	"scripts": {
 		"deploy": "wrangler deploy index.js",
-		"dev": "wrangler dev index.js"
+		"dev": "wrangler dev index.js",
+		"dry-deploy": "npx wrangler deploy --outdir .dry-deploy --dry-run"
 	},
 	"devDependencies": {
 		"@cloudflare/workers-types": "^4.20240208.0",
@@ -12,6 +13,7 @@
 		"wrangler": "^3.0.0"
 	},
 	"dependencies": {
+		"@jup-ag/referral-sdk": "^0.1.6",
 		"@solana/web3.js": "^1.90.1",
 		"bs58": "^5.0.0"
 	}

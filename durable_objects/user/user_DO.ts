@@ -17,7 +17,7 @@ import { UserPositionTracker } from "./trackers/user_position_tracker";
 import { generateEd25519Keypair } from "../../crypto/cryptography";
 import { UserDOFetchMethod, parseUserDOFetchMethod } from "./userDO_interop";
 import { TokenPairPositionTrackerDOFetchMethod, importNewPosition, makeTokenPairPositionTrackerDOFetchRequest, markPositionAsClosedInTokenPairPositionTracker, markPositionAsClosingInTokenPairPositionTracker } from "../token_pair_position_tracker/token_pair_position_tracker_DO_interop";
-import { sellTokenAndParseSwapTransaction, buyTokenAndParseSwapTransaction, SwapResult, isTransactionPreparationFailure, isTransactionExecutionFailure, isTransactionParseFailure, isSwapExecutionError, isRetryableTransactionParseFailure, SuccessfulSwapSummary } from "../../rpc/rpc_interop";
+import { jup_sellTokenAndParseSwapTransaction, jup_buyTokenAndParseSwapTransaction, SwapResult, isTransactionPreparationFailure, isTransactionExecutionFailure, isTransactionParseFailure, isSwapExecutionError, isRetryableTransactionParseFailure, SuccessfulSwapSummary } from "../../rpc/rpc_interop";
 import { getVsTokenInfo } from "../../tokens/vs_tokens";
 import { Env } from "../../env";
 import { Wallet } from "../../crypto/wallet";
@@ -302,7 +302,7 @@ export class UserDO {
         const chatID = openPositionRequest.chatID;
         const tokenInfo = (await getTokenInfo(positionRequest.token.address, this.env)).tokenInfo!!;        
         // deliberate fire-and-forget.  callbacks will handle state management.
-        buyTokenAndParseSwapTransaction(positionRequest, this.wallet!!, this.env)
+        jup_buyTokenAndParseSwapTransaction(positionRequest, this.wallet!!, this.env)
             .then(swapResult => this.buySwapCallback(positionRequest, swapResult, tokenInfo));
         return makeJSONResponse<OpenPositionResponse>({});
     }
@@ -338,7 +338,7 @@ export class UserDO {
         };
         markPositionAsClosingInTokenPairPositionTracker(markPositionAsClosingRequest, this.env);
         // deliberate fire-and-forget.  callbacks will handle state changes.
-        sellTokenAndParseSwapTransaction(position, this.wallet!!, this.env)
+        jup_sellTokenAndParseSwapTransaction(position, this.wallet!!, this.env)
             .then((swapResult) => this.sellSwapCallback(swapResult, position));
         return makeJSONResponse<ManuallyClosePositionResponse>({});
     }
@@ -347,7 +347,7 @@ export class UserDO {
         const positions = closePositionsRequest.positions;
         for (const position of positions) {
             // fire and forget.  callbacks will handle state changes / user notifications.
-            sellTokenAndParseSwapTransaction(position, this.wallet!!, this.env)
+            jup_sellTokenAndParseSwapTransaction(position, this.wallet!!, this.env)
                 .then((swapResult) => this.sellSwapCallback(swapResult, position));
 
         }
@@ -359,7 +359,7 @@ export class UserDO {
         // fire and forget.  callbacks will handle state changes / user notifications.
         const positionRequest = positionRequestRequest.positionRequest;
         const tokenInfo = (await getTokenInfo(positionRequest.token.address, this.env)).tokenInfo!!;
-        buyTokenAndParseSwapTransaction(positionRequest, this.wallet!!, this.env)
+        jup_buyTokenAndParseSwapTransaction(positionRequest, this.wallet!!, this.env)
             .then((swapResult) => this.buySwapCallback(positionRequest, swapResult, tokenInfo));
         return makeJSONResponse<OpenPositionResponse>({});
     }
