@@ -1,47 +1,34 @@
 import { Connection, ParsedInstruction, ParsedTransactionWithMeta, TokenBalance, TransactionError } from "@solana/web3.js";
-import { PreparseSwapResult, SuccessfulSwapSummary, SwapExecutionError, SwapResult, TransactionParseFailure } from "./rpc_types";
+import { PreparseConfirmedSwapResult, PreparseSwapResult, SwapSummary, UnknownTransactionParseSummary, SwapExecutionError, ParsedSwapSummary } from "./rpc_types";
 import { MATH_DECIMAL_PLACES, fromTokenAmount } from "../decimalized/decimalized_amount";
 import { dDiv, dSub } from "../decimalized/decimalized_math";
 import { Env } from "../env";
-import { Position, PositionRequest } from "../positions/positions";
+import { Position, PositionRequest, Swappable, isPosition, isPositionRequest } from "../positions/positions";
+import { getLastValidBlockheight } from "./rpc_common";
+import { sleep } from "../util/sleep";
+import { TokenInfo } from "../tokens/token_info";
 
 // This may come in handy at some point: https://github.com/cocrafts/walless/blob/a05d20f8275c8167a26de976a3b6701d64472765/apps/wallet/src/engine/runners/solana/history/swapHistory.ts#L85
 
 export async function parseBuySwapTransaction(positionRequest : PositionRequest, 
-    preparseSwapResult : PreparseSwapResult, 
+    preparseSwapResult : PreparseConfirmedSwapResult, 
     connection : Connection, 
-    env : Env) : Promise<SwapResult> {
+    env : Env) : Promise<ParsedSwapSummary> {
     
-    if (preparseSwapResult.status !== 'transaction-confirmed') {
-        return {
-            positionID : preparseSwapResult.positionID,
-            signature : preparseSwapResult.signature,
-            status: preparseSwapResult.status
-        };
-    }
-    return await implParseSwapTransaction(preparseSwapResult.positionID, 
-        preparseSwapResult.signature!!,
+    return await implParseSwapTransaction(preparseSwapResult.signature,
         positionRequest.vsToken.address,
         positionRequest.token.address,
         connection,
-        env)
+        env);
 }
 
 export async function parseSellSwapTransaction(position : Position,
         preparseSwapResult : PreparseSwapResult,
         connection : Connection,
-        env : Env) : Promise<SwapResult> {
-    
-    if (preparseSwapResult.status !== 'transaction-confirmed') {
-        return {
-            positionID : preparseSwapResult.positionID,
-            signature : preparseSwapResult.signature,
-            status: preparseSwapResult.status
-        };
-    }
+        env : Env) : Promise<ParsedSwapSummary> {
 
-    return await implParseSwapTransaction(preparseSwapResult.positionID, 
-        preparseSwapResult.signature!!,
+    return await implParseSwapTransaction(
+        preparseSwapResult.signature,
         position.token.address,
         position.vsToken.address,
         connection,
@@ -49,12 +36,11 @@ export async function parseSellSwapTransaction(position : Position,
 }
 
 async function implParseSwapTransaction(
-    positionID : string,
     signature : string, 
     inTokenAddress : string, 
     outTokenAddress : string, 
     connection : Connection,
-    env : Env) : Promise<SwapResult> {
+    env : Env) : Promise<ParsedSwapSummary> {
     
     const parsedTransaction = await connection.getParsedTransaction(signature, {
         maxSupportedTransactionVersion: 0,
@@ -62,10 +48,8 @@ async function implParseSwapTransaction(
     });
 
     if (!parsedTransaction) {
-        return { 
-            positionID : positionID, 
-            signature: signature, 
-            status: TransactionParseFailure.UnknownTransaction
+        return {  
+            status: 'unknown-transaction'
         };
     }
 
@@ -75,20 +59,13 @@ async function implParseSwapTransaction(
     const postTxTokenBalances = (meta?.postTokenBalances||[]);
     
     const isToken = (address : string) => { return (balance : TokenBalance) => { balance.mint === address }};
-    const getTokenAmt = (tokenBalances : TokenBalance[], address : string) => fromTokenAmount(tokenBalances.find(isToken(address))?.uiTokenAmount);
+    const getTokenAmt = (tokenBalances : TokenBalance[], address : string) => fromTokenAmount(tokenBalances.find(isToken(address))?.uiTokenAmount!!);
     
     const inTokenPreAmt = getTokenAmt(preTxTokenBalances, inTokenAddress);
     const inTokenPostAmt = getTokenAmt(postTxTokenBalances, inTokenAddress);
     const outTokenPreAmt = getTokenAmt(preTxTokenBalances, outTokenAddress);
     const outTokenPostAmt = getTokenAmt(postTxTokenBalances, outTokenAddress); 
-    if (!inTokenPreAmt || !inTokenPostAmt || !outTokenPreAmt || !outTokenPostAmt) {
-        return { 
-            positionID : positionID, 
-            signature: signature, 
-            status: TransactionParseFailure.CouldNotDetermineAmountsSpent
-        };
-    }
-    
+
     const spentAmt = dSub(inTokenPostAmt, inTokenPreAmt);
     const receivedAmt = dSub(outTokenPostAmt, outTokenPreAmt);
     const fillPrice = dDiv(receivedAmt, spentAmt, MATH_DECIMAL_PLACES);
@@ -99,13 +76,11 @@ async function implParseSwapTransaction(
     if (err) {
         const swapExecutionError = determineSwapExecutionError(parsedTransaction, env);
         return {
-            positionID : positionID,
-            signature: signature,
             status: swapExecutionError
         }
     }
 
-    const successfulSwapSummary : SuccessfulSwapSummary = {
+    const swapSummary : SwapSummary = {
         inTokenAddress: inTokenAddress,
         inTokenAmt: spentAmt,
         outTokenAddress: outTokenAddress,
@@ -114,15 +89,69 @@ async function implParseSwapTransaction(
         fillPrice: fillPrice
     };
 
-    const swapResult : SwapResult = {
-        positionID : positionID,
+    const swapResult : ParsedSwapSummary = {
         status : 'swap-successful',
-        signature: signature,
-        successfulSwapSummary: successfulSwapSummary
+        swapSummary: swapSummary
     };
 
     return swapResult;
+}
 
+export async function waitForBlockFinalizationAndParseBuy(
+    positionRequest: Swappable, 
+    signature : string, 
+    connection : Connection, 
+    env : Env) : Promise<ParsedSwapSummary> {
+    if (isPositionRequest(positionRequest)) {
+
+    }
+    else {
+
+    }
+    const inTokenAddress = positionRequest.vsToken.address;
+    const outTokenAddress = positionRequest.token.address;
+    return waitForBlockFinalizationAndParse(signature, inTokenAddress, outTokenAddress, connection, env);
+}
+
+
+
+export async function waitForBlockFinalizationAndParseSell(
+    position: Position, 
+    signature : string, 
+    connection : Connection, 
+    env : Env) : Promise<ParsedSwapSummary> {
+    const inTokenAddress = position.token.address;
+    const outTokenAddress = position.vsToken.address;
+    return waitForBlockFinalizationAndParse(signature, inTokenAddress, outTokenAddress, connection, env);
+}
+
+
+async function waitForBlockFinalizationAndParse(signature : string, 
+    inTokenAddress : string, 
+    outTokenAddress : string, 
+    connection : Connection,
+    env : Env) : Promise<ParsedSwapSummary> {
+
+    await waitUntilCurrentBlockFinalized(connection, env);
+
+    return implParseSwapTransaction(signature, inTokenAddress, outTokenAddress, connection, env);
+}
+
+async function waitUntilCurrentBlockFinalized(connection : Connection, env : Env) {
+    try {
+        const currentSlot = await connection.getSlot('confirmed');
+        let finalizedSlot = await connection.getSlot('finalized');
+        while(currentSlot > finalizedSlot) {
+            sleep(10000);
+            finalizedSlot = await connection.getSlot('finalized');
+        }
+        return;
+    }
+    catch(e) {
+        // What else can I do...
+        sleep(2 * parseInt(env.MAX_BLOCK_FINALIZATION_TIME_MS, 10));
+        return;
+    }
 }
 
 function determineSwapExecutionError(parsedTransaction : ParsedTransactionWithMeta, env : Env) : SwapExecutionError {

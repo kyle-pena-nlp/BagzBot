@@ -5,7 +5,7 @@ import { UserInitializeRequest, UserInitializeResponse } from "./actions/user_in
 import { GetUserDataRequest } from "./actions/get_user_data";
 import { DeleteSessionRequest, DeleteSessionResponse } from "./actions/delete_session";
 import { StoreSessionValuesRequest, StoreSessionValuesResponse } from "./actions/store_session_values";
-import { GetSessionValuesRequest, SessionValuesResponse} from "./actions/get_session_values";
+import { GetSessionValuesRequest  } from "./actions/get_session_values";
 import { GetSessionValuesWithPrefixRequest, GetSessionValuesWithPrefixResponse } from "./actions/get_session_values";
 import { AutomaticallyClosePositionsRequest, AutomaticallyClosePositionsResponse } from "../token_pair_position_tracker/actions/automatically_close_positions";
 import { DefaultTrailingStopLossRequestRequest } from "./actions/request_default_position_request";
@@ -16,24 +16,20 @@ import { SessionTracker } from "./trackers/session_tracker";
 import { UserPositionTracker } from "./trackers/user_position_tracker";
 import { generateEd25519Keypair } from "../../crypto/cryptography";
 import { UserDOFetchMethod, parseUserDOFetchMethod } from "./userDO_interop";
-import { TokenPairPositionTrackerDOFetchMethod, importNewPosition, makeTokenPairPositionTrackerDOFetchRequest, markPositionAsClosedInTokenPairPositionTracker, markPositionAsClosingInTokenPairPositionTracker } from "../token_pair_position_tracker/token_pair_position_tracker_DO_interop";
-import { jup_sellTokenAndParseSwapTransaction, jup_buyTokenAndParseSwapTransaction, SwapResult, isTransactionPreparationFailure, isTransactionExecutionFailure, isTransactionParseFailure, isSwapExecutionError, isRetryableTransactionParseFailure, SuccessfulSwapSummary } from "../../rpc/rpc_interop";
+import { TokenPairPositionTrackerDOFetchMethod, makeTokenPairPositionTrackerDOFetchRequest, markPositionAsClosedInTokenPairPositionTracker, markPositionAsClosingInTokenPairPositionTracker } from "../token_pair_position_tracker/token_pair_position_tracker_DO_interop";
 import { getVsTokenInfo } from "../../tokens/vs_tokens";
 import { Env } from "../../env";
 import { Wallet } from "../../crypto/wallet";
 import { GenerateWalletRequest, GenerateWalletResponse } from "./actions/generate_wallet";
-import { PositionRequest, Position, PositionType, PositionStatus } from "../../positions/positions";
+import { PositionRequest, PositionType, PositionStatus } from "../../positions/positions";
 import { TokenInfo } from "../../tokens/token_info";
 import { ListPositionsRequest } from "./actions/list_positions";
 import { TokenPairPositionTrackerInitializeRequest } from "../token_pair_position_tracker/actions/initialize_token_pair_position_tracker";
 import { GetPositionRequest } from "./actions/get_position";
-import { sendMessageToTG } from "../../telegram/telegram_helpers";
-import { expBackoff } from "../../util/exp_backoff";
 import { getTokenInfo } from "../polled_token_pair_list/polled_token_pair_list_DO_interop";
-import { ImportNewPositionsResponse } from "../token_pair_position_tracker/actions/import_new_positions";
-import { MarkPositionAsClosedRequest } from "../token_pair_position_tracker/actions/mark_position_as_closed";
-import { MarkPositionAsClosingRequest } from "../token_pair_position_tracker/actions/mark_position_as_closing";
 import { GetWalletDataRequest, GetWalletDataResponse } from "./actions/get_wallet_data";
+import { buy } from "./user_buy";
+import { sell } from "./user_sell";
 
 /* Durable Object storing state of user */
 export class UserDO {
@@ -302,8 +298,7 @@ export class UserDO {
         const chatID = openPositionRequest.chatID;
         const tokenInfo = (await getTokenInfo(positionRequest.token.address, this.env)).tokenInfo!!;        
         // deliberate fire-and-forget.  callbacks will handle state management.
-        jup_buyTokenAndParseSwapTransaction(positionRequest, this.wallet!!, this.env)
-            .then(swapResult => this.buySwapCallback(positionRequest, swapResult, tokenInfo));
+        buy(positionRequest, this.wallet!!, this.userPositionTracker, this.env);
         return makeJSONResponse<OpenPositionResponse>({});
     }
 
@@ -328,137 +323,39 @@ export class UserDO {
         const positionID = manuallyClosePositionRequest.positionID;
         const position = this.userPositionTracker.getPosition(positionID);
         if (position == null) {
-            return makeSuccessResponse();
+            return makeJSONResponse<ManuallyClosePositionResponse>({ message: 'Position does not exist.' });
         }
-        this.userPositionTracker.setAsClosing(positionID);
-        const markPositionAsClosingRequest : MarkPositionAsClosingRequest = {
-            positionID : positionID,
-            tokenAddress : position.token.address,
-            vsTokenAddress : position.vsToken.address
-        };
-        markPositionAsClosingInTokenPairPositionTracker(markPositionAsClosingRequest, this.env);
-        // deliberate fire-and-forget.  callbacks will handle state changes.
-        jup_sellTokenAndParseSwapTransaction(position, this.wallet!!, this.env)
-            .then((swapResult) => this.sellSwapCallback(swapResult, position));
-        return makeJSONResponse<ManuallyClosePositionResponse>({});
+        else if (position.status === PositionStatus.Closing) {
+            return makeJSONResponse<ManuallyClosePositionResponse>({ message: 'Position are being closed.' });
+        }
+        else if (position.status === PositionStatus.Closed) {
+            return makeJSONResponse<ManuallyClosePositionResponse>({ message: 'Position already closed.' });
+        }
+        // deliberate fire-and-forget
+        sell(position, this.wallet!!, this.userPositionTracker, this.env);
+        return makeJSONResponse<ManuallyClosePositionResponse>({ message: 'Position will now be closed. '});
     }
 
     async handleAutomaticallyClosePositionsRequest(closePositionsRequest : AutomaticallyClosePositionsRequest) : Promise<Response> {
         const positions = closePositionsRequest.positions;
         for (const position of positions) {
             // fire and forget.  callbacks will handle state changes / user notifications.
-            jup_sellTokenAndParseSwapTransaction(position, this.wallet!!, this.env)
-                .then((swapResult) => this.sellSwapCallback(swapResult, position));
-
+            if (position.status === PositionStatus.Closing) {
+                continue;
+            }
+            else if (position.status === PositionStatus.Closed) {
+                continue;
+            }
+            sell(position, this.wallet!!, this.userPositionTracker, this.env);
         }
         return makeJSONResponse<AutomaticallyClosePositionsResponse>({});
     }
 
     async handleOpenPositionRequest(positionRequestRequest: OpenPositionRequest) : Promise<Response> {
-
-        // fire and forget.  callbacks will handle state changes / user notifications.
         const positionRequest = positionRequestRequest.positionRequest;
-        const tokenInfo = (await getTokenInfo(positionRequest.token.address, this.env)).tokenInfo!!;
-        jup_buyTokenAndParseSwapTransaction(positionRequest, this.wallet!!, this.env)
-            .then((swapResult) => this.buySwapCallback(positionRequest, swapResult, tokenInfo));
+        // deliberate fire-and-forget
+        buy(positionRequest, this.wallet!!, this.userPositionTracker, this.env);
         return makeJSONResponse<OpenPositionResponse>({});
-    }
-
-    // this is the callback from executing a sell
-    async sellSwapCallback(swapResult : SwapResult, position : Position) {
-        const status = swapResult.status;
-        if (isTransactionPreparationFailure(status)) {
-            // TODO: mark position as open again
-        }
-        else if (isTransactionExecutionFailure(status)) {
-            // TODO: mark position as open again
-        }
-        else if (isTransactionParseFailure(status)) {
-            // TODO: retry transaction parse
-        }
-        else if (isSwapExecutionError(status)) {
-            // TODO: mark position as open again
-        }
-        else if (status === 'swap-successful') {
-            const summary = swapResult.successfulSwapSummary;
-            this.userPositionTracker.closePosition(swapResult.positionID);
-            const markPositionAsClosedRequest : MarkPositionAsClosedRequest = {
-                positionID : position.positionID,
-                tokenAddress : position.token.address,
-                vsTokenAddress : position.vsToken.address,
-            };
-            await markPositionAsClosedInTokenPairPositionTracker(markPositionAsClosedRequest, this.env);
-        }
-    }
-
-    // this is the callback from executing a buy
-    async buySwapCallback(positionRequest: PositionRequest, swapResult : SwapResult, tokenInfo : TokenInfo) {
-        const status = swapResult.status;
-        // TODO: 1. these error message may be wrong.
-        // TODO: 2. appropriate retries.
-        if (isTransactionPreparationFailure(status)) {
-            await sendMessageToTG(positionRequest.chatID, `Purchase failed.`, this.env);
-        }
-        else if (isTransactionExecutionFailure(status)) {
-            await sendMessageToTG(positionRequest.chatID, `Purchase failed.`, this.env);
-        }
-        else if (isRetryableTransactionParseFailure(status)) {
-            await sendMessageToTG(positionRequest.chatID, `Purchase failed.`, this.env);
-        }
-        else if (isTransactionParseFailure(status)) {
-            await sendMessageToTG(positionRequest.chatID, `Purchase failed.`, this.env);
-        }
-        else if (isSwapExecutionError(status)) {
-            await sendMessageToTG(positionRequest.chatID, `Purchase failed.`, this.env);
-        }
-        else {
-            const swapSummary = swapResult.successfulSwapSummary!!;
-
-            const position = this.convertToPosition(positionRequest, swapSummary, tokenInfo);
-
-            // should be non-blocking, so fire-and-forget
-            this.sendBuyTokenSwapSummaryToUser(positionRequest.chatID, swapSummary);
-
-            await this.addPositionToTracking(position);
-        }
-    }
-
-    async addPositionToTracking(position : Position) : Promise<ImportNewPositionsResponse> {
-        this.userPositionTracker.storePositions([position]);
-        const response = await importNewPosition(position, this.env);
-        return response;
-    }
-
-    convertToPosition(positionRequest: PositionRequest, swapSummary : SuccessfulSwapSummary, tokenInfo : TokenInfo) : Position {
-        const vsTokenInfo = getVsTokenInfo(positionRequest.vsToken.address)!!;
-        const position : Position = {
-            userID: positionRequest.userID,
-            chatID : positionRequest.chatID,
-            positionID : positionRequest.positionID,
-            type: positionRequest.type,
-            status: PositionStatus.Open,
-            token: tokenInfo,
-            vsToken: vsTokenInfo,
-            vsTokenAmt : swapSummary.inTokenAmt,
-            tokenAmt: swapSummary.outTokenAmt,
-            sellSlippagePercent: positionRequest.slippagePercent,
-            triggerPercent : positionRequest.triggerPercent,
-            retrySellIfSlippageExceeded : positionRequest.retrySellIfSlippageExceeded,
-            fillPrice: swapSummary.fillPrice
-        };
-        return position;
-    }
-
-    async sendBuyTokenSwapSummaryToUser(chatID:  number, summary: SuccessfulSwapSummary) {
-        const tokenInfoResponse = await getTokenInfo(summary.outTokenAddress, this.env);
-        if (tokenInfoResponse.type === 'valid') {
-            const tokenInfo = tokenInfoResponse.tokenInfo!!;
-            const summaryMessage = `${summary.outTokenAmt} of ${tokenInfo.symbol} purchased (${summary.fees} SOL in fees)`;
-            await sendMessageToTG(chatID, summaryMessage, this.env);
-        }
-        else {
-            // TODO: log errors
-        }
     }
 
     async validateFetchRequest(request : Request) : Promise<[UserDOFetchMethod,any]> {

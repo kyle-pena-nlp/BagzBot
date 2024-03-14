@@ -5,7 +5,7 @@ import { Wallet } from "../crypto/wallet";
 import { executeRawSignedTransaction } from "./rpc_execute_signed_transaction";
 import { GetQuoteFailure, 
     PreparseSwapResult, 
-    SwapResult, 
+    ParsedSwapSummary, 
     TransactionPreparationFailure, 
     isGetQuoteFailure } from "./rpc_types";
 import * as jupiter_quotes from "./jupiter_quotes";
@@ -30,35 +30,6 @@ import { Env } from "../env";
 // TODO: https://solanacookbook.com/guides/retrying-transactions.html#how-rpc-nodes-broadcast-transactions
 // specifically: https://solanacookbook.com/guides/retrying-transactions.html#customizing-rebroadcast-logic 
 // https://github.com/solana-labs/solana-program-library/blob/ea354ab358021aa08f774e2d4028b33ec56d4180/token/program/src/error.rs#L16
-
-
-
-export async function jup_buyTokenAndParseSwapTransaction(positionRequest : PositionRequest, wallet : Wallet, env: Env) : Promise<SwapResult>
-{
-    const connection = new Connection(env.RPC_ENDPOINT_URL);
-    return buyToken(positionRequest, wallet, env)
-        .then(transactionResult => rpc_parse.parseBuySwapTransaction(positionRequest, transactionResult, connection, env))    
-}
-
-export async function jup_sellTokenAndParseSwapTransaction(position : Position, wallet : Wallet, env : Env) : Promise<SwapResult> {
-    const connection = new Connection(env.RPC_ENDPOINT_URL);
-    return sellToken(position, wallet, env)
-        .then(transactionResult => rpc_parse.parseSellSwapTransaction(position, transactionResult, connection, env));
-}
-
-export async function buyToken(positionRequest: PositionRequest, wallet : Wallet, env : Env) : Promise<PreparseSwapResult> {
-    const positionID = positionRequest.positionID;
-    return jupiter_quotes.getBuyTokenSwapRoute(positionRequest, env) 
-        .then(swapRoute => getRawSignedTransaction(swapRoute, wallet, env))
-        .then(rawSignedTxOrError => executeRawSignedTransaction(positionID, rawSignedTxOrError, env));
-}
-
-export async function sellToken(position : Position, wallet: Wallet, env : Env) : Promise<PreparseSwapResult> {
-    const positionID = position.positionID;
-    return jupiter_quotes.getSellTokenSwapRoute(position, env) 
-        .then(swapRoute => getRawSignedTransaction(swapRoute, wallet, env))
-        .then(rawSignedTx => executeRawSignedTransaction(positionID, rawSignedTx, env));
-}
 
 
 async function getRawSignedTransaction(swapRoute : jupiter_types.SwapRoute|GetQuoteFailure, wallet : Wallet, env : Env) : Promise<VersionedTransaction|GetQuoteFailure|TransactionPreparationFailure> {

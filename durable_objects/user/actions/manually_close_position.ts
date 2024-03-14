@@ -3,5 +3,5 @@ export interface ManuallyClosePositionRequest {
 }
 
 export interface ManuallyClosePositionResponse {
-
+	message: string
 }

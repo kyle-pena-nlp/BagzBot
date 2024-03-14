@@ -72,10 +72,7 @@ export function fromNumber(x : number, decimalPlaces? : number) : DecimalizedAmo
     };
 }
 
-export function fromTokenAmount(tokenAmount : TokenAmount|null|undefined) : DecimalizedAmount|null {
-    if (tokenAmount == null) {
-        return null;
-    }
+export function fromTokenAmount(tokenAmount : TokenAmount) : DecimalizedAmount {
     return {
         tokenAmount: tokenAmount.amount,
         decimals: tokenAmount.decimals

@@ -3,83 +3,11 @@ import { dDiv } from "../decimalized/decimalized_math";
 import { Env } from "../env";
 import { getVsTokenDecimalsMultiplier } from "../tokens/vs_tokens";
 import { makeJSONRequest } from "../util/http_helpers";
-import { HeliusParsedTokenInputOutput, PreparseSwapResult, SuccessfulSwapSummary, SwapExecutionError, SwapResult, TransactionParseFailure, isSwapExecutionError, isTransactionExecutionFailure, isTransactionParseFailure, isTransactionPreparationFailure } from "./rpc_types";
-
-export async function parseSwapTransactionUsingJupiterAPI(positionID : string, transactionResult : PreparseSwapResult, env : Env) : Promise<SwapResult> {
-    
-    const status = transactionResult.status;
-
-    if (isTransactionPreparationFailure(status)) {
-        return { positionID : positionID, status: status };
-    }
-    else if (isTransactionExecutionFailure(status)) {
-        return { positionID : positionID, status: status };
-    }
-
-    const signature = transactionResult.signature!!;
-    const parsedTransaction = await callJupiterParseAPI(signature, env);
-
-    if (isTransactionParseFailure(parsedTransaction)) {
-        return { positionID : positionID, status: parsedTransaction, signature : signature };
-    }
-
-    const summary = summarizeParsedSwapTransaction(parsedTransaction, env);
-
-    if (isSwapExecutionError(summary)) {
-        return { positionID : positionID, status: summary, signature : signature };
-    }
-
-    return { positionID : positionID, status: 'swap-successful', signature : signature, successfulSwapSummary: summary };
-}
-
-async function callJupiterParseAPI(signature : string, env : Env) : Promise<TransactionParseFailure|{ parsed: any }> {
-    
-    const url = `${env.V0_HELIUS_RPC_TRANSACTION_PARSING_URL}?api-key=${env.HELIUS_API_KEY}&commitment=confirmed`
-    
-    const body = {
-        "transactions": [signature]
-    };
-
-    const request = makeJSONRequest(url, body);
-    const response = await fetch(request).catch((reason) => {
-        return null;
-    });
-    
-    if (!response) {
-        return TransactionParseFailure.BadRequest;
-    }
-    
-    // Unauthorized
-    if (response.status == 400) {
-        return TransactionParseFailure.BadRequest;
-    }
-    else if (response.status == 401) {
-        throw new Error("Failed to authenticate with HELIUS transaction parsing API")
-    }
-    // forbidden
-    else if (response.status == 403) {
-        return TransactionParseFailure.BadRequest;
-    }
-    // not found
-    else if (response.status == 404) {
-        return TransactionParseFailure.BadRequest;
-    }
-    // Rate-limited
-    else if (response.status == 429) {
-        return TransactionParseFailure.RateLimited;
-    }   
-    // helius internal error
-    else if (response.status == 500) {
-        return TransactionParseFailure.InternalError;
-    }
-
-    const datas = (await response.json().catch(reason => null)) as any[]|null;
-
-    return { 'parsed': (datas||[{}])[0] };
-}
+import { HeliusParsedTokenInputOutput, SwapSummary, SwapExecutionError } from "./rpc_types";
 
 
-function summarizeParsedSwapTransaction(summarizeMe : { parsed: any }, env : Env) : SwapExecutionError|SuccessfulSwapSummary {
+
+function summarizeParsedSwapTransaction(summarizeMe : { parsed: any }, env : Env) : SwapExecutionError|SwapSummary {
 
     const parsedTransaction = summarizeMe.parsed;
 

@@ -8,7 +8,6 @@ export enum PositionType {
 };
 
 export enum PositionStatus {
-	Unfilled = "Unfilled",
 	Open = "Open",
 	Closing = "Closing",
 	Closed = "Closed"
@@ -60,6 +59,16 @@ export interface PositionRequest extends BasePositionRequest {
 	vsToken : TokenInfo
 };
 
+export type Swappable = PositionRequest | Position;
+
+export function isPositionRequest(s : Swappable) : s is PositionRequest {
+	return !('fillPrice' in s);
+}
+
+export function isPosition(s : Swappable) : s is Position {
+	return 'fillPrice' in s;
+}
+
 export function convertPreRequestToRequest(r : PositionPreRequest, token : TokenInfo) {
 	const positionRequest : PositionRequest = {
 		userID : r.userID,
@@ -74,4 +83,34 @@ export function convertPreRequestToRequest(r : PositionPreRequest, token : Token
 		vsToken: getVsTokenInfo(r.vsTokenAddress)!!
 	};
 	return positionRequest;
+}
+
+export function getInAndOutTokens(s : Swappable): { inToken : TokenInfo, outToken : TokenInfo } {
+    if (isPositionRequest(s)) {
+        return { 
+            inToken : s.vsToken,
+            outToken : s.token
+        };
+    }
+    else if (isPosition(s)) {
+        return {
+            inToken : s.token,
+            outToken : s.vsToken
+        }
+    }
+    else {
+        throw new Error("Programmer error.")
+    }
+}
+
+export function getSwapOfXDescription(s : Swappable, caps : boolean = false) : string {
+    if (isPositionRequest(s)) {
+        return (caps ? 'P' : 'p') + `urchase of ${s.token.symbol}`;
+    }
+    else if (isPosition(s)) {
+        return (caps ? 'S' : 's') + `ale of ${s.token.symbol}`;
+    }
+    else {
+        throw new Error("Programmer error.")
+    }
 }

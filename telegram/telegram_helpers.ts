@@ -1,4 +1,7 @@
 import  { Env } from "../env";
+import { MenuCode } from "../menus";
+import { CallbackData } from "../menus/callback_data";
+import { CallbackButton } from "./callback_button";
 import { makeFakeFailedRequestResponse, makeJSONRequest, makeJSONResponse, makeSuccessResponse } from "../util/http_helpers";
 
 export interface DeleteTGMessageResponse {
@@ -61,20 +64,41 @@ export function escapeTGText(text : string, parseMode : 'MarkdownV2'|'HTML') : s
     return text;
 }
 
-export function makeTelegramSendMessageRequest(chatID : number, text : string, env : Env, parseMode? : 'MarkdownV2'|'HTML') : Request {
-    const url = makeTelegramBotUrl('sendMessage', env);
-    parseMode = parseMode||'HTML'
-    const sendMessageBody = {
-        "chat_id": chatID,
-        "text": escapeTGText(text, parseMode),
-        "parse_mode": parseMode
-    };
-    const request = makeJSONRequest(url, sendMessageBody);
-    return request;
+
+
+
+
+export async function updateTGMessage(chatID : number, 
+    messageID : number, 
+    text : string, 
+    env : Env,
+    parseMode : 'HTML'|'MarkdownV2' = 'HTML', 
+    includeDismissButton : boolean = false) : Promise<TgMessageSentInfo> {
+    const request = makeTelegramUpdateMessageRequest(chatID, messageID, text, env, parseMode, includeDismissButton);
+    return await fetch(request).then(async (response) => {
+        if (response.ok) {
+            const responseJSON : any = await response.json();
+            return {
+                success: true,
+                chatID : responseJSON.result?.chat.id,
+                messageID: responseJSON.result?.message_id
+            };
+        }
+        else {
+            return { success: false };
+        }
+    }).catch(() => {
+        return { success: false};
+    });
 }
 
-export async function sendMessageToTG(chatID : number, text : string, env : Env) : Promise<TgMessageSentInfo> {
-    const request = makeTelegramSendMessageRequest(chatID, text, env);
+export async function sendMessageToTG(chatID : number, 
+    text : string, 
+    env : Env,
+    parseMode : 'HTML'|'MarkdownV2' = 'HTML', 
+    includeDismissButton : boolean = false) : Promise<TgMessageSentInfo> {
+    
+    const request = makeTelegramSendMessageRequest(chatID, text, env, parseMode, includeDismissButton);
     return await fetch(request).then(async (response) => {
         if (response.ok) {
             const responseJSON : any = await response.json();
@@ -118,6 +142,60 @@ export async function sendRequestToTG(request : Request) : Promise<Response> {
             return makeSuccessResponse();
         }
     })
+}
+
+function makeTelegramSendMessageRequest(chatID : number, 
+    text : string, 
+    env : Env, 
+    parseMode : 'MarkdownV2'|'HTML',
+    includeDismissButton : boolean) : Request {
+    const url = makeTelegramBotUrl('sendMessage', env);
+    parseMode = parseMode||'HTML'
+    let sendMessageBody : any = {
+        "chat_id": chatID,
+        "text": escapeTGText(text, parseMode),
+        "parse_mode": parseMode
+    };
+    if (includeDismissButton) {
+        sendMessageBody = addDismissButton(sendMessageBody);
+    }
+    const request = makeJSONRequest(url, sendMessageBody);
+    return request;
+}
+
+function makeTelegramUpdateMessageRequest(chatID : number, 
+    messageID : number, 
+    text : string, 
+    env : Env, 
+    parseMode : 'MarkdownV2'|'HTML',
+    includeDismissButton : boolean) : Request {
+    const url = makeTelegramBotUrl('editMessageText', env);
+    parseMode = parseMode||'HTML'
+    let sendMessageBody : any = {
+        "chat_id": chatID,
+        "message_id": messageID,
+        "text": escapeTGText(text, parseMode),
+        "parse_mode": parseMode
+    };
+    if (includeDismissButton) {
+        sendMessageBody = addDismissButton(sendMessageBody);
+    }
+    const request = makeJSONRequest(url, sendMessageBody);
+    return request;
+}
+
+function addDismissButton(requestBody: any) {
+    const dismissButton : CallbackButton = {
+        text: "Dismiss",
+        callback_data: new CallbackData(MenuCode.Close).toString()
+    };
+    const dismissButtonKeyboard : CallbackButton[][] = [[dismissButton]];
+    return {
+        ...requestBody,
+        reply_markup: {
+            "inline_keyboard": dismissButtonKeyboard
+        }
+    }
 }
 
 

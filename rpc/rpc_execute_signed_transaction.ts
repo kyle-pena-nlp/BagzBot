@@ -4,15 +4,19 @@ import { GetQuoteFailure,
     TransactionPreparationFailure, 
     TransactionExecutionError,
     isGetQuoteFailure, 
-    isTransactionPreparationFailure } from "./rpc_types";
+    isTransactionPreparationFailure, 
+    TransactionExecutionErrorCouldntConfirm} from "./rpc_types";
 import { sleep } from "../util/sleep";
 import { getLastValidBlockheight, getLatestBlockheight } from "./rpc_common";
 import { Env } from "../env";
 import * as bs58 from "bs58";
 
+// TODO: export async function retryConfirmation()
+
 export async function executeRawSignedTransaction(
     positionID : string,
-    rawSignedTx : VersionedTransaction|GetQuoteFailure|TransactionPreparationFailure, 
+    rawSignedTx : VersionedTransaction, 
+    connection : Connection,
     env : Env,
     logHandler? : (msg: string, error : any) => Promise<void>) : Promise<PreparseSwapResult> {
     
@@ -21,23 +25,11 @@ export async function executeRawSignedTransaction(
         logHandler = async (msg:string, error: any) => {};
     }
 
-    if (isGetQuoteFailure(rawSignedTx)) {
-        return { positionID : positionID, status: rawSignedTx };
-    }
-
-    // early-out if the tx is really just an error code
-    if (isTransactionPreparationFailure(rawSignedTx)) {
-        return { positionID : positionID, status: rawSignedTx };
-    }
-    
     // Define some settings
     const maxConfirmExceptions = parseInt(env.RPC_MAX_CONFIRM_EXCEPTIONS,10);
     const REBROADCAST_DELAY_MS = parseInt(env.RPC_REBROADCAST_DELAY_MS, 10);
     const REATTEMPT_CONFIRM_DELAY = parseInt(env.RPC_REATTEMPT_CONFIRM_DELAY, 10);
     const confirmTimeoutMS = parseInt(env.RPC_CONFIRM_TIMEOUT_MS, 10);
-
-    // create cxn to RPC
-    const connection = new Connection(env.RPC_ENDPOINT_URL);
 
     // transform tx to buffer, extract signature yo damn self
     const txBuffer = Buffer.from(rawSignedTx.serialize());
@@ -56,7 +48,11 @@ export async function executeRawSignedTransaction(
     // if the current blockheight exceeds this, the transaction will never execute.
     const lastValidBlockheight = await getLastValidBlockheight(connection).catch((reason) => null);
     if (!lastValidBlockheight) {
-        return { positionID: positionID, status: TransactionExecutionError.CouldNotPollBlockheight };
+        return { 
+            positionID: positionID, 
+            status: TransactionExecutionError.CouldNotDetermineMaxBlockheight, 
+            signature : signature 
+        };
     }
 
     const resendTxTask = (async () => {
@@ -108,8 +104,12 @@ export async function executeRawSignedTransaction(
                 await logHandler("getBlockHeight threw an exception", e);
                 if (!anyTxSent) {
                     stopConfirmingSignal = true;
+                    return TransactionExecutionError.CouldNotPollBlockheightNoTxSent;
                 }
-                return TransactionExecutionError.CouldNotPollBlockheight; // 'could-not-poll-blockheight';
+                else {
+                    // If we can't poll blockheight, we shouldn't be retrying (how would we know when to stop?)
+                    break;
+                }  
             }
 
             /*
@@ -188,14 +188,14 @@ export async function executeRawSignedTransaction(
 
             /* i.e.; RPC is down. */
             if (confirmExceptions >= maxConfirmExceptions) {
-                return TransactionExecutionError.CouldNotConfirmTooManyExceptions; //'confirmation-too-many-exceptions';
+                return TransactionExecutionErrorCouldntConfirm.CouldNotConfirmTooManyExceptions; //'confirmation-too-many-exceptions';
             }
 
             // this is a failsafe to prevent infinite looping.
             const confirmTimedOut = (Date.now() - startConfirmMS) > confirmTimeoutMS;
             if (confirmTimedOut) {
                 stopSendingSignal = true;
-                return TransactionExecutionError.TimeoutCouldNotConfirm;
+                return TransactionExecutionErrorCouldntConfirm.TimeoutCouldNotConfirm;
             }
         }
         return;
@@ -205,7 +205,11 @@ export async function executeRawSignedTransaction(
     const sendStatus = await resendTxTask;
     const finalStatus = determineTxConfirmationFinalStatus(sendStatus, confirmStatus);
 
-    return { positionID : positionID, status: finalStatus, signature: signature };
+    return { 
+        positionID : positionID, 
+        status: finalStatus, 
+        signature: signature
+    };
 }
 
 function parseSendRawTransactionException(e : any) : string|null {
@@ -232,7 +236,9 @@ function parseSwapExecutionError(err : any, rawSignedTx : VersionedTransaction, 
 }
 
 
-function determineTxConfirmationFinalStatus(sendStatus : TransactionExecutionError|undefined, confirmStatus : TransactionExecutionError|'transaction-confirmed'|undefined) : TransactionExecutionError | 'transaction-confirmed' {
-    return confirmStatus || sendStatus || TransactionExecutionError.Unknown;
+function determineTxConfirmationFinalStatus(
+    sendStatus : TransactionExecutionError|undefined, 
+    confirmStatus : TransactionExecutionError|TransactionExecutionErrorCouldntConfirm|'transaction-confirmed'|undefined) : TransactionExecutionError | TransactionExecutionErrorCouldntConfirm | 'transaction-confirmed' {
+    return confirmStatus || sendStatus || TransactionExecutionErrorCouldntConfirm.Unknown;
 }
 

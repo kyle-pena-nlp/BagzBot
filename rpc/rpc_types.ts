@@ -10,25 +10,44 @@ export enum TransactionPreparationFailure {
     FailedToSignTransaction = "FailedToSignTransaction"
 };
 
-export enum TransactionParseFailure {
-    BadRequest = "BadRequest",
-    RateLimited = "RateLimited",
-    UnknownTransaction = "UnknownTransaction",
-    InternalError = "InternalError",
-    CouldNotDetermineAmountsSpent = "CouldNotDetermineAmountsSpent"
-};
 
 export enum TransactionExecutionError {
-    CouldNotPollBlockheight = "CouldNotPollBlockheight",
+    CouldNotPollBlockheightNoTxSent = "CouldNotPollBlockheightNoTxSent",
+    CouldNotDetermineMaxBlockheight = "CouldNotDetermineMaxBlockheight",
     BlockheightExceeded = "BlockheightExceeded",
     TransactionDropped = "TransactionDropped",
     TransactionFailedOtherReason = "TransactionFailedOtherReason",
-    CouldNotConfirmTooManyExceptions = "CouldNotConfirmTooManyExceptions",
-    TimeoutCouldNotConfirm = "TimeoutCouldNotConfirm",
-    Unknown = "Unknown",
     SlippageToleranceExceeded = "SlippageToleranceExceeded",
     InsufficientNativeTokensError = "InsufficientNativeTokensError",
     InsufficientFundsError = "InsufficientFundsError"
+};
+
+export enum TransactionExecutionErrorCouldntConfirm {
+    CouldNotConfirmTooManyExceptions = "CouldNotConfirmTooManyExceptions",
+    TimeoutCouldNotConfirm = "TimeoutCouldNotConfirm",
+    Unknown = "Unknown"
+}
+
+
+export type PreparseSwapResult = PreparseUnconfirmedSwapResult | PreparseConfirmedSwapResult | PreparseFailedSwapResult;
+
+
+export interface PreparseConfirmedSwapResult {
+    positionID : string
+    status: 'transaction-confirmed'
+    signature : string
+};
+
+export interface PreparseFailedSwapResult {
+    positionID : string
+    status: TransactionExecutionError
+    signature : string
+};
+
+export interface PreparseUnconfirmedSwapResult {
+    positionID : string
+    status: TransactionExecutionErrorCouldntConfirm
+    signature : string
 };
 
 export enum SwapExecutionError {
@@ -37,20 +56,22 @@ export enum SwapExecutionError {
     OtherSwapExecutionError = "OtherSwapExecutionError"
 };
 
-export interface PreparseSwapResult {
-    positionID : string
-    status: GetQuoteFailure|TransactionPreparationFailure|TransactionExecutionError|TransactionExecutionError|'transaction-confirmed'
-    signature ?: string
+
+
+export interface UnknownTransactionParseSummary {
+    status: 'unknown-transaction';
 }
 
-export interface SwapResult {
-    positionID : string
-    status: GetQuoteFailure|TransactionPreparationFailure|TransactionExecutionError|TransactionParseFailure|SwapExecutionError|'swap-successful'
-    signature ?: string
-    successfulSwapSummary ?: SuccessfulSwapSummary
-};
+export interface SwapExecutionErrorParseSummary {
+    status : SwapExecutionError
+}
 
-export interface SuccessfulSwapSummary {
+export interface ParsedSuccessfulSwapSummary {
+    status : 'swap-successful'
+    swapSummary : SwapSummary
+}
+
+export interface SwapSummary {
     inTokenAddress : string,
     inTokenAmt : DecimalizedAmount,
     outTokenAddress: string,
@@ -59,7 +80,9 @@ export interface SuccessfulSwapSummary {
     fillPrice : DecimalizedAmount
 };
 
-
+export type ParsedSwapSummary = ParsedSuccessfulSwapSummary | 
+    UnknownTransactionParseSummary | 
+    SwapExecutionErrorParseSummary;
 
 export interface ConfirmationErr {
     err: {}|string
@@ -84,18 +107,25 @@ export function isGetQuoteFailure<T>(obj : T|GetQuoteFailure) : obj is GetQuoteF
     return isEnumValue(obj, GetQuoteFailure);
 }
 
-export function isTransactionExecutionFailure<T>(obj : T|TransactionExecutionError) : obj is TransactionExecutionError {
+export function isTransactionExecutionError<T>(obj : T|TransactionExecutionError) : obj is TransactionExecutionError {
     return isEnumValue(obj, TransactionExecutionError);
     //return typeof obj === 'string' && obj != null && (Object.values(TransactionExecutionError) as any[]).includes(obj);
 }
 
-export function isRetryableTransactionParseFailure<T>(obj : T | TransactionParseFailure) : obj is TransactionParseFailure.RateLimited|TransactionParseFailure.InternalError {
-    return obj === TransactionParseFailure.RateLimited || obj === TransactionParseFailure.InternalError;
+export function isTransactionExecutionErrorCouldntConfirm<T>(obj : T|TransactionExecutionErrorCouldntConfirm) : obj is TransactionExecutionErrorCouldntConfirm {
+    return isEnumValue(obj, TransactionExecutionErrorCouldntConfirm);
 }
 
-export function isTransactionParseFailure<T>(obj : T |TransactionParseFailure) : obj is TransactionParseFailure {
-    return isEnumValue(obj, TransactionParseFailure);
-    //return typeof obj === 'string' && obj != null && Object.values(obj).includes(TransactionParseFailure.BadRequest);
+export function isUnknownTransactionParseSummary(obj : ParsedSwapSummary) : obj is UnknownTransactionParseSummary {
+    return obj.status === 'unknown-transaction';
+}
+
+export function isSwapExecutionErrorParseSummary(obj : ParsedSwapSummary) : obj is SwapExecutionErrorParseSummary {
+    return isEnumValue(obj.status, SwapExecutionError);
+}
+
+export function isSuccessfullyParsedSwapSummary(obj : ParsedSwapSummary) : obj is ParsedSuccessfulSwapSummary {
+    return obj.status === 'swap-successful';
 }
 
 export function isSwapExecutionError<T>(obj: T | SwapExecutionError): obj is SwapExecutionError {
@@ -110,4 +140,26 @@ function isEnumValue<T extends Record<string,string|number>>(value: any, enumTyp
 
 export function isTransactionParseErrorHeliusResponse(obj: { error: string }|any[]) : obj is { error : string } {
     return obj && typeof obj === 'object' && "error" in obj;
+}
+
+
+export function isFailedParseSwapSummary(parsedSwapResult : ParsedSwapSummary) : parsedSwapResult is SwapExecutionErrorParseSummary {
+    return parsedSwapResult.status !== 'swap-successful';
+}
+
+export function isSuccessfulSwapSummary(parsedSwapResult : ParsedSwapSummary): parsedSwapResult is ParsedSuccessfulSwapSummary {
+    return parsedSwapResult.status === 'swap-successful';
+}
+
+
+export function isConfirmed(maybeExecutedTx : PreparseSwapResult) : maybeExecutedTx is PreparseConfirmedSwapResult {
+    return maybeExecutedTx.status === 'transaction-confirmed';
+}
+
+export function isFailed(maybeExecutedTx : PreparseSwapResult) : maybeExecutedTx is PreparseFailedSwapResult {
+    return isTransactionExecutionError(maybeExecutedTx.status);
+}
+
+export function isUnconfirmed(maybeExecutedTx : PreparseSwapResult) : maybeExecutedTx is PreparseUnconfirmedSwapResult {
+    return isTransactionExecutionErrorCouldntConfirm(maybeExecutedTx.status);
 }

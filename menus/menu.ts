@@ -3,6 +3,7 @@ import { Env } from "../env";
 
 import { makeJSONRequest } from "../util/http_helpers";
 import { escapeTGText, makeTelegramBotUrl  } from "../telegram/telegram_helpers";
+import { CallbackButton } from "../telegram/callback_button";
 
 export enum MenuDisplayMode {
 	UpdateMenu,
@@ -66,10 +67,6 @@ export interface MenuSpec {
 	forceReply : boolean
 };
 
-export interface CallbackButton {
-	text: string,
-	callback_data : string
-};
 
 export interface MenuCapabilities {
     renderText() : string;
