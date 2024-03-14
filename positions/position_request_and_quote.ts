@@ -1,4 +1,4 @@
-import { GetQuoteFailure } from "../rpc/rpc_interop";
+import { GetQuoteFailure } from "../rpc/rpc_types";
 import { PositionRequest } from "./positions";
 import { Quote } from "./quote"
 

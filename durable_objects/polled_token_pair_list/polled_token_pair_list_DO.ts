@@ -105,12 +105,9 @@ export class PolledTokenPairListDO {
     }
 
     async addFeeAccount(stagedTokenInfo : StagedTokenInfo) : Promise<TokenInfo> {
-        // this calculates what the feeAccount address but doesn't guarantee it is 'registered' or 'exists'
-        const feeAccount = await deriveFeeAccount(stagedTokenInfo.address, this.env);
         // We use the SDK (https://www.npmjs.com/package/@jup-ag/referral-sdk) to ensure the feeAccount is registered w/ the referals program
         const tokenInfo : TokenInfo = {
-            ...stagedTokenInfo,
-            feeAccount: feeAccount.toBase58()
+            ...stagedTokenInfo
         };
         return tokenInfo;
     }

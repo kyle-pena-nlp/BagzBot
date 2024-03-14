@@ -15,13 +15,12 @@ export interface StagedTokenInfo {
 
 export interface TokenInfo extends StagedTokenInfo {
     [ key : string ] : Structural
-    feeAccount: string
 };
 
 export async function deriveFeeAccount(tokenAddress : string, env : Env) : Promise<PublicKey> {
     const referralAccountPubkey = new PublicKey(env.FEE_ACCOUNT_PUBLIC_KEY);
     const outputToken = new PublicKey(tokenAddress);
-    const [feeAccount] = await PublicKey.findProgramAddressSync(
+    const [feeAccount] = PublicKey.findProgramAddressSync(
         [
           Buffer.from("referral_ata"),
           referralAccountPubkey.toBuffer(), // your referral account public key

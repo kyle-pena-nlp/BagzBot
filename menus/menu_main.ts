@@ -1,5 +1,7 @@
 import { UserData } from "../durable_objects/user/model/user_data";
-import { CallbackButton, Menu, MenuCapabilities, MenuCode } from "./menu";
+import { Menu, MenuCapabilities } from "./menu";
+import { CallbackButton } from "../telegram/callback_button";
+import { MenuCode } from "./menu_code";
 
 export class MenuMain extends Menu<UserData> implements MenuCapabilities {
     renderText(): string {

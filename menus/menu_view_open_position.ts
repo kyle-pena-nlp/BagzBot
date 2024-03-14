@@ -1,6 +1,8 @@
 import { Position } from "../positions/positions";
 import { CallbackData } from "./callback_data";
-import { CallbackButton, Menu, MenuCapabilities, MenuCode } from "./menu";
+import { Menu, MenuCapabilities } from "./menu";
+import { CallbackButton } from "../telegram/callback_button";
+import { MenuCode } from "./menu_code";
 
 export class MenuViewOpenPosition extends Menu<Position> implements MenuCapabilities {
     renderText(): string {

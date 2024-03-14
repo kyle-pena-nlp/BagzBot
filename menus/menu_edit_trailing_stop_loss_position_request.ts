@@ -1,8 +1,10 @@
 import { CallbackData } from "./callback_data";
 import { PositionRequest } from "../positions/positions";
 import { PositionRequestAndQuote } from "../positions/position_request_and_quote";
-import { CallbackButton, Menu, MenuCapabilities, MenuCode } from "./menu";
+import { Menu, MenuCapabilities } from "./menu";
 import { renderTrailingStopLossRequestMarkdown } from "./trailing_stop_loss_helpers";
+import { CallbackButton } from "../telegram/callback_button";
+import { MenuCode } from "./menu_code";
 
 export class MenuEditTrailingStopLossPositionRequest extends Menu<PositionRequestAndQuote> implements MenuCapabilities {
     renderText(): string {

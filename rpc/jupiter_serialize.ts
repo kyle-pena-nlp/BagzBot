@@ -11,7 +11,7 @@ export async function serializeSwapRouteTransaction(swapRoute : SwapRoute|Transa
     if (isTransactionPreparationFailure(swapRoute)) {
         return swapRoute;
     }
-    const feeAccount = await deriveFeeAccount(swapRoute.outTokenAddress, env);
+    const feeAccount = deriveFeeAccount(swapRoute.outTokenAddress, env);
     const body = {
       quoteResponse: swapRoute.route,
       userPublicKey: publicKey,

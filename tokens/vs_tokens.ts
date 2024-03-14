@@ -19,8 +19,8 @@ export function getVsTokenInfo(vsToken : string|VsToken) : TokenInfo|null {
         name : name,
         symbol : symbol,
         logoURI : logoURI,
-        decimals : decimals
-    }
+        decimals : decimals,
+    };
 }
 
 export function getVsTokenLogoURI(vsToken : string|VsToken) : string|null {
