@@ -1,9 +1,11 @@
 import { PublicKey } from "@solana/web3.js"
 import { Env } from "../env";
+import { Structural } from "../util/structural";
 
 const SWAP_JUPITER_REFERRAL_PROGRAM = "REFER4ZgmyYx9c6He5XfaTMiGfdLwRnkV4RPp9t9iF3";
 
 export interface StagedTokenInfo {
+    [ key : string ] : Structural
     address: string
     name : string
 	symbol : string
@@ -12,6 +14,7 @@ export interface StagedTokenInfo {
 }
 
 export interface TokenInfo extends StagedTokenInfo {
+    [ key : string ] : Structural
     feeAccount: string
 };
 

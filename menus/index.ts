@@ -1,4 +1,5 @@
-import { BaseMenu, MenuCode } from "./menu";
+import { BaseMenu } from "./menu";
+import { MenuCode } from "./menu_code";
 import { MenuConfirmTrailingStopLossPositionRequest } from "./menu_confirm_trailing_stop_loss_position_request";
 import { MenuEditTrailingStopLossPositionRequest } from "./menu_edit_trailing_stop_loss_position_request";
 import { MenuError } from "./menu_error";

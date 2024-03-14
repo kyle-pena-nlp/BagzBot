@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { SessionValue } from "../model/session";
+import { Structural } from "../model/session";
 
 /*
     This class tracks 'Session State', which is values associated with a message (like a menu).
@@ -13,7 +13,7 @@ import { SessionValue } from "../model/session";
 export class SessionTracker {
     sessionIDs : Record<string,string> = {};
     sessionKeys : Record<string,string[]> = {};
-    sessionValues : Record<string,SessionValue> = {};
+    sessionValues : Record<string,Structural> = {};
     dirtyTracking : Set<string> = new Set<string>();
     deletedKeys : Set<string> = new Set<string>();
     constructor() {
@@ -42,7 +42,7 @@ export class SessionTracker {
             return;
         }
         
-        const putEntries : Record<string,string[]|SessionValue> = {};
+        const putEntries : Record<string,string[]|Structural> = {};
         for (const record of [this.sessionIDs, this.sessionKeys, this.sessionValues]) {
             for (const key of Object.keys(record)) {
                 if (this.dirtyTracking.has(key)) {
@@ -72,7 +72,7 @@ export class SessionTracker {
             this.markAsDirty(sessionIDKey);
         }
     }
-    storeSessionValue(messageID : number, sessionKey : string, value : SessionValue) {
+    storeSessionValue(messageID : number, sessionKey : string, value : Structural) {
         this.ensureHasSession(messageID);
         const messageIDKey = new MessageIDKey(messageID);
         const sessionIDKey = new SessionIDKey(this.sessionIDs[messageIDKey.toString()]);
@@ -85,7 +85,7 @@ export class SessionTracker {
         this.sessionValues[sessionKeyKey.toString()] = value;
         this.markAsDirty(sessionKeyKey);
     }
-    getSessionValue(messageID : number, sessionKey : string) : SessionValue {
+    getSessionValue(messageID : number, sessionKey : string) : Structural {
         this.ensureHasSession(messageID);
         const messageIDKey  = new MessageIDKey(messageID);
         const sessionIDKey  = new SessionIDKey(this.sessionIDs[messageIDKey.toString()]);
@@ -96,7 +96,7 @@ export class SessionTracker {
         this.ensureHasSession(messageID);
         const sessionID = this.sessionIDs[new MessageIDKey(messageID).toString()];
         const sessionKeys = this.sessionKeys[new SessionIDKey(sessionID).toString()];
-        const session : Record<string,SessionValue> = {};
+        const session : Record<string,Structural> = {};
         for (const sessionKey of sessionKeys) {
             const sessionKeyKey = new SessionKeyKey(new SessionIDKey(sessionID), sessionKey);
             const value = this.sessionValues[sessionKeyKey.toString()];
@@ -108,7 +108,7 @@ export class SessionTracker {
         this.ensureHasSession(messageID);
         const sessionID = this.sessionIDs[new MessageIDKey(messageID).toString()];
         const sessionKeys = this.sessionKeys[new SessionIDKey(sessionID).toString()];
-        const sessionValuesMatchingPrefix : Record<string,SessionValue> = {};
+        const sessionValuesMatchingPrefix : Record<string,Structural> = {};
         for (const sessionKey of sessionKeys) {
             const sessionKeyKey = new SessionKeyKey(new SessionIDKey(sessionID), sessionKey);
             if (sessionKeyKey.hasPrefix(prefix)) {

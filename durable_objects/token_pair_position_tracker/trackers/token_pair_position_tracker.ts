@@ -9,6 +9,7 @@ export interface PositionsToClose {
 
 export class TokenPairPositionTracker {
 
+    // TODO: unused, remove.
     // positions sent to DEX yet not filled/confirmed
     sentPositionRequests : MapWithStorage<PositionRequest> = new MapWithStorage<PositionRequest>("sentPositionRequests");
 
@@ -24,10 +25,17 @@ export class TokenPairPositionTracker {
     // positions that have been sent to be closed but closing has not been filled/confirmed
     closingPositions : MapWithStorage<Position> = new MapWithStorage<Position>("closingPositions");
 
+    // TODO: unused, remove.
     // positions confirmed as closed
     closedPositions : MapWithStorage<Position> = new MapWithStorage<Position>("closedPositions");
 
     constructor() {
+    }
+
+    any() : boolean {
+        return  this.newOpenPositions.size > 0 ||
+                this.openPositions.size > 0 ||
+                this.closingPositions.size > 0;
     }
 
     importNewOpenPositions(positions : Position[]) {

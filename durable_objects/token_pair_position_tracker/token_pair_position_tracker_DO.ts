@@ -1,19 +1,26 @@
 import { DurableObjectState } from "@cloudflare/workers-types";
-import { Position, PositionRequest } from "../../positions/positions";
 import { makeJSONResponse } from "../../util/http_helpers";
 import { TokenPairPositionTrackerDOFetchMethod, parseTokenPairPositionTrackerDOFetchMethod } from "./token_pair_position_tracker_DO_interop";
 import { TokenPairPositionTracker } from "./trackers/token_pair_position_tracker";
 import { Env } from "../../env";
-import { ManuallyClosePositionRequest, ManuallyClosePositionResponse } from "../user/actions/manually_close_position";
-import { OpenPositionResponse } from "../user/actions/open_new_position";
 import { TokenPairPositionTrackerInitializeRequest } from "./actions/initialize_token_pair_position_tracker";
 import { ImportNewPositionsRequest, ImportNewPositionsResponse } from "./actions/import_new_positions";
 import { UpdatePriceRequest, UpdatePriceResponse  } from "./actions/update_price";
-import { DecimalizedAmount } from "../../decimalized/decimalized_amount";
-import { sendClosePositionOrdersToUserDOs } from "../user/userDO_interop";
+import { DecimalizedAmount, MATH_DECIMAL_PLACES, fromNumber } from "../../decimalized/decimalized_amount";
+import { UserDOFetchMethod, sendClosePositionOrdersToUserDOs } from "../user/userDO_interop";
 import { AutomaticallyClosePositionRequest, AutomaticallyClosePositionsRequest } from "./actions/automatically_close_positions";
 import { MarkPositionAsClosedRequest, MarkPositionAsClosedResponse } from "./actions/mark_position_as_closed";
 import { MarkPositionAsClosingRequest, MarkPositionAsClosingResponse } from "./actions/mark_position_as_closing";
+
+/*
+    Big TODO: How do we limit concurrent outgoing requests when a dip happens?
+    This is a big burst and may trip limits.
+    Should we shard a token-pair position tracker once a certain number of positions exist?
+    i.e.; USDCaddr-CHONKYaddr-1,  USDCaddr-CHONKYaddr-2, etc.
+
+    Also, is it possible to have cron job execution on DOs?
+    Or do I need to hack something together with alarms?
+*/
 
 /* 
     Durable Object storing all open positions for a single token/vsToken pair.  
@@ -28,6 +35,7 @@ export class TokenPairPositionTrackerDO {
     // initialized properties - token and the 'swap-from' vsToken (i.e; USDC)
     tokenAddress :   string|null
     vsTokenAddress : string|null
+    isPolling : boolean
     
     // this performs all the book keeping and determines what RPC actions to take
     tokenPairPositionTracker : TokenPairPositionTracker = new TokenPairPositionTracker();
@@ -40,28 +48,95 @@ export class TokenPairPositionTrackerDO {
         
         this.tokenAddress       = null;  // address of token being traded
         this.vsTokenAddress     = null;  // i.e.; USDC or SOL
+        this.isPolling          = false;
 
-        /* RPC connection */
         this.env = env;
+
+        this.state.blockConcurrencyWhile(async () => {
+            await this.initializeFromStorage(this.state.storage);
+        });
+    }
+
+    async initializeFromStorage(storage : DurableObjectStorage) {
+        const entries = await storage.list();
+        this.tokenAddress = entries.get("tokenAddress") as string|null;
+        this.vsTokenAddress = entries.get("vsTokenAddress") as string|null;
+        this.tokenPairPositionTracker.initialize(entries);
+    }
+
+    shouldBePolling() : boolean {
+        return this.tokenPairPositionTracker.any() && this.initialized();
     }
 
     initialized() : boolean {
         return this.vsTokenAddress != null && this.tokenAddress != null;
     }
 
+    async alarm() {
+        const beginExecutionTime = Date.now();
+        await this.state.storage.deleteAlarm();
+        try {
+            const price = await this.getPrice();
+            if (price != null) {
+                this.handleUpdatePrice({ price });
+            }
+        }
+        catch(e) {
+            console.log("Price polling failed.");
+        }
+        if (!this.shouldBePolling()) {
+            this.isPolling = false;
+            return;
+        }
+        else {
+            await this.scheduleNextPoll(beginExecutionTime);
+        }
+    }
+
+    async getPrice() : Promise<DecimalizedAmount|undefined> {
+        const tokenAddress = this.tokenAddress!!;
+        const vsTokenAddress = this.vsTokenAddress;
+        const url = `https://price.jup.ag/v4/price?ids=${tokenAddress}&vsToken=${vsTokenAddress}`
+        const response = await fetch(url);
+        if (!response.ok) {
+            return;
+        }
+        const responseBody : any = (await response.json());
+        const price = responseBody.data[tokenAddress];
+        const decimalizedPrice = fromNumber(price, MATH_DECIMAL_PLACES);
+        return decimalizedPrice;
+    }
+
+    async scheduleNextPoll(begin : number) {
+        this.isPolling = true;
+        const end = Date.now();
+        const elapsed = end - begin;
+        if (elapsed > 1000) {
+            console.log("Tracker ran longer than 1s");
+        }
+        const remainder = elapsed % 1000;
+        const nextAlarm = 1000 - remainder;
+        const alarmTime = Date.now() + nextAlarm;
+        await this.state.storage.setAlarm(alarmTime);
+    }
+
     async fetch(request : Request) : Promise<Response> {
 
         const [method,body] = await this.validateFetchRequest(request);
+        const response = this._fetch(method,body);
+        if (this.shouldBePolling() && !this.isPolling) {
+            this.scheduleNextPoll(Date.now());
+        }
+        return response;
+    }
 
+    async _fetch(method : TokenPairPositionTrackerDOFetchMethod, body : any) : Promise<Response> {
         switch(method) {
             case TokenPairPositionTrackerDOFetchMethod.initialize:
                 return await this.handleInitialize(body);
             case TokenPairPositionTrackerDOFetchMethod.updatePrice:
                 this.assertIsInitialized();
                 return await this.handleUpdatePrice(body);
-            case TokenPairPositionTrackerDOFetchMethod.requestNewPosition:
-                this.assertIsInitialized();
-                return await this.handleRequestNewPosition(body);
             case TokenPairPositionTrackerDOFetchMethod.importNewOpenPositions:
                 this.assertIsInitialized();
                 return await this.handleImportNewOpenPositions(body);
@@ -72,7 +147,7 @@ export class TokenPairPositionTrackerDO {
                 this.assertIsInitialized();
                 return await this.handleMarkPositionAsClosed(body);
             default:
-                throw new Error(`Unknown method ${method}`);
+                return makeJSONResponse({},400);
         }
     }
 
@@ -124,66 +199,11 @@ export class TokenPairPositionTrackerDO {
         const responseBody : UpdatePriceResponse = {};
         return makeJSONResponse(responseBody);
     }
-    
-    async handleRequestNewPosition(request : Request) : Promise<Response> {
-        const positionRequest : PositionRequest = await request.json();
-        const actionsToTake = this.tokenPairPositionTracker.addPositionRequest(positionRequest);
-        //this.processActionsToTake(actionsToTake);
-        const responseBody : OpenPositionResponse = {};
-        return makeJSONResponse(responseBody);
-    }
-
-    async callbackSuccessFillingPosition(position : Position) {
-        this.tokenPairPositionTracker.callbackSuccessFilledPosition(position);
-        //this.notifyUserPositionFilled(position);
-    }
-
-    async callbackFailureFillingPosition(position : Position) {
-        this.tokenPairPositionTracker.callbackFailureFilledPosition(position);
-        //this.notifyUserPositionFailedToFill(position);
-    }
-
-    async callbackSuccessClosePositions(positions : Position[]) {
-        for (const position of positions) {
-            //this.tokenPairPositionTracker.callbackSuccessClosedPosition(position);
-            //this.notifyUserPositionClosed(position);
-        }
-    }
-
-    async callbackFailureToClosePositions(positions : Position[]) {
-        for (const position of positions) {
-            //this.tokenPairPositionTracker.callbackFailureToClosePositions(position);
-            //this.notifyUserPositionDidNotClose(position);
-        }
-    }    
 
     async updatePrice(newPrice : DecimalizedAmount) {
         // fire and forget so we don't block subsequent update-price ticks
         const positionsToClose = this.tokenPairPositionTracker.updatePrice(newPrice);
         const request : AutomaticallyClosePositionsRequest = { positions: positionsToClose.positionsToClose }
         sendClosePositionOrdersToUserDOs(request, this.env);
-    }
-
-    async sendOrdersToClosePositions(positions : Position[]) {
-        const positionsByUserID = this.groupPositionsByUser(positions);
-        for (const [userID,positions] of positionsByUserID) {
-            this.sendClosePositionOrdersToUserDO(userID, positions);
-        }
-    }
-
-    sendClosePositionOrdersToUserDO(telegramUserID : number, positionsToClose :Position[]) {
-        //closePositions(telegramUserID, positionsToClose);
-    }
-
-    private groupPositionsByUser(positions : Position[]) : Map<number,Position[]> {
-        const record = new Map<number,Position[]>();
-        for (const position of positions) {
-            const userID = position.userID;
-            if (!(userID in record)) {
-                record.set(userID, []);
-            }
-            record.get(userID)!!.push(position);
-        }
-        return record;
     }
 }

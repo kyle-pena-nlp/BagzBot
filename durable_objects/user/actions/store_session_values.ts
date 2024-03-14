@@ -1,8 +1,8 @@
-import { SessionValue } from "../model/session"
+import { Structural } from "../../../util/structural";
 
 export interface StoreSessionValuesRequest {
 	messageID: number
-	sessionValues : Record<string,SessionValue>
+	sessionValues : Record<string,Structural>
 };
 
 export interface StoreSessionValuesResponse {

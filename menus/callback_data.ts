@@ -1,4 +1,4 @@
-import { MenuCode } from "./menu";
+import { MenuCode } from "./menu_code";
 
 export class CallbackData {
 	menuCode : MenuCode

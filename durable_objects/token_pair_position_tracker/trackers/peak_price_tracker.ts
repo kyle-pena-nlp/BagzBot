@@ -5,6 +5,7 @@ import { DecimalizedAmountSet } from "../../../decimalized/decimalized_amount_se
 import { setDifference, setIntersection } from "../../../util/set_operations";
 import { PositionsAssociatedWithPeakPrices } from "./positions_associated_with_peak_prices";
 import * as dMath from "../../../decimalized/decimalized_math";
+import { structuralEquals } from "../../../util/structural";
 
 /* 
     This class maintains lists of positions grouped by peak price thus far
@@ -21,9 +22,6 @@ export class PeakPricePositionTracker {
     _buffer : PositionsAssociatedWithPeakPrices = new PositionsAssociatedWithPeakPrices();
     itemsByPeakPrice : PositionsAssociatedWithPeakPrices = new PositionsAssociatedWithPeakPrices();
     pricePeakSessionKeyPrefix : string    
-    
-    dirtyTracking : DecimalizedAmountMap<boolean[]> = new DecimalizedAmountMap<boolean[]>();
-    deletedKeys : Set<number> = new Set<number>();
 
     constructor(pricePeakSessionKeyPrefix : string) {
         this.pricePeakSessionKeyPrefix = pricePeakSessionKeyPrefix;
@@ -34,6 +32,12 @@ export class PeakPricePositionTracker {
         }
         this.itemsByPeakPrice.push(price, position);
         //this.itemsByPeakPrice.get(price)!!.push(position);
+    }
+    markAsClosing(positionID : string) {
+        this.itemsByPeakPrice.markAsClosing(positionID);
+    }
+    removePosition(positionID : string) {
+        this.itemsByPeakPrice.removePosition(positionID);
     }
     update(newPrice : DecimalizedAmount) {
         const peaks = [...this.itemsByPeakPrice.keys()];
@@ -187,7 +191,7 @@ export class PeakPricePositionTracker {
     }
     private positionsEqualByValue(a : Position, b : Position) : boolean {
         for (const key of Object.keys(a)) {
-            if (a[key] !== b[key]) {
+            if (!structuralEquals(a[key], b[key])) {
                 return false;
             }
         }

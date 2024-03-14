@@ -1,10 +1,10 @@
 import { PositionDisplayInfo } from "./position_display_info";
-import { SessionValue } from "./session";
+import { Structural } from "../../../util/structural";
 
 export interface UserData {
 	initialized : boolean	
 	telegramUserID? : number
 	telegramUserName?: string
 	hasWallet: boolean
-	session : Record<string,SessionValue>
+	session : Record<string,Structural>
 };

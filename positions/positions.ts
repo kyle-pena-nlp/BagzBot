@@ -1,7 +1,7 @@
 import { TokenInfo } from "../tokens/token_info"
 import { DecimalizedAmount } from "../decimalized/decimalized_amount";
 import { getVsTokenInfo } from "../tokens/vs_tokens";
-import { SessionValue } from "../durable_objects/user/model/session";
+import { Structural } from "../util/structural";
 
 export enum PositionType {
 	LongTrailingStopLoss = "Auto-Sell"
@@ -15,7 +15,7 @@ export enum PositionStatus {
 
 
 export interface Position {
-
+	[ key : string ] : Structural
 	userID : number
 	chatID : number
 	positionID : string
@@ -54,7 +54,7 @@ export interface PositionPreRequest extends BasePositionRequest {
 }
 
 export interface PositionRequest extends BasePositionRequest {
-	[ key : string ] : SessionValue
+	[ key : string ] : Structural
 	token : TokenInfo
 	vsToken : TokenInfo
 };

@@ -1,4 +1,4 @@
-import { SessionValue } from "../model/session"
+import { Structural } from "../../../util/structural";
 
 export interface GetSessionValuesRequest {
 	messageID : number
@@ -6,7 +6,7 @@ export interface GetSessionValuesRequest {
 }
 
 export interface SessionValuesResponse {
-	sessionValues : Record<string,SessionValue>
+	sessionValues : Record<string,Structural>
 }
 
 
@@ -16,5 +16,5 @@ export interface GetSessionValuesWithPrefixRequest {
 };
 
 export interface GetSessionValuesWithPrefixResponse {
-	values : Record<string,SessionValue>
+	values : Record<string,Structural>
 };

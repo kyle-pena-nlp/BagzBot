@@ -9,8 +9,6 @@ import { MarkPositionAsClosingRequest, MarkPositionAsClosingResponse } from "./a
 export enum TokenPairPositionTrackerDOFetchMethod {
 	initialize  = "initialize",
 	updatePrice = "updatePrice",
-	requestNewPosition = "requestNewPosition",
-	getPositions = "getPositions",
 	importNewOpenPositions = "importNewOpenPositions",
 	markPositionAsClosing = "markPositionAsClosing",
 	markPositionAsClosed = "markPositionAsClosed"

@@ -9,7 +9,7 @@ import { GetSessionValuesRequest  } from "./actions/get_session_values";
 import { GetSessionValuesWithPrefixRequest, GetSessionValuesWithPrefixResponse } from "./actions/get_session_values";
 import { AutomaticallyClosePositionsRequest, AutomaticallyClosePositionsResponse } from "../token_pair_position_tracker/actions/automatically_close_positions";
 import { DefaultTrailingStopLossRequestRequest } from "./actions/request_default_position_request";
-import { SessionValue } from "./model/session";
+import { Structural } from "../../util/structural";
 import { OpenPositionRequest, OpenPositionResponse } from "./actions/open_new_position";
 import { makeSuccessResponse, makeJSONResponse, makeFailureResponse, maybeGetJson } from "../../util/http_helpers";
 import { SessionTracker } from "./trackers/session_tracker";
@@ -245,7 +245,7 @@ export class UserDO {
 
     async handleGetSessionValues(jsonRequestBody : GetSessionValuesRequest) : Promise<Response> {
         const messageID = jsonRequestBody.messageID;
-        const sessionValues : Record<string,SessionValue> = {};
+        const sessionValues : Record<string,Structural> = {};
         for (const sessionKey of jsonRequestBody.sessionKeys) {
             const value = this.sessionTracker.getSessionValue(messageID, sessionKey);
             sessionValues[sessionKey] = value;

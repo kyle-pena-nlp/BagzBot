@@ -80,7 +80,7 @@ export class PositionsAssociatedWithPeakPrices extends DecimalizedAmountMap<Read
             }
         }
     }
-    markAsClosed(positionID : string) {
+    removePosition(positionID : string) {
         const location = this.locationMap.get(positionID);
         if (location) {
             const [price,index] = location;

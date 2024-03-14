@@ -62,6 +62,9 @@ export class MapWithStorage<TValue> {
             yield [key.replace(prefixRegex,""),value];
         }
     }
+    get size() : number {
+        return this.items.size;
+    }
     initialize(entries : Map<string,any>) {
         for (const [key,value] of entries) {
             if (this.prefixMatches(key)) {

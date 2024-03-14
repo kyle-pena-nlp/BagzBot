@@ -1,10 +1,12 @@
 import { TokenAmount } from "@solana/web3.js";
 import { tryParseFloat } from "../util/numbers";
+import { Structural } from "../util/structural";
 
 export const MATH_DECIMAL_PLACES = 6;
 
 /* See decimalized_math.ts for operations on this type */
 export interface DecimalizedAmount {
+    [ key : string ] : Structural
     tokenAmount : string, // amount * 10^decimals.  String because maybe too big for JS?
     decimals : number
 }

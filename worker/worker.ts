@@ -1,6 +1,5 @@
 import { TokenNameAndAddress } from "../durable_objects/user/model/token_name_and_address";
 import { getTokenInfo } from "../durable_objects/polled_token_pair_list/polled_token_pair_list_DO_interop";
-import { SessionValue } from "../durable_objects/user/model/session";
 import { generateWallet, getAndMaybeInitializeUserData, getDefaultTrailingStopLoss, getPosition, getWalletData, listOpenTrailingStopLossPositions, manuallyClosePosition, readSessionObj, requestNewPosition, storeSessionObj, storeSessionObjProperty, storeSessionValues } from "../durable_objects/user/userDO_interop";
 import { Env } from "../env";
 import { PositionRequest, convertPreRequestToRequest } from "../positions/positions";
@@ -13,8 +12,9 @@ import { QuantityAndToken } from "../durable_objects/user/model/quantity_and_tok
 import { OpenPositionRequest } from "../durable_objects/user/actions/open_new_position";
 import { GetTokenInfoResponse } from "../durable_objects/polled_token_pair_list/actions/get_token_info";
 import { tryParseFloat } from "../util/numbers";
-import { quoteBuy } from "../rpc/rpc_interop";
 import { PositionRequestAndQuote } from "../positions/position_request_and_quote";
+import { Structural } from "../util/structural";
+import { quoteBuy } from "../rpc/jupiter_quotes";
 
 export class Worker {
 
@@ -148,7 +148,7 @@ export class Worker {
                 const trailingStopLossSelectedVsToken = callbackData.menuArg!!;
                 const vsTokenAddress = getVsTokenAddress(trailingStopLossSelectedVsToken);
                 const vsToken = getVsTokenInfo(trailingStopLossSelectedVsToken);
-                await storeSessionValues(telegramUserID, messageID, new Map<string,SessionValue>([
+                await storeSessionValues(telegramUserID, messageID, new Map<string,Structural>([
                     ["vsToken", vsToken],
                     ["vsTokenAddress", vsTokenAddress]
                 ]), "PositionRequest", env);

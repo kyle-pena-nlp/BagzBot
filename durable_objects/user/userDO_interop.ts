@@ -8,7 +8,7 @@ import { GetUserDataRequest } from "./actions/get_user_data";
 import { ManuallyClosePositionRequest, ManuallyClosePositionResponse } from "./actions/manually_close_position";
 import { StoreSessionValuesRequest, StoreSessionValuesResponse } from "./actions/store_session_values";
 import { UserInitializeRequest, UserInitializeResponse } from "./actions/user_initialize";
-import { SessionKey, SessionValue } from "./model/session";
+import { SessionKey } from "./model/session";
 import { UserData } from "./model/user_data";
 import { ListPositionsRequest } from "./actions/list_positions";
 import { DefaultTrailingStopLossRequestRequest } from "./actions/request_default_position_request";
@@ -18,6 +18,7 @@ import { AutomaticallyClosePositionsRequest, AutomaticallyClosePositionsResponse
 import { groupIntoMap } from "../../util/collections";
 import { GenerateWalletRequest, GenerateWalletResponse } from "./actions/generate_wallet";
 import { GetWalletDataRequest, GetWalletDataResponse } from "./actions/get_wallet_data";
+import { Structural } from "../../util/structural";
 
 export enum UserDOFetchMethod {
 	get = "get",
@@ -117,23 +118,23 @@ export async function getSessionState(telegramUserID : number, messageID : numbe
 	return sessionValuesResponse.sessionValues;
 }
 
-export async function storeSessionObjProperty(telegramUserID : number, messageID : number, property : string, value : SessionValue, prefix : string, env : Env) {
-	const sessionValues = new Map<SessionKey,SessionValue>([[property,value]]);
+export async function storeSessionObjProperty(telegramUserID : number, messageID : number, property : string, value : Structural, prefix : string, env : Env) {
+	const sessionValues = new Map<SessionKey,Structural>([[property,value]]);
 	return await storeSessionValues(telegramUserID, messageID, sessionValues, prefix, env);
 }
 
-export async function readSessionObj<TObj extends {[key : string] : SessionValue}>(telegramUserID : number, messageID : number, prefix : string, env : Env) : Promise<TObj> {
+export async function readSessionObj<TObj extends {[key : string] : Structural}>(telegramUserID : number, messageID : number, prefix : string, env : Env) : Promise<TObj> {
 	const record = await readSessionValuesWithPrefix(telegramUserID, messageID, prefix, env);
 	const obj = stripPrefixFromRecordKeys(record, prefix);
 	return obj as TObj;
 }
 
-function stripPrefixFromRecordKeys<TObj extends {[key : string] : SessionValue}>(record : Record<string,SessionValue>, prefix : string) : TObj {
+function stripPrefixFromRecordKeys<TObj extends {[key : string] : Structural}>(record : Record<string,Structural>, prefix : string) : TObj {
 	const replacePattern = new RegExp(`^${prefix}/`);
-	const obj : {[key:string]:SessionValue} = {};
+	const obj : {[key:string]:Structural} = {};
 	for (const key of Object.keys(record)) {
 		const prefixFreeKey = key.replace(replacePattern, "");
-		obj[prefixFreeKey] = record[key] as SessionValue;
+		obj[prefixFreeKey] = record[key] as Structural;
 	}
 	return obj as TObj;
 }
@@ -147,8 +148,8 @@ async function readSessionValuesWithPrefix(telegramUserID : number, messageID : 
 	return response.values;
 }
 
-export async function storeSessionObj<TObj extends {[key : string] : SessionValue}>(telegramUserID : number, messageID : number, obj : TObj, prefix : string, env : Env) : Promise<StoreSessionValuesResponse> {
-	const valuesMap = new Map<string,SessionValue>();
+export async function storeSessionObj<TObj extends {[key : string] : Structural}>(telegramUserID : number, messageID : number, obj : TObj, prefix : string, env : Env) : Promise<StoreSessionValuesResponse> {
+	const valuesMap = new Map<string,Structural>();
 	for (const key of Object.keys(obj)) {
 		const propertyValue = obj[key];
 		valuesMap.set(key, propertyValue);
@@ -162,8 +163,8 @@ export async function manuallyClosePosition(telegramUserID : number, positionID 
 	return response;
 }
 
-export async function storeSessionValues(telegramUserID : number, messageID : number, sessionValues : Map<string,SessionValue>, prefix : string, env : Env) : Promise<StoreSessionValuesResponse> {
-	const sessionValuesRecord : Record<string,SessionValue> = {};
+export async function storeSessionValues(telegramUserID : number, messageID : number, sessionValues : Map<string,Structural>, prefix : string, env : Env) : Promise<StoreSessionValuesResponse> {
+	const sessionValuesRecord : Record<string,Structural> = {};
 	for (const [sessionKey,value] of sessionValues) {
 		const fullSessionKey = `${prefix}/${sessionKey}`;
 		sessionValuesRecord[fullSessionKey] = value;
