@@ -19,6 +19,7 @@ import { MenuWallet } from "./menu_wallet";
 import { PositiveDecimalKeypad } from "./positive_decimal_keypad";
 import { PositiveIntegerKeypad } from "./positive_integer_keypad";
 import { MenuTODO } from "./todo_menu";
+import { MenuPleaseWait } from "./menu_please_wait";
 
 export {
     BaseMenu,
@@ -41,5 +42,6 @@ export {
     MenuWallet,
     PositiveDecimalKeypad,
     PositiveIntegerKeypad,
-    MenuTODO
-}
+    MenuTODO,
+    MenuPleaseWait
+};

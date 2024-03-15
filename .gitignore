@@ -29,3 +29,4 @@ archive/
 .vscode/*
 !.vscode/launch.json
 .*/
+**/.*

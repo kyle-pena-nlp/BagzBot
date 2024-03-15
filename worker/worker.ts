@@ -7,7 +7,7 @@ import { deleteTGMessage, sendMessageToTG, sendRequestToTG } from "../telegram/t
 import { AutoSellOrderSpec, TelegramWebhookInfo } from "../telegram/telegram_webhook_info";
 import { getVsTokenAddress, getVsTokenInfo, getVsTokenName } from "../tokens/vs_tokens";
 import { makeFakeFailedRequestResponse, makeJSONResponse, makeSuccessResponse } from "../util/http_helpers";
-import { BaseMenu, MenuCode, MenuConfirmTrailingStopLossPositionRequest, MenuEditTrailingStopLossPositionRequest, MenuError, MenuFAQ, MenuHelp, MenuListPositions, MenuMain, MenuPleaseEnterToken, MenuTODO, MenuTrailingStopLossAutoRetrySell, MenuTrailingStopLossEntryBuyQuantity, MenuTrailingStopLossPickVsToken, MenuTrailingStopLossSlippagePercent, MenuTrailingStopLossTriggerPercent, MenuViewOpenPosition, MenuViewWallet, MenuWallet, PositiveDecimalKeypad, PositiveIntegerKeypad } from "../menus";
+import { BaseMenu, MenuCode, MenuConfirmTrailingStopLossPositionRequest, MenuEditTrailingStopLossPositionRequest, MenuError, MenuFAQ, MenuHelp, MenuListPositions, MenuMain, MenuPleaseEnterToken, MenuPleaseWait, MenuTODO, MenuTrailingStopLossAutoRetrySell, MenuTrailingStopLossEntryBuyQuantity, MenuTrailingStopLossPickVsToken, MenuTrailingStopLossSlippagePercent, MenuTrailingStopLossTriggerPercent, MenuViewOpenPosition, MenuViewWallet, MenuWallet, PositiveDecimalKeypad, PositiveIntegerKeypad } from "../menus";
 import { QuantityAndToken } from "../durable_objects/user/model/quantity_and_token";
 import { OpenPositionRequest } from "../durable_objects/user/actions/open_new_position";
 import { GetTokenInfoResponse } from "../durable_objects/polled_token_pair_list/actions/get_token_info";
@@ -141,7 +141,7 @@ export class Worker {
                     positionRequest: positionRequestAfterFinalSubmit 
                 };
                 await requestNewPosition(telegramUserID, positionRequestRequest, env);
-                return this.createMainMenu(telegramWebhookInfo, env);
+                return new MenuPleaseWait(undefined);
             case MenuCode.TrailingStopLossEntryBuyQuantityMenu:
                 const quantityAndTokenForBuyQuantityMenu : QuantityAndToken = await this.getTrailingStopLossPositionQuantityAndVsTokenFromSession(telegramUserID, messageID, env);
                 return new MenuTrailingStopLossEntryBuyQuantity(quantityAndTokenForBuyQuantityMenu);

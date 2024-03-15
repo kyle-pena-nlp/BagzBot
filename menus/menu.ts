@@ -38,11 +38,13 @@ export abstract class BaseMenu {
         const body : any = { 
             chat_id: chatID,
             text: menuSpec.text,
-            parse_mode: menuSpec.parseMode,
-            reply_markup: {
-                "inline_keyboard": menuSpec.options
-            }
+            parse_mode: menuSpec.parseMode
         };
+        if (menuSpec.options.length > 0 && menuSpec.options[0].length > 0) {
+            body.reply_markup = {
+                "inline_keyboard": menuSpec.options
+            };
+        }
         const method = 'sendMessage';
         const url = makeTelegramBotUrl(method, env);
         const request = makeJSONRequest(url, body);
@@ -55,11 +57,13 @@ export abstract class BaseMenu {
             chat_id: chatID,
             text: menuSpec.text,
             parse_mode: menuSpec.parseMode,
-            message_id: messageID,
-            reply_markup: {
-                "inline_keyboard": menuSpec.options
-            }
+            message_id: messageID
         };
+        if (menuSpec.options.length > 0 && menuSpec.options[0].length > 0) {
+            body.reply_markup = {
+                "inline_keyboard": menuSpec.options
+            };
+        }
         const method = 'editMessageText';
         const url = makeTelegramBotUrl(method, env);
         const request = makeJSONRequest(url, body);
