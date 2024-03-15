@@ -1,7 +1,7 @@
+import { CallbackButton } from "../telegram/callback_button";
+import { TokenInfo } from "../tokens/token_info";
 import { CallbackData } from "./callback_data";
 import { Menu, MenuCapabilities } from "./menu";
-import { TokenInfo } from "../tokens/token_info";
-import { CallbackButton } from "../telegram/callback_button";
 import { MenuCode } from "./menu_code";
 
 export class MenuOpenPosition extends Menu<TokenInfo> implements MenuCapabilities {

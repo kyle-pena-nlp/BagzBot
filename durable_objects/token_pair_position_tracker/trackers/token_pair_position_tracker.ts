@@ -1,7 +1,7 @@
-import { DecimalizedAmount } from "../../../decimalized/decimalized_amount";
+import { DecimalizedAmount } from "../../../decimalized";
 import { Position, PositionRequest, PositionStatus } from "../../../positions/positions";
+import { MapWithStorage } from "../../../util";
 import { PeakPricePositionTracker } from "./peak_price_tracker";
-import { MapWithStorage } from "../../../util/map_with_storage";
 
 export interface PositionsToClose {
     positionsToClose : Position[]

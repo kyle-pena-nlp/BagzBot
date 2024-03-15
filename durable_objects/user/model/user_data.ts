@@ -1,5 +1,4 @@
-import { PositionDisplayInfo } from "./position_display_info";
-import { Structural } from "../../../util/structural";
+import { Structural } from "../../../util";
 
 export interface UserData {
 	initialized : boolean	

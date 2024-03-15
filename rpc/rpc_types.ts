@@ -1,5 +1,5 @@
-import { DecimalizedAmount } from "../decimalized/decimalized_amount";
-import { isEnumValue } from "../util/enums";
+import { DecimalizedAmount } from "../decimalized";
+import { isEnumValue } from "../util";
 
 export enum GetQuoteFailure {
     FailedToDetermineSwapRoute = "FailedToDetermineSwapRoute"
@@ -135,15 +135,12 @@ export function isSwapExecutionError<T>(obj: T | SwapExecutionError): obj is Swa
     //return typeof obj === 'string' && obj != null && Object.values(obj).includes(SwapExecutionError.OtherError);
 }
 
-
-
 export function isTransactionParseErrorHeliusResponse(obj: { error: string }|any[]) : obj is { error : string } {
     return obj && typeof obj === 'object' && "error" in obj;
 }
 
-
-export function isFailedParseSwapSummary(parsedSwapResult : ParsedSwapSummary) : parsedSwapResult is SwapExecutionErrorParseSummary {
-    return parsedSwapResult.status !== 'swap-successful';
+export function isSwapExecutionErrorParseSwapSummary(parsedSwapResult : ParsedSwapSummary) : parsedSwapResult is SwapExecutionErrorParseSummary {
+    return isSwapExecutionError(parsedSwapResult.status);
 }
 
 export function isSuccessfulSwapSummary(parsedSwapResult : ParsedSwapSummary): parsedSwapResult is ParsedSuccessfulSwapSummary {

@@ -1,4 +1,4 @@
-import { DecimalizedAmount, toKey, fromKey } from "./decimalized_amount";
+import { DecimalizedAmount, fromKey, toKey } from "./decimalized_amount";
 export class DecimalizedAmountMap<V> {
     inner : Map<string,V> = new Map<string,V>();
     constructor() {

@@ -1,7 +1,7 @@
 
-import { Menu, MenuCapabilities, MenuDisplayMode, MenuSpec } from "./menu";
-import { CallbackData } from "./callback_data";
 import { CallbackButton } from "../telegram/callback_button";
+import { CallbackData } from "./callback_data";
+import { Menu, MenuCapabilities, MenuDisplayMode, MenuSpec } from "./menu";
 import { MenuCode } from "./menu_code";
 
 export class PositiveDecimalKeypad extends Menu<string> implements MenuCapabilities {

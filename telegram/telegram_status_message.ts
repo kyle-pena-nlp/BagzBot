@@ -1,5 +1,5 @@
 import { Env } from "../env";
-import { pause } from "../util/sleep";
+import { pause } from "../util";
 import { deleteTGMessage, sendMessageToTG, updateTGMessage } from "./telegram_helpers";
 
 export interface UpdateableNotification { 
@@ -54,7 +54,7 @@ export class TGStatusMessage {
             };
     }
     /* Append a status message to a queue of status messages, in a non-blocking fashion, with 500ms pauses between messages. */
-    static async update(statusMessage : UpdateableNotification, 
+    static async queue(statusMessage : UpdateableNotification, 
         message : string, 
         dismissable : boolean) {
         statusMessage.promiseChain = statusMessage.promiseChain.then(m => {

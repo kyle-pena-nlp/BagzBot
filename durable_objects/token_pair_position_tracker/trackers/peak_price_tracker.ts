@@ -1,11 +1,8 @@
+import * as dMath from "../../../decimalized";
+import { DecimalizedAmount, DecimalizedAmountSet, MATH_DECIMAL_PLACES, fromKey, fromNumber, toKey } from "../../../decimalized";
 import { Position, PositionStatus, PositionType } from "../../../positions/positions";
-import { DecimalizedAmount, fromKey, fromNumber, toKey, MATH_DECIMAL_PLACES } from "../../../decimalized/decimalized_amount";
-import { DecimalizedAmountMap } from "../../../decimalized/decimalized_amount_map";
-import { DecimalizedAmountSet } from "../../../decimalized/decimalized_amount_set";
-import { setDifference, setIntersection } from "../../../util/set_operations";
+import { setDifference, setIntersection, structuralEquals } from "../../../util";
 import { PositionsAssociatedWithPeakPrices } from "./positions_associated_with_peak_prices";
-import * as dMath from "../../../decimalized/decimalized_math";
-import { structuralEquals } from "../../../util/structural";
 
 /* 
     This class maintains lists of positions grouped by peak price thus far

@@ -1,7 +1,7 @@
 import { QuantityAndToken } from "../durable_objects/user/model/quantity_and_token";
+import { CallbackButton } from "../telegram/callback_button";
 import { CallbackData } from "./callback_data";
 import { Menu, MenuCapabilities } from "./menu";
-import { CallbackButton } from "../telegram/callback_button";
 import { MenuCode } from "./menu_code";
 
 export class MenuTrailingStopLossEntryBuyQuantity extends Menu<QuantityAndToken> implements MenuCapabilities {

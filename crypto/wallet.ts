@@ -1,4 +1,4 @@
-import { Structural } from "../util/structural"
+import { Structural } from "../util";
 
 export interface Wallet {
 	readonly [ key : string ] : Structural

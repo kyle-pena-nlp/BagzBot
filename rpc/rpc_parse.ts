@@ -1,12 +1,11 @@
 import { Connection, ParsedTransactionWithMeta, TokenBalance } from "@solana/web3.js";
-import { PreparseConfirmedSwapResult, PreparseSwapResult, SwapSummary, SwapExecutionError, ParsedSwapSummary } from "./rpc_types";
-import { DecimalizedAmount, MATH_DECIMAL_PLACES, fromTokenAmount } from "../decimalized/decimalized_amount";
-import { dDiv, dNegate, dSub } from "../decimalized/decimalized_math";
+import { UserAddress } from "../crypto/wallet";
+import { DecimalizedAmount, MATH_DECIMAL_PLACES, dDiv, dNegate, dSub, fromTokenAmount } from "../decimalized";
 import { Env } from "../env";
 import { Position, PositionRequest, Swappable, isPosition, isPositionRequest } from "../positions/positions";
-import { sleep } from "../util/sleep";
-import { UserAddress } from "../crypto/wallet";
-import { safe } from "../util/safe";
+import { deriveTokenAccount } from "../tokens/token_info";
+import { safe, sleep } from "../util";
+import { ParsedSwapSummary, PreparseConfirmedSwapResult, PreparseSwapResult, SwapExecutionError, SwapSummary } from "./rpc_types";
 
 
 // This may come in handy at some point: https://github.com/cocrafts/walless/blob/a05d20f8275c8167a26de976a3b6701d64472765/apps/wallet/src/engine/runners/solana/history/swapHistory.ts#L85
@@ -118,9 +117,10 @@ function calculateTokenBalanceChange(parsedTransaction : ParsedTransactionWithMe
 }
 
 function findWithMintAndPubKey(tokenBalances : TokenBalance[], accountKeys : string[], tokenAddress : string, userAddress : UserAddress) {
+    const tokenAccountAddress = deriveTokenAccount(tokenAddress, userAddress).toBase58();
     const tokenBalance = tokenBalances
-        .map(e => { return { ...e, address: accountKeys[e.accountIndex] } })
-        .find(e => (e.address === userAddress.address) && (e.mint === tokenAddress));
+        .map(e => { return { ...e, accountAddress: accountKeys[e.accountIndex] } })
+        .find(e => (e.accountAddress === tokenAccountAddress) && (e.mint === tokenAddress));
     return tokenBalance;
 }
 

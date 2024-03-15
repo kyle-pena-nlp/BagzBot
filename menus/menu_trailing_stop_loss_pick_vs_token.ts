@@ -1,8 +1,8 @@
-import { CallbackData } from "./callback_data";
 import { TokenNameAndAddress } from "../durable_objects/user/model/token_name_and_address";
-import { Menu, MenuCapabilities } from "./menu";
-import { getVsTokenInfo } from "../tokens/vs_tokens";
 import { CallbackButton } from "../telegram/callback_button";
+import { getVsTokenInfo } from "../tokens/vs_tokens";
+import { CallbackData } from "./callback_data";
+import { Menu, MenuCapabilities } from "./menu";
 import { MenuCode } from "./menu_code";
 
 export class MenuTrailingStopLossPickVsToken extends Menu<TokenNameAndAddress> implements MenuCapabilities {

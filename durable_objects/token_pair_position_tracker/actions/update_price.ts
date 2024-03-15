@@ -1,4 +1,4 @@
-import { DecimalizedAmount } from "../../../decimalized/decimalized_amount";
+import { DecimalizedAmount } from "../../../decimalized";
 
 export interface UpdatePriceRequest {
     price : DecimalizedAmount

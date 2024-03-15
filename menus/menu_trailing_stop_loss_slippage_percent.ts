@@ -1,6 +1,6 @@
+import { CallbackButton } from "../telegram/callback_button";
 import { CallbackData } from "./callback_data";
 import { Menu, MenuCapabilities } from "./menu";
-import { CallbackButton } from "../telegram/callback_button";
 import { MenuCode } from "./menu_code";
 
 export class MenuTrailingStopLossSlippagePercent extends Menu<number> implements MenuCapabilities {

@@ -1,10 +1,10 @@
-import { CallbackData } from "./callback_data";
 import { Env } from "../env";
+import { CallbackData } from "./callback_data";
 import { MenuCode } from "./menu_code";
 
-import { makeJSONRequest } from "../util/http_helpers";
-import { escapeTGText, makeTelegramBotUrl  } from "../telegram/telegram_helpers";
 import { CallbackButton } from "../telegram/callback_button";
+import { escapeTGText, makeTelegramBotUrl } from "../telegram/telegram_helpers";
+import { makeJSONRequest } from "../util";
 
 export enum MenuDisplayMode {
 	UpdateMenu,

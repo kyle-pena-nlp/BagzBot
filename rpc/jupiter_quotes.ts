@@ -1,12 +1,12 @@
 
-import { getVsTokenDecimalsMultiplier, getVsTokenInfo } from "../tokens/vs_tokens";
+import { DecimalizedAmount } from "../decimalized";
+import { Env } from "../env";
 import { Position, PositionRequest } from "../positions/positions";
-import { DecimalizedAmount } from "../decimalized/decimalized_amount";
 import { Quote } from "../positions/quote";
+import { TokenInfo } from "../tokens/token_info";
+import { getVsTokenDecimalsMultiplier, getVsTokenInfo } from "../tokens/vs_tokens";
 import { JupiterQuoteAPIParams, SwapRoute } from "./jupiter_types";
 import { GetQuoteFailure, isGetQuoteFailure } from "./rpc_types";
-import { Env } from "../env";
-import { TokenInfo } from "../tokens/token_info";
 
 export async function quoteBuy(positionRequest : PositionRequest,  env : Env) : Promise<GetQuoteFailure|Quote> {
     const swapRoute = await getBuyTokenSwapRoute(positionRequest, env);

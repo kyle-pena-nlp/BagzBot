@@ -1,4 +1,4 @@
-import { toFriendlyString } from "../decimalized/decimalized_amount";
+import { toFriendlyString } from "../decimalized";
 import { PositionRequestAndQuote } from "../positions/position_request_and_quote";
 import { isGetQuoteFailure } from "../rpc/rpc_types";
 

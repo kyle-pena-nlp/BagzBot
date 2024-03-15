@@ -1,16 +1,14 @@
 import { Connection, SignatureStatus, VersionedTransaction } from "@solana/web3.js";
-import { GetQuoteFailure, 
-    PreparseSwapResult, 
-    TransactionPreparationFailure, 
-    TransactionExecutionError,
-    isGetQuoteFailure, 
-    isTransactionPreparationFailure, 
-    TransactionExecutionErrorCouldntConfirm} from "./rpc_types";
-import { sleep } from "../util/sleep";
-import { getLastValidBlockheight, getLatestBlockheight } from "./rpc_common";
-import { Env } from "../env";
 import * as bs58 from "bs58";
 import { Buffer } from "node:buffer";
+import { Env } from "../env";
+import { sleep } from "../util";
+import { getLastValidBlockheight, getLatestBlockheight } from "./rpc_common";
+import {
+    PreparseSwapResult,
+    TransactionExecutionError,
+    TransactionExecutionErrorCouldntConfirm
+} from "./rpc_types";
 
 // TODO: export async function retryConfirmation()
 

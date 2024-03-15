@@ -1,5 +1,5 @@
-import { Menu, MenuCapabilities } from "./menu";
 import { CallbackButton } from "../telegram/callback_button";
+import { Menu, MenuCapabilities } from "./menu";
 
 export class MenuTODO extends Menu<undefined> implements MenuCapabilities {
     renderText(): string {

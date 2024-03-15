@@ -1,6 +1,6 @@
 import { UserData } from "../durable_objects/user/model/user_data";
-import { Menu, MenuCapabilities } from "./menu";
 import { CallbackButton } from "../telegram/callback_button";
+import { Menu, MenuCapabilities } from "./menu";
 import { MenuCode } from "./menu_code";
 
 export class MenuMain extends Menu<UserData> implements MenuCapabilities {

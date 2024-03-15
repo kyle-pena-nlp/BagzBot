@@ -7,6 +7,7 @@ const keysToLookFor = [
     'positionID',
     'address',
     'symbol',
+    'status',
     'description',
     'purpose',
     'length',
@@ -29,7 +30,7 @@ export class BotError {
     }
 }
 
-function digest(x : any, memo : WeakMap<object,string>) {
+function digest(x : any, memo : WeakMap<object,string>) : string {
     if (x == null || 
         typeof x === 'string' || 
         typeof x == 'number' || 
@@ -46,7 +47,7 @@ function digest(x : any, memo : WeakMap<object,string>) {
             throw new Error("Programmer error.");
         }
         const value = x[key];
-        const valueDigest = (memo.has(value)) ? memo.get(value) : digest(value, memo);
+        const valueDigest = (memo.has(value)) ? memo.get(value)!! : digest(value, memo);
         memo.set(value,valueDigest);
         digestParts.push(`[${key}]: [${valueDigest}]`);
     }   
@@ -57,9 +58,13 @@ function digest(x : any, memo : WeakMap<object,string>) {
     return digestParts.join(" :: ");
 }
 
-export function logIt(x : any, level : 'error'|'info'|'debug') {
+function logIt(xs : any[], level : 'error'|'info'|'debug') {
     const memo = new WeakMap<object,string>();
-    const digestString = digest(x, memo);
+    const digestStrings : string[] = [];
+    for (const x of xs) {
+        digestStrings.push(digest(x, memo));
+    }
+    const digestString = digestStrings.join(" // ");
     const now = Date.now();
     const logMsg = `${now} :: ${digestString}`;
     switch(level) {
@@ -74,6 +79,14 @@ export function logIt(x : any, level : 'error'|'info'|'debug') {
     }
 }
 
-export function logError(x : any) {
-    logIt(x, 'error');
+export function logError(...xs : any[]) {
+    logIt(xs, 'error');
+}
+
+export function logInfo(...xs : any[]) {
+    logIt(xs, 'info');
+}
+
+export function logDebug(...xs : any[]) {
+    logIt(xs, 'debug');
 }

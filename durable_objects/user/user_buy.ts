@@ -1,10 +1,10 @@
 
-import { PositionRequest, Position, PositionStatus } from "../../positions/positions";
-import { Env } from "../../env";
-import { importNewPosition as importNewPositionIntoPriceTracker} from "../token_pair_position_tracker/token_pair_position_tracker_DO_interop";
 import { Wallet } from "../../crypto/wallet";
+import { Env } from "../../env";
+import { Position, PositionRequest, PositionStatus } from "../../positions/positions";
 import { SwapSummary } from "../../rpc/rpc_types";
 import { TGStatusMessage } from "../../telegram/telegram_status_message";
+import { importNewPosition as importNewPositionIntoPriceTracker } from "../token_pair_position_tracker/token_pair_position_tracker_DO_interop";
 import { UserPositionTracker } from "./trackers/user_position_tracker";
 import { swap } from "./user_swap";
 /* markPositionAsOpen, renegeOpenPosition */
@@ -21,7 +21,7 @@ export async function buy(positionRequest: PositionRequest,
         const newPosition = convertToPosition(positionRequest, parsedSwapSummary.swapSummary);
         userPositionTracker.storePositions([newPosition]);
         await importNewPositionIntoPriceTracker(newPosition, env);
-        TGStatusMessage.update(notificationChannel, `Peak Price is now being tracked. Position will be unwound when price dips below ${positionRequest.triggerPercent}% of peak.`, true);    
+        TGStatusMessage.queue(notificationChannel, `Peak Price is now being tracked. Position will be unwound when price dips below ${positionRequest.triggerPercent}% of peak.`, true);    
     }
 
     await TGStatusMessage.finalize(notificationChannel);

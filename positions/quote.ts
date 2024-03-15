@@ -1,5 +1,5 @@
-import { TokenInfo } from "../tokens/token_info"
-import { DecimalizedAmount } from "../decimalized/decimalized_amount";
+import { DecimalizedAmount } from "../decimalized";
+import { TokenInfo } from "../tokens/token_info";
 
 export interface Quote {
     inToken : TokenInfo

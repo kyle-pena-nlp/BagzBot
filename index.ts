@@ -1,18 +1,17 @@
 
 import { Env } from "./env";
-import { makeFakeFailedRequestResponse, makeSuccessResponse } from "./util/http_helpers";
 import { TelegramWebhookInfo } from "./telegram/telegram_webhook_info";
+import { Result, makeFakeFailedRequestResponse, makeSuccessResponse } from "./util";
 import { Worker } from "./worker/worker";
-import { Result } from "./util/result";
 
 /* Durable Objects */
-import { UserDO } from "./durable_objects/user/user_DO";
-import { TokenPairPositionTrackerDO } from "./durable_objects/token_pair_position_tracker/token_pair_position_tracker_DO";
 import { PolledTokenPairListDO } from "./durable_objects/polled_token_pair_list/polled_token_pair_list_DO";
+import { TokenPairPositionTrackerDO } from "./durable_objects/token_pair_position_tracker/token_pair_position_tracker_DO";
+import { UserDO } from "./durable_objects/user/user_DO";
 
 
 /* Export of imported DO's (required by wrangler) */
-export { UserDO, TokenPairPositionTrackerDO, PolledTokenPairListDO }
+export { PolledTokenPairListDO, TokenPairPositionTrackerDO, UserDO };
 
 enum ERRORS {
     UNHANDLED_EXCEPTION = 500,

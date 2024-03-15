@@ -1,6 +1,5 @@
 import { TokenAmount } from "@solana/web3.js";
-import { tryParseFloat } from "../util/numbers";
-import { Structural } from "../util/structural";
+import { Structural } from "../util";
 
 export const MATH_DECIMAL_PLACES = 6;
 

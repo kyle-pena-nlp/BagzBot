@@ -1,5 +1,5 @@
 import { Env } from "../../env";
-import { makeJSONRequest, makeRequest } from "../../util/http_helpers";
+import { makeJSONRequest, makeRequest } from "../../util";
 import { GetTokenInfoRequest, GetTokenInfoResponse } from "./actions/get_token_info";
 
 export enum PolledTokenPairListDOFetchMethod {

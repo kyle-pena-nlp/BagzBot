@@ -1,8 +1,8 @@
-import  { Env } from "../env";
+import { Env } from "../env";
 import { MenuCode } from "../menus";
 import { CallbackData } from "../menus/callback_data";
+import { makeFakeFailedRequestResponse, makeJSONRequest, makeSuccessResponse } from "../util";
 import { CallbackButton } from "./callback_button";
-import { makeFakeFailedRequestResponse, makeJSONRequest, makeJSONResponse, makeSuccessResponse } from "../util/http_helpers";
 
 export interface DeleteTGMessageResponse {
     success: boolean

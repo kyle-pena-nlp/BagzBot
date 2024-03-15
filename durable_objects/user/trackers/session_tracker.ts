@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { Structural } from "../../../util/structural";
+import { Structural } from "../../../util";
 
 /*
     This class tracks 'Session State', which is values associated with a message (like a menu).

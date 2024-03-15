@@ -1,24 +1,22 @@
 import { Env } from "../../env";
 import { Position, PositionRequest } from "../../positions/positions";
 import { TokenInfo } from "../../tokens/token_info";
-import { makeJSONRequest, makeRequest } from "../../util/http_helpers";
+import { Structural, groupIntoMap, makeJSONRequest, makeRequest } from "../../util";
+import { AutomaticallyClosePositionsRequest, AutomaticallyClosePositionsResponse } from "../token_pair_position_tracker/actions/automatically_close_positions";
 import { DeleteSessionRequest } from "./actions/delete_session";
+import { GenerateWalletRequest, GenerateWalletResponse } from "./actions/generate_wallet";
+import { GetPositionRequest } from "./actions/get_position";
 import { GetSessionValuesRequest, GetSessionValuesWithPrefixRequest, GetSessionValuesWithPrefixResponse, SessionValuesResponse } from "./actions/get_session_values";
 import { GetUserDataRequest } from "./actions/get_user_data";
+import { GetWalletDataRequest, GetWalletDataResponse } from "./actions/get_wallet_data";
+import { ListPositionsRequest } from "./actions/list_positions";
 import { ManuallyClosePositionRequest, ManuallyClosePositionResponse } from "./actions/manually_close_position";
+import { OpenPositionRequest, OpenPositionResponse } from "./actions/open_new_position";
+import { DefaultTrailingStopLossRequestRequest } from "./actions/request_default_position_request";
 import { StoreSessionValuesRequest, StoreSessionValuesResponse } from "./actions/store_session_values";
 import { UserInitializeRequest, UserInitializeResponse } from "./actions/user_initialize";
 import { SessionKey } from "./model/session";
 import { UserData } from "./model/user_data";
-import { ListPositionsRequest } from "./actions/list_positions";
-import { DefaultTrailingStopLossRequestRequest } from "./actions/request_default_position_request";
-import { OpenPositionRequest, OpenPositionResponse } from "./actions/open_new_position";
-import { GetPositionRequest } from "./actions/get_position";
-import { AutomaticallyClosePositionsRequest, AutomaticallyClosePositionsResponse } from "../token_pair_position_tracker/actions/automatically_close_positions";
-import { groupIntoMap } from "../../util/collections";
-import { GenerateWalletRequest, GenerateWalletResponse } from "./actions/generate_wallet";
-import { GetWalletDataRequest, GetWalletDataResponse } from "./actions/get_wallet_data";
-import { Structural } from "../../util/structural";
 
 export enum UserDOFetchMethod {
 	get = "get",

@@ -1,4 +1,4 @@
-import { Structural } from "../../../util/structural";
+import { Structural } from "../../../util";
 
 export interface StoreSessionValuesRequest {
 	messageID: number

@@ -1,9 +1,9 @@
 import { PublicKey, Signer, VersionedTransaction } from "@solana/web3.js";
-import { TransactionPreparationFailure, isTransactionPreparationFailure } from "./rpc_types";
-import { getRecentBlockhash } from "./rpc_common";
 import * as bs58 from "bs58";
 import { Wallet } from "../crypto/wallet";
 import { Env } from "../env";
+import { getRecentBlockhash } from "./rpc_common";
+import { TransactionPreparationFailure, isTransactionPreparationFailure } from "./rpc_types";
 
 export async function signTransaction(swapTransaction : Buffer|TransactionPreparationFailure, wallet : Wallet, env : Env) : Promise<VersionedTransaction|TransactionPreparationFailure> {
     if (isTransactionPreparationFailure(swapTransaction)) {

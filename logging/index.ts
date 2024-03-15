@@ -1,3 +1,3 @@
-import { logError, logIt, BotError } from "./logging";
+import { BotError, logDebug, logError, logInfo } from "./logging";
 
-export { logError, logIt, BotError };
+export { BotError, logDebug, logError, logInfo };
