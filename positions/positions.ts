@@ -15,7 +15,7 @@ export enum PositionStatus {
 
 
 export interface Position {
-	[ key : string ] : Structural
+	readonly [ key : string ] : Structural
 	userID : number
 	chatID : number
 	positionID : string
@@ -54,7 +54,7 @@ export interface PositionPreRequest extends BasePositionRequest {
 }
 
 export interface PositionRequest extends BasePositionRequest {
-	[ key : string ] : Structural
+	readonly [ key : string ] : Structural
 	token : TokenInfo
 	vsToken : TokenInfo
 };

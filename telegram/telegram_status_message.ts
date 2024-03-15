@@ -31,7 +31,7 @@ export class TGStatusMessage {
         env : Env, 
         parseMode : 'HTML'|'MarkdownV2' = 'HTML') : UpdateableNotification {
         const promiseChain = sendMessageToTG(chatID, message, env, parseMode, dismissable).then(sentMsgInfo => {
-            if (sentMsgInfo.success) {
+            if (!sentMsgInfo.success) {
                 return { chatID: chatID, env : env };
             }
             const messageID = sentMsgInfo.messageID!!;
@@ -40,6 +40,18 @@ export class TGStatusMessage {
         return {
             promiseChain: promiseChain
         }
+    }
+    static replaceWithNotification(
+        messageID : number,
+        message : string,
+        dismissable : boolean,
+        chatID : number,
+        env : Env,
+        parseMode : 'HTML'|'MarkdownV2' = 'HTML') : UpdateableNotification {
+            const statusMessage = new TGStatusMessage(message,parseMode,dismissable,messageID,chatID,env);
+            return {
+                promiseChain: statusMessage.send()
+            };
     }
     /* Append a status message to a queue of status messages, in a non-blocking fashion, with 500ms pauses between messages. */
     static async update(statusMessage : UpdateableNotification, 
@@ -53,6 +65,9 @@ export class TGStatusMessage {
                 return TGStatusMessage.createAndSend(message, dismissable, m.chatID, m.env).promiseChain;
             }
         }).then(pause(500));
+    }
+    static async finalize(statusMessage : UpdateableNotification) {
+        await statusMessage.promiseChain;
     }
     /* Remove a message in a non-blocking fashion. */
     static async remove(statusMessage : UpdateableNotification) {

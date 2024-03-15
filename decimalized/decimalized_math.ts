@@ -20,6 +20,10 @@ export function dSub(a : DecimalizedAmount, b : DecimalizedAmount) : Decimalized
     };
 }
 
+export function dNegate(x : DecimalizedAmount) : DecimalizedAmount {
+    return dSub({ tokenAmount: "0", decimals : 1}, x);
+}
+
 export function dMult(a : DecimalizedAmount, b : DecimalizedAmount) : DecimalizedAmount {
     const decimals = Math.max(a.decimals, b.decimals);
     a = convertToLargerDecimals(a, decimals);

@@ -6,7 +6,7 @@ export const MATH_DECIMAL_PLACES = 6;
 
 /* See decimalized_math.ts for operations on this type */
 export interface DecimalizedAmount {
-    [ key : string ] : Structural
+    readonly [ key : string ] : Structural
     tokenAmount : string, // amount * 10^decimals.  String because maybe too big for JS?
     decimals : number
 }

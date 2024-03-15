@@ -10,6 +10,7 @@ import { sleep } from "../util/sleep";
 import { getLastValidBlockheight, getLatestBlockheight } from "./rpc_common";
 import { Env } from "../env";
 import * as bs58 from "bs58";
+import { Buffer } from "node:buffer";
 
 // TODO: export async function retryConfirmation()
 
@@ -225,6 +226,9 @@ function parseSwapExecutionError(err : any, rawSignedTx : VersionedTransaction, 
             const errorCode = instructionError[1].Custom;
             if(errorCode === parseInt(env.JUPITER_SWAP_PROGRAM_SLIPPAGE_ERROR_CODE,10)) {
                 return TransactionExecutionError.SlippageToleranceExceeded;
+            }
+            else if (errorCode === parseInt(env.JUPITER_SWAP_PROGRAM_FEE_ACCOUNT_NOT_INITIALIZED_ERROR_CODE,10)) {
+                return TransactionExecutionError.TokenFeeAccountNotInitialized;
             }
         }
         catch {

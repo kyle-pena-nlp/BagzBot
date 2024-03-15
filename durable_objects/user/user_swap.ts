@@ -1,31 +1,25 @@
-import { sendMessageToTG } from "../../telegram/telegram_helpers";
-import { PositionRequest, Position, PositionStatus, Swappable, isPositionRequest, isPosition, getSwapOfXDescription } from "../../positions/positions";
+import { Swappable, isPositionRequest, isPosition, getSwapOfXDescription } from "../../positions/positions";
 import { Env } from "../../env";
 import { getBuyTokenSwapRoute, getSellTokenSwapRoute } from "../../rpc/jupiter_quotes";
 import { serializeSwapRouteTransaction } from "../../rpc/jupiter_serialize";
 import { signTransaction } from "../../rpc/rpc_sign_tx";
 import { executeRawSignedTransaction } from "../../rpc/rpc_execute_signed_transaction";
-import { parseBuySwapTransaction, parseSellSwapTransaction, waitForBlockFinalizationAndParseBuy } from "../../rpc/rpc_parse";
-import { importNewPosition as importNewPositionIntoPriceTracker} from "../token_pair_position_tracker/token_pair_position_tracker_DO_interop";
+import { parseBuySwapTransaction, parseSellSwapTransaction, waitForBlockFinalizationAndParse } from "../../rpc/rpc_parse";
 import { GetQuoteFailure, PreparseSwapResult, TransactionExecutionError, TransactionExecutionErrorCouldntConfirm, UnknownTransactionParseSummary, isGetQuoteFailure, isTransactionPreparationFailure } from "../../rpc/rpc_types";
-import { Wallet } from "../../crypto/wallet";
+import { UserAddress, Wallet, toUserAddress } from "../../crypto/wallet";
 import { Connection, VersionedTransaction } from "@solana/web3.js";
 import { PreparseConfirmedSwapResult, 
     PreparseUnconfirmedSwapResult, 
     ParsedSwapSummary, 
-    isTransactionExecutionError, 
-    isTransactionExecutionErrorCouldntConfirm, 
     SwapExecutionErrorParseSummary, 
     isFailed, 
     isFailedParseSwapSummary, 
     isUnconfirmed, 
     isConfirmed, 
     isUnknownTransactionParseSummary, 
-    SwapExecutionError, 
-    SwapSummary } from "../../rpc/rpc_types";
+    SwapExecutionError } from "../../rpc/rpc_types";
 import * as bs58 from "bs58";
 import { TGStatusMessage, UpdateableNotification } from "../../telegram/telegram_status_message";
-import { UserPositionTracker } from "./trackers/user_position_tracker";
 import { SwapRoute } from "../../rpc/jupiter_types";
 /* markPositionAsOpen, renegeOpenPosition */
 
@@ -48,8 +42,9 @@ export async function swap(s: Swappable,
     }    
 
     // serialize swap route 
-    TGStatusMessage.update(notificationChannel, `Serialzing swap`, false);
-    const txBuffer = await serializeSwapRouteTransaction(swapRoute, wallet.publicKey, env).catch(r => null);
+    TGStatusMessage.update(notificationChannel, `Serializing swap`, false);
+    const includeReferralPlatformFee = shouldIncludeReferralPlatformFee(s);
+    const txBuffer = await serializeSwapRouteTransaction(swapRoute, wallet.publicKey, includeReferralPlatformFee, env).catch(r => null);
     if (txBuffer == null || isTransactionPreparationFailure(txBuffer)) {
         TGStatusMessage.update(notificationChannel, `Could not prepare transaction - ${swapOfX} failed.`, true);
         return;
@@ -68,21 +63,32 @@ export async function swap(s: Swappable,
     const signature = bs58.encode(signedTx.signatures[0]);
 
     // attempt to execute tx
-    TGStatusMessage.update(notificationChannel, `Executing transaction`, false);
+    TGStatusMessage.update(notificationChannel, `Executing transaction... (this could take a moment)`, false);
     let maybeExecutedTx = await executeRawSignedTransaction(s.positionID, signedTx, connection, env, logger)
         .catch(r => makeUnknownStatusResult(s, signedTx));
     
-    const executionStatusMsg = sendMessageToUserAboutExecutionStatus(s, maybeExecutedTx, env);
-    TGStatusMessage.update(notificationChannel, executionStatusMsg, false);
+    const executionStatusMsg = getMessageToUserAboutExecutionStatus(s, maybeExecutedTx, env); 
     
     // if failed, bail out and tell user
     if (isFailed(maybeExecutedTx)) {
+        TGStatusMessage.update(notificationChannel, executionStatusMsg, true);
         return;
+    }
+    else {
+        TGStatusMessage.update(notificationChannel, executionStatusMsg, false);
     }
     
     // if unconfirmed (but possiblt executed), wait and then attempt to parse
-    TGStatusMessage.update(notificationChannel, `Parsing transaction`, false);
-    const parsedSwapSummary = await getParsedSwapSummary(s, maybeExecutedTx, signature, connection, env);
+    
+    const userAddress = toUserAddress(wallet);
+    let parsedSwapSummary : ParsedSwapSummary|null = null;
+    if (isUnconfirmed(maybeExecutedTx)) {
+        TGStatusMessage.update(notificationChannel, `Transaction unconfirmed.  Waiting for block finalization and will reattempt confirmation.`, false);
+        parsedSwapSummary = await waitForBlockFinalizationAndParse(s, signature, userAddress, connection, env);
+    }
+    else {
+        parsedSwapSummary = await parseSwapTransaction(s, maybeExecutedTx, userAddress, connection, env)
+    }
     
     // if the tx couldn't be found, then assume the tx was dropped and tell the user.
     if (isUnknownTransactionParseSummary(parsedSwapSummary)) {
@@ -99,6 +105,18 @@ export async function swap(s: Swappable,
     }
 
     return parsedSwapSummary;
+}
+
+function shouldIncludeReferralPlatformFee(s : Swappable) : boolean {
+    if (isPosition(s)) {
+        return true;
+    }
+    else if (isPositionRequest(s)) {
+        return false;
+    }
+    else {
+        throw new Error("Programmer Error.");
+    }
 }
 
 async function getSwapRoute(s : Swappable, env : Env) : Promise<SwapRoute|GetQuoteFailure> {
@@ -136,33 +154,26 @@ function makeSwapSummaryFailedMessage(parsedSwapResult : SwapExecutionErrorParse
 async function getParsedSwapSummary(s: Swappable, 
     maybeExecutedTx : PreparseConfirmedSwapResult|PreparseUnconfirmedSwapResult, 
     signature: string,
+    userAddress : UserAddress,
     connection : Connection,
     env : Env) : Promise<ParsedSwapSummary> {
 
     // if unconfirmed, retry parsing after waiting for current block to finalize
     if (isUnconfirmed(maybeExecutedTx)) {
-        const unconfirmedMsg = makeTransactionUnconfirmedMessage(s, maybeExecutedTx.status);
-        sendMessageToTG(s.chatID, unconfirmedMsg, env);
-        return waitForBlockFinalizationAndParseBuy(s, signature, connection, env);
-    }
-
-    if (!isConfirmed(maybeExecutedTx)) {
-        throw new Error("Programmer error.");
+        return waitForBlockFinalizationAndParse(s, signature, userAddress, connection, env);
     }
 
     // if confirmed
-    const confirmedMsg = makeTransactionExecutedMessage(s);
-    sendMessageToTG(s.chatID, confirmedMsg, env);
-    return parseSwapTransaction(s, maybeExecutedTx, connection, env)
+    return parseSwapTransaction(s, maybeExecutedTx, userAddress, connection, env)
 
 }
 
-function parseSwapTransaction(s : Swappable, confirmedTx : PreparseConfirmedSwapResult, connection : Connection, env : Env) {
+function parseSwapTransaction(s : Swappable, confirmedTx : PreparseConfirmedSwapResult, userAddress : UserAddress, connection : Connection, env : Env) {
     if (isPositionRequest(s)) {
-        return parseBuySwapTransaction(s, confirmedTx, connection, env);
+        return parseBuySwapTransaction(s, confirmedTx, userAddress, connection, env);
     }
     else if (isPosition(s)) {
-        return parseSellSwapTransaction(s, confirmedTx, connection, env);
+        return parseSellSwapTransaction(s, confirmedTx, userAddress, connection, env);
     }
     else {
         throw new Error("Programmer error.");
@@ -180,7 +191,7 @@ function makeUnknownStatusResult(s: Swappable, signedTx : VersionedTransaction) 
 }
 
 
-function sendMessageToUserAboutExecutionStatus(s: Swappable, executedTx : PreparseSwapResult, env : Env) : string {
+function getMessageToUserAboutExecutionStatus(s: Swappable, executedTx : PreparseSwapResult, env : Env) : string {
     if (isFailed(executedTx)) {
         const errorMsg = makeTransactionFailedErrorMessage(s, executedTx.status);
         return errorMsg;
@@ -218,6 +229,8 @@ function makeTransactionFailedErrorMessage(s: Swappable, status : TransactionExe
             return `${swapOfX} failed.`
         case TransactionExecutionError.CouldNotDetermineMaxBlockheight:
             return `${swapOfX} failed because a 3rd party service is down.`;
+        case TransactionExecutionError.TokenFeeAccountNotInitialized:
+            return `${swapOfX} failed because of a configuration problemwith the bot.`
         default:
             throw new Error("Programmer error.");
     }
@@ -234,7 +247,7 @@ function makeTransactionUnconfirmedMessage(s: Swappable, status: TransactionExec
         case TransactionExecutionErrorCouldntConfirm.CouldNotConfirmTooManyExceptions:
             return `${swapOfXCaps} could not be confirmed.  ${weWillRetry}.`;
         case TransactionExecutionErrorCouldntConfirm.TimeoutCouldNotConfirm:
-            return `${swapOfXCaps} could be confirmed within time limit. ${weWillRetry}.`;
+            return `${swapOfXCaps} could not be confirmed within time limit. ${weWillRetry}.`;
         case TransactionExecutionErrorCouldntConfirm.Unknown:
             return `Something went wrong and ${swapOfX} could not be confirmed.  ${weWillRetry}.`;
         default:
@@ -243,7 +256,6 @@ function makeTransactionUnconfirmedMessage(s: Swappable, status: TransactionExec
 }
 
 function makeTransactionExecutedMessage(s: Swappable) {
-    const swapOfX = getSwapOfXDescription(s);
+    const swapOfX = getSwapOfXDescription(s, true);
     return `${swapOfX} successful.`;
 }
-

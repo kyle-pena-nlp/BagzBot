@@ -40,7 +40,20 @@ export class PolledTokenPairListDO {
         this.tokenTracker.initialize(storageEntries);        
     }
 
+    async flushToStorage() {
+        await Promise.allSettled([
+            this.polledTokenPairTracker.flushToStorage(this.state.storage),
+            this.tokenTracker.flushToStorage(this.state.storage)
+        ]);
+    }
+
     async fetch(request : Request) : Promise<Response> {
+        const response = await this._fetch(request);
+        await this.flushToStorage();
+        return response;
+    }
+
+    async _fetch(request : Request) : Promise<Response> {
         const [method,jsonRequestBody] = await this.validateFetchRequest(request);
         switch(method) {
             case PolledTokenPairListDOFetchMethod.initialize:

@@ -4,7 +4,7 @@ export async function sleep(ms : number){
 
 export function pause<T>(ms : number) : (t : T) => Promise<T> {
     return async (t : T) => {
-        sleep(ms);
+        await sleep(ms);
         return t;
     };
 }

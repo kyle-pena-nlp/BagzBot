@@ -1,4 +1,5 @@
 import { DurableObjectState } from "@cloudflare/workers-types";
+import { ChangeTrackedValue } from "../../util/change_tracked_value";
 import { UserData } from "./model/user_data";
 import { ManuallyClosePositionRequest, ManuallyClosePositionResponse } from "./actions/manually_close_position";
 import { UserInitializeRequest, UserInitializeResponse } from "./actions/user_initialize";
@@ -26,7 +27,6 @@ import { TokenInfo } from "../../tokens/token_info";
 import { ListPositionsRequest } from "./actions/list_positions";
 import { TokenPairPositionTrackerInitializeRequest } from "../token_pair_position_tracker/actions/initialize_token_pair_position_tracker";
 import { GetPositionRequest } from "./actions/get_position";
-import { getTokenInfo } from "../polled_token_pair_list/polled_token_pair_list_DO_interop";
 import { GetWalletDataRequest, GetWalletDataResponse } from "./actions/get_wallet_data";
 import { buy } from "./user_buy";
 import { sell } from "./user_sell";
@@ -39,13 +39,13 @@ export class UserDO {
     state: DurableObjectState;
 
     // user's ID
-    telegramUserID : number|null;
+    telegramUserID : ChangeTrackedValue<number|null> = new ChangeTrackedValue<number|null>('telegramUserID', null);
 
     // user's name
-    telegramUserName : string|null;
+    telegramUserName : ChangeTrackedValue<string|null> = new ChangeTrackedValue<string|null>('telegramUserName', null);
 
     // the user's wallet.  TODO: encrypt private keys
-    wallet : Wallet|null;
+    wallet : ChangeTrackedValue<Wallet|null> = new ChangeTrackedValue<Wallet|null>('wallet', null);
 
     // the default values for a trailing sotp loss
     defaultTrailingStopLossRequest : PositionRequest;
@@ -60,9 +60,6 @@ export class UserDO {
         // persistent state object which reaches eventual consistency
         this.env                = env;
         this.state              = state;
-        this.telegramUserID     = null;
-        this.telegramUserName   = null;
-        this.wallet             = null;
         // TODO: allow user to update defaults in 'Options' menu
         this.defaultTrailingStopLossRequest = {
             userID: -1,
@@ -72,7 +69,7 @@ export class UserDO {
             token : getVsTokenInfo('USDC')!!,
             vsToken : getVsTokenInfo('SOL')!!,
             vsTokenAmt : parseFloat(env.DEFAULT_TLS_VS_TOKEN_FRACTION),
-            slippagePercent : 0.5,
+            slippagePercent : 2.0,
             triggerPercent : 5,
             retrySellIfSlippageExceeded : true            
         };
@@ -83,30 +80,39 @@ export class UserDO {
 
     async initializeFromPersistence() {
         const storage = await this.state.storage.list();
-        for (const key of storage.keys()) {
-            switch(key) {
-                case 'telegramUserID':
-                    this.telegramUserID = storage.get(key) as number|null;
-                    break;
-                case 'telegramUserName':
-                    this.telegramUserName = storage.get(key) as string|null;
-                    break;
-                case 'wallet':
-                    this.wallet = storage.get(key) as Wallet|null;
-                    break;
-            }
-        }
+        this.telegramUserID.initialize(storage);
+        this.telegramUserName.initialize(storage);
+        this.wallet.initialize(storage);
         this.sessionTracker.initialize(storage);
         this.userPositionTracker.initialize(storage);
     }
 
+    async flushToStorage() {
+        await Promise.allSettled([
+            this.telegramUserID.flushToStorage(this.state.storage),
+            this.telegramUserName.flushToStorage(this.state.storage),
+            this.wallet.flushToStorage(this.state.storage),
+            this.sessionTracker.flushToStorage(this.state.storage),
+            this.userPositionTracker.flushToStorage(this.state.storage)
+        ]);
+    }
+
     initialized() : boolean {
-        return (this.telegramUserID != null) && (this.telegramUserName != null);
+        return (this.telegramUserID.value != null) && (this.telegramUserName.value != null);
     }
 
     async fetch(request : Request) : Promise<Response> {
-        const [method,jsonRequestBody,response] = await this._fetch(request);
-        return response;
+        try {
+            const [method,jsonRequestBody,response] = await this._fetch(request);
+            return response;
+        }
+        catch {
+            return makeSuccessResponse();
+        }
+        finally {
+            this.flushToStorage();
+        }
+
     }
 
     async _fetch(request : Request) : Promise<[UserDOFetchMethod,any,Response]> {
@@ -260,45 +266,33 @@ export class UserDO {
         if (this.initialized()) {
             return makeSuccessResponse("User already initialized");
         }
-        this.telegramUserID = userInitializeRequest.telegramUserID;
-        this.telegramUserName = userInitializeRequest.telegramUserName;
-        return await this.state.storage.put({ 
-            "telegramUserID": this.telegramUserID, 
-            "telegramUserName": this.telegramUserName 
-        }).then(() => {
-            return makeJSONResponse<UserInitializeResponse>({});
-        });
+        this.telegramUserID.value = userInitializeRequest.telegramUserID;
+        this.telegramUserName.value = userInitializeRequest.telegramUserName;
+        return makeJSONResponse<UserInitializeResponse>({});
     }
 
     async handleGenerateWallet(generateWalletRequest : GenerateWalletRequest) : Promise<Response> {
-        if (!this.wallet) {
+        if (!this.wallet.value) {
             const { publicKey, privateKey } = await generateEd25519Keypair();
-            this.wallet = {
+            this.wallet.value = {
                 publicKey: publicKey,
                 privateKey: privateKey
             };
-            return await this.state.storage.put("wallet",this.wallet).then(() => {
-                return makeJSONResponse<GenerateWalletResponse>({ success: true });
-            }).catch(() => {
-                return makeJSONResponse<GenerateWalletResponse>({ success: false });
-            });
         }
         return makeJSONResponse<GenerateWalletResponse>({ success: true });
     }
 
     async handleGetWalletData(request : GetWalletDataRequest) : Promise<Response> {
         return makeJSONResponse<GetWalletDataResponse>({
-            address : this.wallet!!.publicKey
+            address : this.wallet.value!!.publicKey
         });
     }
 
     async handleOpenNewPosition(openPositionRequest : OpenPositionRequest) : Promise<Response> {
         // fire and forget (async callback will handle success and failure cases for swap)
-        const positionRequest = openPositionRequest.positionRequest;
-        const chatID = openPositionRequest.chatID;
-        const tokenInfo = (await getTokenInfo(positionRequest.token.address, this.env)).tokenInfo!!;        
+        const positionRequest = openPositionRequest.positionRequest;       
         // deliberate fire-and-forget.  callbacks will handle state management.
-        buy(positionRequest, this.wallet!!, this.userPositionTracker, this.env);
+        buy(positionRequest, this.wallet.value!!, this.userPositionTracker, this.env);
         return makeJSONResponse<OpenPositionResponse>({});
     }
 
@@ -332,7 +326,7 @@ export class UserDO {
             return makeJSONResponse<ManuallyClosePositionResponse>({ message: 'Position already closed.' });
         }
         // deliberate fire-and-forget
-        sell(position, this.wallet!!, this.userPositionTracker, this.env);
+        sell(position, this.wallet.value!!, this.userPositionTracker, this.env);
         return makeJSONResponse<ManuallyClosePositionResponse>({ message: 'Position will now be closed. '});
     }
 
@@ -346,16 +340,9 @@ export class UserDO {
             else if (position.status === PositionStatus.Closed) {
                 continue;
             }
-            sell(position, this.wallet!!, this.userPositionTracker, this.env);
+            sell(position, this.wallet.value!!, this.userPositionTracker, this.env);
         }
         return makeJSONResponse<AutomaticallyClosePositionsResponse>({});
-    }
-
-    async handleOpenPositionRequest(positionRequestRequest: OpenPositionRequest) : Promise<Response> {
-        const positionRequest = positionRequestRequest.positionRequest;
-        // deliberate fire-and-forget
-        buy(positionRequest, this.wallet!!, this.userPositionTracker, this.env);
-        return makeJSONResponse<OpenPositionResponse>({});
     }
 
     async validateFetchRequest(request : Request) : Promise<[UserDOFetchMethod,any]> {
@@ -381,13 +368,13 @@ export class UserDO {
     }
 
     assertUserHasNoWallet() {
-        if (this.wallet) {
+        if (this.wallet.value) {
             throw new Error("User already has wallet");
         }
     }
 
     assertUserHasWallet() {
-        if (!this.wallet) {
+        if (!this.wallet.value) {
             throw new Error("User has no wallet");
         }
     }    
@@ -396,9 +383,9 @@ export class UserDO {
         
         const session = this.sessionTracker.getSessionValues(messageID);
         return {
-            hasWallet: !!(this.wallet),
+            hasWallet: !!(this.wallet.value),
             initialized: this.initialized(),
-            telegramUserName : this.telegramUserName||undefined,
+            telegramUserName : this.telegramUserName.value||undefined,
             session: session
         };
     }

@@ -18,14 +18,14 @@ export async function buy(positionRequest: PositionRequest,
     const notificationChannel = TGStatusMessage.createAndSend(`Initiating.`, false, positionRequest.chatID, env);
 
     const parsedSwapSummary = await swap(positionRequest, wallet, env, notificationChannel);
-    if (!parsedSwapSummary) {
-        return;
+    if (parsedSwapSummary) {
+        const newPosition = convertToPosition(positionRequest, parsedSwapSummary.swapSummary);
+        userPositionTracker.storePositions([newPosition]);
+        await importNewPositionIntoPriceTracker(newPosition, env);
+        TGStatusMessage.update(notificationChannel, `Peak Price is now being tracked. Position will be unwound when price dips below ${positionRequest.triggerPercent}% of peak.`, true);    
     }
 
-    const newPosition = convertToPosition(positionRequest, parsedSwapSummary.swapSummary);
-    userPositionTracker.storePositions([newPosition]);
-    await importNewPositionIntoPriceTracker(newPosition, env);
-    TGStatusMessage.update(notificationChannel, `Peak Price is now being tracked. Position will be unwound when price dips below ${positionRequest.triggerPercent}% of peak.`, true);
+    await TGStatusMessage.finalize(notificationChannel);
 }
 
 function convertToPosition(positionRequest: PositionRequest, swapSummary : SwapSummary) : Position {

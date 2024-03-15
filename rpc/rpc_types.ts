@@ -19,7 +19,8 @@ export enum TransactionExecutionError {
     TransactionFailedOtherReason = "TransactionFailedOtherReason",
     SlippageToleranceExceeded = "SlippageToleranceExceeded",
     InsufficientNativeTokensError = "InsufficientNativeTokensError",
-    InsufficientFundsError = "InsufficientFundsError"
+    InsufficientFundsError = "InsufficientFundsError",
+    TokenFeeAccountNotInitialized = "TokenFeeAccountNotInitialized"
 };
 
 export enum TransactionExecutionErrorCouldntConfirm {

@@ -31,4 +31,6 @@ export async function sell(position: Position,
     };
     
     await removePositionFromPriceTracking(removeFromPriceTrackingRequest, env);
+
+    await TGStatusMessage.finalize(notificationChannel);
 }

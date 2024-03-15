@@ -11,6 +11,7 @@ import { UserDOFetchMethod, sendClosePositionOrdersToUserDOs } from "../user/use
 import { AutomaticallyClosePositionRequest, AutomaticallyClosePositionsRequest } from "./actions/automatically_close_positions";
 import { MarkPositionAsClosedRequest, MarkPositionAsClosedResponse } from "./actions/mark_position_as_closed";
 import { MarkPositionAsClosingRequest, MarkPositionAsClosingResponse } from "./actions/mark_position_as_closing";
+import { ChangeTrackedValue } from "../../util/change_tracked_value";
 
 /*
     Big TODO: How do we limit concurrent outgoing requests when a dip happens?
@@ -33,9 +34,9 @@ export class TokenPairPositionTrackerDO {
     state :   DurableObjectState
 
     // initialized properties - token and the 'swap-from' vsToken (i.e; USDC)
-    tokenAddress :   string|null
-    vsTokenAddress : string|null
-    isPolling : boolean
+    tokenAddress :   ChangeTrackedValue<string|null> = new ChangeTrackedValue<string|null>("tokenAddress",null);
+    vsTokenAddress : ChangeTrackedValue<string|null> = new ChangeTrackedValue<string|null>("vsTokenAddress",null);
+    isPolling : boolean // deliberately not change tracked.
     
     // this performs all the book keeping and determines what RPC actions to take
     tokenPairPositionTracker : TokenPairPositionTracker = new TokenPairPositionTracker();
@@ -45,13 +46,8 @@ export class TokenPairPositionTrackerDO {
     constructor(state : DurableObjectState, env : Env) {
 
         this.state       = state; // access to persistent storage (as opposed to in-memory)
-        
-        this.tokenAddress       = null;  // address of token being traded
-        this.vsTokenAddress     = null;  // i.e.; USDC or SOL
         this.isPolling          = false;
-
         this.env = env;
-
         this.state.blockConcurrencyWhile(async () => {
             await this.initializeFromStorage(this.state.storage);
         });
@@ -59,9 +55,17 @@ export class TokenPairPositionTrackerDO {
 
     async initializeFromStorage(storage : DurableObjectStorage) {
         const entries = await storage.list();
-        this.tokenAddress = entries.get("tokenAddress") as string|null;
-        this.vsTokenAddress = entries.get("vsTokenAddress") as string|null;
+        this.tokenAddress.initialize(entries);
+        this.vsTokenAddress.initialize(entries);
         this.tokenPairPositionTracker.initialize(entries);
+    }
+
+    async flushToStorage() {
+        await Promise.allSettled([
+            this.tokenAddress.flushToStorage(this.state.storage),
+            this.vsTokenAddress.flushToStorage(this.state.storage),
+            this.tokenPairPositionTracker.flushToStorage(this.state.storage)
+        ]);
     }
 
     shouldBePolling() : boolean {
@@ -69,10 +73,22 @@ export class TokenPairPositionTrackerDO {
     }
 
     initialized() : boolean {
-        return this.vsTokenAddress != null && this.tokenAddress != null;
+        return this.vsTokenAddress.value != null && this.tokenAddress.value != null;
     }
 
     async alarm() {
+        try {
+            await this._alarm();
+        }
+        catch(e : any) {
+            console.error(e.toString());
+        }
+        finally {
+            await this.flushToStorage();
+        }
+    }
+
+    async _alarm() {
         const beginExecutionTime = Date.now();
         await this.state.storage.deleteAlarm();
         try {
@@ -94,7 +110,7 @@ export class TokenPairPositionTrackerDO {
     }
 
     async getPrice() : Promise<DecimalizedAmount|undefined> {
-        const tokenAddress = this.tokenAddress!!;
+        const tokenAddress = this.tokenAddress.value!!;
         const vsTokenAddress = this.vsTokenAddress;
         const url = `https://price.jup.ag/v4/price?ids=${tokenAddress}&vsToken=${vsTokenAddress}`
         const response = await fetch(url);
@@ -123,10 +139,11 @@ export class TokenPairPositionTrackerDO {
     async fetch(request : Request) : Promise<Response> {
 
         const [method,body] = await this.validateFetchRequest(request);
-        const response = this._fetch(method,body);
+        const response = await this._fetch(method,body);
         if (this.shouldBePolling() && !this.isPolling) {
             this.scheduleNextPoll(Date.now());
         }
+        await this.flushToStorage();
         return response;
     }
 
@@ -187,8 +204,8 @@ export class TokenPairPositionTrackerDO {
 
     async handleInitialize(initializeRequest : TokenPairPositionTrackerInitializeRequest) : Promise<Response> {
         if (!this.initialized()) {
-            this.tokenAddress = initializeRequest.token.address;
-            this.vsTokenAddress = initializeRequest.vsToken.address;
+            this.tokenAddress.value = initializeRequest.token.address;
+            this.vsTokenAddress.value = initializeRequest.vsToken.address;
         }
         return new Response(null, { status: 200 });
     }
