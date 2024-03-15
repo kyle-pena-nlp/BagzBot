@@ -1,6 +1,6 @@
 import { MATH_DECIMAL_PLACES, dDiv } from "../decimalized";
 import { Env } from "../env";
-import { getVsTokenDecimalsMultiplier } from "../tokens/vs_tokens";
+import { getVsTokenDecimalsMultiplier } from "../tokens";
 import { HeliusParsedTokenInputOutput, SwapExecutionError, SwapSummary } from "./rpc_types";
 
 

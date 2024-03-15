@@ -1,4 +1,4 @@
-import { PositionRequest } from "../../../positions/positions";
+import { PositionRequest } from "../../../positions";
 
 export interface OpenPositionRequest {
     chatID : number

@@ -1,5 +1,5 @@
-import { Position } from "../positions/positions";
-import { CallbackButton } from "../telegram/callback_button";
+import { Position } from "../positions";
+import { CallbackButton } from "../telegram";
 import { CallbackData } from "./callback_data";
 import { Menu, MenuCapabilities } from "./menu";
 import { MenuCode } from "./menu_code";

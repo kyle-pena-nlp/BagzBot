@@ -1,4 +1,4 @@
-import { CallbackButton } from "../telegram/callback_button";
+import { CallbackButton } from "../telegram";
 import { Menu, MenuCapabilities } from "./menu";
 
 export class MenuError extends Menu<undefined> implements MenuCapabilities {

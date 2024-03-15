@@ -1,4 +1,4 @@
-import { TokenInfo } from "../../../tokens/token_info";
+import { TokenInfo } from "../../../tokens";
 
 export class TokenTracker {
     tokenInfos : Record<string,TokenInfo> = {};

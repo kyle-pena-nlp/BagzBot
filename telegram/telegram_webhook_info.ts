@@ -1,6 +1,6 @@
 import { CallbackData } from "../menus/callback_data";
-import { PositionPreRequest, PositionType } from "../positions/positions";
-import { getVsTokenAddress } from "../tokens/vs_tokens";
+import { PositionPreRequest, PositionType } from "../positions";
+import { getVsTokenAddress } from "../tokens";
 import { TGTextEntity, TGTextEntityType } from "./telegram_helpers";
 
 export class AutoSellOrderSpec {

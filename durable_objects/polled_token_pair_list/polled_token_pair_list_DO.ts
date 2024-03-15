@@ -1,6 +1,6 @@
 import { DurableObjectState } from "@cloudflare/workers-types";
 import { Env } from "../../env";
-import { StagedTokenInfo, TokenInfo } from "../../tokens/token_info";
+import { StagedTokenInfo, TokenInfo } from "../../tokens";
 import { makeFailureResponse, makeJSONResponse, makeSuccessResponse, maybeGetJson } from "../../util";
 import { GetTokenInfoRequest, GetTokenInfoResponse } from "./actions/get_token_info";
 import { PolledTokenPairListDOFetchMethod, parsePolledTokenPairListDOFetchMethod } from "./polled_token_pair_list_DO_interop";

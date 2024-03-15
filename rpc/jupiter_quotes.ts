@@ -1,10 +1,8 @@
 
 import { DecimalizedAmount } from "../decimalized";
 import { Env } from "../env";
-import { Position, PositionRequest } from "../positions/positions";
-import { Quote } from "../positions/quote";
-import { TokenInfo } from "../tokens/token_info";
-import { getVsTokenDecimalsMultiplier, getVsTokenInfo } from "../tokens/vs_tokens";
+import { Position, PositionRequest, Quote } from "../positions";
+import { TokenInfo, getVsTokenDecimalsMultiplier, getVsTokenInfo } from "../tokens";
 import { JupiterQuoteAPIParams, SwapRoute } from "./jupiter_types";
 import { GetQuoteFailure, isGetQuoteFailure } from "./rpc_types";
 

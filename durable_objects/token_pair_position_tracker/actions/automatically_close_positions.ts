@@ -1,4 +1,4 @@
-import { Position } from "../../../positions/positions"
+import { Position } from "../../../positions/position"
 
 
 export interface AutomaticallyClosePositionRequest {

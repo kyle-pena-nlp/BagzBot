@@ -1,5 +1,5 @@
 import { GetQuoteFailure } from "../rpc/rpc_types";
-import { PositionRequest } from "./positions";
+import { PositionRequest } from "./position";
 import { Quote } from "./quote";
 
 export interface PositionRequestAndQuote {

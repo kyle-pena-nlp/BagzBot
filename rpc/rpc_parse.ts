@@ -2,8 +2,8 @@ import { Connection, ParsedTransactionWithMeta, TokenBalance } from "@solana/web
 import { UserAddress } from "../crypto/wallet";
 import { DecimalizedAmount, MATH_DECIMAL_PLACES, dDiv, dNegate, dSub, fromTokenAmount } from "../decimalized";
 import { Env } from "../env";
-import { Position, PositionRequest, Swappable, isPosition, isPositionRequest } from "../positions/positions";
-import { deriveTokenAccount } from "../tokens/token_info";
+import { Position, PositionRequest, Swappable, isPosition, isPositionRequest } from "../positions";
+import { deriveTokenAccount } from "../tokens";
 import { safe, sleep } from "../util";
 import { ParsedSwapSummary, PreparseConfirmedSwapResult, PreparseSwapResult, SwapExecutionError, SwapSummary } from "./rpc_types";
 

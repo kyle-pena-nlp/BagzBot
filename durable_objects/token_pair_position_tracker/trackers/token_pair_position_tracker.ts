@@ -1,5 +1,5 @@
 import { DecimalizedAmount } from "../../../decimalized";
-import { Position, PositionRequest, PositionStatus } from "../../../positions/positions";
+import { Position, PositionRequest, PositionStatus } from "../../../positions";
 import { MapWithStorage } from "../../../util";
 import { PeakPricePositionTracker } from "./peak_price_tracker";
 

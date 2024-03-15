@@ -1,6 +1,6 @@
 import * as dMath from "../../../decimalized";
 import { DecimalizedAmount, DecimalizedAmountSet, MATH_DECIMAL_PLACES, fromKey, fromNumber, toKey } from "../../../decimalized";
-import { Position, PositionStatus, PositionType } from "../../../positions/positions";
+import { Position, PositionStatus, PositionType } from "../../../positions";
 import { setDifference, setIntersection, structuralEquals } from "../../../util";
 import { PositionsAssociatedWithPeakPrices } from "./positions_associated_with_peak_prices";
 

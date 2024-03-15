@@ -1,6 +1,5 @@
 import { DecimalizedAmount } from "../decimalized";
-import { TokenInfo } from "../tokens/token_info";
-import { getVsTokenInfo } from "../tokens/vs_tokens";
+import { TokenInfo, getVsTokenInfo } from "../tokens";
 import { Structural, isEnumValue } from "../util";
 
 export enum PositionType {
@@ -37,7 +36,7 @@ export interface Position {
 	retrySellIfSlippageExceeded : boolean
 };
 
-export interface BasePositionRequest {
+interface BasePositionRequest {
 
 	userID : number
 	chatID : number

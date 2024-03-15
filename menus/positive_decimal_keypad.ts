@@ -1,5 +1,5 @@
 
-import { CallbackButton } from "../telegram/callback_button";
+import { CallbackButton } from "../telegram";
 import { CallbackData } from "./callback_data";
 import { Menu, MenuCapabilities, MenuDisplayMode, MenuSpec } from "./menu";
 import { MenuCode } from "./menu_code";

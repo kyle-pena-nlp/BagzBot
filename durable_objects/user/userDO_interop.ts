@@ -1,6 +1,6 @@
 import { Env } from "../../env";
-import { Position, PositionRequest } from "../../positions/positions";
-import { TokenInfo } from "../../tokens/token_info";
+import { Position, PositionRequest } from "../../positions";
+import { TokenInfo } from "../../tokens";
 import { Structural, groupIntoMap, makeJSONRequest, makeRequest } from "../../util";
 import { AutomaticallyClosePositionsRequest, AutomaticallyClosePositionsResponse } from "../token_pair_position_tracker/actions/automatically_close_positions";
 import { DeleteSessionRequest } from "./actions/delete_session";

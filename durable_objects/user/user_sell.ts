@@ -1,7 +1,7 @@
 import { Wallet } from "../../crypto/wallet";
 import { Env } from "../../env";
-import { Position } from "../../positions/positions";
-import { TGStatusMessage } from "../../telegram/telegram_status_message";
+import { Position } from "../../positions";
+import { TGStatusMessage } from "../../telegram";
 import { MarkPositionAsClosedRequest } from "../token_pair_position_tracker/actions/mark_position_as_closed";
 import { markPositionAsClosedInTokenPairPositionTracker as removePositionFromPriceTracking } from "../token_pair_position_tracker/token_pair_position_tracker_DO_interop";
 import { UserPositionTracker } from "./trackers/user_position_tracker";

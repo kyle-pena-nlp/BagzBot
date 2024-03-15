@@ -1,5 +1,5 @@
 import { UserData } from "../durable_objects/user/model/user_data";
-import { CallbackButton } from "../telegram/callback_button";
+import { CallbackButton } from "../telegram";
 import { Menu, MenuCapabilities } from "./menu";
 import { MenuCode } from "./menu_code";
 

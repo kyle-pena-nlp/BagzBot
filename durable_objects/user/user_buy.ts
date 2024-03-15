@@ -1,9 +1,9 @@
 
 import { Wallet } from "../../crypto/wallet";
 import { Env } from "../../env";
-import { Position, PositionRequest, PositionStatus } from "../../positions/positions";
+import { Position, PositionRequest, PositionStatus } from "../../positions";
 import { SwapSummary } from "../../rpc/rpc_types";
-import { TGStatusMessage } from "../../telegram/telegram_status_message";
+import { TGStatusMessage } from "../../telegram";
 import { importNewPosition as importNewPositionIntoPriceTracker } from "../token_pair_position_tracker/token_pair_position_tracker_DO_interop";
 import { UserPositionTracker } from "./trackers/user_position_tracker";
 import { swap } from "./user_swap";

@@ -1,5 +1,5 @@
 import { toFriendlyString } from "../decimalized";
-import { PositionRequestAndQuote } from "../positions/position_request_and_quote";
+import { PositionRequestAndQuote } from "../positions";
 import { isGetQuoteFailure } from "../rpc/rpc_types";
 
 const SIG_FIGS = 4;

@@ -1,5 +1,5 @@
 import { DecimalizedAmount, DecimalizedAmountMap } from "../../../decimalized";
-import { Position, PositionStatus } from "../../../positions/positions";
+import { Position, PositionStatus } from "../../../positions";
 
 export class PositionsAssociatedWithPeakPrices extends DecimalizedAmountMap<ReadonlyArray<Position>> {
     locationMap : Map<string,[DecimalizedAmount,number]> = new Map<string,[DecimalizedAmount,number]>();

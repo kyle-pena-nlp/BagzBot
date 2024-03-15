@@ -1,5 +1,5 @@
-import { PositionRequestAndQuote } from "../positions/position_request_and_quote";
-import { CallbackButton } from "../telegram/callback_button";
+import { PositionRequestAndQuote } from "../positions";
+import { CallbackButton } from "../telegram";
 import { CallbackData } from "./callback_data";
 import { Menu, MenuCapabilities } from "./menu";
 import { MenuCode } from "./menu_code";

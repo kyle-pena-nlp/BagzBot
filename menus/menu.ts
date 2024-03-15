@@ -2,8 +2,7 @@ import { Env } from "../env";
 import { CallbackData } from "./callback_data";
 import { MenuCode } from "./menu_code";
 
-import { CallbackButton } from "../telegram/callback_button";
-import { escapeTGText, makeTelegramBotUrl } from "../telegram/telegram_helpers";
+import { CallbackButton, escapeTGText, makeTelegramBotUrl } from "../telegram";
 import { makeJSONRequest } from "../util";
 
 export enum MenuDisplayMode {

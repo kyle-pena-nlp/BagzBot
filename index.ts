@@ -1,6 +1,6 @@
 
 import { Env } from "./env";
-import { TelegramWebhookInfo } from "./telegram/telegram_webhook_info";
+import { TelegramWebhookInfo } from "./telegram";
 import { Result, makeFakeFailedRequestResponse, makeSuccessResponse } from "./util";
 import { Worker } from "./worker/worker";
 

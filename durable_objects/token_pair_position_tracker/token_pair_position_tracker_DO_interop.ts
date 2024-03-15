@@ -1,5 +1,5 @@
 import { Env } from "../../env";
-import { Position } from "../../positions/positions";
+import { Position } from "../../positions";
 import { makeJSONRequest, makeRequest } from "../../util";
 import { ImportNewPositionsRequest, ImportNewPositionsResponse } from "./actions/import_new_positions";
 import { MarkPositionAsClosedRequest, MarkPositionAsClosedResponse } from "./actions/mark_position_as_closed";

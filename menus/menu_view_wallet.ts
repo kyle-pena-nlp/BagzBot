@@ -1,5 +1,5 @@
 import { GetWalletDataResponse } from "../durable_objects/user/actions/get_wallet_data";
-import { CallbackButton } from "../telegram/callback_button";
+import { CallbackButton } from "../telegram";
 import { Menu, MenuCapabilities } from "./menu";
 
 export class MenuViewWallet extends Menu<GetWalletDataResponse> implements MenuCapabilities {

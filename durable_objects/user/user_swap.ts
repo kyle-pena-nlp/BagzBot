@@ -3,7 +3,7 @@ import * as bs58 from "bs58";
 import { UserAddress, Wallet, toUserAddress } from "../../crypto/wallet";
 import { Env } from "../../env";
 import { logError, logInfo } from "../../logging";
-import { Swappable, getSwapOfXDescription, isPosition, isPositionRequest } from "../../positions/positions";
+import { Swappable, getSwapOfXDescription, isPosition, isPositionRequest } from "../../positions";
 import { getBuyTokenSwapRoute, getSellTokenSwapRoute } from "../../rpc/jupiter_quotes";
 import { serializeSwapRouteTransaction } from "../../rpc/jupiter_serialize";
 import { SwapRoute } from "../../rpc/jupiter_types";
@@ -11,7 +11,7 @@ import { executeRawSignedTransaction } from "../../rpc/rpc_execute_signed_transa
 import { parseBuySwapTransaction, parseSellSwapTransaction, waitForBlockFinalizationAndParse } from "../../rpc/rpc_parse";
 import { signTransaction } from "../../rpc/rpc_sign_tx";
 import { GetQuoteFailure, ParsedSuccessfulSwapSummary, ParsedSwapSummary, PreparseConfirmedSwapResult, PreparseSwapResult, SwapExecutionError, SwapExecutionErrorParseSummary, TransactionExecutionError, TransactionExecutionErrorCouldntConfirm, UnknownTransactionParseSummary, isConfirmed, isFailed, isGetQuoteFailure, isSuccessfullyParsedSwapSummary, isSwapExecutionErrorParseSwapSummary, isTransactionPreparationFailure, isUnconfirmed, isUnknownTransactionParseSummary } from "../../rpc/rpc_types";
-import { TGStatusMessage, UpdateableNotification } from "../../telegram/telegram_status_message";
+import { TGStatusMessage, UpdateableNotification } from "../../telegram";
 import { assertNever } from "../../util";
 /* markPositionAsOpen, renegeOpenPosition */
 

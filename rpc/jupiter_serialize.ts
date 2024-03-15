@@ -1,6 +1,6 @@
 import { Buffer } from "node:buffer";
 import { Env } from "../env";
-import { deriveFeeAccount } from "../tokens/token_info";
+import { deriveFeeAccount } from "../tokens";
 import { makeJSONRequest, tryReadResponseBody } from "../util";
 import { SwapRoute } from "./jupiter_types";
 import { TransactionPreparationFailure, isTransactionPreparationFailure } from "./rpc_types";
