@@ -14,7 +14,7 @@ export async function sell(position: Position,
 
     userPositionTracker.setAsClosing(position.positionID);
 
-    const notificationChannel = TGStatusMessage.createAndSend(`Initiating swap.`, false, position.chatID, env);
+    const notificationChannel = TGStatusMessage.replaceWithNotification(position.messageID, `Initiating.`, false, position.chatID, env);
 
     const parsedSwapSummary = await swap(position, wallet, env, notificationChannel);
     if (!parsedSwapSummary) {

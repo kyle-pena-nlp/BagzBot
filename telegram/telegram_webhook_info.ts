@@ -1,12 +1,13 @@
 import { CallbackData } from "../menus/callback_data";
 import { TGTextEntity, TGTextEntityType } from "./telegram_helpers";
 import { getVsTokenAddress } from "../tokens/vs_tokens";
-import { PositionPreRequest, PositionRequest, PositionType } from "../positions/positions";
+import { PositionPreRequest, PositionType } from "../positions/positions";
 
 export class AutoSellOrderSpec {
 
 	userID : number
 	chatID : number
+	messageID : number
 	tokenAddress : string
 	vsTokenAddress : string
 	vsTokenAmt : number
@@ -17,6 +18,7 @@ export class AutoSellOrderSpec {
 	constructor(
 		userID : number,
 		chatID : number,
+		messageID : number,
 		tokenAddress : string, 
 		vsTokenAddress : string, 
 		vsTokenAmt : number, 
@@ -25,6 +27,7 @@ export class AutoSellOrderSpec {
 		autoRetrySellIfSlippageExceeded? : boolean) {
 		this.userID = userID;
 		this.chatID = chatID;
+		this.messageID = messageID;
 		this.tokenAddress = tokenAddress;
 		this.vsTokenAddress = vsTokenAddress;
 		this.vsTokenAmt = vsTokenAmt;
@@ -37,8 +40,9 @@ export class AutoSellOrderSpec {
 		const positionRequest : PositionPreRequest = {
 			userID : this.userID,
 			chatID : this.chatID,
+			messageID : this.messageID,
 			positionID : crypto.randomUUID(),
-			type : PositionType.LongTrailingStopLoss,
+			positionType : PositionType.LongTrailingStopLoss,
 			tokenAddress : this.tokenAddress,
 			vsTokenAddress : this.vsTokenAddress,
 			vsTokenAmt : this.vsTokenAmt,
@@ -49,8 +53,9 @@ export class AutoSellOrderSpec {
 		return positionRequest;
 	}
 
-	static parse(userID : number, chatID : number, entities : TGTextEntity[]) : AutoSellOrderSpec|null {
-		const tokens = entities;
+	static parse(msg : TelegramWebhookInfo) : AutoSellOrderSpec|null {
+
+		const tokens = msg.commandTokens!!;
 
 		const vsTokenAmt : number|null = AutoSellOrderSpec.maybeParseFloat(tokens[1]);
 		if (vsTokenAmt == null) {
@@ -99,7 +104,7 @@ export class AutoSellOrderSpec {
 			return null;
 		}
 		
-		return new AutoSellOrderSpec(userID, chatID, tokenAddress, vsTokenAddress, vsTokenAmt, triggerPercent, slippageTolerancePercent, autoRetry);
+		return new AutoSellOrderSpec(msg.telegramUserID, msg.chatID, msg.messageID, tokenAddress, vsTokenAddress, vsTokenAmt, triggerPercent, slippageTolerancePercent, autoRetry);
 	}
 
 	static describeFormat() : string {
@@ -209,7 +214,7 @@ export class TelegramWebhookInfo {
 		if (!this.commandTokens) {
 			return null;
 		}
-		const parsedResult = AutoSellOrderSpec.parse(this.telegramUserID, this.chatID, this.commandTokens);
+		const parsedResult = AutoSellOrderSpec.parse(this);
 		return parsedResult;
 	}
 

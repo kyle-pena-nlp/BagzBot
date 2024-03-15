@@ -1,4 +1,5 @@
 import { DecimalizedAmount } from "../decimalized/decimalized_amount";
+import { isEnumValue } from "../util/enums";
 
 export enum GetQuoteFailure {
     FailedToDetermineSwapRoute = "FailedToDetermineSwapRoute"
@@ -135,9 +136,6 @@ export function isSwapExecutionError<T>(obj: T | SwapExecutionError): obj is Swa
 }
 
 
-function isEnumValue<T extends Record<string,string|number>>(value: any, enumType: T): value is T[keyof T] {
-    return Object.values(enumType).includes(value);
-}
 
 export function isTransactionParseErrorHeliusResponse(obj: { error: string }|any[]) : obj is { error : string } {
     return obj && typeof obj === 'object' && "error" in obj;

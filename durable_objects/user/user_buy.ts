@@ -7,7 +7,6 @@ import { SwapSummary } from "../../rpc/rpc_types";
 import { TGStatusMessage } from "../../telegram/telegram_status_message";
 import { UserPositionTracker } from "./trackers/user_position_tracker";
 import { swap } from "./user_swap";
-import * as bs58 from "bs58";
 /* markPositionAsOpen, renegeOpenPosition */
 
 export async function buy(positionRequest: PositionRequest, 
@@ -15,8 +14,8 @@ export async function buy(positionRequest: PositionRequest,
     userPositionTracker: UserPositionTracker, 
     env : Env) {
 
-    const notificationChannel = TGStatusMessage.createAndSend(`Initiating.`, false, positionRequest.chatID, env);
-
+    const notificationChannel = TGStatusMessage.replaceWithNotification(positionRequest.messageID, `Initiating.`, false, positionRequest.chatID, env);
+    
     const parsedSwapSummary = await swap(positionRequest, wallet, env, notificationChannel);
     if (parsedSwapSummary) {
         const newPosition = convertToPosition(positionRequest, parsedSwapSummary.swapSummary);
@@ -32,8 +31,9 @@ function convertToPosition(positionRequest: PositionRequest, swapSummary : SwapS
     const position : Position = {
         userID: positionRequest.userID,
         chatID : positionRequest.chatID,
+        messageID : positionRequest.messageID,
         positionID : positionRequest.positionID,
-        type: positionRequest.type,
+        type: positionRequest.positionType,
         status: PositionStatus.Open,
         token: positionRequest.token,
         vsToken: positionRequest.vsToken,

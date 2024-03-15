@@ -64,8 +64,9 @@ export class UserDO {
         this.defaultTrailingStopLossRequest = {
             userID: -1,
             chatID: -1,
+            messageID: -1,
             positionID : "",
-            type : PositionType.LongTrailingStopLoss,
+            positionType : PositionType.LongTrailingStopLoss,
             token : getVsTokenInfo('USDC')!!,
             vsToken : getVsTokenInfo('SOL')!!,
             vsTokenAmt : parseFloat(env.DEFAULT_TLS_VS_TOKEN_FRACTION),
@@ -202,6 +203,7 @@ export class UserDO {
         const defaultTrailingStopLossRequest = structuredClone(this.defaultTrailingStopLossRequest);
         defaultTrailingStopLossRequest.userID = defaultTrailingStopLossRequestRequest.userID;
         defaultTrailingStopLossRequest.chatID = defaultTrailingStopLossRequestRequest.chatID;
+        defaultTrailingStopLossRequest.messageID = defaultTrailingStopLossRequestRequest.messageID;
         defaultTrailingStopLossRequest.positionID = crypto.randomUUID();
         defaultTrailingStopLossRequest.token = defaultTrailingStopLossRequestRequest.token;
         const responseBody = defaultTrailingStopLossRequest;

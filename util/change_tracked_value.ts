@@ -12,6 +12,9 @@ export class ChangeTrackedValue<T extends Structural> {
     setValue(value : T) {
         this.value = value;
     }
+    getValue() : T {
+        return this.value;
+    }
     initialize(entries : Map<string,any>) {
         if (entries.has(this.storageKey)) {
             const storageValue = entries.get(this.storageKey) as T;

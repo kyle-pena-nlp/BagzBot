@@ -2,10 +2,15 @@ import { TokenInfo } from "../tokens/token_info"
 import { DecimalizedAmount } from "../decimalized/decimalized_amount";
 import { getVsTokenInfo } from "../tokens/vs_tokens";
 import { Structural } from "../util/structural";
+import { isEnumValue } from "../util/enums";
 
 export enum PositionType {
 	LongTrailingStopLoss = "Auto-Sell"
 };
+
+export function isPositionType(x : any) {
+	return isEnumValue(x, PositionType);
+}
 
 export enum PositionStatus {
 	Open = "Open",
@@ -13,11 +18,11 @@ export enum PositionStatus {
 	Closed = "Closed"
 };
 
-
 export interface Position {
 	readonly [ key : string ] : Structural
 	userID : number
 	chatID : number
+	messageID : number
 	positionID : string
 	type: PositionType
 	status : PositionStatus
@@ -37,8 +42,10 @@ export interface BasePositionRequest {
 
 	userID : number
 	chatID : number
+	messageID : number
+
 	positionID : string
-	type : PositionType
+	positionType : PositionType
 
 	vsTokenAmt : number
 	slippagePercent : number
@@ -62,19 +69,24 @@ export interface PositionRequest extends BasePositionRequest {
 export type Swappable = PositionRequest | Position;
 
 export function isPositionRequest(s : Swappable) : s is PositionRequest {
-	return !('fillPrice' in s);
+	return  !('fillPrice' in s);
 }
 
 export function isPosition(s : Swappable) : s is Position {
-	return 'fillPrice' in s;
+	return ('fillPrice' in s);
+}
+
+export function isSwappable(x : any) : x is Swappable {
+	return ('positionID' in x) && ('positionType' in x) && isPositionType(x['positionType']);
 }
 
 export function convertPreRequestToRequest(r : PositionPreRequest, token : TokenInfo) {
 	const positionRequest : PositionRequest = {
 		userID : r.userID,
 		chatID : r.chatID,
+		messageID : r.messageID,
 		positionID : r.positionID,
-		type: r.type,
+		positionType: r.positionType,
 		vsTokenAmt: r.vsTokenAmt,
 		slippagePercent: r.slippagePercent,
 		triggerPercent: r.triggerPercent,
@@ -113,4 +125,22 @@ export function getSwapOfXDescription(s : Swappable, caps : boolean = false) : s
     else {
         throw new Error("Programmer error.")
     }
+}
+
+export class SwappableError {
+	userID : number
+	chatID : number
+	messageID : number
+	message : string
+	inToken : TokenInfo
+	outToken : TokenInfo
+	constructor(s : Swappable, message : string) {
+		this.userID = s.userID;
+		this.chatID = s.chatID;
+		this.messageID = s.messageID;
+		this.message = message;
+		const { inToken, outToken } = getInAndOutTokens(s);
+		this.inToken = inToken;
+		this.outToken = outToken;
+	}
 }

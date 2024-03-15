@@ -21,6 +21,7 @@ export class Worker {
     async handleMessage(telegramWebhookInfo : TelegramWebhookInfo, env : Env) : Promise<Response> {
         const telegramUserID = telegramWebhookInfo.telegramUserID;
         const chatID = telegramWebhookInfo.chatID;
+        const messageID = telegramWebhookInfo.messageID;
         const tokenAddress = telegramWebhookInfo.text!!;
         const validateTokenResponse : GetTokenInfoResponse = await getTokenInfo(tokenAddress, env);
         if (validateTokenResponse.type === 'invalid') {
@@ -28,7 +29,7 @@ export class Worker {
             return makeFakeFailedRequestResponse(404, "Token does not exist");
         }
         else if (validateTokenResponse.type === 'valid') {
-            const defaultTrailingStopLossRequest = await getDefaultTrailingStopLoss(telegramUserID, chatID, validateTokenResponse.tokenInfo!!, env);
+            const defaultTrailingStopLossRequest = await getDefaultTrailingStopLoss(telegramUserID, chatID, messageID, validateTokenResponse.tokenInfo!!, env);
             // send out a 'stub' message that will be updated as the request editor menu.
             const tokenAddress = validateTokenResponse.tokenInfo!!.address;
             const tokenSymbol  = validateTokenResponse.tokenInfo!!.symbol;
@@ -134,9 +135,12 @@ export class Worker {
             case MenuCode.TrailingStopLossEditorFinalSubmit:
                 // TODO: do the read within UserDO to avoid the extra roundtrip
                 const positionRequestAfterFinalSubmit = await readSessionObj<PositionRequest>(telegramUserID, messageID, "PositionRequest", env);
-                const positionRequestRequest : OpenPositionRequest = { chatID: chatID, userID: telegramUserID, positionRequest: positionRequestAfterFinalSubmit };
+                const positionRequestRequest : OpenPositionRequest = { 
+                    chatID: chatID, 
+                    userID: telegramUserID, 
+                    positionRequest: positionRequestAfterFinalSubmit 
+                };
                 await requestNewPosition(telegramUserID, positionRequestRequest, env);
-                // TODO: post-confirm screen
                 return this.createMainMenu(telegramWebhookInfo, env);
             case MenuCode.TrailingStopLossEntryBuyQuantityMenu:
                 const quantityAndTokenForBuyQuantityMenu : QuantityAndToken = await this.getTrailingStopLossPositionQuantityAndVsTokenFromSession(telegramUserID, messageID, env);

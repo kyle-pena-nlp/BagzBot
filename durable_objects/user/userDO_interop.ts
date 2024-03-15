@@ -96,8 +96,16 @@ export async function getPosition(telegramUserID : number, positionID : string, 
 	return position;
 }
 
-export async function getDefaultTrailingStopLoss(telegramUserID : number, chatID : number, token : TokenInfo, env : Env) : Promise<PositionRequest> {
-	const body : DefaultTrailingStopLossRequestRequest = { userID: telegramUserID, chatID: chatID, token : token };
+export async function getDefaultTrailingStopLoss(telegramUserID : number, 
+	chatID : number, 
+	messageID :  number,
+	token : TokenInfo, 
+	env : Env) : Promise<PositionRequest> {
+	const body : DefaultTrailingStopLossRequestRequest = { 
+		userID: telegramUserID, 
+		chatID: chatID, 
+		messageID : messageID,
+		token : token };
 	const trailingStopLossRequest = await sendJSONRequestToUserDO<DefaultTrailingStopLossRequestRequest,PositionRequest>(telegramUserID, UserDOFetchMethod.getDefaultTrailingStopLossRequest, body, env);
 	return trailingStopLossRequest;
 }
