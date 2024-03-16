@@ -1,13 +1,17 @@
 const keysToLookFor = [
+    'message',
     'telegramUserID',
     'userID', // telegramUserID is sometimes called this instead
     'messageID',
-    'message',
     'chatID',
     'positionID',
-    'address',
-    'symbol',
     'status',
+    'positionType',
+    'token',
+    'vsToken',
+    'address',
+    'signature',
+    'symbol',
     'description',
     'purpose',
     'length',
@@ -18,6 +22,10 @@ const fnsToLookFor = [
     'describe',
     'purpose'
 ];
+
+// TODO: switch to emitting JSON
+
+const FORBIDDEN_LOG_KEYS = ['wallet','privateKey','encryptedPrivateKey','bytesAsHexString'];
 
 export class BotError {
     userID : number
@@ -41,19 +49,36 @@ function digest(x : any, memo : WeakMap<object,string>) : string {
         return x.toString();
     }
     let digestParts : string[] = [];
-    for (const key in keysToLookFor) {
+    for (const key of keysToLookFor) {
         // paranoia here is probably a good thing.
-        if (key === 'wallet' || key === 'privateKey') {
+        if (FORBIDDEN_LOG_KEYS.includes(key)) {
             throw new Error("Programmer error.");
         }
+        if (!(key in x)) {
+            continue;
+        }
         const value = x[key];
-        const valueDigest = (memo.has(value)) ? memo.get(value)!! : digest(value, memo);
-        memo.set(value,valueDigest);
+        const isWeakmapCompatible = value !== null && (typeof value === 'object' || typeof value === 'symbol');
+        const valueDigest = (isWeakmapCompatible && memo.has(value)) ? memo.get(value)!! : digest(value, memo);
+        if (isWeakmapCompatible) {
+            memo.set(value,valueDigest);
+        }
         digestParts.push(`[${key}]: [${valueDigest}]`);
     }   
-    for (const key in fnsToLookFor) {
+    for (const key of fnsToLookFor) {
+        if (!(key in x)) {
+            continue;
+        }
         const callable = (x[key] as () => string);
-        digestParts.push(`[${key}]: ${callable()}`);
+        if (typeof callable !== 'function') {
+            continue;
+        }
+        try {
+            const value = callable();
+            digestParts.push(`[${key}]: ${value}`);
+        }
+        catch{
+        }
     }
     return digestParts.join(" :: ");
 }
@@ -70,10 +95,13 @@ function logIt(xs : any[], level : 'error'|'info'|'debug') {
     switch(level) {
         case 'error':
             console.error(logMsg);
+            break;
         case 'info':
             console.info(logMsg);
+            break;
         case 'debug':
             console.info(logMsg);
+            break;
         default:
             throw new Error("Programmer error.");
     }

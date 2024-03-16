@@ -1,4 +1,4 @@
-import { Wallet } from "../../crypto/wallet";
+import { Wallet } from "../../crypto";
 import { Env } from "../../env";
 import { Position } from "../../positions";
 import { TGStatusMessage } from "../../telegram";

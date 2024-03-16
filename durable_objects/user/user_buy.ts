@@ -1,5 +1,5 @@
 
-import { Wallet } from "../../crypto/wallet";
+import { Wallet } from "../../crypto";
 import { Env } from "../../env";
 import { Position, PositionRequest, PositionStatus } from "../../positions";
 import { SwapSummary } from "../../rpc/rpc_types";

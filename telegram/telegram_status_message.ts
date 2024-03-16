@@ -1,4 +1,5 @@
 import { Env } from "../env";
+import { logError } from "../logging";
 import { pause } from "../util";
 import { deleteTGMessage, sendMessageToTG, updateTGMessage } from "./telegram_helpers";
 
@@ -67,7 +68,9 @@ export class TGStatusMessage {
         }).then(pause(500));
     }
     static async finalize(statusMessage : UpdateableNotification) {
-        await statusMessage.promiseChain;
+        await statusMessage.promiseChain.catch(r => {
+            logError(r);
+        });
     }
     /* Remove a message in a non-blocking fashion. */
     static async remove(statusMessage : UpdateableNotification) {

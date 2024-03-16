@@ -1,7 +1,6 @@
 import { PublicKey, Signer, VersionedTransaction } from "@solana/web3.js";
 import * as bs58 from "bs58";
-import { decryptPrivateKey } from "../crypto/private_keys";
-import { Wallet } from "../crypto/wallet";
+import { Wallet, decryptPrivateKey } from "../crypto";
 import { Env } from "../env";
 import { getRecentBlockhash } from "./rpc_common";
 import { TransactionPreparationFailure, isTransactionPreparationFailure } from "./rpc_types";

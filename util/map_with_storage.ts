@@ -32,7 +32,7 @@ export class MapWithStorage<TValue> {
     }
     *keys() {
         const prefixRegex = this.prefixRegex();
-        for (const key in this.items.keys()) {
+        for (const key of this.items.keys()) {
             yield key.replace(prefixRegex, "");
         }   
     }

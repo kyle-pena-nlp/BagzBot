@@ -25,7 +25,7 @@ export async function encryptPrivateKey(plaintext : string, userID : number, env
     }
     const checkResult = await decryptPrivateKey(result, userID, env);
     if (checkResult !== plaintext) {
-        logError("Round-trip encryption of private key did not produce original key.")
+        logError({ userID : userID }, "Round-trip encryption of private key did not produce original key.");
         throw new Error("Programmer error.")
     }
     return result;

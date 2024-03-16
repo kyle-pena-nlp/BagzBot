@@ -1,6 +1,6 @@
 import { Connection, VersionedTransaction } from "@solana/web3.js";
 import * as bs58 from "bs58";
-import { UserAddress, Wallet, toUserAddress } from "../../crypto/wallet";
+import { UserAddress, Wallet, toUserAddress } from "../../crypto";
 import { Env } from "../../env";
 import { logError, logInfo } from "../../logging";
 import { Swappable, getSwapOfXDescription, isPosition, isPositionRequest } from "../../positions";
@@ -30,7 +30,7 @@ export async function swap(s: Swappable,
 
     const swapRoute = await getSwapRoute(s, env).catch(r => null);
     if (swapRoute == null || isGetQuoteFailure(swapRoute)) {
-        logError(s, swapRoute);
+        logError("Failed getting swap route", s, swapRoute);
         TGStatusMessage.queue(notificationChannel, `Could not get a quote for ${swapOfX} - purchase failed. Try again soon.`, true);
         return;
     }
@@ -41,7 +41,7 @@ export async function swap(s: Swappable,
     // serialize swap route 
     const txBuffer = await serializeSwapRouteTransaction(swapRoute, wallet.publicKey, shouldIncludeReferralPlatformFee(s), env).catch(r => null);
     if (txBuffer == null || isTransactionPreparationFailure(txBuffer)) {
-        logError(s, txBuffer);
+        logError("Failed serializing transaction", s, txBuffer);
         TGStatusMessage.queue(notificationChannel, `Could not prepare transaction - ${swapOfX} failed.`, true);
         return;
     }
@@ -52,7 +52,7 @@ export async function swap(s: Swappable,
     // sign tx
     const signedTx = await signTransaction(txBuffer, wallet, s.userID, env).catch(r => null);
     if (signedTx == null || isTransactionPreparationFailure(signedTx)) {
-        logError(s, signedTx);
+        logError("Failed signing transaction", s, signedTx);
         TGStatusMessage.queue(notificationChannel, `Could not sign transaction - ${swapOfX} failed.`, true);
         return;
     }
@@ -69,13 +69,13 @@ export async function swap(s: Swappable,
     TGStatusMessage.queue(notificationChannel, `Executing transaction... (this could take a moment)`, false);
     let maybeExecutedTx = await executeRawSignedTransaction(s.positionID, signedTx, connection, env, logger)
         .catch(r => { 
-            logError(s, { message: 'Initial execution unexpected failure, converting to unconfirmed' });
+            logError('Initial execution unexpected failure, converting to unconfirmed', s, r);
             return makeUnknownStatusResult(s, signedTx) 
         });
 
     // if failed, bail out and tell user
     if (isFailed(maybeExecutedTx)) {
-        logError(s, maybeExecutedTx);
+        logError('Transaction execution failed', s, maybeExecutedTx);
         const msg = makeTransactionFailedErrorMessage(s, maybeExecutedTx.status);
         TGStatusMessage.queue(notificationChannel, msg, true);
         return;        
@@ -85,21 +85,21 @@ export async function swap(s: Swappable,
 
     // if successful, parse the transaction
     if (isConfirmed(maybeExecutedTx)) {
-        logInfo(s, maybeExecutedTx);
+        logInfo('Transaction confirmed', s, maybeExecutedTx);
         parsedSwapSummary = await parseSwapTransaction(s, maybeExecutedTx, userAddress, connection, env).catch(r => null);
     }
 
     // if unconfirmed, try to confirm one last time.
 
     if (isUnconfirmed(maybeExecutedTx)) {
-        logInfo(s, maybeExecutedTx);
+        logInfo('Transaction unconfirmed', s, maybeExecutedTx);
         const msg = makeTransactionUnconfirmedMessage(s, maybeExecutedTx.status);
         TGStatusMessage.queue(notificationChannel, msg, true);
         parsedSwapSummary = await waitForBlockFinalizationAndParse(s, signature, userAddress, connection, env).catch(r => null);
     }
     
     if (parsedSwapSummary == null) {
-        logError(s, { message : 'Unexpected error retrieving transaction' });
+        logError('Unexpected error retrieving transaction', s);
         const msg = `There was a problem retrieving information about your transaction.`;
         TGStatusMessage.queue(notificationChannel, msg, true);
         return;
@@ -107,7 +107,7 @@ export async function swap(s: Swappable,
     
     // if the tx couldn't be found, then assume the tx was dropped and tell the user.
     if (isUnknownTransactionParseSummary(parsedSwapSummary)) {
-        logInfo(s, parsedSwapSummary);
+        logError('Transaction could not be found', s, parsedSwapSummary);
         const txNotFoundMsg = makeTxNotFoundMessage(parsedSwapSummary, s);
         TGStatusMessage.queue(notificationChannel, txNotFoundMsg, true);
         return;
@@ -115,14 +115,14 @@ export async function swap(s: Swappable,
 
     // if the swap failed for some reason (like insufficient funds or slippage), let the user know and bail.
     if (isSwapExecutionErrorParseSwapSummary(parsedSwapSummary)) {
-        logError(s, parsedSwapSummary);
+        logError('Swap execution error', s, parsedSwapSummary);
         const failedMsg = makeSwapSummaryFailedMessage(parsedSwapSummary, s);
         TGStatusMessage.queue(notificationChannel, failedMsg, true);
         return;
     }
 
     if (isSuccessfullyParsedSwapSummary(parsedSwapSummary)) {
-        logInfo(s, parsedSwapSummary);
+        logInfo('Swap successful', s, parsedSwapSummary);
         const msg = `${SwapOfX} was successful.`;
         TGStatusMessage.queue(notificationChannel, msg, false);
     }

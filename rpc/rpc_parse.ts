@@ -1,5 +1,5 @@
 import { Connection, ParsedTransactionWithMeta, TokenBalance } from "@solana/web3.js";
-import { UserAddress } from "../crypto/wallet";
+import { UserAddress } from "../crypto";
 import { DecimalizedAmount, MATH_DECIMAL_PLACES, dDiv, dNegate, dSub, fromTokenAmount } from "../decimalized";
 import { Env } from "../env";
 import { Position, PositionRequest, Swappable, isPosition, isPositionRequest } from "../positions";

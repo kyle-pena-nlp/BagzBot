@@ -9,7 +9,7 @@ export function structuralEquals(x : Structural, y : Structural) {
     }
     else {
         const keys = new Set<string>([...Object.keys(x), ...Object.keys(y)]);
-        for (const key in keys) {
+        for (const key of keys) {
             if (!(key in x)) {
                 return false;
             }

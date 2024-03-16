@@ -24,7 +24,7 @@ export class DecimalizedAmountMap<V> {
         return this.inner.delete(key);
     }
     *keys() {
-        for (const key in this.inner.keys()) {
+        for (const key of this.inner.keys()) {
             yield fromKey(key);
         }   
     }

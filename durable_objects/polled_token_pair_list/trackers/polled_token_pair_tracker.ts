@@ -26,7 +26,7 @@ export class PolledTokenPairTracker {
         this.markForDeletion(polledTokenPairKey.toString())
     }
     *list() {
-        for (const key in Object.keys(this.polledTokenPairs)) {
+        for (const key of Object.keys(this.polledTokenPairs)) {
             const tokenPairInfo = this.polledTokenPairs[key];
             yield [tokenPairInfo.tokenAddress, tokenPairInfo.vsTokenAddress];
         }

@@ -5,6 +5,7 @@ import { QuantityAndToken } from "../durable_objects/user/model/quantity_and_tok
 import { TokenNameAndAddress } from "../durable_objects/user/model/token_name_and_address";
 import { generateWallet, getAndMaybeInitializeUserData, getDefaultTrailingStopLoss, getPosition, getWalletData, listOpenTrailingStopLossPositions, manuallyClosePosition, readSessionObj, requestNewPosition, storeSessionObj, storeSessionObjProperty, storeSessionValues } from "../durable_objects/user/userDO_interop";
 import { Env } from "../env";
+import { logError } from "../logging";
 import { BaseMenu, MenuCode, MenuConfirmTrailingStopLossPositionRequest, MenuEditTrailingStopLossPositionRequest, MenuError, MenuFAQ, MenuHelp, MenuListPositions, MenuMain, MenuPleaseEnterToken, MenuPleaseWait, MenuTODO, MenuTrailingStopLossAutoRetrySell, MenuTrailingStopLossEntryBuyQuantity, MenuTrailingStopLossPickVsToken, MenuTrailingStopLossSlippagePercent, MenuTrailingStopLossTriggerPercent, MenuViewOpenPosition, MenuViewWallet, MenuWallet, PositiveDecimalKeypad, PositiveIntegerKeypad } from "../menus";
 import { PositionRequest, PositionRequestAndQuote, convertPreRequestToRequest } from "../positions";
 import { quoteBuy } from "../rpc/jupiter_quotes";
@@ -94,9 +95,12 @@ export class Worker {
                 const trailingStopLossCustomSlippageSubmittedKeypadEntry = tryParseFloat(callbackData.menuArg!!);
                 if (trailingStopLossCustomSlippageSubmittedKeypadEntry) {
                     await storeSessionObjProperty(telegramUserID, messageID, "slippagePercent", trailingStopLossCustomSlippageSubmittedKeypadEntry, "PositionRequest", env);
-                    const positionRequestAfterEditingSlippagePct = await readSessionObj<PositionRequest>(telegramUserID, messageID, "PositionRequest", env);
-                    return await this.getQuoteAndMakeStopLossRequestEditorMenu(positionRequestAfterEditingSlippagePct, env);
                 }
+                const positionRequestAfterEditingSlippagePct = await readSessionObj<PositionRequest>(telegramUserID, messageID, "PositionRequest", env);
+                if (!trailingStopLossCustomSlippageSubmittedKeypadEntry) {
+                    logError("Invalid slippage percent submitted", telegramWebhookInfo, trailingStopLossCustomSlippageSubmittedKeypadEntry);
+                }
+                return await this.getQuoteAndMakeStopLossRequestEditorMenu(positionRequestAfterEditingSlippagePct, env);                
             case MenuCode.TrailingStopLossEnterBuyQuantityKeypad:
                 const buyTrailingStopLossQuantityKeypadEntry = callbackData.menuArg||'';
                 const trailingStopLossEnterBuyQuantityKeypad = this.makeTrailingStopLossBuyQuantityKeypad(buyTrailingStopLossQuantityKeypadEntry);
@@ -105,9 +109,12 @@ export class Worker {
                 const submittedTrailingStopLossBuyQuantity = tryParseFloat(callbackData.menuArg!!);
                 if (submittedTrailingStopLossBuyQuantity) {
                     await storeSessionObjProperty(telegramUserID, messageID, "vsTokenAmt", submittedTrailingStopLossBuyQuantity, "PositionRequest", env);
-                    const trailingStopLossRequestStateAfterBuyQuantityEdited = await readSessionObj<PositionRequest>(telegramUserID, messageID, "PositionRequest", env);
-                    return await this.getQuoteAndMakeStopLossRequestEditorMenu(trailingStopLossRequestStateAfterBuyQuantityEdited, env);
                 }
+                const trailingStopLossRequestStateAfterBuyQuantityEdited = await readSessionObj<PositionRequest>(telegramUserID, messageID, "PositionRequest", env);
+                if (!submittedTrailingStopLossBuyQuantity) {
+                    logError("Invalid buy quantity submitted", telegramWebhookInfo, trailingStopLossRequestStateAfterBuyQuantityEdited);
+                }
+                return await this.getQuoteAndMakeStopLossRequestEditorMenu(trailingStopLossRequestStateAfterBuyQuantityEdited, env);
             case MenuCode.TrailingStopLossChooseAutoRetrySellMenu:
                 return new MenuTrailingStopLossAutoRetrySell(undefined);
             case MenuCode.TrailingStopLossChooseAutoRetrySellSubmit:
@@ -125,9 +132,12 @@ export class Worker {
                 const trailingStopLossCustomTriggerPercentSubmission = tryParseFloat(callbackData.menuArg!!);
                 if (trailingStopLossCustomTriggerPercentSubmission) {
                     await storeSessionObjProperty(telegramUserID, messageID, "triggerPercent", trailingStopLossCustomTriggerPercentSubmission, "PositionRequest", env);
-                    const trailingStopLossPositionRequestAfterEditingCustomTriggerPercent = await readSessionObj<PositionRequest>(telegramUserID, messageID, "PositionRequest", env);
-                    return await this.getQuoteAndMakeStopLossRequestEditorMenu(trailingStopLossPositionRequestAfterEditingCustomTriggerPercent, env);
                 }
+                const trailingStopLossPositionRequestAfterEditingCustomTriggerPercent = await readSessionObj<PositionRequest>(telegramUserID, messageID, "PositionRequest", env);
+                if (!trailingStopLossCustomTriggerPercentSubmission) {
+                    logError("Invalid trigger percent submitted", trailingStopLossCustomTriggerPercentSubmission, telegramWebhookInfo);
+                }
+                return await this.getQuoteAndMakeStopLossRequestEditorMenu(trailingStopLossPositionRequestAfterEditingCustomTriggerPercent, env);                
             case MenuCode.TrailingStopLossEditorFinalSubmit:
                 // TODO: do the read within UserDO to avoid the extra roundtrip
                 const positionRequestAfterFinalSubmit = await readSessionObj<PositionRequest>(telegramUserID, messageID, "PositionRequest", env);

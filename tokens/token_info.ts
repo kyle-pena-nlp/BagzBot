@@ -1,6 +1,6 @@
 import { PublicKey } from "@solana/web3.js";
 import { Buffer } from "node:buffer";
-import { UserAddress } from "../crypto/wallet";
+import { UserAddress } from "../crypto";
 import { Env } from "../env";
 import { Structural } from "../util";
 
