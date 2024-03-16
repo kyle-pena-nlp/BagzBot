@@ -23,6 +23,7 @@ export interface Env {
 	RPC_CONFIRM_TIMEOUT_MS : string
 	RPC_MAX_CONFIRM_EXCEPTIONS : string
 	MAX_BLOCK_FINALIZATION_TIME_MS : string
+	PK_AES_SALT : string
 	UserDO : any // i'd like to strongly type this as DurableObjectNamespace, but can't for technical reasons
 	TokenPairPositionTrackerDO : any // ditto
 	PolledTokenPairListDO : any // ditto

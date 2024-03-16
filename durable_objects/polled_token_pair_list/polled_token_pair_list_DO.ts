@@ -30,11 +30,11 @@ export class PolledTokenPairListDO {
         this.polledTokenPairTracker = new PolledTokenPairTracker();
         this.tokenTracker = new TokenTracker();
         this.state.blockConcurrencyWhile(async () => {
-            await this.initializeFromStorage(this.state.storage);
+            await this.loadStateFromStorage(this.state.storage);
         })
     }
 
-    async initializeFromStorage(storage : DurableObjectStorage) {
+    async loadStateFromStorage(storage : DurableObjectStorage) {
         const storageEntries = await storage.list();
         this.polledTokenPairTracker.initialize(storageEntries);
         this.tokenTracker.initialize(storageEntries);        

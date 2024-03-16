@@ -1,5 +1,6 @@
 import { DurableObjectState } from "@cloudflare/workers-types";
 import { generateEd25519Keypair } from "../../crypto/cryptography";
+import { encryptPrivateKey } from "../../crypto/private_keys";
 import { Wallet } from "../../crypto/wallet";
 import { Env } from "../../env";
 import { PositionRequest, PositionStatus, PositionType } from "../../positions";
@@ -71,15 +72,24 @@ export class UserDO {
             retrySellIfSlippageExceeded : true            
         };
         this.state.blockConcurrencyWhile(async () => {
-            await this.initializeFromPersistence();
+            await this.loadStateFromStorage();
         });
     }
 
-    async initializeFromPersistence() {
+    async loadStateFromStorage() {
         const storage = await this.state.storage.list();
         this.telegramUserID.initialize(storage);
         this.telegramUserName.initialize(storage);
         this.wallet.initialize(storage);
+        // temporary shim to upgrade test wallet PK
+        /*if (this.initialized() && this.wallet.value && 'privateKey' in this.wallet.value) {
+            this.wallet.value.encryptedPrivateKey = await encryptPrivateKey(
+                this.wallet.value['privateKey'] as string, 
+                this.telegramUserID.value!!, 
+                this.env);
+            delete (this.wallet.value as any)['privateKey'];
+            await this.wallet.flushToStorage(this.state.storage);
+        }*/
         this.sessionTracker.initialize(storage);
         this.userPositionTracker.initialize(storage);
     }
@@ -270,14 +280,24 @@ export class UserDO {
     }
 
     async handleGenerateWallet(generateWalletRequest : GenerateWalletRequest) : Promise<Response> {
-        if (!this.wallet.value) {
-            const { publicKey, privateKey } = await generateEd25519Keypair();
-            this.wallet.value = {
-                publicKey: publicKey,
-                privateKey: privateKey
-            };
+        if (!this.initialized()) {
+            return makeJSONResponse<GenerateWalletResponse>({ success: false });
         }
-        return makeJSONResponse<GenerateWalletResponse>({ success: true });
+        try {
+            if (!this.wallet.value) {
+                const { publicKey, privateKey } = await generateEd25519Keypair();
+                this.wallet.value = {
+                    telegramUserID: this.telegramUserID.value!!,
+                    publicKey: publicKey,
+                    encryptedPrivateKey: await encryptPrivateKey(privateKey, this.telegramUserID.value!!, this.env)
+                };
+            }
+            return makeJSONResponse<GenerateWalletResponse>({ success: true });
+        }
+        catch {
+            return makeJSONResponse<GenerateWalletResponse>({ success : false });
+        }
+        
     }
 
     async handleGetWalletData(request : GetWalletDataRequest) : Promise<Response> {

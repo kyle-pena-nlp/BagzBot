@@ -48,11 +48,11 @@ export class TokenPairPositionTrackerDO {
         this.isPolling          = false;
         this.env = env;
         this.state.blockConcurrencyWhile(async () => {
-            await this.initializeFromStorage(this.state.storage);
+            await this.loadStateFromStorage(this.state.storage);
         });
     }
 
-    async initializeFromStorage(storage : DurableObjectStorage) {
+    async loadStateFromStorage(storage : DurableObjectStorage) {
         const entries = await storage.list();
         this.tokenAddress.initialize(entries);
         this.vsTokenAddress.initialize(entries);

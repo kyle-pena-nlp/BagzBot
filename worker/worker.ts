@@ -272,6 +272,7 @@ export class Worker {
 
     async handleCreateWallet(telegramWebhookInfo : TelegramWebhookInfo, env : Env) : Promise<Response> {
         const responseBody = await generateWallet(telegramWebhookInfo.telegramUserID, env);
+        // todo: handle error case.
         return makeJSONResponse(responseBody);
     }
 

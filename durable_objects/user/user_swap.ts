@@ -50,14 +50,14 @@ export async function swap(s: Swappable,
     }
 
     // sign tx
-    const signedTx = await signTransaction(txBuffer, wallet, env).catch(r => null);
+    const signedTx = await signTransaction(txBuffer, wallet, s.userID, env).catch(r => null);
     if (signedTx == null || isTransactionPreparationFailure(signedTx)) {
         logError(s, signedTx);
         TGStatusMessage.queue(notificationChannel, `Could not sign transaction - ${swapOfX} failed.`, true);
         return;
     }
     else {
-        TGStatusMessage.queue(notificationChannel, `Could not sign transaction - ${swapOfX} failed.`, true);
+        TGStatusMessage.queue(notificationChannel, `Transaction for ${swapOfX} signed.`, true);
     }
 
     // get some stuff we'll need
