@@ -11,7 +11,7 @@ import { PositionRequest, PositionRequestAndQuote, convertPreRequestToRequest } 
 import { quoteBuy } from "../rpc/jupiter_quotes";
 import { AutoSellOrderSpec, TelegramWebhookInfo, deleteTGMessage, sendMessageToTG, sendRequestToTG, updateTGMessage } from "../telegram";
 import { getVsTokenInfo } from "../tokens";
-import { Structural, makeFakeFailedRequestResponse, makeJSONResponse, makeSuccessResponse, tryParseFloat } from "../util";
+import { Structural, assertNever, makeFakeFailedRequestResponse, makeJSONResponse, makeSuccessResponse, tryParseFloat } from "../util";
 
 export class Worker {
 
@@ -191,6 +191,7 @@ export class Worker {
                 const z = await readSessionObj<PositionRequest>(telegramUserID, messageID, "PositionRequest", env);
                 return await this.getQuoteAndMakeStopLossRequestEditorMenu(z, env);
             default:
+                assertNever(callbackData.menuCode);
                 return new MenuError(undefined);
         }
     }

@@ -1,3 +1,5 @@
+import { assertNever } from "../util";
+
 const keysToLookFor = [
     'message',
     'telegramUserID',
@@ -103,6 +105,7 @@ function logIt(xs : any[], level : 'error'|'info'|'debug') {
             console.info(logMsg);
             break;
         default:
+            assertNever(level);
             throw new Error("Programmer error.");
     }
 }

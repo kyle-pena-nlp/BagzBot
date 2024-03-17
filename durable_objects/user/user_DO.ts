@@ -3,7 +3,7 @@ import { Wallet, encryptPrivateKey, generateEd25519Keypair } from "../../crypto"
 import { Env } from "../../env";
 import { PositionRequest, PositionStatus, PositionType } from "../../positions";
 import { TokenInfo, getVsTokenInfo } from "../../tokens";
-import { ChangeTrackedValue, Structural, makeFailureResponse, makeJSONResponse, makeSuccessResponse, maybeGetJson } from "../../util";
+import { ChangeTrackedValue, Structural, assertNever, makeFailureResponse, makeJSONResponse, makeSuccessResponse, maybeGetJson } from "../../util";
 import { AutomaticallyClosePositionsRequest, AutomaticallyClosePositionsResponse } from "../token_pair_position_tracker/actions/automatically_close_positions";
 import { TokenPairPositionTrackerInitializeRequest } from "../token_pair_position_tracker/actions/initialize_token_pair_position_tracker";
 import { TokenPairPositionTrackerDOFetchMethod, makeTokenPairPositionTrackerDOFetchRequest } from "../token_pair_position_tracker/token_pair_position_tracker_DO_interop";
@@ -187,6 +187,7 @@ export class UserDO {
                 response = await this.handleAutomaticallyClosePositionsRequest(jsonRequestBody);
                 break;
             default:
+                assertNever(method);
                 response = makeFailureResponse('Unknown method: ${method.toString()}');
         }
 

@@ -67,7 +67,7 @@ export async function swap(s: Swappable,
 
     // attempt to execute tx
     TGStatusMessage.queue(notificationChannel, `Executing transaction... (this could take a moment)`, false);
-    let maybeExecutedTx = await executeRawSignedTransaction(s.positionID, signedTx, connection, env, logger)
+    let maybeExecutedTx = await executeRawSignedTransaction(s.positionID, signedTx, connection, env)
         .catch(r => { 
             logError('Initial execution unexpected failure, converting to unconfirmed', s, r);
             return makeUnknownStatusResult(s, signedTx); 
@@ -107,7 +107,7 @@ export async function swap(s: Swappable,
     
     // if the tx couldn't be found, then assume the tx was dropped and tell the user.
     if (isUnknownTransactionParseSummary(parsedSwapSummary)) {
-        logError('Transaction could not be found', s, parsedSwapSummary);
+        logError('Transaction could not be found', s, parsedSwapSummary, { signature : signature });
         const txNotFoundMsg = makeTxNotFoundMessage(parsedSwapSummary, s);
         TGStatusMessage.queue(notificationChannel, txNotFoundMsg, true);
         return;
@@ -164,13 +164,15 @@ function makeSwapSummaryFailedMessage(parsedSwapResult : SwapExecutionErrorParse
     const swapOfX = getSwapOfXDescription(s, true);
     switch(status) {
         case SwapExecutionError.InsufficientBalance:
-            return `${swapOfX} was not executed.`;
+            return `${swapOfX} was not executed due to insufficient balance.`;
         case SwapExecutionError.SlippageToleranceExceeded:
             return `${swapOfX} was not executed.  The slippage tolerance was exceeded (price moved too fast).`;
         case SwapExecutionError.OtherSwapExecutionError:
             return `${swapOfX} failed.`;
+        case SwapExecutionError.TokenAccountFeeNotInitialized:
+            return `${swapOfX} failed.`;
         default:
-            throw new Error("Programmer error.");
+            assertNever(status);
     }
 }
 
@@ -218,7 +220,7 @@ function makeTransactionFailedErrorMessage(s: Swappable, status : TransactionExe
         case TransactionExecutionError.TokenFeeAccountNotInitialized:
             return `${swapOfX} failed because of a configuration problemwith the bot.`;
         default:
-            return assertNever(status);
+            assertNever(status);
     }
 }
 
@@ -237,6 +239,7 @@ function makeTransactionUnconfirmedMessage(s: Swappable, status: TransactionExec
         case TransactionExecutionErrorCouldntConfirm.Unknown:
             return `Something went wrong and ${swapOfX} could not be confirmed.  ${weWillRetry}.`;
         default:
+            assertNever(status);
             throw new Error("Programmer error.");
     }
 }

@@ -27,3 +27,11 @@ export function tryParseInt(x : string|null|undefined) : number|null {
         }
     }
 }
+
+export function strictParseInt(x : string) : number {
+    const result = tryParseInt(x);
+    if (result == null) {
+        throw new Error(`string '${x}' is not parseable as an int`);
+    }
+    return result;
+}

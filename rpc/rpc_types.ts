@@ -53,7 +53,8 @@ export interface PreparseUnconfirmedSwapResult extends BasePreparseResult {
 export enum SwapExecutionError {
     InsufficientBalance = "InsufficientBalance",
     SlippageToleranceExceeded = "SlippageToleranceExceeded",
-    OtherSwapExecutionError = "OtherSwapExecutionError"
+    OtherSwapExecutionError = "OtherSwapExecutionError",
+    TokenAccountFeeNotInitialized = "TokenAccountFeeNotInitialized"
 };
 
 

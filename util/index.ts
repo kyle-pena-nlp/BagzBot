@@ -14,13 +14,12 @@ import {
     tryReadResponseBody
 } from "./http_helpers";
 import { MapWithStorage } from "./map_with_storage";
-import { tryParseFloat, tryParseInt } from "./numbers";
+import { strictParseInt, tryParseFloat, tryParseInt } from "./numbers";
 import { Result } from "./result";
 import { safe } from "./safe";
 import { setDifference, setIntersection } from "./set_operations";
 import { pause, sleep } from "./sleep";
 import { Structural, structuralEquals } from "./structural";
-
 
 export {
     ChangeTrackedValue, MapWithStorage,
@@ -34,6 +33,7 @@ export {
     maybeGetJson, pause, safe,
     setDifference,
     setIntersection,
-    sleep, strictParseBoolean, structuralEquals, tryParseFloat,
+    sleep, strictParseBoolean, strictParseInt, structuralEquals, tryParseFloat,
     tryParseInt, tryReadResponseBody
 };
+

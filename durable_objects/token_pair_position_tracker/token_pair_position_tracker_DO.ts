@@ -1,7 +1,7 @@
 import { DurableObjectState } from "@cloudflare/workers-types";
 import { DecimalizedAmount, MATH_DECIMAL_PLACES, fromNumber } from "../../decimalized";
 import { Env } from "../../env";
-import { ChangeTrackedValue, makeJSONResponse } from "../../util";
+import { ChangeTrackedValue, assertNever, makeJSONResponse } from "../../util";
 import { sendClosePositionOrdersToUserDOs } from "../user/userDO_interop";
 import { AutomaticallyClosePositionsRequest } from "./actions/automatically_close_positions";
 import { ImportNewPositionsRequest, ImportNewPositionsResponse } from "./actions/import_new_positions";
@@ -163,6 +163,7 @@ export class TokenPairPositionTrackerDO {
                 this.assertIsInitialized();
                 return await this.handleMarkPositionAsClosed(body);
             default:
+                assertNever(method);
                 return makeJSONResponse({},400);
         }
     }

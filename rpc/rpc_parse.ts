@@ -52,7 +52,10 @@ async function parseSwapTransaction(
     const parsedTransaction = await connection.getParsedTransaction(signature, {
         maxSupportedTransactionVersion: 0,
         commitment: 'confirmed'
-    }).catch(r => null);
+    }).catch(r => {
+        logError("Hard error retrieving parsed transaction", userAddress, { signature : signature }, r);
+        return null;
+    });
 
     if (!parsedTransaction) {
         return {  

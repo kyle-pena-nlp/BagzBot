@@ -1,7 +1,7 @@
 import { DurableObjectState } from "@cloudflare/workers-types";
 import { Env } from "../../env";
 import { StagedTokenInfo, TokenInfo } from "../../tokens";
-import { makeFailureResponse, makeJSONResponse, makeSuccessResponse, maybeGetJson } from "../../util";
+import { assertNever, makeFailureResponse, makeJSONResponse, makeSuccessResponse, maybeGetJson } from "../../util";
 import { GetTokenInfoRequest, GetTokenInfoResponse } from "./actions/get_token_info";
 import { PolledTokenPairListDOFetchMethod, parsePolledTokenPairListDOFetchMethod } from "./polled_token_pair_list_DO_interop";
 import { PolledTokenPairTracker } from "./trackers/polled_token_pair_tracker";
@@ -62,6 +62,7 @@ export class PolledTokenPairListDO {
                 const validateTokenResponse = await this.handleValidateToken(jsonRequestBody);
                 return makeJSONResponse(validateTokenResponse);
             default:
+                assertNever(method);
                 return makeFailureResponse("Unknown method.");
         }
     }
@@ -152,7 +153,7 @@ export class PolledTokenPairListDO {
         return tokenInfos;   
     }
 
-    async validateFetchRequest(request : Request) {
+    async validateFetchRequest(request : Request) : Promise<[PolledTokenPairListDOFetchMethod,any]> {
         const jsonBody : any = await maybeGetJson<any>(request);
         const methodName = new URL(request.url).pathname.substring(1);
         const method : PolledTokenPairListDOFetchMethod|null = parsePolledTokenPairListDOFetchMethod(methodName);

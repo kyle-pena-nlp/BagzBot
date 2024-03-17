@@ -2,6 +2,7 @@ import { Connection, SignatureStatus, VersionedTransaction } from "@solana/web3.
 import * as bs58 from "bs58";
 import { Buffer } from "node:buffer";
 import { Env } from "../env";
+import { logError } from "../logging";
 import { sleep } from "../util";
 import { getLastValidBlockheight, getLatestBlockheight } from "./rpc_common";
 import {
@@ -16,13 +17,7 @@ export async function executeRawSignedTransaction(
     positionID : string,
     rawSignedTx : VersionedTransaction, 
     connection : Connection,
-    env : Env,
-    logHandler? : (msg: string, error : any) => Promise<void>) : Promise<PreparseSwapResult> {
-    
-    // no-op the logHandler if one is not provided
-    if (logHandler == null) {
-        logHandler = async (msg:string, error: any) => {};
-    }
+    env : Env) : Promise<PreparseSwapResult> {
 
     // Define some settings
     const maxConfirmExceptions = parseInt(env.RPC_MAX_CONFIRM_EXCEPTIONS,10);
@@ -74,7 +69,7 @@ export async function executeRawSignedTransaction(
                 anyTxSent = true;
             }
             catch(e) {
-                await logHandler("sendRawTransaction threw an exception", e);
+                logError("sendRawTransaction threw an exception", e, signature);
                 const exceptionKind = parseSendRawTransactionException(e);
                 if (exceptionKind === 'InsufficientNativeTokensError') {
                     stopConfirmingSignal = true;
@@ -100,7 +95,7 @@ export async function executeRawSignedTransaction(
                 blockheight = await getLatestBlockheight(connection);
             }
             catch(e) {
-                await logHandler("getBlockHeight threw an exception", e);
+                logError("getBlockHeight threw an exception", e, signature);
                 if (!anyTxSent) {
                     stopConfirmingSignal = true;
                     return TransactionExecutionError.CouldNotPollBlockheightNoTxSent;
@@ -155,23 +150,23 @@ export async function executeRawSignedTransaction(
                     // if tx DNE and blockheight exceeded, tx was dropped (TODO: is this certainly true?)
                     const currentBlockheight = await getLatestBlockheight(connection).catch((reason) => null);
                     if (currentBlockheight && (currentBlockheight > lastValidBlockheight)) {
-                        await logHandler("No transaction found", {});
+                        logError("No transaction found", signature);
                         return TransactionExecutionError.TransactionDropped;// 'transaction-dropped';
                     }
                     if (!currentBlockheight) {
-                        await logHandler('Could not poll currentBlockheight', {});
+                        logError('Could not poll currentBlockheight', signature);
                     } 
                 }
             }
             catch(e) {
                 confirmExceptions++;
-                await logHandler('getSignatureStatuses threw an exception', e);
+                logError('getSignatureStatuses threw an exception', e, signature);
             }
 
             /* If the transaction itself failed, exit confirmation loop with 'transaction-failed'. */
             const err = result?.err;
             if (err) {
-                await logHandler("Transaction failed", err);
+                logError('Transaction failed', err, signature);
                 stopSendingSignal = true;
                 return parseSwapExecutionError(err, rawSignedTx, env);
             }
@@ -227,6 +222,10 @@ function parseSwapExecutionError(err : any, rawSignedTx : VersionedTransaction, 
             }
             else if (errorCode === parseInt(env.JUPITER_SWAP_PROGRAM_FEE_ACCOUNT_NOT_INITIALIZED_ERROR_CODE,10)) {
                 return TransactionExecutionError.TokenFeeAccountNotInitialized;
+            }
+            else if (errorCode === parseInt(env.JUPITER_SWAP_PROGRAM_INSUFFICIENT_LAMPORTS_ERROR_CODE, 10)) {
+                // instruction index === 3
+                return TransactionExecutionError.InsufficientNativeTokensError;
             }
         }
         catch {
