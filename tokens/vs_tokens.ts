@@ -1,6 +1,6 @@
 import { TokenInfo } from "./token_info";
 
-const SOL_ADDRESS = "So11111111111111111111111111111111111111112";
+export const SOL_ADDRESS = "So11111111111111111111111111111111111111112";
 const SOL_SYMBOL = "SOL";
 const SOL_NAME = "Wrapped SOL";
 

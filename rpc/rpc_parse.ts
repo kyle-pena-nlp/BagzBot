@@ -1,9 +1,10 @@
 import { Connection, ParsedTransactionWithMeta, TokenBalance } from "@solana/web3.js";
 import { UserAddress } from "../crypto";
-import { DecimalizedAmount, MATH_DECIMAL_PLACES, dDiv, dNegate, dSub, fromTokenAmount } from "../decimalized";
+import { DecimalizedAmount, MATH_DECIMAL_PLACES, dAdd, dDiv, dNegate, dSub, fromTokenAmount } from "../decimalized";
 import { Env } from "../env";
+import { logError } from "../logging";
 import { Position, PositionRequest, Swappable, isPosition, isPositionRequest } from "../positions";
-import { deriveTokenAccount } from "../tokens";
+import { SOL_ADDRESS, deriveTokenAccount, getVsTokenDecimals } from "../tokens";
 import { safe, sleep } from "../util";
 import { ParsedSwapSummary, PreparseConfirmedSwapResult, PreparseSwapResult, SwapExecutionError, SwapSummary } from "./rpc_types";
 
@@ -67,8 +68,8 @@ async function parseSwapTransaction(
         };
     }    
 
-    const swapInTokenDiff = safe(dNegate)(calculateTokenBalanceChange(parsedTransaction, inTokenAddress, userAddress));
     const swapOutTokenDiff = calculateTokenBalanceChange(parsedTransaction, outTokenAddress, userAddress);
+    const swapInTokenDiff = safe(dNegate)(calculateTokenBalanceChange(parsedTransaction, inTokenAddress, userAddress));
 
     if (swapInTokenDiff == null || swapOutTokenDiff == null) {
         throw new Error("Programmer error.");
@@ -101,27 +102,64 @@ function calculateTokenBalanceChange(parsedTransaction : ParsedTransactionWithMe
     const preTokenBalances = parsedTransaction.meta?.preTokenBalances||[];
     const postTokenBalances = parsedTransaction.meta?.postTokenBalances||[];
     const accountKeys = parsedTransaction.transaction.message.accountKeys.map(a => a.pubkey.toBase58());
-    //const accountKeys = (parsedTransaction.meta?.loadedAddresses?.writable||[]).map(a => a.toBase58());
+    // depending on whether we are dealing with SOL, we look in different places.
+    // TODO: does the pre-and-post difference include any tx fees paid or not?
+    if (tokenAddress === SOL_ADDRESS) {
+        const ownerAccountIdx = accountKeys.indexOf(userAddress.address);
+        const preSOLBalances = parsedTransaction.meta?.preBalances;
+        const postSOLBalances = parsedTransaction.meta?.postBalances;
+        const rawPreSolAmount = preSOLBalances?.[ownerAccountIdx];
+        const rawPostSolAmount = postSOLBalances?.[ownerAccountIdx];
+        if (rawPreSolAmount == null || rawPostSolAmount == null) {
+            logError("Could not find pre/post SOL balances", userAddress, parsedTransaction.transaction.signatures[0]);
+            return null;
+        }
+        const solDecimals = getVsTokenDecimals('SOL')!!;
+        const preSOLDecimalized : DecimalizedAmount = { 
+            tokenAmount: rawPreSolAmount.toString(),
+            decimals : solDecimals 
+        };
+        const postSOLDecimalized : DecimalizedAmount = {
+            tokenAmount : rawPostSolAmount.toString(),
+            decimals: solDecimals
+        };
+        const solBalanceDiff = dSub(postSOLDecimalized,preSOLDecimalized);
 
-    const preTokenBalance = findWithMintAndPubKey(preTokenBalances, accountKeys, tokenAddress, userAddress);
-    const postTokenBalance = findWithMintAndPubKey(postTokenBalances, accountKeys, tokenAddress, userAddress);
-
-    if (preTokenBalance == null || postTokenBalance == null) {
-        return null;
+        // sadly, the pre/post amount for SOL doesn't seem to exclude fees, so we do that here.
+        const solFees = parsedTransaction.meta?.fee||0;
+        const solFeeDecimalized : DecimalizedAmount = {
+            tokenAmount: solFees.toString(),
+            decimals : solDecimals
+        }
+        return dAdd(solBalanceDiff, solFeeDecimalized);
     }
-
-    const preAmount = fromTokenAmount(preTokenBalance.uiTokenAmount);
-    const postAmount = fromTokenAmount(postTokenBalance.uiTokenAmount);
-
-    return dSub(postAmount,preAmount);
+    else {
+        const preTokenBalance = findWithMintAndPubKey(preTokenBalances, accountKeys, tokenAddress, userAddress);
+        const postTokenBalance = findWithMintAndPubKey(postTokenBalances, accountKeys, tokenAddress, userAddress);
+    
+        if (preTokenBalance == null || postTokenBalance == null) {
+            return null;
+        }
+    
+        const preAmount = fromTokenAmount(preTokenBalance.uiTokenAmount);
+        const postAmount = fromTokenAmount(postTokenBalance.uiTokenAmount);
+    
+        return dSub(postAmount,preAmount);
+    }
 }
 
 function findWithMintAndPubKey(tokenBalances : TokenBalance[], accountKeys : string[], tokenAddress : string, userAddress : UserAddress) {
-    const tokenAccountAddress = deriveTokenAccount(tokenAddress, userAddress).toBase58();
+    
+    const tokenAccountAddress = getTokenAccountAddress(tokenAddress, userAddress);
     const tokenBalance = tokenBalances
         .map(e => { return { ...e, accountAddress: accountKeys[e.accountIndex] }; })
         .find(e => (e.accountAddress === tokenAccountAddress) && (e.mint === tokenAddress));
     return tokenBalance;
+}
+
+function getTokenAccountAddress(tokenAddress : string, userAddress : UserAddress) : string {
+    const tokenAccountAddress = deriveTokenAccount(tokenAddress, userAddress).toBase58();
+    return tokenAccountAddress;
 }
 
 export async function waitForBlockFinalizationAndParse(s : Swappable,

@@ -44,10 +44,20 @@ export enum TGTextEntityType {
     other
 }
 
-export interface TgMessageSentInfo {
-    success: boolean
-    chatID? : number
-    messageID? : number
+export interface SuccessfulTgMessageSentInfo {
+    success: true
+    chatID : number
+    messageID : number
+}
+
+export interface FailedTgMessageSentInfo {
+    success : false
+}
+
+export type TgMessageSentInfo = FailedTgMessageSentInfo | SuccessfulTgMessageSentInfo
+
+export function isSuccessfulTgMessage(x : TgMessageSentInfo) : x is SuccessfulTgMessageSentInfo {
+    return x.success;
 }
 
 export function makeTelegramBotUrl(methodName : string, env : Env) {
@@ -78,17 +88,21 @@ export async function updateTGMessage(chatID : number,
     return await fetch(request).then(async (response) => {
         if (response.ok) {
             const responseJSON : any = await response.json();
-            return {
+            const success : SuccessfulTgMessageSentInfo = {
                 success: true,
-                chatID : responseJSON.result?.chat.id,
-                messageID: responseJSON.result?.message_id
+                chatID : responseJSON.result.chat.id as number,
+                messageID: responseJSON.result.message_id as number
             };
+            return success;
         }
         else {
-            return { success: false };
+            const responseDescription = (await response.json().catch(r => null));
+            const failure : FailedTgMessageSentInfo = { success: false };
+            return failure;
         }
     }).catch(() => {
-        return { success: false};
+        const failure : FailedTgMessageSentInfo = { success: false };
+        return failure;
     });
 }
 
@@ -102,17 +116,20 @@ export async function sendMessageToTG(chatID : number,
     return await fetch(request).then(async (response) => {
         if (response.ok) {
             const responseJSON : any = await response.json();
-            return {
+            const success : SuccessfulTgMessageSentInfo = {
                 success: true,
                 chatID : responseJSON.result?.chat.id,
                 messageID: responseJSON.result?.message_id
             };
+            return success;
         }
         else {
-            return { success: false };
+            const failure : FailedTgMessageSentInfo = { success: false };
+            return failure;
         }
     }).catch(() => {
-        return { success: false};
+        const failure : FailedTgMessageSentInfo = { success: false};
+        return failure;
     });
 }
 

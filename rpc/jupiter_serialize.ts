@@ -1,7 +1,7 @@
 import { Buffer } from "node:buffer";
 import { Env } from "../env";
 import { deriveFeeAccount } from "../tokens";
-import { makeJSONRequest, tryReadResponseBody } from "../util";
+import { makeJSONRequest, strictParseBoolean as parseBoolStrict, tryReadResponseBody } from "../util";
 import { SwapRoute } from "./jupiter_types";
 import { TransactionPreparationFailure, isTransactionPreparationFailure } from "./rpc_types";
 
@@ -18,9 +18,11 @@ export async function serializeSwapRouteTransaction(swapRoute : SwapRoute|Transa
       quoteResponse: swapRoute.route,
       userPublicKey: publicKey,
       wrapAndUnwrapSol: true,
-
       computeUnitPriceMicroLamports: "auto"
     };
+    if (parseBoolStrict(env.JUPITER_USE_DYNAMIC_COMPUTE_UNIT_LIMIT)) {
+        body.dynamicComputeUnitLimit = true; 
+    }
     if (includeReferralPlatformFee) {
         const feeAccount = await deriveFeeAccount(swapRoute.outTokenAddress, env);
         body.feeAccount = feeAccount.toBase58();

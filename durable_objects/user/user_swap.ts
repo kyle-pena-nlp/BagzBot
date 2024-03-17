@@ -57,7 +57,7 @@ export async function swap(s: Swappable,
         return;
     }
     else {
-        TGStatusMessage.queue(notificationChannel, `Transaction for ${swapOfX} signed.`, true);
+        TGStatusMessage.queue(notificationChannel, `Transaction for ${swapOfX} signed.`, false);
     }
 
     // get some stuff we'll need

@@ -9,7 +9,7 @@ import { logError } from "../logging";
 import { BaseMenu, MenuCode, MenuConfirmTrailingStopLossPositionRequest, MenuEditTrailingStopLossPositionRequest, MenuError, MenuFAQ, MenuHelp, MenuListPositions, MenuMain, MenuPleaseEnterToken, MenuPleaseWait, MenuTODO, MenuTrailingStopLossAutoRetrySell, MenuTrailingStopLossEntryBuyQuantity, MenuTrailingStopLossPickVsToken, MenuTrailingStopLossSlippagePercent, MenuTrailingStopLossTriggerPercent, MenuViewOpenPosition, MenuViewWallet, MenuWallet, PositiveDecimalKeypad, PositiveIntegerKeypad } from "../menus";
 import { PositionRequest, PositionRequestAndQuote, convertPreRequestToRequest } from "../positions";
 import { quoteBuy } from "../rpc/jupiter_quotes";
-import { AutoSellOrderSpec, TelegramWebhookInfo, deleteTGMessage, sendMessageToTG, sendRequestToTG } from "../telegram";
+import { AutoSellOrderSpec, TelegramWebhookInfo, deleteTGMessage, sendMessageToTG, sendRequestToTG, updateTGMessage } from "../telegram";
 import { getVsTokenAddress, getVsTokenInfo, getVsTokenName } from "../tokens";
 import { Structural, makeFakeFailedRequestResponse, makeJSONResponse, makeSuccessResponse, tryParseFloat } from "../util";
 
@@ -31,6 +31,10 @@ export class Worker {
             const tokenAddress = validateTokenResponse.tokenInfo!!.address;
             const tokenSymbol  = validateTokenResponse.tokenInfo!!.symbol;
             const tgMessageInfo = await sendMessageToTG(telegramWebhookInfo.chatID, `Token address '${tokenAddress}' (${tokenSymbol}) recognized!`, env);
+            if (!tgMessageInfo.success) {
+                return makeSuccessResponse();
+            }
+            defaultTrailingStopLossRequest.messageID = tgMessageInfo.messageID;
             await storeSessionObj<PositionRequest>(telegramUserID, tgMessageInfo.messageID!!, defaultTrailingStopLossRequest, "PositionRequest", env);
             const menu = await this.getQuoteAndMakeStopLossRequestEditorMenu(defaultTrailingStopLossRequest, env);
             const request = menu.getUpdateExistingMenuRequest(chatID, tgMessageInfo.messageID!!, env);
@@ -49,11 +53,13 @@ export class Worker {
         return makeSuccessResponse();
     }
 
+    // TODO: switch to handlers, factor handlers out into little classes (preferably into the menu classes themselves)
     async handleCallbackQueryInternal(telegramWebhookInfo : TelegramWebhookInfo, env : Env) : Promise<BaseMenu|void> {
         const telegramUserID = telegramWebhookInfo.telegramUserID;
         const messageID = telegramWebhookInfo.messageID;
         const chatID = telegramWebhookInfo.chatID;
-        const callbackData = telegramWebhookInfo.callbackData!!;switch(callbackData.menuCode) {
+        const callbackData = telegramWebhookInfo.callbackData!!;
+        switch(callbackData.menuCode) {
             case MenuCode.Main:
                 return this.createMainMenu(telegramWebhookInfo, env);
             case MenuCode.CreateWallet:
@@ -286,12 +292,20 @@ export class Worker {
         return makeJSONResponse(responseBody);
     }
 
+    // TODO: this is a total mess
     async handleCommand(telegramWebhookInfo : TelegramWebhookInfo, env: any) : Promise<Response> {
         const command = telegramWebhookInfo.command!!;
-        const [commandTextResponse,menu,storeSessionObjectRequest] = await this.handleCommandInternal(command, telegramWebhookInfo, env);
-        const tgMessageInfo = await sendMessageToTG(telegramWebhookInfo.chatID, commandTextResponse, env);
+        const tgMessage = await sendMessageToTG(telegramWebhookInfo.chatID, 'Processing command', env);
+        if (!tgMessage.success) {
+            return makeSuccessResponse();
+        }
+        const [commandTextResponse,menu,storeSessionObjectRequest] = await this.handleCommandInternal(command, telegramWebhookInfo, tgMessage.messageID, env);
+        const tgMessageInfo = await updateTGMessage(telegramWebhookInfo.chatID, tgMessage.messageID, commandTextResponse, env);
+        if (!tgMessageInfo.success) {
+            return makeSuccessResponse();
+        }
         if (storeSessionObjectRequest != null) {
-            await storeSessionObj(telegramWebhookInfo.telegramUserID, tgMessageInfo.messageID!!, storeSessionObjectRequest.obj, storeSessionObjectRequest.prefix, env);
+            await storeSessionObj(telegramWebhookInfo.telegramUserID, tgMessageInfo.messageID, storeSessionObjectRequest.obj, storeSessionObjectRequest.prefix, env);
         }
         if (menu != null) {
             const menuDisplayRequest = menu.getUpdateExistingMenuRequest(telegramWebhookInfo.chatID, tgMessageInfo.messageID!!, env);
@@ -300,7 +314,7 @@ export class Worker {
         return makeSuccessResponse();
     }
 
-    async handleCommandInternal(command : string, telegramWebhookInfo : TelegramWebhookInfo, env : Env) : Promise<[string,BaseMenu?,{ obj : any, prefix : string }?]> {
+    async handleCommandInternal(command : string, telegramWebhookInfo : TelegramWebhookInfo, messageID : number, env : Env) : Promise<[string,BaseMenu?,{ obj : any, prefix : string }?]> {
         switch(command) {
             case '/start':
                 const userData = await getAndMaybeInitializeUserData(telegramWebhookInfo.telegramUserID, telegramWebhookInfo.telegramUserName, telegramWebhookInfo.messageID, env);
@@ -323,6 +337,7 @@ export class Worker {
                 const tokenRecognizedForAutoSellOrderMsg =  `Token address '${tokenAddress}' (${tokenInfo.symbol!!}) recognized!`;
                 const positionPrerequest = autoSellOrderSpec.toPositionPreRequest();
                 const positionRequest = convertPreRequestToRequest(positionPrerequest, tokenInfo);
+                positionRequest.messageID = messageID; // ugh hack.
                 return [tokenRecognizedForAutoSellOrderMsg,
                     await this.getQuoteAndMakeStopLossRequestEditorMenu(positionRequest, env),
                     { obj: positionPrerequest, prefix: "PositionRequest" }];
