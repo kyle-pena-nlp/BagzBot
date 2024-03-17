@@ -1,6 +1,6 @@
 import { CallbackData } from "../menus/callback_data";
 import { PositionPreRequest, PositionType } from "../positions";
-import { getVsTokenAddress } from "../tokens";
+import { getVsTokenInfo } from "../tokens";
 import { TGTextEntity, TGTextEntityType } from "./telegram_helpers";
 
 export class AutoSellOrderSpec {
@@ -117,12 +117,12 @@ export class AutoSellOrderSpec {
 			return null;
 		}
 		const text = entity.text;
-		const vsTokenAddress = getVsTokenAddress(text);
-		if (vsTokenAddress == null) {
-			return null;
-		}
-		else {
+		try {
+			const vsTokenAddress = getVsTokenInfo(text).address;
 			return vsTokenAddress;
+		}
+		catch {
+			return null;
 		}
 	}
 

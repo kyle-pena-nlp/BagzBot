@@ -1,4 +1,4 @@
-export interface TokenNameAndAddress {
-	token : string
+export interface TokenSymbolAndAddress {
+	tokenSymbol : string
 	tokenAddress : string
 };

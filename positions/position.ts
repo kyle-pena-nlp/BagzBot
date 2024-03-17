@@ -90,7 +90,7 @@ export function convertPreRequestToRequest(r : PositionPreRequest, token : Token
 		triggerPercent: r.triggerPercent,
 		retrySellIfSlippageExceeded: r.retrySellIfSlippageExceeded,
 		token: token,
-		vsToken: getVsTokenInfo(r.vsTokenAddress)!!
+		vsToken: getVsTokenInfo(r.vsTokenAddress)
 	};
 	return positionRequest;
 }

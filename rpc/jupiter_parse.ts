@@ -17,7 +17,7 @@ function summarizeParsedSwapTransaction(summarizeMe : { parsed: any }, env : Env
         const tokenInputs = swapEvent.tokenInputs[0] as HeliusParsedTokenInputOutput;
         const tokenOutputs = swapEvent.tokenOutputs[0] as HeliusParsedTokenInputOutput;
         const decimalizedFees = parsedTransaction.fee as number;
-        const solFee = decimalizedFees / getVsTokenDecimalsMultiplier('SOL')!!;
+        const solFee = decimalizedFees / getVsTokenDecimalsMultiplier('SOL');
         const fillPrice = calculateFillPrice(tokenInputs, tokenOutputs);
         return {
             inTokenAddress : tokenInputs.mint,

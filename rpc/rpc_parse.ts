@@ -4,7 +4,7 @@ import { DecimalizedAmount, MATH_DECIMAL_PLACES, dAdd, dDiv, dNegate, dSub, from
 import { Env } from "../env";
 import { logError } from "../logging";
 import { Position, PositionRequest, Swappable, isPosition, isPositionRequest } from "../positions";
-import { SOL_ADDRESS, deriveTokenAccount, getVsTokenDecimals } from "../tokens";
+import { SOL_ADDRESS, deriveTokenAccount, getVsTokenInfo } from "../tokens";
 import { safe, sleep } from "../util";
 import { ParsedSwapSummary, PreparseConfirmedSwapResult, PreparseSwapResult, SwapExecutionError, SwapSummary } from "./rpc_types";
 
@@ -114,7 +114,7 @@ function calculateTokenBalanceChange(parsedTransaction : ParsedTransactionWithMe
             logError("Could not find pre/post SOL balances", userAddress, parsedTransaction.transaction.signatures[0]);
             return null;
         }
-        const solDecimals = getVsTokenDecimals('SOL')!!;
+        const solDecimals = getVsTokenInfo('SOL').decimals;
         const preSOLDecimalized : DecimalizedAmount = { 
             tokenAmount: rawPreSolAmount.toString(),
             decimals : solDecimals 

@@ -27,7 +27,7 @@ async function makeQuote(swapRoute : GetQuoteFailure|SwapRoute, inTokenInfo : To
     const route = swapRoute.route;
     const inTokenAmount = route.inAmount as string;
     const outTokenAmount = route.outAmount as string;
-    const solTokenInfo = getVsTokenInfo('SOL')!!;
+    const solTokenInfo = getVsTokenInfo('SOL');
     const priceImpactPct = parseFloat(route.priceImpactPct||'0' as string);
     const botFee : DecimalizedAmount = { tokenAmount: route?.platformFee?.amount || '0', decimals: outTokenInfo.decimals };
     const botFeeToken = outTokenInfo; // fees are charged in units of what token you are buying
@@ -58,7 +58,7 @@ export async function getBuyTokenSwapRoute(positionRequest : PositionRequest, en
     const vsTokenAddress = positionRequest.vsToken.address;
     const tokenAddress = positionRequest.token.address;
     const slippageBps = positionRequest.slippagePercent * 100;
-    const vsTokenDecimalsMultiplier = getVsTokenDecimalsMultiplier(vsTokenAddress)!!;
+    const vsTokenDecimalsMultiplier = getVsTokenDecimalsMultiplier(vsTokenAddress);
     const decimalizedVsTokenAmount = (positionRequest.vsTokenAmt * vsTokenDecimalsMultiplier).toString();
     // I am punting on this for the moment due to complications with the referral program.
     const platformFeeBps = 0.0; //parseInt(env.PLATFORM_FEE_BPS,10);

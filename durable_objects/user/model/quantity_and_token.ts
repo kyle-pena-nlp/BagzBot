@@ -1,5 +1,5 @@
 export interface QuantityAndToken {
-	thisToken : string
+	thisTokenSymbol : string
 	thisTokenAddress : string
 	quantity : number
 };

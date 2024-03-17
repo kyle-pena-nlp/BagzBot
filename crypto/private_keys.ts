@@ -9,9 +9,9 @@ export interface EncryptedPrivateKey {
     bytesAsHexstring : string
 }
 
-/* Note - I am deriving the none from the userID because:
-    1. There is only ever one piece of information encrypted by this method per user (this key)
-    2. UserIDs are unique and static
+/* Note - I am deriving the nonce from the userID because:
+    1. There is only ever one piece of information encrypted by *this method* per user (this key)
+    2. UserIDs are unique and static, so they are as good as sequential
 */
 export async function encryptPrivateKey(plaintext : string, userID : number, env : Env): Promise<EncryptedPrivateKey> {
     const plaintextBuffer = stringToBuffer(plaintext);

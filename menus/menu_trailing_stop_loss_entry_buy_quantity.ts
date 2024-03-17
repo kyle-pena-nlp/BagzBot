@@ -6,7 +6,7 @@ import { MenuCode } from "./menu_code";
 
 export class MenuTrailingStopLossEntryBuyQuantity extends Menu<QuantityAndToken> implements MenuCapabilities {
     renderText(): string {
-        return `${this.menuData.quantity} ${this.menuData.thisToken}`;
+        return `${this.menuData.quantity} ${this.menuData.thisTokenSymbol}`;
     }
     renderOptions(): CallbackButton[][] {
         const options = this.emptyMenu();

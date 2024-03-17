@@ -2,7 +2,7 @@ import { GetTokenInfoResponse } from "../durable_objects/polled_token_pair_list/
 import { getTokenInfo } from "../durable_objects/polled_token_pair_list/polled_token_pair_list_DO_interop";
 import { OpenPositionRequest } from "../durable_objects/user/actions/open_new_position";
 import { QuantityAndToken } from "../durable_objects/user/model/quantity_and_token";
-import { TokenNameAndAddress } from "../durable_objects/user/model/token_name_and_address";
+import { TokenSymbolAndAddress } from "../durable_objects/user/model/token_name_and_address";
 import { generateWallet, getAndMaybeInitializeUserData, getDefaultTrailingStopLoss, getPosition, getWalletData, listOpenTrailingStopLossPositions, manuallyClosePosition, readSessionObj, requestNewPosition, storeSessionObj, storeSessionObjProperty, storeSessionValues } from "../durable_objects/user/userDO_interop";
 import { Env } from "../env";
 import { logError } from "../logging";
@@ -10,7 +10,7 @@ import { BaseMenu, MenuCode, MenuConfirmTrailingStopLossPositionRequest, MenuEdi
 import { PositionRequest, PositionRequestAndQuote, convertPreRequestToRequest } from "../positions";
 import { quoteBuy } from "../rpc/jupiter_quotes";
 import { AutoSellOrderSpec, TelegramWebhookInfo, deleteTGMessage, sendMessageToTG, sendRequestToTG, updateTGMessage } from "../telegram";
-import { getVsTokenAddress, getVsTokenInfo, getVsTokenName } from "../tokens";
+import { getVsTokenInfo } from "../tokens";
 import { Structural, makeFakeFailedRequestResponse, makeJSONResponse, makeSuccessResponse, tryParseFloat } from "../util";
 
 export class Worker {
@@ -158,11 +158,11 @@ export class Worker {
                 const quantityAndTokenForBuyQuantityMenu : QuantityAndToken = await this.getTrailingStopLossPositionQuantityAndVsTokenFromSession(telegramUserID, messageID, env);
                 return new MenuTrailingStopLossEntryBuyQuantity(quantityAndTokenForBuyQuantityMenu);
             case MenuCode.TrailingStopLossPickVsTokenMenu:
-                const trailingStopLossVsTokenNameAndAddress : TokenNameAndAddress = await this.getTrailingStopLossPositionVsTokenFromSession(telegramUserID, messageID, env);
+                const trailingStopLossVsTokenNameAndAddress : TokenSymbolAndAddress = await this.getTrailingStopLossPositionVsTokenFromSession(telegramUserID, messageID, env);
                 return new MenuTrailingStopLossPickVsToken(trailingStopLossVsTokenNameAndAddress);
             case MenuCode.TrailingStopLossPickVsTokenMenuSubmit:
                 const trailingStopLossSelectedVsToken = callbackData.menuArg!!;
-                const vsTokenAddress = getVsTokenAddress(trailingStopLossSelectedVsToken);
+                const vsTokenAddress = getVsTokenInfo(trailingStopLossSelectedVsToken).address;
                 const vsToken = getVsTokenInfo(trailingStopLossSelectedVsToken);
                 await storeSessionValues(telegramUserID, messageID, new Map<string,Structural>([
                     ["vsToken", vsToken],
@@ -210,10 +210,10 @@ export class Worker {
         }
     }
 
-    async getTrailingStopLossPositionVsTokenFromSession(telegramUserID : number, messageID : number, env : Env) : Promise<TokenNameAndAddress> {
+    async getTrailingStopLossPositionVsTokenFromSession(telegramUserID : number, messageID : number, env : Env) : Promise<TokenSymbolAndAddress> {
         const positionRequest = await readSessionObj<PositionRequest>(telegramUserID, messageID, "PositionRequest", env);
         return {
-            token: getVsTokenName(positionRequest.vsToken.address)!!,
+            tokenSymbol: positionRequest.vsToken.symbol,
             tokenAddress: positionRequest.vsToken.address
         };
     }
@@ -221,7 +221,7 @@ export class Worker {
     async getTrailingStopLossPositionQuantityAndVsTokenFromSession(telegramUserID : number, messageID : number, env: Env) : Promise<QuantityAndToken> {
         const positionRequest = await readSessionObj<PositionRequest>(telegramUserID, messageID, "PositionRequest", env);
         return {
-            thisToken:  getVsTokenName(positionRequest.vsToken.address)!!,
+            thisTokenSymbol:  positionRequest.vsToken.symbol,
             thisTokenAddress: positionRequest.vsToken.address,
             quantity: positionRequest.vsTokenAmt
         };
@@ -308,7 +308,7 @@ export class Worker {
             await storeSessionObj(telegramWebhookInfo.telegramUserID, tgMessageInfo.messageID, storeSessionObjectRequest.obj, storeSessionObjectRequest.prefix, env);
         }
         if (menu != null) {
-            const menuDisplayRequest = menu.getUpdateExistingMenuRequest(telegramWebhookInfo.chatID, tgMessageInfo.messageID!!, env);
+            const menuDisplayRequest = menu.getUpdateExistingMenuRequest(telegramWebhookInfo.chatID, tgMessageInfo.messageID, env);
             fetch(menuDisplayRequest);
         }
         return makeSuccessResponse();
