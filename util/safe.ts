@@ -9,5 +9,5 @@ export function safe<T,V>(callable : (t : T) => V) : (t : T|null|undefined) => V
         else {
             return callable(t);
         }
-    }
+    };
 }

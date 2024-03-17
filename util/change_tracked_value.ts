@@ -1,9 +1,9 @@
 import { DurableObjectStorage } from "@cloudflare/workers-types";
 import { Structural, structuralEquals } from "./structural";
 export class ChangeTrackedValue<T extends Structural> {
-    storageKey : string
+    storageKey : string;
     _buffer : T;
-    value  : T
+    value  : T;
     constructor(storageKey : string, value : T) {
         this.storageKey = storageKey;
         this._buffer = structuredClone(value);

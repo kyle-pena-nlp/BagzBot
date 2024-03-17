@@ -61,7 +61,7 @@ export async function getBuyTokenSwapRoute(positionRequest : PositionRequest, en
     const vsTokenDecimalsMultiplier = getVsTokenDecimalsMultiplier(vsTokenAddress)!!;
     const decimalizedVsTokenAmount = (positionRequest.vsTokenAmt * vsTokenDecimalsMultiplier).toString();
     // I am punting on this for the moment due to complications with the referral program.
-    const platformFeeBps = 0.0 //parseInt(env.PLATFORM_FEE_BPS,10);
+    const platformFeeBps = 0.0; //parseInt(env.PLATFORM_FEE_BPS,10);
     const quoteAPIParams : JupiterQuoteAPIParams = {
         inputTokenAddress: vsTokenAddress, 
         outputTokenAddress: tokenAddress, 
@@ -121,6 +121,6 @@ function makeJupiterQuoteAPIURL(params : JupiterQuoteAPIParams,
         `&slippageBps=${params.slippageBps}`,
         hasPlatformFee ? `&platformFeeBps=${params.platformFeeBps}` : '',
         `&swapMode=${params.swapMode}`
-    ]
+    ];
     return parts.join('');
 }

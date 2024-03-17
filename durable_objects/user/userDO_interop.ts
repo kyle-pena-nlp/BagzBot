@@ -57,7 +57,7 @@ export function parseUserDOFetchMethod(value : string) : UserDOFetchMethod|null 
 }
 
 export function makeUserDOFetchRequest<T>(method : UserDOFetchMethod, body?: T, httpMethod? : 'GET'|'POST') : Request {
-	const url = `http://userDO/${method.toString()}`
+	const url = `http://userDO/${method.toString()}`;
 	if (body != null) {
 		return makeJSONRequest(url, body);
 	}
@@ -118,7 +118,7 @@ export async function deleteSession(telegramUserID : number, messageID : number,
 export async function getSessionState(telegramUserID : number, messageID : number, sessionKeys : SessionKey[], env : Env) {
 	const body : GetSessionValuesRequest = {
 		messageID: messageID,
-		sessionKeys: sessionKeys.map(x => { return x.toString()})	
+		sessionKeys: sessionKeys.map(x => { return x.toString(); })	
 	};
 	const sessionValuesResponse = await sendJSONRequestToUserDO<GetSessionValuesRequest,SessionValuesResponse>(telegramUserID, UserDOFetchMethod.getSessionValues, body, env);
 	return sessionValuesResponse.sessionValues;

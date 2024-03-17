@@ -1,5 +1,5 @@
 export class MapWithStorage<TValue> {
-    storageKeyPrefix : string
+    storageKeyPrefix : string;
     items : Map<string,TValue> = new Map<string,TValue>();
     dirtyTracking : Set<string> = new Set<string>();
     deletedKeys : Set<string> = new Set<string>();
@@ -79,14 +79,14 @@ export class MapWithStorage<TValue> {
         }
         const putPromise = storage.put(putEntries).then(() => {
             this.dirtyTracking.clear();
-        })
+        });
         const deletePromise = storage.delete([...this.deletedKeys]).then(() => {
             this.deletedKeys.clear();
-        })
+        });
         await Promise.all([putPromise, deletePromise]);
     }
     private addPrefix(key : string) {
-        return `${this.storageKeyPrefix}:${key}`
+        return `${this.storageKeyPrefix}:${key}`;
     }
     private prefixMatches(key : string) {
         return this.prefixRegex().test(key);

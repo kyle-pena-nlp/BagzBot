@@ -11,7 +11,7 @@ export interface Wallet {
 export function toUserAddress(wallet : Wallet) {
 	return {
 		address : wallet.publicKey
-	}
+	};
 }
 
 export interface UserAddress {

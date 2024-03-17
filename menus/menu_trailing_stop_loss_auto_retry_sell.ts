@@ -5,7 +5,7 @@ import { MenuCode } from "./menu_code";
 
 export class MenuTrailingStopLossAutoRetrySell extends Menu<undefined> implements MenuCapabilities {
     renderText(): string {
-        return "If the slippage exceeded when trying to close the position, should we retry selling the position when the positions auto-sell conditions are met?"
+        return "If the slippage exceeded when trying to close the position, should we retry selling the position when the positions auto-sell conditions are met?";
     }
     renderOptions(): CallbackButton[][] {
         const options = this.emptyMenu();

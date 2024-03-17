@@ -31,8 +31,8 @@ export function makeJSONRequest<T>(url : string, body : T) : Request {
 export function makeRequest(url : string, method? : 'GET'|'POST') {
     return new Request(url, {
         method: method
-    })    
-};
+    });    
+}
 
 export function makeJSONResponse<T>(body: T, status? : number, statusText? : string) : Response {
     return new Response(JSON.stringify(body), {

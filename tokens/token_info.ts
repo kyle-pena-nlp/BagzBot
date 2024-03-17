@@ -20,7 +20,7 @@ export interface StagedTokenInfo {
 
 export interface TokenInfo extends StagedTokenInfo {
     readonly [ key : string ] : Structural
-};
+}
 
 export async function deriveFeeAccount(tokenAddress : string, env : Env) : Promise<PublicKey> {
     const referralAccountPubkey = new PublicKey(env.FEE_ACCOUNT_PUBLIC_KEY);

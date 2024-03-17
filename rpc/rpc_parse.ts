@@ -64,7 +64,7 @@ async function parseSwapTransaction(
         const swapExecutionError = determineSwapExecutionError(parsedTransaction, env);
         return {
             status: swapExecutionError
-        }
+        };
     }    
 
     const swapInTokenDiff = safe(dNegate)(calculateTokenBalanceChange(parsedTransaction, inTokenAddress, userAddress));
@@ -119,7 +119,7 @@ function calculateTokenBalanceChange(parsedTransaction : ParsedTransactionWithMe
 function findWithMintAndPubKey(tokenBalances : TokenBalance[], accountKeys : string[], tokenAddress : string, userAddress : UserAddress) {
     const tokenAccountAddress = deriveTokenAccount(tokenAddress, userAddress).toBase58();
     const tokenBalance = tokenBalances
-        .map(e => { return { ...e, accountAddress: accountKeys[e.accountIndex] } })
+        .map(e => { return { ...e, accountAddress: accountKeys[e.accountIndex] }; })
         .find(e => (e.accountAddress === tokenAccountAddress) && (e.mint === tokenAddress));
     return tokenBalance;
 }

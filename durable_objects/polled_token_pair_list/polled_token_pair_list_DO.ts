@@ -19,10 +19,10 @@ export class PolledTokenPairListDO {
         Maintains a list of tokens to poll for price updates
     */
 
-    state: DurableObjectState
-    env : Env
-    polledTokenPairTracker : PolledTokenPairTracker
-    tokenTracker : TokenTracker
+    state: DurableObjectState;
+    env : Env;
+    polledTokenPairTracker : PolledTokenPairTracker;
+    tokenTracker : TokenTracker;
 
     constructor(state : DurableObjectState, env : Env) {
         this.state = state;
@@ -31,7 +31,7 @@ export class PolledTokenPairListDO {
         this.tokenTracker = new TokenTracker();
         this.state.blockConcurrencyWhile(async () => {
             await this.loadStateFromStorage(this.state.storage);
-        })
+        });
     }
 
     async loadStateFromStorage(storage : DurableObjectStorage) {
@@ -82,7 +82,7 @@ export class PolledTokenPairListDO {
         if (this.tokenTracker.isRepeatedlyNonExistent(tokenAddress)) {
             return {
                 type: 'invalid'
-            }
+            };
         }
 
         // if the token is already in the tracker, respond with the token info
@@ -113,7 +113,7 @@ export class PolledTokenPairListDO {
             this.tokenTracker.markAsNonExistent(tokenAddress);
             return {
                 type: 'invalid'
-            }
+            };
         }
     }
 
@@ -201,8 +201,8 @@ export class PolledTokenPairListDO {
 
     getDurableObjectForTokenPair(env : any, token : string, vsToken : string) {
         const name = `${token}-->${vsToken}`;
-        let id = env.PositionTrackerDO.idFromName(name);
-        let stub = env.TOKEN_TICKER_DO.get(id);
+        const id = env.PositionTrackerDO.idFromName(name);
+        const stub = env.TOKEN_TICKER_DO.get(id);
         return stub;
     }
 

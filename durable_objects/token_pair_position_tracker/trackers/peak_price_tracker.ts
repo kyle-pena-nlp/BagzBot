@@ -18,7 +18,7 @@ export class PeakPricePositionTracker {
     /* positions grouped by peakPrice, and a buffer for diffing purposes since last flush to storage */
     _buffer : PositionsAssociatedWithPeakPrices = new PositionsAssociatedWithPeakPrices();
     itemsByPeakPrice : PositionsAssociatedWithPeakPrices = new PositionsAssociatedWithPeakPrices();
-    pricePeakSessionKeyPrefix : string    
+    pricePeakSessionKeyPrefix : string;    
 
     constructor(pricePeakSessionKeyPrefix : string) {
         this.pricePeakSessionKeyPrefix = pricePeakSessionKeyPrefix;
@@ -44,7 +44,7 @@ export class PeakPricePositionTracker {
         for (const peak of peaks) {
             // if the new price is greater than this peak, roll in this peak to the merged peak
             if (dMath.compare(peak, newPrice) < 0) {
-                mergedPeaks.push(peak)
+                mergedPeaks.push(peak);
                 mergedPositions.push(...this.itemsByPeakPrice.get(peak)!!);
             }
             else {
@@ -98,7 +98,7 @@ export class PeakPricePositionTracker {
         // denseify the arrays (out-of-order initialization causes arrays to be sparse arrays behind the scene)
         for (const key of this.itemsByPeakPrice.keys()) {
             const sparseArray = this.itemsByPeakPrice.get(key)!!;
-            this.itemsByPeakPrice.set(key, Array.from(sparseArray))
+            this.itemsByPeakPrice.set(key, Array.from(sparseArray));
         }
         // when done initializing, copy state to _buffer to avoid writing back fresh state to storage
         this.overwriteBufferWithCurrentState();
@@ -173,7 +173,7 @@ export class PeakPricePositionTracker {
     }
     private makeStorageKey(price : DecimalizedAmount, index : number) : string {
         // TODO: make decimalized prices the law of the land in this codebase
-        return `${this.pricePeakSessionKeyPrefix}:${toKey(price)}:${index.toString()}`
+        return `${this.pricePeakSessionKeyPrefix}:${toKey(price)}:${index.toString()}`;
     }
     private overwriteBufferWithCurrentState() {
         this._buffer.clear();

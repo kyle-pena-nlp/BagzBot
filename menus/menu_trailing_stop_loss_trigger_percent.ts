@@ -5,7 +5,7 @@ import { MenuCode } from "./menu_code";
 
 export class MenuTrailingStopLossTriggerPercent extends Menu<number> implements MenuCapabilities {
     renderText(): string {
-        return "Pick the percentage below the latest peak price that the position should be automatically sold."
+        return "Pick the percentage below the latest peak price that the position should be automatically sold.";
     }
     renderOptions(): CallbackButton[][] {
         const options = this.emptyMenu();

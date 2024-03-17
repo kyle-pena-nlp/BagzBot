@@ -30,17 +30,17 @@ import { TokenPairPositionTracker } from "./trackers/token_pair_position_tracker
 export class TokenPairPositionTrackerDO {
 
     // persistence for this durable object
-    state :   DurableObjectState
+    state :   DurableObjectState;
 
     // initialized properties - token and the 'swap-from' vsToken (i.e; USDC)
     tokenAddress :   ChangeTrackedValue<string|null> = new ChangeTrackedValue<string|null>("tokenAddress",null);
     vsTokenAddress : ChangeTrackedValue<string|null> = new ChangeTrackedValue<string|null>("vsTokenAddress",null);
-    isPolling : boolean // deliberately not change tracked.
+    isPolling : boolean; // deliberately not change tracked.
     
     // this performs all the book keeping and determines what RPC actions to take
     tokenPairPositionTracker : TokenPairPositionTracker = new TokenPairPositionTracker();
     
-    env : Env
+    env : Env;
 
     constructor(state : DurableObjectState, env : Env) {
 
@@ -111,7 +111,7 @@ export class TokenPairPositionTrackerDO {
     async getPrice() : Promise<DecimalizedAmount|undefined> {
         const tokenAddress = this.tokenAddress.value!!;
         const vsTokenAddress = this.vsTokenAddress;
-        const url = `https://price.jup.ag/v4/price?ids=${tokenAddress}&vsToken=${vsTokenAddress}`
+        const url = `https://price.jup.ag/v4/price?ids=${tokenAddress}&vsToken=${vsTokenAddress}`;
         const response = await fetch(url);
         if (!response.ok) {
             return;
@@ -176,7 +176,7 @@ export class TokenPairPositionTrackerDO {
     async handleMarkPositionAsClosed(body: MarkPositionAsClosedRequest) : Promise<Response> {
         this.tokenPairPositionTracker.closePosition(body.positionID);
         const responseBody : MarkPositionAsClosedResponse = {};
-        return makeJSONResponse(responseBody)
+        return makeJSONResponse(responseBody);
     }
 
     async handleMarkPositionAsClosing(body : MarkPositionAsClosingRequest): Promise<Response> {
@@ -219,7 +219,7 @@ export class TokenPairPositionTrackerDO {
     async updatePrice(newPrice : DecimalizedAmount) {
         // fire and forget so we don't block subsequent update-price ticks
         const positionsToClose = this.tokenPairPositionTracker.updatePrice(newPrice);
-        const request : AutomaticallyClosePositionsRequest = { positions: positionsToClose.positionsToClose }
+        const request : AutomaticallyClosePositionsRequest = { positions: positionsToClose.positionsToClose };
         sendClosePositionOrdersToUserDOs(request, this.env);
     }
 }

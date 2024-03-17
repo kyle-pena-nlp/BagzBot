@@ -5,12 +5,12 @@ import { MenuCode } from "./menu_code";
 
 export class PositiveIntegerKeypad extends Menu<string> implements MenuCapabilities {
     
-    messageFormat : string
-    minValue? : number
-    maxValue? : number
-    thisMenuCode : MenuCode
-    submitMenuCode : MenuCode
-    cancelMenuCode : MenuCode
+    messageFormat : string;
+    minValue? : number;
+    maxValue? : number;
+    thisMenuCode : MenuCode;
+    submitMenuCode : MenuCode;
+    cancelMenuCode : MenuCode;
 
     constructor(messageFormat: string,
         thisMenuCode : MenuCode,

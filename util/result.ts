@@ -1,9 +1,9 @@
 export class Result<T> {
 
-	success: boolean
-	ok: boolean
-	message?: string
-	value?: T
+	success: boolean;
+	ok: boolean;
+	message?: string;
+	value?: T;
 
 	constructor(success : boolean, message? : string, value? : T) {
 		this.success = success;

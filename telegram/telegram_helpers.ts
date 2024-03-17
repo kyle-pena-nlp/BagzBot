@@ -59,7 +59,7 @@ export function escapeTGText(text : string, parseMode : 'MarkdownV2'|'HTML') : s
         const pattern = /\[|]|\(|\)|~|`|>|#|\+|-|=|\||{|}|\.|!/g;
         text = text.replace(pattern, function (substring) {
             return '\\' + substring;
-        })
+        });
     }
     return text;
 }
@@ -122,13 +122,13 @@ export async function deleteTGMessage(messageID : number, chatID : number, env :
     return await fetch(request).then(async (response) => {
         if (!response.ok) {
             const description = await tryGetTGDescription(response);
-            return { success: false }
+            return { success: false };
         }
         else {
-            return { success: true }
+            return { success: true };
         }
     }).catch((response) => {
-        return { success : false }
+        return { success : false };
     });
 }
 
@@ -141,7 +141,7 @@ export async function sendRequestToTG(request : Request) : Promise<Response> {
         else {
             return makeSuccessResponse();
         }
-    })
+    });
 }
 
 function makeTelegramSendMessageRequest(chatID : number, 
@@ -150,7 +150,7 @@ function makeTelegramSendMessageRequest(chatID : number,
     parseMode : 'MarkdownV2'|'HTML',
     includeDismissButton : boolean) : Request {
     const url = makeTelegramBotUrl('sendMessage', env);
-    parseMode = parseMode||'HTML'
+    parseMode = parseMode||'HTML';
     let sendMessageBody : any = {
         "chat_id": chatID,
         "text": escapeTGText(text, parseMode),
@@ -170,7 +170,7 @@ function makeTelegramUpdateMessageRequest(chatID : number,
     parseMode : 'MarkdownV2'|'HTML',
     includeDismissButton : boolean) : Request {
     const url = makeTelegramBotUrl('editMessageText', env);
-    parseMode = parseMode||'HTML'
+    parseMode = parseMode||'HTML';
     let sendMessageBody : any = {
         "chat_id": chatID,
         "message_id": messageID,
@@ -195,7 +195,7 @@ function addDismissButton(requestBody: any) {
         reply_markup: {
             "inline_keyboard": dismissButtonKeyboard
         }
-    }
+    };
 }
 
 

@@ -6,11 +6,16 @@
 		"deploy": "wrangler deploy index.js",
 		"dev": "wrangler dev index.js",
 		"dry-deploy": "npx wrangler deploy --outdir .dry-deploy --dry-run",
-		"check-for-errors": "tsc --noEmit"
+		"check-for-errors": "tsc --noEmit",
+		"lint": "eslint . --ext .ts"
 	},
 	"devDependencies": {
 		"@cloudflare/workers-types": "^4.20240208.0",
 		"@types/node": "^20.11.19",
+		"@typescript-eslint/eslint-plugin": "^7.2.0",
+		"@typescript-eslint/parser": "^7.2.0",
+		"eslint": "^8.57.0",
+		"typescript": "^5.4.2",
 		"wrangler": "^3.0.0"
 	},
 	"dependencies": {

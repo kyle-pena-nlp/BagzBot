@@ -3,7 +3,7 @@ import { Menu, MenuCapabilities } from "./menu";
 
 export class MenuPleaseEnterToken extends Menu<undefined> implements MenuCapabilities {
     renderText(): string {
-        return "Enter a token."
+        return "Enter a token.";
     }
     renderOptions(): CallbackButton[][] {
         const options = this.emptyMenu();

@@ -1,17 +1,17 @@
 import { TokenInfo } from "./token_info";
 
-const SOL_ADDRESS = "So11111111111111111111111111111111111111112"
-const SOL_SYMBOL = "SOL"
-const SOL_NAME = "Wrapped SOL"
+const SOL_ADDRESS = "So11111111111111111111111111111111111111112";
+const SOL_SYMBOL = "SOL";
+const SOL_NAME = "Wrapped SOL";
 
-const USDC_ADDRESS = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
-const USDC_SYMBOL = "USDC"
-const USDC_NAME = "USD Coin"
+const USDC_ADDRESS = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+const USDC_SYMBOL = "USDC";
+const USDC_NAME = "USD Coin";
 
 export enum VsToken {
 	SOL = "SOL",
 	USDC = "USDC"
-};
+}
 
 export function getVsTokenInfo(vsToken : string|VsToken) : TokenInfo|null {
     const address = getVsTokenAddress(vsToken);

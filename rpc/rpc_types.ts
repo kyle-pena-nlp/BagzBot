@@ -33,23 +33,21 @@ export enum TransactionExecutionErrorCouldntConfirm {
 
 export type PreparseSwapResult = PreparseUnconfirmedSwapResult | PreparseConfirmedSwapResult | PreparseFailedSwapResult;
 
-
-export interface PreparseConfirmedSwapResult {
+interface BasePreparseResult {
     positionID : string
+    signature : string
+}
+
+export interface PreparseConfirmedSwapResult extends BasePreparseResult {
     status: 'transaction-confirmed'
-    signature : string
 };
 
-export interface PreparseFailedSwapResult {
-    positionID : string
+export interface PreparseFailedSwapResult extends BasePreparseResult {
     status: TransactionExecutionError
-    signature : string
 };
 
-export interface PreparseUnconfirmedSwapResult {
-    positionID : string
+export interface PreparseUnconfirmedSwapResult extends BasePreparseResult {
     status: TransactionExecutionErrorCouldntConfirm
-    signature : string
 };
 
 export enum SwapExecutionError {

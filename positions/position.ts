@@ -106,10 +106,10 @@ export function getInAndOutTokens(s : Swappable): { inToken : TokenInfo, outToke
         return {
             inToken : s.token,
             outToken : s.vsToken
-        }
+        };
     }
     else {
-        throw new Error("Programmer error.")
+        throw new Error("Programmer error.");
     }
 }
 
@@ -121,17 +121,17 @@ export function getSwapOfXDescription(s : Swappable, caps : boolean = false) : s
         return (caps ? 'S' : 's') + `ale of ${s.token.symbol}`;
     }
     else {
-        throw new Error("Programmer error.")
+        throw new Error("Programmer error.");
     }
 }
 
 export class SwappableError {
-	userID : number
-	chatID : number
-	messageID : number
-	message : string
-	inToken : TokenInfo
-	outToken : TokenInfo
+	userID : number;
+	chatID : number;
+	messageID : number;
+	message : string;
+	inToken : TokenInfo;
+	outToken : TokenInfo;
 	constructor(s : Swappable, message : string) {
 		this.userID = s.userID;
 		this.chatID = s.chatID;

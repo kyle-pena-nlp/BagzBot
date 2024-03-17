@@ -20,7 +20,7 @@ export class DecimalizedAmountSet {
     }
     delete(x : DecimalizedAmount) : boolean {
         const key = toKey(x);
-        return this.inner.delete(key)
+        return this.inner.delete(key);
     }
     clear() {
         this.inner.clear();

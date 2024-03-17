@@ -8,7 +8,7 @@ export function renderTrailingStopLossRequestMarkdown(requestAndQuote : Position
     const positionRequest = requestAndQuote.positionRequest;
     const quote = requestAndQuote.quote;
     if (isGetQuoteFailure(quote)) {
-        return `Could not generate a quote for this ${positionRequest.token.symbol} order.  Try clicking 'Refresh'`
+        return `Could not generate a quote for this ${positionRequest.token.symbol} order.  Try clicking 'Refresh'`;
     }
     else {
         const lines = [

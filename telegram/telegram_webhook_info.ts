@@ -5,15 +5,15 @@ import { TGTextEntity, TGTextEntityType } from "./telegram_helpers";
 
 export class AutoSellOrderSpec {
 
-	userID : number
-	chatID : number
-	messageID : number
-	tokenAddress : string
-	vsTokenAddress : string
-	vsTokenAmt : number
-	triggerPct : number
-	slippageTolerancePct : number
-	autoRetrySellIfSlippageExceeded? : boolean
+	userID : number;
+	chatID : number;
+	messageID : number;
+	tokenAddress : string;
+	vsTokenAddress : string;
+	vsTokenAmt : number;
+	triggerPct : number;
+	slippageTolerancePct : number;
+	autoRetrySellIfSlippageExceeded? : boolean;
 	
 	constructor(
 		userID : number,
@@ -108,7 +108,7 @@ export class AutoSellOrderSpec {
 	}
 
 	static describeFormat() : string {
-		return '/autosell 1.5 SOL of [tokenAddress] trigger 5% slippage 0.5% retrysell yes'
+		return '/autosell 1.5 SOL of [tokenAddress] trigger 5% slippage 0.5% retrysell yes';
 	}
 
 
@@ -188,15 +188,15 @@ export class AutoSellOrderSpec {
 
 export class TelegramWebhookInfo {
 
-    telegramUserID : number
-    telegramUserName : string
-    chatID : number /* The Telegram chat ID */
-    messageID : number /* The telegram message ID */
-    messageType : 'callback'|'message'|'command'|null
-    command: string|null
-	commandTokens : TGTextEntity[]|null
-    callbackData : CallbackData|null
-    text : string|null
+    telegramUserID : number;
+    telegramUserName : string;
+    chatID : number; /* The Telegram chat ID */
+    messageID : number; /* The telegram message ID */
+    messageType : 'callback'|'message'|'command'|null;
+    command: string|null;
+	commandTokens : TGTextEntity[]|null;
+    callbackData : CallbackData|null;
+    text : string|null;
 
     constructor(telegramRequestBody : any) {
 		this.chatID = this.getChatID(telegramRequestBody);
@@ -259,7 +259,7 @@ export class TelegramWebhookInfo {
 			return null;
 		}
 		else {
-			return CallbackData.parse(callbackDataString)
+			return CallbackData.parse(callbackDataString);
 		}
 	}
 
@@ -299,7 +299,8 @@ export class TelegramWebhookInfo {
 					return {
 						type: TGTextEntityType.text,
 						text: w
-				}});
+					};
+				});
 				tgTextEntities.push(...tokens);
 			}
 			const entityType = this.getTGEntityType(entity.type);
@@ -307,7 +308,7 @@ export class TelegramWebhookInfo {
 			tgTextEntities.push({
 				type: entityType,
 				text: entityText
-			})
+			});
 		}
 		return tgTextEntities;
 	}
@@ -338,7 +339,7 @@ export class TelegramWebhookInfo {
 	}
 
 	private getTelegramUserName(requestBody : any) : string {
-		const fromParentObj = requestBody?.message || requestBody?.callback_query
+		const fromParentObj = requestBody?.message || requestBody?.callback_query;
 		const firstName : string = fromParentObj.from?.first_name!!;
 		const lastName : string = fromParentObj.from?.last_name!!;
 		const userName = [firstName, lastName].filter(x => x).join(" ") || 'user';

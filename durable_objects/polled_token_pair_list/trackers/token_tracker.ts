@@ -33,7 +33,7 @@ export class TokenTracker {
     }
     removeToken(tokenAddress : string) {
         delete this.tokenInfos[new TokenAddressKey(tokenAddress).toString()];
-        this.markDeleted(new TokenAddressKey(tokenAddress).toString())
+        this.markDeleted(new TokenAddressKey(tokenAddress).toString());
     }
     async flushToStorage(storage : DurableObjectStorage) {
         if (this.deletedKeys.size == 0 && this.dirtyTracking.size == 0) {
@@ -45,10 +45,10 @@ export class TokenTracker {
         }
         const putPromise = storage.put(putEntries).then(() => {
             this.dirtyTracking.clear();
-        })
+        });
         const deletePromise = storage.delete([...this.deletedKeys]).then(() => {
             this.deletedKeys.clear();
-        })
+        });
         await Promise.all([putPromise, deletePromise]);
     }
     markDirty(key : string) {
@@ -81,7 +81,7 @@ export class TokenTracker {
 }
 
 class TokenAddressKey {
-    address : string
+    address : string;
     constructor(address : string) {
         this.address = address;
     }

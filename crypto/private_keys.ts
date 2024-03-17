@@ -22,11 +22,11 @@ export async function encryptPrivateKey(plaintext : string, userID : number, env
     const encryptedHexBytes = encryptedBuffer.toString('hex');
     const result =  {
         bytesAsHexstring: encryptedHexBytes
-    }
+    };
     const checkResult = await decryptPrivateKey(result, userID, env);
     if (checkResult !== plaintext) {
         logError({ userID : userID }, "Round-trip encryption of private key did not produce original key.");
-        throw new Error("Programmer error.")
+        throw new Error("Programmer error.");
     }
     return result;
 }
@@ -35,7 +35,7 @@ export async function decryptPrivateKey(encryptedPrivateKey : EncryptedPrivateKe
     const encryptedBytes = Buffer.from(encryptedPrivateKey.bytesAsHexstring, 'hex');
     const iv = await get96BitHashBuffer(userID.toString());
     const passphrase = await derive256BitPassphrase(userID, env);
-    const plaintextArrayBuffer = await decryptWithAESGCM256(encryptedBytes, passphrase, iv)
+    const plaintextArrayBuffer = await decryptWithAESGCM256(encryptedBytes, passphrase, iv);
     const plaintextBuffer = Buffer.from(plaintextArrayBuffer);
     const plaintextString = bufferToString(plaintextBuffer);
     return plaintextString;

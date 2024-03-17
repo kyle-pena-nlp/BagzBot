@@ -26,10 +26,10 @@ export class UserPositionTracker {
         }
         const putPromise = storage.put(putEntries).then(() => {
             this.dirtyTracking.clear();
-        })
+        });
         const deletePromise = storage.delete([...this.deletedKeys]).then(() => {
             this.deletedKeys.clear();
-        })
+        });
         await Promise.all([putPromise, deletePromise]);
     }
     storePositions(positions: Position[]) {
@@ -81,7 +81,7 @@ export class UserPositionTracker {
 }
 
 class PositionIDKey {
-    positionID : string
+    positionID : string;
     constructor(positionID : string) {
         this.positionID = positionID;
     }

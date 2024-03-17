@@ -55,4 +55,4 @@ Check out our official Discord Community.
 <b>Legal</b>
 
 See here for Legal.
-`
+`;

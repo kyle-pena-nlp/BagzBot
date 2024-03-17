@@ -8,7 +8,7 @@ import { makeJSONRequest } from "../util";
 export enum MenuDisplayMode {
 	UpdateMenu,
 	NewMenu
-};
+}
 
 export interface MenuSpec {
 	text: string,
@@ -16,8 +16,7 @@ export interface MenuSpec {
 	parseMode : 'HTML'|'MarkdownV2'
 	mode : MenuDisplayMode
 	forceReply : boolean
-};
-
+}
 
 export interface MenuCapabilities {
     renderText() : string;
@@ -83,7 +82,7 @@ export abstract class BaseMenu {
 
 export abstract class Menu<T> extends BaseMenu {
 
-    menuData   : T
+    menuData   : T;
 
     constructor(miscData : T) {
         super();

@@ -86,7 +86,7 @@ export class TokenPairPositionTracker {
 
         return {
             positionsToClose: positionsToClose
-        }
+        };
     }
 
     markPositionAsClosing(positionID : string) {
@@ -127,7 +127,7 @@ export class TokenPairPositionTracker {
         // nothing can be done yet.
 
         // if new, move to closing
-        const newOpenPosition = this.newOpenPositions.get(positionID)
+        const newOpenPosition = this.newOpenPositions.get(positionID);
         if (newOpenPosition) {
             this.newOpenPositions.delete(positionID);
             newOpenPosition.status = PositionStatus.Closed;

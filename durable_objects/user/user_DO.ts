@@ -30,7 +30,7 @@ import { sell } from "./user_sell";
 export class UserDO {
 
     // boilerplate DO stuff
-    env : Env
+    env : Env;
     state: DurableObjectState;
 
     // user's ID
@@ -130,7 +130,7 @@ export class UserDO {
                 response = await this.handleGet(jsonRequestBody);            
                 break;
             case UserDOFetchMethod.initialize:
-                response = await this.handleInitialize(jsonRequestBody)            
+                response = await this.handleInitialize(jsonRequestBody);            
                 break;
             case UserDOFetchMethod.storeSessionValues:
                 this.assertUserIsInitialized();
@@ -241,7 +241,7 @@ export class UserDO {
         this.sessionTracker.deleteSession(messageID);
         return await this.sessionTracker.flushToStorage(this.state.storage).then(() => {
             return makeJSONResponse<DeleteSessionResponse>({});
-        })
+        });
     }
 
     async handleStoreSessionValues(jsonRequestBody : StoreSessionValuesRequest) : Promise<Response> {
@@ -252,7 +252,7 @@ export class UserDO {
         }
         return await this.sessionTracker.flushToStorage(this.state.storage).then(() => {
             return makeJSONResponse<StoreSessionValuesResponse>({});
-        })
+        });
     }
 
     async handleGetSessionValues(jsonRequestBody : GetSessionValuesRequest) : Promise<Response> {

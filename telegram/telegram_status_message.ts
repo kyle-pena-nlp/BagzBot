@@ -5,17 +5,17 @@ import { deleteTGMessage, sendMessageToTG, updateTGMessage } from "./telegram_he
 
 export interface UpdateableNotification { 
     promiseChain: Promise<TGStatusMessage|{ chatID : number, env : Env }> 
-};
+}
 
 export class TGStatusMessage {
-    messageID : number
-    chatID : number
-    message : string
-    parseMode : 'HTML'|'MarkdownV2'
-    dismissable : boolean
-    lastSendSuccessful : boolean
-    env : Env
-    deleted : boolean = false
+    messageID : number;
+    chatID : number;
+    message : string;
+    parseMode : 'HTML'|'MarkdownV2';
+    dismissable : boolean;
+    lastSendSuccessful : boolean;
+    env : Env;
+    deleted : boolean = false;
     private constructor(message : string, parseMode : 'HTML'|'MarkdownV2', dismissable : boolean, messageID : number, chatID : number, env : Env) {
         this.messageID = messageID;
         this.chatID = chatID;
@@ -40,7 +40,7 @@ export class TGStatusMessage {
         });
         return {
             promiseChain: promiseChain
-        }
+        };
     }
     static replaceWithNotification(
         messageID : number,

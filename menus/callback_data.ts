@@ -1,8 +1,8 @@
 import { MenuCode } from "./menu_code";
 
 export class CallbackData {
-	menuCode : MenuCode
-	menuArg? : string
+	menuCode : MenuCode;
+	menuArg? : string;
 	constructor(menuCode : MenuCode, menuArg ?: string) {
 		this.menuCode = menuCode;
 		this.menuArg = menuArg;		
@@ -22,4 +22,4 @@ export class CallbackData {
 	private static parseMenuCode(menuCode : string) : MenuCode {
 		return Object.values(MenuCode).find((x) => x === menuCode)!!;
 	}
-};
+}

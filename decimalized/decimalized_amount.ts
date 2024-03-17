@@ -53,7 +53,7 @@ export function fromKey(key : string) : DecimalizedAmount {
     return {
         tokenAmount : stringParts[0],
         decimals : parseInt(stringParts[1], 10)
-    }
+    };
 }
 
 /*
@@ -77,7 +77,7 @@ export function fromTokenAmount(tokenAmount : TokenAmount) : DecimalizedAmount {
     return {
         tokenAmount: tokenAmount.amount,
         decimals: tokenAmount.decimals
-    }
+    };
 }
 
 export function moveDecimalLeftInString(tokenAmount : string, decimals : number) : string {

@@ -7,15 +7,15 @@ const keysToLookFor = [
     'positionID',
     'status',
     'positionType',
-    'token',
-    'vsToken',
     'address',
     'signature',
     'symbol',
     'description',
     'purpose',
     'length',
-    'size'
+    'size',
+    'token',
+    'vsToken'
 ];
 
 const fnsToLookFor = [
@@ -28,9 +28,9 @@ const fnsToLookFor = [
 const FORBIDDEN_LOG_KEYS = ['wallet','privateKey','encryptedPrivateKey','bytesAsHexString'];
 
 export class BotError {
-    userID : number
-    chatID : number
-    message : string
+    userID : number;
+    chatID : number;
+    message : string;
     constructor(userID : number, chatID : number, message : string) {
         this.userID = userID;
         this.chatID = chatID;
@@ -90,7 +90,7 @@ function logIt(xs : any[], level : 'error'|'info'|'debug') {
         digestStrings.push(digest(x, memo));
     }
     const digestString = digestStrings.join(" // ");
-    const now = Date.now();
+    const now = Date.now().toLocaleString();
     const logMsg = `${now} :: ${digestString}`;
     switch(level) {
         case 'error':

@@ -6,7 +6,7 @@ import { MenuCode } from "./menu_code";
 
 export class MenuViewOpenPosition extends Menu<Position> implements MenuCapabilities {
     renderText(): string {
-        const line1 = `<b>${this.menuData.type.toString()}</b> <i>${this.menuData.token.symbol}</i> position (${this.menuData.tokenAmt.toString()})`
+        const line1 = `<b>${this.menuData.type.toString()}</b> <i>${this.menuData.token.symbol}</i> position (${this.menuData.tokenAmt.toString()})`;
         const line2 = ``;//`Current Value in ${this.miscData.vsToken.symbol}: <b>${this.miscData.vsTokenValue.toString()}</b> ${this.miscData.vsToken.symbol}`
         return [line1,line2].join("\r\n");
     }

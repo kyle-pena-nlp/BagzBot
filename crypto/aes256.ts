@@ -1,6 +1,6 @@
 import { Buffer } from "node:buffer";
 
-const AES256GCMALGO = 'AES-GCM'
+const AES256GCMALGO = 'AES-GCM';
 
 export async function encryptWithAESGCM256(text : Buffer, 
     passphrase : CryptoKey, 
@@ -51,7 +51,7 @@ function makeAESGCM256Params(iv : ArrayBuffer) : AesGcmParams {
 }
 
 function addPKCS7Padding(b : Buffer) : Buffer {
-    const blockSize = 16 // AES-256 block size is ALWAYS 16 bytes
+    const blockSize = 16; // AES-256 block size is ALWAYS 16 bytes
     const byteView = new Uint8Array(b);
     // gives 16 when byteView.length is divisible by 16
     // (which means an entire block of 16 is included.)

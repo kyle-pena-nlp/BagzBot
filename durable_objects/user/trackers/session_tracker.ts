@@ -54,10 +54,10 @@ export class SessionTracker {
 
         const putPromise = storage.put(putEntries).then(() => {
             this.dirtyTracking.clear();
-        })
+        });
         const deletePromise = storage.delete([...this.deletedKeys]).then(() => {
             this.deletedKeys.clear();
-        })
+        });
         await Promise.all([putPromise, deletePromise]);
     }
     ensureHasSession(messageID : number) {
@@ -132,8 +132,8 @@ export class SessionTracker {
             return;
         }
         const sessionKeys = this.sessionKeys[sessionIDKey.toString()];
-        delete this.sessionKeys[sessionIDKey.toString()]
-        this.markAsDeleted(sessionIDKey)
+        delete this.sessionKeys[sessionIDKey.toString()];
+        this.markAsDeleted(sessionIDKey);
 
         for (const sessionKey of sessionKeys) {
             const sessionKeyKey = new SessionKeyKey(sessionIDKey, sessionKey);
@@ -162,8 +162,8 @@ enum KeyType {
 }
 
 class MessageIDKey {
-    messageID : number
-    keyType : KeyType
+    messageID : number;
+    keyType : KeyType;
     constructor(messageID : number) {
         this.messageID = messageID;
         this.keyType = KeyType.MessageID;
@@ -182,8 +182,8 @@ class MessageIDKey {
 }
 
 class SessionIDKey {
-    sessionID : string
-    keyType : KeyType
+    sessionID : string;
+    keyType : KeyType;
     constructor(sessionID : string) {
         this.sessionID = sessionID;
         this.keyType = KeyType.SessionID;
@@ -202,9 +202,9 @@ class SessionIDKey {
 }
 
 class SessionKeyKey {
-    sessionIDKey : SessionIDKey
-    sessionKey : string
-    keyType : KeyType
+    sessionIDKey : SessionIDKey;
+    sessionKey : string;
+    keyType : KeyType;
     constructor(sessionIDKey : SessionIDKey, sessionKey : string) {
         this.sessionIDKey = sessionIDKey;
         this.sessionKey = sessionKey;
@@ -227,7 +227,7 @@ class SessionKeyKey {
 }
 
 class NotAKey {
-    keyType : KeyType
+    keyType : KeyType;
     constructor() {
         this.keyType = KeyType.NotAKey;
     }

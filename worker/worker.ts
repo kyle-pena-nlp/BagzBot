@@ -118,7 +118,7 @@ export class Worker {
             case MenuCode.TrailingStopLossChooseAutoRetrySellMenu:
                 return new MenuTrailingStopLossAutoRetrySell(undefined);
             case MenuCode.TrailingStopLossChooseAutoRetrySellSubmit:
-                await storeSessionObjProperty(telegramUserID, messageID, "retrySellIfSlippageExceeded", callbackData.menuArg!! === "true", "PositionRequest", env);
+                await storeSessionObjProperty(telegramUserID, messageID, "retrySellIfSlippageExceeded", callbackData.menuArg === "true", "PositionRequest", env);
                 const trailingStopLossRequestStateAfterAutoRetrySellEdited = await readSessionObj<PositionRequest>(telegramUserID, messageID, "PositionRequest", env);
                 return await this.getQuoteAndMakeStopLossRequestEditorMenu(trailingStopLossRequestStateAfterAutoRetrySellEdited, env);
             case MenuCode.TrailingStopLossConfirmMenu:
@@ -126,7 +126,7 @@ export class Worker {
                 return await this.getQuoteAndMakeStopLossConfirmMenu(trailingStopLossRequestAfterDoneEditing, env);
             case MenuCode.TrailingStopLossCustomTriggerPercentKeypad:
                 const trailingStopLossTriggerPercentKeypadCurrentEntry = callbackData.menuArg||'';
-                const trailingStopLossCustomTriggerPercentKeypad = this.makeTrailingStopLossCustomTriggerPercentKeypad(trailingStopLossTriggerPercentKeypadCurrentEntry)
+                const trailingStopLossCustomTriggerPercentKeypad = this.makeTrailingStopLossCustomTriggerPercentKeypad(trailingStopLossTriggerPercentKeypadCurrentEntry);
                 return trailingStopLossCustomTriggerPercentKeypad;
             case MenuCode.TrailingStopLossCustomTriggerPercentKeypadSubmit:
                 const trailingStopLossCustomTriggerPercentSubmission = tryParseFloat(callbackData.menuArg!!);
@@ -249,7 +249,7 @@ export class Worker {
     async getQuoteAndMakeStopLossConfirmMenu(positionRequest: PositionRequest, env : Env) : Promise<BaseMenu> {
         const quote = await quoteBuy(positionRequest, env);
         const positionRequestAndQuote : PositionRequestAndQuote = { positionRequest: positionRequest, quote : quote };
-        return new MenuConfirmTrailingStopLossPositionRequest(positionRequestAndQuote)
+        return new MenuConfirmTrailingStopLossPositionRequest(positionRequestAndQuote);
     }
 
     makeTrailingStopLossCustomSlippagePctKeypad(currentEntry : string) {
@@ -291,7 +291,7 @@ export class Worker {
         const [commandTextResponse,menu,storeSessionObjectRequest] = await this.handleCommandInternal(command, telegramWebhookInfo, env);
         const tgMessageInfo = await sendMessageToTG(telegramWebhookInfo.chatID, commandTextResponse, env);
         if (storeSessionObjectRequest != null) {
-            await storeSessionObj(telegramWebhookInfo.telegramUserID, tgMessageInfo.messageID!!, storeSessionObjectRequest.obj, storeSessionObjectRequest.prefix, env)
+            await storeSessionObj(telegramWebhookInfo.telegramUserID, tgMessageInfo.messageID!!, storeSessionObjectRequest.obj, storeSessionObjectRequest.prefix, env);
         }
         if (menu != null) {
             const menuDisplayRequest = menu.getUpdateExistingMenuRequest(telegramWebhookInfo.chatID, tgMessageInfo.messageID!!, env);

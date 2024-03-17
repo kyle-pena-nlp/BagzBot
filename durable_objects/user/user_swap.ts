@@ -22,7 +22,7 @@ export async function swap(s: Swappable,
 
     const logger = async (msg: string, err: any) => {
         console.log(msg + err.toString());
-    }
+    };
 
     // get swap route / quote
     const swapOfX = getSwapOfXDescription(s);
@@ -70,7 +70,7 @@ export async function swap(s: Swappable,
     let maybeExecutedTx = await executeRawSignedTransaction(s.positionID, signedTx, connection, env, logger)
         .catch(r => { 
             logError('Initial execution unexpected failure, converting to unconfirmed', s, r);
-            return makeUnknownStatusResult(s, signedTx) 
+            return makeUnknownStatusResult(s, signedTx); 
         });
 
     // if failed, bail out and tell user
@@ -94,12 +94,12 @@ export async function swap(s: Swappable,
     if (isUnconfirmed(maybeExecutedTx)) {
         logInfo('Transaction unconfirmed', s, maybeExecutedTx);
         const msg = makeTransactionUnconfirmedMessage(s, maybeExecutedTx.status);
-        TGStatusMessage.queue(notificationChannel, msg, true);
+        TGStatusMessage.queue(notificationChannel, msg, false);
         parsedSwapSummary = await waitForBlockFinalizationAndParse(s, signature, userAddress, connection, env).catch(r => null);
     }
     
     if (parsedSwapSummary == null) {
-        logError('Unexpected error retrieving transaction', s);
+        logError('Unexpected error retrieving transaction', s, { signature : signature });
         const msg = `There was a problem retrieving information about your transaction.`;
         TGStatusMessage.queue(notificationChannel, msg, true);
         return;
@@ -166,9 +166,9 @@ function makeSwapSummaryFailedMessage(parsedSwapResult : SwapExecutionErrorParse
         case SwapExecutionError.InsufficientBalance:
             return `${swapOfX} was not executed.`;
         case SwapExecutionError.SlippageToleranceExceeded:
-            return `${swapOfX} was not executed.  The slippage tolerance was exceeded (price moved too fast).`
+            return `${swapOfX} was not executed.  The slippage tolerance was exceeded (price moved too fast).`;
         case SwapExecutionError.OtherSwapExecutionError:
-            return `${swapOfX} failed.`
+            return `${swapOfX} failed.`;
         default:
             throw new Error("Programmer error.");
     }
@@ -212,11 +212,11 @@ function makeTransactionFailedErrorMessage(s: Swappable, status : TransactionExe
         case TransactionExecutionError.TransactionDropped:
             return `${swapOfX} failed because the order was dropped by a 3rd party.`;
         case TransactionExecutionError.TransactionFailedOtherReason:
-            return `${swapOfX} failed.`
+            return `${swapOfX} failed.`;
         case TransactionExecutionError.CouldNotDetermineMaxBlockheight:
             return `${swapOfX} failed because a 3rd party service is down.`;
         case TransactionExecutionError.TokenFeeAccountNotInitialized:
-            return `${swapOfX} failed because of a configuration problemwith the bot.`
+            return `${swapOfX} failed because of a configuration problemwith the bot.`;
         default:
             return assertNever(status);
     }

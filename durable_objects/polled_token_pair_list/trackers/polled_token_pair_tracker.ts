@@ -1,7 +1,7 @@
 export class PolledTokenPairTracker {
-    polledTokenPairs : Record<string,PolledTokenPairInfo>
-    dirtyTracking : Set<string>
-    deletedKeys : Set<string>
+    polledTokenPairs : Record<string,PolledTokenPairInfo>;
+    dirtyTracking : Set<string>;
+    deletedKeys : Set<string>;
     constructor() {
         this.polledTokenPairs = {};
         this.dirtyTracking = new Set<string>();
@@ -22,8 +22,8 @@ export class PolledTokenPairTracker {
     }
     deleteTokenPair(tokenAddress : string, vsTokenAddress : string) {
         const polledTokenPairKey = new PolledTokenPairKey(tokenAddress, vsTokenAddress);
-        delete this.polledTokenPairs[polledTokenPairKey.toString()]
-        this.markForDeletion(polledTokenPairKey.toString())
+        delete this.polledTokenPairs[polledTokenPairKey.toString()];
+        this.markForDeletion(polledTokenPairKey.toString());
     }
     *list() {
         for (const key of Object.keys(this.polledTokenPairs)) {
@@ -61,17 +61,17 @@ export class PolledTokenPairTracker {
         }
         const putPromise = storage.put(putEntries).then(() => {
             this.dirtyTracking.clear();
-        })
+        });
         const deletePromise = storage.delete([...this.deletedKeys]).then(() => {
             this.deletedKeys.clear();
-        })
+        });
         await Promise.all([putPromise, deletePromise]);
     }
 }
 
 export class PolledTokenPairKey {
-    tokenAddress : string
-    vsTokenAddress : string
+    tokenAddress : string;
+    vsTokenAddress : string;
     constructor(tokenAddress : string, vsTokenAddress : string) {
         this.tokenAddress = tokenAddress;
         this.vsTokenAddress = vsTokenAddress;
@@ -82,7 +82,7 @@ export class PolledTokenPairKey {
     static parse(key : string) : PolledTokenPairKey|null {
         const tokens = key.split(":");
         if (tokens[0] === 'tokenPairKey') {
-            return new PolledTokenPairKey(tokens[1], tokens[2])
+            return new PolledTokenPairKey(tokens[1], tokens[2]);
         }
         else {
             return null;
