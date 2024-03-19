@@ -3,7 +3,7 @@ import { DecimalizedAmount, dMult } from "../decimalized";
 import { PeakPricePositionTracker } from "../durable_objects/token_pair_position_tracker/trackers/peak_price_tracker";
 import { Position, PositionStatus, PositionType } from "../positions";
 import { TokenInfo, getVsTokenInfo } from "../tokens";
-import { FakeDurableObjectStorage } from "./fake_storage";
+import { FakeDurableObjectStorage } from "./fakeStorage";
 
 test("tracker_stores_position", () => {
     const triggerPct = 10;
