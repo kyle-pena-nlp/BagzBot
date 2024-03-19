@@ -101,47 +101,6 @@ test('moveDecimalInString_zeroptzero_multNegPlaces', () => {
     testMoveDecimalInString("0.0", -2, "0");
 });
 
-/*
-
-
-
-test('fromNumber1', () => {
-    testFromNumberEq10Dec(1, {
-        tokenAmount: "1",
-        decimals: 0
-    });
-});
-
-test('fromNumber0_1', () => {
-    testFromNumberEq10Dec(0.1, {
-        tokenAmount: "1",
-        decimals: 1
-    });
-});
-
-test('fromNumber0_01', () => {
-    testFromNumberEq10Dec(0.01, {
-        tokenAmount: "1",
-        decimals: 2
-    });
-});
-
-test('fromNumber1e_neg_19', () => {
-    testFromNumberEq10Dec(1e-19, {
-        tokenAmount: "1",
-        decimals: 19
-    });
-});
-
-function testFromNumberEq10Dec(x : number, expectation : DecimalizedAmount) {
-    const result = fromNumber(x, 10);
-    expect(result).toEqual(expectation);
-}
-
-
-
-
-}*/
 
 function testMoveDecimalInString(x : string, d : number, expectation : string) {
 

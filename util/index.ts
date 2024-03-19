@@ -17,7 +17,7 @@ import { MapWithStorage } from "./map_with_storage";
 import { strictParseInt, tryParseFloat, tryParseInt } from "./numbers";
 import { Result } from "./result";
 import { safe } from "./safe";
-import { setDifference, setIntersection } from "./set_operations";
+import { setDifference, setIntersection, setUnion } from "./set_operations";
 import { pause, sleep } from "./sleep";
 import { Structural, structuralEquals } from "./structural";
 
@@ -33,6 +33,7 @@ export {
     maybeGetJson, pause, safe,
     setDifference,
     setIntersection,
+    setUnion,
     sleep, strictParseBoolean, strictParseInt, structuralEquals, tryParseFloat,
     tryParseInt, tryReadResponseBody
 };

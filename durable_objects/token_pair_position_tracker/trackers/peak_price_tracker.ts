@@ -1,7 +1,7 @@
 import * as dMath from "../../../decimalized";
 import { DecimalizedAmount, DecimalizedAmountSet, MATH_DECIMAL_PLACES, fromKey, fromNumber, toKey } from "../../../decimalized";
 import { Position, PositionStatus, PositionType } from "../../../positions";
-import { setDifference, setIntersection, structuralEquals } from "../../../util";
+import { setDifference, setIntersection, setUnion, structuralEquals } from "../../../util";
 import { PositionsAssociatedWithPeakPrices } from "./positions_associated_with_peak_prices";
 
 /* 
@@ -47,7 +47,9 @@ export class PeakPricePositionTracker {
         for (const peak of peaks) {
             // if the new price is GT than peak, roll the positions in that peak into the new list
             if (dMath.dCompare(peak, newPrice) < 0) {
+                // mark for deletion the peak that is being rolled into the bigger peak 
                 mergedPeaks.push(peak);
+                // add all the positions at this peak into the merge list
                 (this.itemsByPeakPrice.get(peak)||[]).forEach((position) => {
                     if (position == null) {
                         return;
@@ -66,6 +68,12 @@ export class PeakPricePositionTracker {
             this.itemsByPeakPrice.set(newPrice, mergedPositions);
         }
         return this.collectTrailingStopLossesToClose(newPrice);
+    }
+    getPeakPrice(positionID : string) : DecimalizedAmount|undefined {
+        return this.itemsByPeakPrice.getPeakPrice(positionID);
+    }
+    getPosition(positionID : string) : Position|undefined {
+        return this.itemsByPeakPrice.getPosition(positionID);
     }
     private collectTrailingStopLossesToClose(newPrice : DecimalizedAmount) : Position[] {
         
@@ -176,24 +184,35 @@ export class PeakPricePositionTracker {
         // for each price in common between here and last persistence, compare by array position
         const commonPrices = setIntersection(currentPriceSet, oldPriceSet, DecimalizedAmountSet);
         for (const commonPrice of commonPrices) {
+
+            // compare the old and new groups of positions for this peak price
             const oldArray = this._buffer.get(commonPrice)||[];
             const newArray = this.itemsByPeakPrice.get(commonPrice)||[];
-            const iterUpperBound = Math.max(oldArray.length, newArray.length);
-            for (let i = 0; i < iterUpperBound; i++) {
+
+            // carefully get a list of unique indices present in either
+            const newIndices = new Set<number>(Object.keys(newArray).map(index => parseInt(index,10)));
+            const oldIndices = new Set<number>(Object.keys(oldArray).map(index => parseInt(index,10)));
+            const allIndices = setUnion(newIndices, oldIndices, Set<number>);
+            const allIndicesArray = [...allIndices];
+            
+            // for each index
+            for (const i of allIndicesArray) {
 
                 const oldPosition = oldArray[i];
                 const newPosition = newArray[i];
 
+                // if position is present in both arrays at this index
                 if ((oldPosition != null) && (newPosition != null)) {
-                    // present in both arrays
                     if (!this.positionsEqualByValue(oldPosition,newPosition)) {
                         putEntries[this.makeStorageKey(commonPrice,i)] = newPosition;
                     }
                 }
+                // if position is present only in old array at this index
                 else if (newPosition == null && oldPosition != null) {
                     // deleted in new array
                     deletedKeys.add(this.makeStorageKey(commonPrice, i));
                 }
+                // if position is present only in new array at this index
                 else if (newPosition != null && oldPosition == null) {
                     // new in new array
                     putEntries[this.makeStorageKey(commonPrice,i)] = newPosition;

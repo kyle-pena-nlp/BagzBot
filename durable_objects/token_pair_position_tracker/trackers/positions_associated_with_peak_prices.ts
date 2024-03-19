@@ -22,6 +22,15 @@ export class PositionsAssociatedWithPeakPrices extends DecimalizedAmountMap<Read
     get(price : DecimalizedAmount) : ReadonlySparseArray<Position>|undefined {
         return super.get(price);
     }
+    getPosition(positionID : string) : Position|undefined {
+        const location = this.locationMap.get(positionID);
+        if (location == null) {
+            return undefined;
+        }
+        const [price,index] = location;
+        const position = (this.get(price)||[])[index];
+        return position;
+    }
     push(price : DecimalizedAmount, position : Position) {
         const positionsForPrice = super.get(price);
         if (positionsForPrice == null) {
@@ -116,5 +125,13 @@ export class PositionsAssociatedWithPeakPrices extends DecimalizedAmountMap<Read
                 }
             }
         }
+        this.locationMap.delete(positionID);        
+    }
+    getPeakPrice(positionID : string) : DecimalizedAmount|undefined {
+        const location = this.locationMap.get(positionID);
+        if (location == null) {
+            return undefined;
+        }
+        return location[0];
     }
 }

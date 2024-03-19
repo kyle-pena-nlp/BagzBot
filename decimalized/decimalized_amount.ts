@@ -30,7 +30,12 @@ export function toFriendlyString(x : DecimalizedAmount, maxSigFigs : number,
         return numberParts[0];
     }
     else {
-        const [wholePart,fractionalPart] = numberParts;
+        let [wholePart,fractionalPart] = numberParts;
+        let sign = '';
+        if (wholePart.startsWith("-")) {
+            wholePart = wholePart.substring(1);
+            sign = '-';
+        }
         let { zeros, rest } = splitIntoZerosAndRest(fractionalPart); // 0000444 -> { zeros: '0000', rest: '444' }
         // If there are multiple zeros between the decimal and some non-zero stuff to the right...
         if (useSubscripts && zeros.length > 1 && (wholePart == '0'||wholePart == '') && rest.length > 0) {
@@ -53,7 +58,7 @@ export function toFriendlyString(x : DecimalizedAmount, maxSigFigs : number,
         const localizedWholePart = addCommas ? 
             parseFloat(wholePart).toLocaleString() : 
             parseFloat(wholePart).toString();
-        return localizedWholePart + "." + zeros + rest;
+        return sign + localizedWholePart + "." + zeros + rest;
     }
 }
 

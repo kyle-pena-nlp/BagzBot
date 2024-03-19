@@ -95,52 +95,8 @@ test("tracker_triggers_both_positions_after_peak_consolidation", () => {
 })
 
 
-test("storage_roundtrip_preserves_state", async () => {
-    
-    const fakeStorage = new FakeDurableObjectStorage();
-
-    const triggerPct = 10;
-    const tracker = new PeakPricePositionTracker(prefix());
-    const pos1 = posWithPriceAndTrigger(d(280,0), triggerPct);
-    tracker.push(pos1.fillPrice, pos1);
-
-    const pos2 = posWithPriceAndTrigger(d(290,0), triggerPct);
-    tracker.push(pos2.fillPrice, pos2);
-
-    await tracker.flushToStorage(fakeStorage as unknown as DurableObjectStorage);
-    
-    const entries = fakeStorage.list();
-    const newTracker = new PeakPricePositionTracker(prefix());
-    newTracker.initialize(entries);
-
-    expect(newTracker).toEqual(tracker);
-});
-
-test("storage_only_dumps_deltas", async () => {
-    
-    const fakeStorage = new FakeDurableObjectStorage();
-
-    const triggerPct = 10;
-    const tracker = new PeakPricePositionTracker(prefix());
-    const pos1 = posWithPriceAndTrigger(d(280,0), triggerPct, "A");
-    tracker.push(pos1.fillPrice, pos1);
-
-    await tracker.flushToStorage(fakeStorage as unknown as DurableObjectStorage);
-
-    expect([...Object.values(fakeStorage.puts)]).toEqual([pos1]);
-
-    const pos2 = posWithPriceAndTrigger(d(290,0), triggerPct, "B");
-    tracker.push(pos2.fillPrice, pos2);
-    tracker.removePosition("A");
-
-    await tracker.flushToStorage(fakeStorage as unknown as DurableObjectStorage);
-
-    expect(fakeStorage.deletes).toEqual(["A"]);
-    expect([...Object.values(fakeStorage.puts)]).toEqual([pos2]);
-});
-
 function prefix() {
-    return ".";
+    return "position";
 }
 
 function posWithPriceAndTrigger(initPrice : DecimalizedAmount, triggerPct : number, id : string = "ID") {

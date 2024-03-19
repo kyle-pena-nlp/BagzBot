@@ -28,3 +28,14 @@ export function setIntersection<T,V extends SetLike<T>>(a : SetLike<T>, b : SetL
     }
     return intersection;
 }
+
+export function setUnion<T,V extends SetLike<T>>(a : SetLike<T>, b : SetLike<T>, ctor : SetLikeCtor<T,V>) : SetLike<T> {
+    const union = new ctor();
+    for (const item of a) {
+        union.add(item);
+    }
+    for (const item of b) {
+        union.add(item);
+    }
+    return union;
+}
