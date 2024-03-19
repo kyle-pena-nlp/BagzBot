@@ -10,14 +10,15 @@ export class PositionsAssociatedWithPeakPrices extends DecimalizedAmountMap<Read
         return super.get(price);
     }
     push(price : DecimalizedAmount, position : Position) {
-        const positionsForPrice = super.get(price) as Position[];
-        if (positionsForPrice) {
-            const nextIndex = positionsForPrice.length;
-            this.locationMap.set(position.positionID, [price, nextIndex]);
-            positionsForPrice.push(position);
+        const positionsForPrice = super.get(price);
+        if (positionsForPrice == null) {
+            this.locationMap.set(position.positionID, [price, 0]);
+            this.set(price, [position]);
         }
         else {
-            this.set(price, [position]);
+            const nextIndex = positionsForPrice.length;
+            this.locationMap.set(position.positionID, [price, nextIndex]);
+            (positionsForPrice as Position[]).push(position);
         }
     }
     setAtIndex(price: DecimalizedAmount, index :  number, position : Position) {

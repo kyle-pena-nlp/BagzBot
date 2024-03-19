@@ -1,4 +1,5 @@
 import { DecimalizedAmount } from "../../../decimalized";
+import { logError } from "../../../logging";
 import { Position, PositionRequest, PositionStatus } from "../../../positions";
 import { MapWithStorage } from "../../../util";
 import { PeakPricePositionTracker } from "./peak_price_tracker";
@@ -69,10 +70,10 @@ export class TokenPairPositionTracker {
         this.newOpenPositions.clear();
 
         // update the peak prices
-        this.pricePeaks.update(newPrice);
+        const positionsToClose = this.pricePeaks.update(newPrice);
 
         // find out which positions to close
-        const positionsToClose = this.pricePeaks.collectTrailingStopLossesToClose(newPrice);
+        //const positionsToClose = this.pricePeaks.collectTrailingStopLossesToClose(newPrice);
         
         // mark them as closing and move to closing queue -
         // SUPER CRITICAL to mark as closing to prevent them from;
@@ -172,7 +173,7 @@ export class TokenPairPositionTracker {
             this.closedPositions.flushToStorage(storage)
         ]).then(() => {
             // voidx5 -> void
-            // TODO: logging here?
+            logError("Flushing to storage failed for TokenPairPositionTracker")
             return;
         });
     }

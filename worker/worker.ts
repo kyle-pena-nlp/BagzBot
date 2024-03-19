@@ -234,7 +234,7 @@ export class Worker {
 
     makeTrailingStopLossCustomTriggerPercentKeypad(currentValue : string) {
         return new PositiveIntegerKeypad(
-            "${currentValue}",
+            "${currentValue}", // intentional double quotes - syntax is parsed later
             MenuCode.TrailingStopLossCustomTriggerPercentKeypad,
             MenuCode.TrailingStopLossCustomTriggerPercentKeypadSubmit,
             MenuCode.TrailingStopLossRequestReturnToEditorMenu,
@@ -260,7 +260,7 @@ export class Worker {
     }
 
     makeTrailingStopLossCustomSlippagePctKeypad(currentEntry : string) {
-        return new PositiveIntegerKeypad("${currentValue}%",
+        return new PositiveIntegerKeypad("${currentValue}%", // intentional double quotes - syntax is parsed later
             MenuCode.TrailingStopLossCustomSlippagePctKeypad,
             MenuCode.TrailingStopLossCustomSlippagePctKeypadSubmit,
             MenuCode.TrailingStopLossRequestReturnToEditorMenu,
@@ -270,7 +270,7 @@ export class Worker {
     }
 
     makeTrailingStopLossBuyQuantityKeypad(currentEntry : string) {
-        return new PositiveDecimalKeypad("${currentValue}", 
+        return new PositiveDecimalKeypad("${currentValue}",  // intentional double quotes - syntax is parsed later
             MenuCode.TrailingStopLossEnterBuyQuantityKeypad, 
             MenuCode.TrailingStopLossEnterBuyQuantitySubmit, 
             MenuCode.TrailingStopLossRequestReturnToEditorMenu,

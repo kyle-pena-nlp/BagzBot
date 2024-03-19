@@ -10,9 +10,11 @@ import {
 import { DecimalizedAmountMap } from "./decimalized_amount_map";
 import { DecimalizedAmountSet } from "./decimalized_amount_set";
 import {
-    compare,
+    ZERO,
     dAdd,
+    dCompare,
     dDiv,
+    dMoveDecimalLeft,
     dMult,
     dNegate,
     dSub
@@ -20,9 +22,7 @@ import {
 
 export {
     DecimalizedAmount, DecimalizedAmountMap,
-    DecimalizedAmountSet, MATH_DECIMAL_PLACES, compare, dAdd,
-    dDiv,
-    dMult,
+    DecimalizedAmountSet, MATH_DECIMAL_PLACES, ZERO, dAdd, dCompare, dDiv, dMoveDecimalLeft, dMult,
     dNegate,
     dSub, fromKey,
     fromNumber,

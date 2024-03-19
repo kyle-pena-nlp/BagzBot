@@ -1,6 +1,7 @@
 import { Position } from "../../../positions";
+import { HasPairAddresses } from "./has_pair_addresses";
 
-export interface GetPositionsFromTokenPairTrackerRequest {
+export interface GetPositionsFromTokenPairTrackerRequest extends HasPairAddresses {
 	positionIDs : string[]
 };
 

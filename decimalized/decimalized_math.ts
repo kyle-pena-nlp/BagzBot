@@ -1,4 +1,4 @@
-import { DecimalizedAmount, moveDecimalLeftInString } from "./decimalized_amount";
+import { DecimalizedAmount, moveDecimalInString } from "./decimalized_amount";
 
 export function dAdd(a : DecimalizedAmount, b : DecimalizedAmount) : DecimalizedAmount {
     const decimals = Math.max(a.decimals, b.decimals);
@@ -11,17 +11,21 @@ export function dAdd(a : DecimalizedAmount, b : DecimalizedAmount) : Decimalized
 }
 
 export function dSub(a : DecimalizedAmount, b : DecimalizedAmount) : DecimalizedAmount {
-    const decimals = Math.max(a.decimals, b.decimals);
+    let decimals = Math.max(a.decimals, b.decimals);
     a = convertToLargerDecimals(a, decimals);
     b = convertToLargerDecimals(b, decimals);
+    const biDiff = (BigInt(a.tokenAmount) - BigInt(b.tokenAmount));
+    if (biDiff == 0n) {
+        decimals = 0;
+    }
     return {
-        tokenAmount : (BigInt(a.tokenAmount) - BigInt(b.tokenAmount)).toString(),
+        tokenAmount : biDiff.toString(),
         decimals: decimals
     };
 }
 
 export function dNegate(x : DecimalizedAmount) : DecimalizedAmount {
-    return dSub({ tokenAmount: "0", decimals : 1}, x);
+    return dSub({ tokenAmount: "0", decimals : x.decimals}, x);
 }
 
 export function dMult(a : DecimalizedAmount, b : DecimalizedAmount) : DecimalizedAmount {
@@ -55,12 +59,22 @@ export function percentOf(price : DecimalizedAmount, peakPrice : DecimalizedAmou
     return number;
 }
 
-export function compare(a : DecimalizedAmount, b : DecimalizedAmount) : number {
+export function dMoveDecimalLeft(a : DecimalizedAmount, places : number) {
+    if (places < 0) {
+        throw new Error("Only move to left positive # of places.");
+    }
+    return {
+        tokenAmount: a.tokenAmount,
+        decimals: a.decimals + places
+    };
+}
+
+export function dCompare(a : DecimalizedAmount, b : DecimalizedAmount) : number {
     const decimals = Math.max(a.decimals, b.decimals);
     a = convertToLargerDecimals(a, decimals);
     b = convertToLargerDecimals(b, decimals);
     const aBI = BigInt(a.tokenAmount);
-    const bBI = BigInt(a.tokenAmount);
+    const bBI = BigInt(b.tokenAmount);
     if (aBI < bBI) {
         return -1;
     }
@@ -85,7 +99,8 @@ function convertToLargerDecimals(a : DecimalizedAmount, d : number) {
 }
 
 function dAsNumber(a : DecimalizedAmount) : number {
-    const stringAmount = moveDecimalLeftInString(a.tokenAmount, a.decimals);
+    const stringAmount = moveDecimalInString(a.tokenAmount, -a.decimals);
     return parseFloat(stringAmount);
 }
 
+export const ZERO : DecimalizedAmount = { tokenAmount: "0", decimals: 0 }; 

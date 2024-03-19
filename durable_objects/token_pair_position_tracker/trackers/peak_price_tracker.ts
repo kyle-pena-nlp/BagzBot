@@ -24,11 +24,7 @@ export class PeakPricePositionTracker {
         this.pricePeakSessionKeyPrefix = pricePeakSessionKeyPrefix;
     }
     push(price : DecimalizedAmount, position : Position) {
-        if (!this.itemsByPeakPrice.has(price)) {
-            this.itemsByPeakPrice.set(price, []);
-        }
         this.itemsByPeakPrice.push(price, position);
-        //this.itemsByPeakPrice.get(price)!!.push(position);
     }
     markAsClosing(positionID : string) {
         this.itemsByPeakPrice.markAsClosing(positionID);
@@ -36,14 +32,14 @@ export class PeakPricePositionTracker {
     removePosition(positionID : string) {
         this.itemsByPeakPrice.removePosition(positionID);
     }
-    update(newPrice : DecimalizedAmount) {
+    update(newPrice : DecimalizedAmount) : Position[] {
         const peaks = [...this.itemsByPeakPrice.keys()];
-        peaks.sort(dMath.compare);
+        peaks.sort(dMath.dCompare);
         const mergedPeaks = [];
         const mergedPositions = [];
         for (const peak of peaks) {
             // if the new price is greater than this peak, roll in this peak to the merged peak
-            if (dMath.compare(peak, newPrice) < 0) {
+            if (dMath.dCompare(peak, newPrice) < 0) {
                 mergedPeaks.push(peak);
                 mergedPositions.push(...this.itemsByPeakPrice.get(peak)!!);
             }
@@ -57,25 +53,48 @@ export class PeakPricePositionTracker {
         if (mergedPositions.length) {
             this.itemsByPeakPrice.set(newPrice, mergedPositions);
         }
+        return this.collectTrailingStopLossesToClose(newPrice);
     }
-    collectTrailingStopLossesToClose(newPrice : DecimalizedAmount) : Position[] {
+    private collectTrailingStopLossesToClose(newPrice : DecimalizedAmount) : Position[] {
+        
+        // collect TSL positions to be closed
         const positionsToClose = [];
+
+        // for each group of trades with the same peak price
         for (const peakPrice of this.itemsByPeakPrice.keys()) {
+
+            // if the new price is greater than the peak, no need to consider this group further
+            if (dMath.dCompare(peakPrice, newPrice) < 0) {
+                continue;
+            }
+
+            // compute percent price decrease fraction from the peak
             const priceDecreaseFrac = dMath.dDiv(dMath.dSub(peakPrice, newPrice), peakPrice, MATH_DECIMAL_PLACES);
-            const positionsWithThisPeakPrice = this.itemsByPeakPrice.get(peakPrice)!!;
-            for (const position of positionsWithThisPeakPrice) {
-                // If it is not an open, long trailing stop loss, continue (don't try to sell a position that is already closing).
-                const isOpenPosition = position.status === PositionStatus.Open; // this is super critical.
-                if (!isOpenPosition) {
+            
+            // for each position in this group
+            for (const position of this.itemsByPeakPrice.get(peakPrice)!!) {
+                
+                // If it is not an open position, skip.
+                if (position.status !== PositionStatus.Open) {
                     continue;
                 }
+                
+                // If it's not a TSL, skip
                 if (position.type === PositionType.LongTrailingStopLoss) {
-                    // And the newPrice doesn't trigger the selloff of the position, continue.
-                    const tradeIsTriggered = dMath.compare(priceDecreaseFrac, fromNumber(position.triggerPercent, MATH_DECIMAL_PLACES)) >= 0;
+                    
+                    // compute trigger pct for this position
+                    const triggerPctFrac = dMath.dMoveDecimalLeft(
+                        fromNumber(position.triggerPercent, MATH_DECIMAL_PLACES), 2);
+                    
+                    // if the percent price decrease exceeds the trigger pct, the trade is trigger.
+                    const tradeIsTriggered = dMath.dCompare(priceDecreaseFrac, triggerPctFrac) >= 0;
+                    
+                    // if not, skip it.
                     if (!tradeIsTriggered) {
                         continue;
                     }
-                    // And add it to the list of positions to close
+
+                    // But if it is triggered, add it to the list of positions to close
                     positionsToClose.push(position);
                 }
             }
@@ -165,14 +184,14 @@ export class PeakPricePositionTracker {
         return [putEntries,deletedKeys];
     }
     private prefixRegex() : RegExp {
-        return new RegExp(`^${this.pricePeakSessionKeyPrefix}:`);
+        const regexEscapedPrefix = this.pricePeakSessionKeyPrefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        return new RegExp(`^${regexEscapedPrefix}:`);
     }
     private parseStorageKey(key : string) : [DecimalizedAmount,number] {
         const [prefix,priceString,indexString] = key.split(":");
         return [fromKey(priceString), parseInt(indexString,10)];
     }
     private makeStorageKey(price : DecimalizedAmount, index : number) : string {
-        // TODO: make decimalized prices the law of the land in this codebase
         return `${this.pricePeakSessionKeyPrefix}:${toKey(price)}:${index.toString()}`;
     }
     private overwriteBufferWithCurrentState() {
@@ -182,7 +201,6 @@ export class PeakPricePositionTracker {
             for (const position of this.itemsByPeakPrice.get(key)!!) {
                 const clonedPositionObject = structuredClone(position);
                 this._buffer.push(key, clonedPositionObject);
-                //this._buffer.get(key)!!.push(clonedPositionObject);
             }
         }
     }

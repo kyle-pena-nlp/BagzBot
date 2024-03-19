@@ -2,11 +2,9 @@ import { DurableObjectState } from "@cloudflare/workers-types";
 import { Wallet, encryptPrivateKey, generateEd25519Keypair } from "../../crypto";
 import { Env } from "../../env";
 import { PositionRequest, PositionStatus, PositionType } from "../../positions";
-import { TokenInfo, getVsTokenInfo } from "../../tokens";
-import { ChangeTrackedValue, Structural, assertNever, makeFailureResponse, makeJSONResponse, makeSuccessResponse, maybeGetJson } from "../../util";
+import { getVsTokenInfo } from "../../tokens";
+import { ChangeTrackedValue, Structural, assertNever, groupIntoMap, makeFailureResponse, makeJSONResponse, makeSuccessResponse, maybeGetJson } from "../../util";
 import { AutomaticallyClosePositionsRequest, AutomaticallyClosePositionsResponse } from "../token_pair_position_tracker/actions/automatically_close_positions";
-import { TokenPairPositionTrackerInitializeRequest } from "../token_pair_position_tracker/actions/initialize_token_pair_position_tracker";
-import { TokenPairPositionTrackerDOFetchMethod, makeTokenPairPositionTrackerDOFetchRequest } from "../token_pair_position_tracker/token_pair_position_tracker_DO_interop";
 import { DeleteSessionRequest, DeleteSessionResponse } from "./actions/delete_session";
 import { GenerateWalletRequest, GenerateWalletResponse } from "./actions/generate_wallet";
 import { GetPositionRequest } from "./actions/get_position";
@@ -25,6 +23,10 @@ import { UserPositionTracker } from "./trackers/user_position_tracker";
 import { UserDOFetchMethod, parseUserDOFetchMethod } from "./userDO_interop";
 import { buy } from "./user_buy";
 import { sell } from "./user_sell";
+import { wakeUpTokenPairPositionTracker } from "../token_pair_position_tracker/token_pair_position_tracker_DO_interop";
+
+// TODO: all requests to UserDo include telegramUserID and telegramUserName
+// and ensure initialization.  That way, no purpose-specific initialization call is required
 
 /* Durable Object storing state of user */
 export class UserDO {
@@ -39,7 +41,7 @@ export class UserDO {
     // user's name
     telegramUserName : ChangeTrackedValue<string|null> = new ChangeTrackedValue<string|null>('telegramUserName', null);
 
-    // the user's wallet.  TODO: encrypt private keys
+    // the user's wallet.
     wallet : ChangeTrackedValue<Wallet|null> = new ChangeTrackedValue<Wallet|null>('wallet', null);
 
     // the default values for a trailing sotp loss
@@ -65,13 +67,24 @@ export class UserDO {
             token : getVsTokenInfo('USDC'),
             vsToken : getVsTokenInfo('SOL'),
             vsTokenAmt : parseFloat(env.DEFAULT_TLS_VS_TOKEN_FRACTION),
-            slippagePercent : 2.0,
+            slippagePercent : 5.0,
             triggerPercent : 5,
             retrySellIfSlippageExceeded : true            
         };
         this.state.blockConcurrencyWhile(async () => {
             await this.loadStateFromStorage();
         });
+        this.wakeUpPositionTrackers();
+    }
+
+    async wakeUpPositionTrackers() {
+        const positions = this.userPositionTracker.listPositions();
+        const map = groupIntoMap(positions, p => `${p.token.address}~${p.vsToken.address}`);
+        for (const [key,positions] of map) {
+            const tokenAddress = positions[0].token.address;
+            const vsTokenAddress = positions[0].vsToken.address;
+            wakeUpTokenPairPositionTracker(tokenAddress, vsTokenAddress, this.env);
+        }
     }
 
     async loadStateFromStorage() {
@@ -79,15 +92,6 @@ export class UserDO {
         this.telegramUserID.initialize(storage);
         this.telegramUserName.initialize(storage);
         this.wallet.initialize(storage);
-        // temporary shim to upgrade test wallet PK
-        /*if (this.initialized() && this.wallet.value && 'privateKey' in this.wallet.value) {
-            this.wallet.value.encryptedPrivateKey = await encryptPrivateKey(
-                this.wallet.value['privateKey'] as string, 
-                this.telegramUserID.value!!, 
-                this.env);
-            delete (this.wallet.value as any)['privateKey'];
-            await this.wallet.flushToStorage(this.state.storage);
-        }*/
         this.sessionTracker.initialize(storage);
         this.userPositionTracker.initialize(storage);
     }
@@ -188,7 +192,6 @@ export class UserDO {
                 break;
             default:
                 assertNever(method);
-                response = makeFailureResponse('Unknown method: ${method.toString()}');
         }
 
         return [method,jsonRequestBody,response];
@@ -312,23 +315,7 @@ export class UserDO {
         buy(positionRequest, this.wallet.value!!, this.userPositionTracker, this.env);
         return makeJSONResponse<OpenPositionResponse>({});
     }
-
-    async ensureTokenPairPositionTrackerDOIsInitialized(token : TokenInfo, vsToken : TokenInfo, tokenPairPositionTrackerDO : DurableObjectStub) : Promise<void> {
-        const body: TokenPairPositionTrackerInitializeRequest = {
-            token : token,
-            vsToken : vsToken
-        };
-        const request = makeTokenPairPositionTrackerDOFetchRequest(TokenPairPositionTrackerDOFetchMethod.initialize, body);
-        return await tokenPairPositionTrackerDO.fetch(request).then((response) => {
-            if (!response.ok) {
-                throw new Error("Could not initialize tokenPairPositionTrackerDO");
-            }
-            else {
-                return;
-            }
-        });
-    }
-
+    
     async handleManuallyClosePositionRequest(manuallyClosePositionRequest : ManuallyClosePositionRequest) : Promise<Response> {
         
         const positionID = manuallyClosePositionRequest.positionID;

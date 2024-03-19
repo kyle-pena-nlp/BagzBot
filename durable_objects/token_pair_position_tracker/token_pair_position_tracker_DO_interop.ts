@@ -4,14 +4,29 @@ import { makeJSONRequest, makeRequest } from "../../util";
 import { ImportNewPositionsRequest, ImportNewPositionsResponse } from "./actions/import_new_positions";
 import { MarkPositionAsClosedRequest, MarkPositionAsClosedResponse } from "./actions/mark_position_as_closed";
 import { MarkPositionAsClosingRequest, MarkPositionAsClosingResponse } from "./actions/mark_position_as_closing";
-
+import { WakeupRequest, WakeupResponse } from "./actions/wake_up";
 
 export enum TokenPairPositionTrackerDOFetchMethod {
-	initialize  = "initialize",
+	wakeUp = "wakeUp",
 	updatePrice = "updatePrice",
 	importNewOpenPositions = "importNewOpenPositions",
 	markPositionAsClosing = "markPositionAsClosing",
 	markPositionAsClosed = "markPositionAsClosed"
+}
+
+/* This should be called on cold-start */
+export async function wakeUpTokenPairPositionTracker(tokenAddress : string, vsTokenAddress : string, env : Env) : Promise<WakeupResponse> {
+	const body = { 
+		tokenAddress: tokenAddress, 
+		vsTokenAddress : vsTokenAddress 
+	};
+	const response = await sendJSONRequestToTokenPairPositionTracker<WakeupRequest,WakeupResponse>(
+		TokenPairPositionTrackerDOFetchMethod.wakeUp, 
+		body, 
+		tokenAddress, 
+		vsTokenAddress, 
+		env);
+	return response;
 }
 
 export function parseTokenPairPositionTrackerDOFetchMethod(value : string) : TokenPairPositionTrackerDOFetchMethod|null {
@@ -49,7 +64,11 @@ export async function markPositionAsClosingInTokenPairPositionTracker(request : 
 }
 
 export async function importNewPosition(position : Position, env : Env) : Promise<ImportNewPositionsResponse> {
-	const requestBody : ImportNewPositionsRequest = { positions : [position] };
+	const requestBody : ImportNewPositionsRequest = { 
+		positions : [position], 
+		tokenAddress: position.token.address, 
+		vsTokenAddress: position.vsToken.address
+	};
 	const method = TokenPairPositionTrackerDOFetchMethod.importNewOpenPositions;
 	const tokenAddress = position.token.address;
 	const vsTokenAddress = position.vsToken.address;
@@ -58,7 +77,7 @@ export async function importNewPosition(position : Position, env : Env) : Promis
 
 async function sendJSONRequestToTokenPairPositionTracker<TRequestBody,TResponseBody>(method : TokenPairPositionTrackerDOFetchMethod, requestBody : TRequestBody, tokenAddress : string, vsTokenAddress : string, env : Env) {
 	const tokenPairPositionTrackerDO = getTokenPairPositionTrackerDO(tokenAddress, vsTokenAddress, env);
-	const jsonRequest = makeJSONRequest(`http://tokenPairPositionTracker/{method.toString()}`, requestBody);
+	const jsonRequest = makeJSONRequest(`http://tokenPairPositionTracker/${method.toString()}`, requestBody);
 	const response = await tokenPairPositionTrackerDO.fetch(jsonRequest);
 	const responseBody = await response.json();
 	return responseBody as TRequestBody;

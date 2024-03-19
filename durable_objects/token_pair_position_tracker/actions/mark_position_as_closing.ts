@@ -1,7 +1,7 @@
-export interface MarkPositionAsClosingRequest {
+import { HasPairAddresses } from "./has_pair_addresses";
+
+export interface MarkPositionAsClosingRequest extends HasPairAddresses {
     positionID : string;
-    tokenAddress : string;
-    vsTokenAddress : string;
 }
 
 export interface MarkPositionAsClosingResponse {

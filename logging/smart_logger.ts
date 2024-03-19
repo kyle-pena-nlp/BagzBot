@@ -17,7 +17,8 @@ const keysToLookFor = [
     'length',
     'size',
     'token',
-    'vsToken'
+    'vsToken',
+    'value'
 ];
 
 const fnsToLookFor = [

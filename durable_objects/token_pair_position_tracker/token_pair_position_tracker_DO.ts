@@ -4,11 +4,12 @@ import { Env } from "../../env";
 import { ChangeTrackedValue, assertNever, makeJSONResponse } from "../../util";
 import { sendClosePositionOrdersToUserDOs } from "../user/userDO_interop";
 import { AutomaticallyClosePositionsRequest } from "./actions/automatically_close_positions";
+import { HasPairAddresses } from "./actions/has_pair_addresses";
 import { ImportNewPositionsRequest, ImportNewPositionsResponse } from "./actions/import_new_positions";
-import { TokenPairPositionTrackerInitializeRequest } from "./actions/initialize_token_pair_position_tracker";
 import { MarkPositionAsClosedRequest, MarkPositionAsClosedResponse } from "./actions/mark_position_as_closed";
 import { MarkPositionAsClosingRequest, MarkPositionAsClosingResponse } from "./actions/mark_position_as_closing";
 import { UpdatePriceRequest, UpdatePriceResponse } from "./actions/update_price";
+import { WakeupRequest, WakeupResponse } from "./actions/wake_up";
 import { TokenPairPositionTrackerDOFetchMethod, parseTokenPairPositionTrackerDOFetchMethod } from "./token_pair_position_tracker_DO_interop";
 import { TokenPairPositionTracker } from "./trackers/token_pair_position_tracker";
 
@@ -45,8 +46,8 @@ export class TokenPairPositionTrackerDO {
     constructor(state : DurableObjectState, env : Env) {
 
         this.state       = state; // access to persistent storage (as opposed to in-memory)
-        this.isPolling          = false;
-        this.env = env;
+        this.isPolling   = false;
+        this.env         = env;
         this.state.blockConcurrencyWhile(async () => {
             await this.loadStateFromStorage(this.state.storage);
         });
@@ -93,7 +94,7 @@ export class TokenPairPositionTrackerDO {
         try {
             const price = await this.getPrice();
             if (price != null) {
-                this.handleUpdatePrice({ price });
+                this.updatePrice(price);
             }
         }
         catch(e) {
@@ -110,14 +111,14 @@ export class TokenPairPositionTrackerDO {
 
     async getPrice() : Promise<DecimalizedAmount|undefined> {
         const tokenAddress = this.tokenAddress.value!!;
-        const vsTokenAddress = this.vsTokenAddress;
+        const vsTokenAddress = this.vsTokenAddress.value!!;
         const url = `https://price.jup.ag/v4/price?ids=${tokenAddress}&vsToken=${vsTokenAddress}`;
         const response = await fetch(url);
         if (!response.ok) {
             return;
         }
         const responseBody : any = (await response.json());
-        const price = responseBody.data[tokenAddress];
+        const price = responseBody.data[tokenAddress].price;
         const decimalizedPrice = fromNumber(price, MATH_DECIMAL_PLACES);
         return decimalizedPrice;
     }
@@ -148,39 +149,43 @@ export class TokenPairPositionTrackerDO {
 
     async _fetch(method : TokenPairPositionTrackerDOFetchMethod, body : any) : Promise<Response> {
         switch(method) {
-            case TokenPairPositionTrackerDOFetchMethod.initialize:
-                return await this.handleInitialize(body);
             case TokenPairPositionTrackerDOFetchMethod.updatePrice:
-                this.assertIsInitialized();
                 return await this.handleUpdatePrice(body);
             case TokenPairPositionTrackerDOFetchMethod.importNewOpenPositions:
-                this.assertIsInitialized();
                 return await this.handleImportNewOpenPositions(body);
             case TokenPairPositionTrackerDOFetchMethod.markPositionAsClosing:
-                this.assertIsInitialized();
                 return await this.handleMarkPositionAsClosing(body);
             case TokenPairPositionTrackerDOFetchMethod.markPositionAsClosed:
-                this.assertIsInitialized();
                 return await this.handleMarkPositionAsClosed(body);
+            case TokenPairPositionTrackerDOFetchMethod.wakeUp:
+                return await this.handleWakeup(body);
             default:
                 assertNever(method);
-                return makeJSONResponse({},400);
         }
     }
 
+    async handleWakeup(body : WakeupRequest) {
+        // this is a no-op, because by simply calling a request we wake up the DO
+        const responseBody : WakeupResponse = {};
+        return makeJSONResponse(responseBody);
+    }
+
     async handleImportNewOpenPositions(body : ImportNewPositionsRequest) {
+        this.ensureIsInitialized(body);
         const responseBody : ImportNewPositionsResponse = {};
         this.tokenPairPositionTracker.importNewOpenPositions(body.positions);
         return makeJSONResponse(responseBody);
     }
 
     async handleMarkPositionAsClosed(body: MarkPositionAsClosedRequest) : Promise<Response> {
+        this.ensureIsInitialized(body);
         this.tokenPairPositionTracker.closePosition(body.positionID);
         const responseBody : MarkPositionAsClosedResponse = {};
         return makeJSONResponse(responseBody);
     }
 
     async handleMarkPositionAsClosing(body : MarkPositionAsClosingRequest): Promise<Response> {
+        this.ensureIsInitialized(body);
         this.tokenPairPositionTracker.markPositionAsClosing(body.positionID);
         const responseBody : MarkPositionAsClosingResponse = {};
         return makeJSONResponse(responseBody);
@@ -202,15 +207,8 @@ export class TokenPairPositionTrackerDO {
         }
     }
 
-    async handleInitialize(initializeRequest : TokenPairPositionTrackerInitializeRequest) : Promise<Response> {
-        if (!this.initialized()) {
-            this.tokenAddress.value = initializeRequest.token.address;
-            this.vsTokenAddress.value = initializeRequest.vsToken.address;
-        }
-        return new Response(null, { status: 200 });
-    }
-
     async handleUpdatePrice(request : UpdatePriceRequest) : Promise<Response> {
+        this.ensureIsInitialized(request);
         const newPrice = request.price;
         this.updatePrice(newPrice);
         const responseBody : UpdatePriceResponse = {};
@@ -222,5 +220,10 @@ export class TokenPairPositionTrackerDO {
         const positionsToClose = this.tokenPairPositionTracker.updatePrice(newPrice);
         const request : AutomaticallyClosePositionsRequest = { positions: positionsToClose.positionsToClose };
         sendClosePositionOrdersToUserDOs(request, this.env);
+    }
+    
+    ensureIsInitialized(x : HasPairAddresses) {
+        this.tokenAddress.value = x.tokenAddress;
+        this.vsTokenAddress.value = x.vsTokenAddress;
     }
 }

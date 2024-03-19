@@ -6,7 +6,8 @@ import { logError } from "../logging";
 import { Position, PositionRequest, Swappable, isPosition, isPositionRequest } from "../positions";
 import { SOL_ADDRESS, deriveTokenAccount, getVsTokenInfo } from "../tokens";
 import { safe, sleep } from "../util";
-import { ParsedSwapSummary, PreparseConfirmedSwapResult, PreparseSwapResult, SwapExecutionError, SwapSummary } from "./rpc_types";
+import { parseInstructionError } from "./rpc_parse_instruction_error";
+import { ParsedSwapSummary, PreparseConfirmedSwapResult, PreparseSwapResult, SwapSummary } from "./rpc_types";
 
 
 // This may come in handy at some point: https://github.com/cocrafts/walless/blob/a05d20f8275c8167a26de976a3b6701d64472765/apps/wallet/src/engine/runners/solana/history/swapHistory.ts#L85
@@ -65,7 +66,7 @@ async function parseSwapTransaction(
 
     const err = parsedTransaction.meta?.err;
     if (err) {
-        const swapExecutionError = determineSwapExecutionError(parsedTransaction, env);
+        const swapExecutionError = parseInstructionError(err, env);
         return {
             status: swapExecutionError
         };
@@ -106,7 +107,6 @@ function calculateTokenBalanceChange(parsedTransaction : ParsedTransactionWithMe
     const postTokenBalances = parsedTransaction.meta?.postTokenBalances||[];
     const accountKeys = parsedTransaction.transaction.message.accountKeys.map(a => a.pubkey.toBase58());
     // depending on whether we are dealing with SOL, we look in different places.
-    // TODO: does the pre-and-post difference include any tx fees paid or not?
     if (tokenAddress === SOL_ADDRESS) {
         const ownerAccountIdx = accountKeys.indexOf(userAddress.address);
         const preSOLBalances = parsedTransaction.meta?.preBalances;
@@ -197,26 +197,4 @@ async function waitUntilCurrentBlockFinalized(connection : Connection, env : Env
         sleep(2 * parseInt(env.MAX_BLOCK_FINALIZATION_TIME_MS, 10));
         return;
     }
-}
-
-function determineSwapExecutionError(parsedTransaction : ParsedTransactionWithMeta, env : Env) : SwapExecutionError {
-    //const instructions = parsedTransaction.transaction.message.instructions;
-    //parsedTransaction.meta?.innerInstructions
-    return SwapExecutionError.OtherSwapExecutionError; // TODO: detect actual error cases by code, etc.
-    
-    /*const instructionErrorIndex      = parsedTransaction.instructionError?.[0];
-    const instructionErrorCustomCode = parsedTransaction.instructionError?.[1]?.Custom;
-    const programId = parsedTransaction.instructions.[instructionErrorIndex]?.programId;
-    const jupiter_swap_slippage_custom_error_code = parseInt(env.JUPITER_SWAP_PROGRAM_SLIPPAGE_ERROR_CODE, 10);
-    if (programId === env.JUPITER_SWAP_PROGRAM_ID && instructionErrorCustomCode === jupiter_swap_slippage_custom_error_code) {
-        return SwapExecutionError.SlippageToleranceExceeded;
-    }*/
-    // TODO: detect insufficient balance
-    /*else if (programId === env.JUPITER_SWAP_PROGRAM_ID && instructionErrorCustomCode === jupiter_swap_insufficient_balance) {
-        return 'insufficient-balance';
-    }*/
-    /*
-    else {
-        return SwapExecutionError.OtherSwapExecutionError;
-    }*/
 }

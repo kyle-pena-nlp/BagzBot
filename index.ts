@@ -21,6 +21,8 @@ enum ERRORS {
    NOT_A_PRIVATE_CHAT = 3000
 }
 
+// TODO: on cold-start, wake up all the position Trackers (either directly or indirectly)
+
 /**
  * Worker
  */

@@ -5,13 +5,14 @@ import { Env } from "../env";
 import { logError } from "../logging";
 import { sleep } from "../util";
 import { getLastValidBlockheight, getLatestBlockheight } from "./rpc_common";
+import { parseInstructionError } from "./rpc_parse_instruction_error";
 import {
     PreparseSwapResult,
+    SwapExecutionError,
     TransactionExecutionError,
     TransactionExecutionErrorCouldntConfirm
 } from "./rpc_types";
 
-// TODO: export async function retryConfirmation()
 
 export async function executeRawSignedTransaction(
     positionID : string,
@@ -212,34 +213,25 @@ function parseSendRawTransactionException(e : any) : string|null {
 }
 
 
-function parseSwapExecutionError(err : any, rawSignedTx : VersionedTransaction, env : Env) : TransactionExecutionError {
+function parseSwapExecutionError(err : any, rawSignedTx : VersionedTransaction, env : Env) : SwapExecutionError {
     const instructionError = err?.InstructionError;
     if (instructionError) {
         try {
-            const errorCode = instructionError[1].Custom;
-            if(errorCode === parseInt(env.JUPITER_SWAP_PROGRAM_SLIPPAGE_ERROR_CODE,10)) {
-                return TransactionExecutionError.SlippageToleranceExceeded;
-            }
-            else if (errorCode === parseInt(env.JUPITER_SWAP_PROGRAM_FEE_ACCOUNT_NOT_INITIALIZED_ERROR_CODE,10)) {
-                return TransactionExecutionError.TokenFeeAccountNotInitialized;
-            }
-            else if (errorCode === parseInt(env.JUPITER_SWAP_PROGRAM_INSUFFICIENT_LAMPORTS_ERROR_CODE, 10)) {
-                // instruction index === 3
-                return TransactionExecutionError.InsufficientNativeTokensError;
-            }
+            const swapExecutionError = parseInstructionError(instructionError, env);
+            return swapExecutionError;
         }
         catch {
-            return TransactionExecutionError.TransactionFailedOtherReason;
+            return SwapExecutionError.OtherSwapExecutionError;
         }
     }
 
-    return TransactionExecutionError.TransactionFailedOtherReason;
+    return SwapExecutionError.OtherSwapExecutionError;
 }
 
 
 function determineTxConfirmationFinalStatus(
     sendStatus : TransactionExecutionError|undefined, 
-    confirmStatus : TransactionExecutionError|TransactionExecutionErrorCouldntConfirm|'transaction-confirmed'|undefined) : TransactionExecutionError | TransactionExecutionErrorCouldntConfirm | 'transaction-confirmed' {
+    confirmStatus : TransactionExecutionError|TransactionExecutionErrorCouldntConfirm|SwapExecutionError|'transaction-confirmed'|undefined) : SwapExecutionError | TransactionExecutionError | TransactionExecutionErrorCouldntConfirm | 'transaction-confirmed' {
     return confirmStatus || sendStatus || TransactionExecutionErrorCouldntConfirm.Unknown;
 }
 

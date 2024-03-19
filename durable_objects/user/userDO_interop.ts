@@ -82,7 +82,6 @@ export function getUserDO(telegramUserID : number, env : Env) : any {
 }
 
 export async function listOpenTrailingStopLossPositions(telegramUserID : number, env : Env) : Promise<Position[]> {
-	// TODO: do we need to limit by positions type?  only kind of position currently is LTLS
 	const body  : ListPositionsRequest = {};
 	const positions = await sendJSONRequestToUserDO<ListPositionsRequest,Position[]>(telegramUserID, UserDOFetchMethod.listPositions, body, env);
 	return positions;

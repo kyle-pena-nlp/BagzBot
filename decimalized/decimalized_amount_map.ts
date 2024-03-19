@@ -57,4 +57,10 @@ export class DecimalizedAmountMap<V> {
             callback(value, fromKey(key), this);
         }
     }
+    get size() {
+        return this.inner.size;
+    }
+    any() {
+        return this.inner.size > 0;
+    }
 }

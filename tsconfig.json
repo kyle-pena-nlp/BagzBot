@@ -10,7 +10,7 @@
       "esModuleInterop": true,
       "sourceMap": true,
       "preserveConstEnums": true,
-      "types": ["@cloudflare/workers-types/2023-07-01", "node"]
+      "types": ["@cloudflare/workers-types/2023-07-01", "node", "jest"]
     },
     "include": [
       "./*.ts",

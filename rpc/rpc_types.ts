@@ -31,7 +31,7 @@ export enum TransactionExecutionErrorCouldntConfirm {
 }
 
 
-export type PreparseSwapResult = PreparseUnconfirmedSwapResult | PreparseConfirmedSwapResult | PreparseFailedSwapResult;
+export type PreparseSwapResult = PreparseUnconfirmedSwapResult | PreparseConfirmedSwapResult | PreparseSwapExecutionError | PreparseFailedSwapResult;
 
 interface BasePreparseResult {
     positionID : string
@@ -50,8 +50,13 @@ export interface PreparseUnconfirmedSwapResult extends BasePreparseResult {
     status: TransactionExecutionErrorCouldntConfirm
 };
 
+export interface PreparseSwapExecutionError extends BasePreparseResult {
+    status: SwapExecutionError
+}
+
 export enum SwapExecutionError {
-    InsufficientBalance = "InsufficientBalance",
+    InsufficientSOLBalance = "InsufficientSOLBalance",
+    InsufficientTokenBalance = "InsufficientTokenBalance",
     SlippageToleranceExceeded = "SlippageToleranceExceeded",
     OtherSwapExecutionError = "OtherSwapExecutionError",
     TokenAccountFeeNotInitialized = "TokenAccountFeeNotInitialized"
@@ -151,10 +156,14 @@ export function isConfirmed(maybeExecutedTx : PreparseSwapResult) : maybeExecute
     return maybeExecutedTx.status === 'transaction-confirmed';
 }
 
-export function isFailed(maybeExecutedTx : PreparseSwapResult) : maybeExecutedTx is PreparseFailedSwapResult {
+export function isFailedSwapTxExecution(maybeExecutedTx : PreparseSwapResult) : maybeExecutedTx is PreparseSwapExecutionError {
+    return isEnumValue(maybeExecutedTx.status, SwapExecutionError);
+}
+
+export function isFailedTxExecution(maybeExecutedTx : PreparseSwapResult) : maybeExecutedTx is PreparseFailedSwapResult {
     return isTransactionExecutionError(maybeExecutedTx.status);
 }
 
-export function isUnconfirmed(maybeExecutedTx : PreparseSwapResult) : maybeExecutedTx is PreparseUnconfirmedSwapResult {
+export function isUnconfirmedTxExecution(maybeExecutedTx : PreparseSwapResult) : maybeExecutedTx is PreparseUnconfirmedSwapResult {
     return isTransactionExecutionErrorCouldntConfirm(maybeExecutedTx.status);
 }

@@ -26,7 +26,7 @@ export interface Position {
 	status : PositionStatus
 	token: TokenInfo
 	vsToken: TokenInfo
-	vsTokenAmt: DecimalizedAmount // TODO: switch to RawTokenAmount (decimalized)
+	vsTokenAmt: DecimalizedAmount
 	tokenAmt : DecimalizedAmount
 	fillPrice : DecimalizedAmount
 	sellSlippagePercent : number
