@@ -5,6 +5,7 @@ import { PositionRequest, PositionStatus, PositionType } from "../../positions";
 import { getVsTokenInfo } from "../../tokens";
 import { ChangeTrackedValue, Structural, assertNever, groupIntoMap, makeFailureResponse, makeJSONResponse, makeSuccessResponse, maybeGetJson } from "../../util";
 import { AutomaticallyClosePositionsRequest, AutomaticallyClosePositionsResponse } from "../token_pair_position_tracker/actions/automatically_close_positions";
+import { wakeUpTokenPairPositionTracker } from "../token_pair_position_tracker/token_pair_position_tracker_DO_interop";
 import { DeleteSessionRequest, DeleteSessionResponse } from "./actions/delete_session";
 import { GenerateWalletRequest, GenerateWalletResponse } from "./actions/generate_wallet";
 import { GetPositionRequest } from "./actions/get_position";
@@ -23,7 +24,6 @@ import { UserPositionTracker } from "./trackers/user_position_tracker";
 import { UserDOFetchMethod, parseUserDOFetchMethod } from "./userDO_interop";
 import { buy } from "./user_buy";
 import { sell } from "./user_sell";
-import { wakeUpTokenPairPositionTracker } from "../token_pair_position_tracker/token_pair_position_tracker_DO_interop";
 
 // TODO: all requests to UserDo include telegramUserID and telegramUserName
 // and ensure initialization.  That way, no purpose-specific initialization call is required
@@ -312,6 +312,7 @@ export class UserDO {
         // fire and forget (async callback will handle success and failure cases for swap)
         const positionRequest = openPositionRequest.positionRequest;       
         // deliberate fire-and-forget.  callbacks will handle state management.
+        // TODO AM: store buyQuote on request.  Update when appropriate from menu.
         buy(positionRequest, this.wallet.value!!, this.userPositionTracker, this.env);
         return makeJSONResponse<OpenPositionResponse>({});
     }
@@ -330,21 +331,35 @@ export class UserDO {
             return makeJSONResponse<ManuallyClosePositionResponse>({ message: 'Position already closed.' });
         }
         // deliberate fire-and-forget
-        sell(position, this.wallet.value!!, this.userPositionTracker, this.env);
+        sell(position.positionID, this.wallet.value!!, this.userPositionTracker, this.env);
         return makeJSONResponse<ManuallyClosePositionResponse>({ message: 'Position will now be closed. '});
     }
 
     async handleAutomaticallyClosePositionsRequest(closePositionsRequest : AutomaticallyClosePositionsRequest) : Promise<Response> {
         const positions = closePositionsRequest.positions;
         for (const position of positions) {
-            // fire and forget.  callbacks will handle state changes / user notifications.
-            if (position.status === PositionStatus.Closing) {
+            // before we sell, we verify the position is still active
+            const userTrackedPosition = this.userPositionTracker.getPosition(position.positionID);
+            
+            // if it's already gone, don't try to re-sell it
+            if (userTrackedPosition == null) {
+                continue;
+            } 
+
+            // if it's already in the process of being sold, don't try to re-sell it
+            if (userTrackedPosition.status === PositionStatus.Closing) {
                 continue;
             }
-            else if (position.status === PositionStatus.Closed) {
+
+            // if it's already sold, don't try to re-sell it
+            if (position.status === PositionStatus.Closed) {
                 continue;
             }
-            sell(position, this.wallet.value!!, this.userPositionTracker, this.env);
+
+            // TODO: handle unconfirmed status.
+
+            // otherwise, try to sell it.
+            sell(position.positionID, this.wallet.value!!, this.userPositionTracker, this.env);
         }
         return makeJSONResponse<AutomaticallyClosePositionsResponse>({});
     }

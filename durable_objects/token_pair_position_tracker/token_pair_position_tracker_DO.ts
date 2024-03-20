@@ -12,6 +12,7 @@ import { UpdatePriceRequest, UpdatePriceResponse } from "./actions/update_price"
 import { WakeupRequest, WakeupResponse } from "./actions/wake_up";
 import { TokenPairPositionTrackerDOFetchMethod, parseTokenPairPositionTrackerDOFetchMethod } from "./token_pair_position_tracker_DO_interop";
 import { TokenPairPositionTracker } from "./trackers/token_pair_position_tracker";
+import { logError } from "../../logging";
 
 /*
     Big TODO: How do we limit concurrent outgoing requests when a dip happens?
@@ -95,6 +96,9 @@ export class TokenPairPositionTrackerDO {
             const price = await this.getPrice();
             if (price != null) {
                 this.updatePrice(price);
+            }
+            else {
+                logError("Could not retrieve price", this);
             }
         }
         catch(e) {

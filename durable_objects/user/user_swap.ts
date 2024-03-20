@@ -15,10 +15,12 @@ import { TGStatusMessage, UpdateableNotification } from "../../telegram";
 import { assertNever } from "../../util";
 /* markPositionAsOpen, renegeOpenPosition */
 
-export async function swap(s: Swappable, 
-    wallet : Wallet, 
-    env : Env,
-    notificationChannel : UpdateableNotification) : Promise<ParsedSuccessfulSwapSummary|undefined> {
+
+export async function createAndSignTx(s : Swappable, 
+    wallet: Wallet,
+    env: Env,
+    notificationChannel : UpdateableNotification) : Promise<VersionedTransaction|void> {
+
 
     // get swap route / quote
     const swapOfX = getSwapOfXDescription(s);
@@ -56,8 +58,20 @@ export async function swap(s: Swappable,
         TGStatusMessage.queue(notificationChannel, `Transaction for ${swapOfX} signed.`, false);
     }
 
+    return signedTx;
+}
+
+export async function executeAndConfirmSignedTx(s: Swappable, 
+    signedTx : VersionedTransaction,
+    wallet : Wallet, 
+    env : Env,
+    notificationChannel : UpdateableNotification,
+    connection : Connection) : Promise<ParsedSuccessfulSwapSummary|undefined> {
+
+    const swapOfX = getSwapOfXDescription(s);
+    const SwapOfX = getSwapOfXDescription(s, true);
+
     // get some stuff we'll need
-    const connection = new Connection(env.RPC_ENDPOINT_URL);
     const signature = bs58.encode(signedTx.signatures[0]);
     const userAddress = toUserAddress(wallet);
 

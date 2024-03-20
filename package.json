@@ -7,6 +7,7 @@
 		"dev": "wrangler dev index.js",
 		"dry-deploy": "npx wrangler deploy --outdir .dry-deploy --dry-run",
 		"check-for-errors": "tsc --noEmit",
+		"jest": "npx jest",
 		"lint": "eslint . --ext .ts"
 	},
 	"devDependencies": {

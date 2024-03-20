@@ -5,10 +5,10 @@ import { Env } from "../env";
 import { logError } from "../logging";
 import { Position, PositionRequest, Swappable, isPosition, isPositionRequest } from "../positions";
 import { SOL_ADDRESS, deriveTokenAccount, getVsTokenInfo } from "../tokens";
-import { safe, sleep } from "../util";
+import { safe } from "../util";
+import { waitUntilCurrentBlockFinalized } from "./rpc_blocks";
 import { parseInstructionError } from "./rpc_parse_instruction_error";
 import { ParsedSwapSummary, PreparseConfirmedSwapResult, PreparseSwapResult, SwapSummary } from "./rpc_types";
-
 
 // This may come in handy at some point: https://github.com/cocrafts/walless/blob/a05d20f8275c8167a26de976a3b6701d64472765/apps/wallet/src/engine/runners/solana/history/swapHistory.ts#L85
 
@@ -42,7 +42,7 @@ export async function parseSellSwapTransaction(position : Position,
 }
 
 // REFERENCE: https://github.com/StrataFoundation/strata-data-pipelines/blob/b42b07152c378151bcc722eee73e3102d1087a93/src/event-transformer/transformers/tokenAccounts.ts#L34
-async function parseSwapTransaction(
+export async function parseSwapTransaction(
     signature : string, 
     inTokenAddress : string, 
     outTokenAddress : string, 
@@ -83,13 +83,17 @@ async function parseSwapTransaction(
 
     const fees = parsedTransaction.meta?.fee || 0;
 
+    const txSlot = parsedTransaction.slot;
+
     const swapSummary : SwapSummary = {
         inTokenAddress: inTokenAddress,
         inTokenAmt: swapInTokenDiff,
         outTokenAddress: outTokenAddress,
         outTokenAmt: swapOutTokenDiff,
         fees: fees,
-        fillPrice: fillPrice
+        fillPrice: fillPrice,
+        txSignature: signature,
+        txSlot: txSlot
     };
 
     const swapResult : ParsedSwapSummary = {
@@ -182,19 +186,3 @@ export async function waitForBlockFinalizationAndParse(s : Swappable,
         }
 }
 
-async function waitUntilCurrentBlockFinalized(connection : Connection, env : Env) {
-    try {
-        const currentSlot = await connection.getSlot('confirmed');
-        let finalizedSlot = await connection.getSlot('finalized');
-        while(currentSlot > finalizedSlot) {
-            sleep(10000);
-            finalizedSlot = await connection.getSlot('finalized');
-        }
-        return;
-    }
-    catch(e) {
-        // What else can I do...
-        sleep(2 * parseInt(env.MAX_BLOCK_FINALIZATION_TIME_MS, 10));
-        return;
-    }
-}

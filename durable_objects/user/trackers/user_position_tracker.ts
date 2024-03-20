@@ -39,6 +39,13 @@ export class UserPositionTracker {
             this.markAsDirty(positionIDKey);
         }
     }
+    removePositions(positionIDs : string[]) {
+        for (const positionID of positionIDs) {
+            const positionIDKey = new PositionIDKey(positionID);
+            delete this.positions[positionIDKey.toString()];
+            this.markAsDeleted(positionIDKey);
+        }
+    }
     closePosition(positionID : string) {
         // TODO: maybe, keep in list and mark status as closed???
         if (positionID in Object.keys(this.positions)) {
@@ -54,7 +61,7 @@ export class UserPositionTracker {
         const positionIDKey = new PositionIDKey(positionID);
         return this.positions[positionIDKey.toString()]||null;
     }
-    setAsClosing(positionID : string) {
+    markAsClosing(positionID : string) {
         const positionIDKey = new PositionIDKey(positionID);
         const position = this.positions[positionIDKey.toString()];
         if (position) {

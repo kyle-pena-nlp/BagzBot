@@ -7,7 +7,7 @@ import { generateWallet, getAndMaybeInitializeUserData, getDefaultTrailingStopLo
 import { Env } from "../env";
 import { logError } from "../logging";
 import { BaseMenu, MenuCode, MenuConfirmTrailingStopLossPositionRequest, MenuEditTrailingStopLossPositionRequest, MenuError, MenuFAQ, MenuHelp, MenuListPositions, MenuMain, MenuPleaseEnterToken, MenuPleaseWait, MenuTODO, MenuTrailingStopLossAutoRetrySell, MenuTrailingStopLossEntryBuyQuantity, MenuTrailingStopLossPickVsToken, MenuTrailingStopLossSlippagePercent, MenuTrailingStopLossTriggerPercent, MenuViewOpenPosition, MenuViewWallet, MenuWallet, PositiveDecimalKeypad, PositiveIntegerKeypad } from "../menus";
-import { PositionRequest, PositionRequestAndQuote, convertPreRequestToRequest } from "../positions";
+import { PositionRequest, PositionRequestAndMaybeQuote, PositionRequestAndQuote, convertPreRequestToRequest } from "../positions";
 import { quoteBuy } from "../rpc/jupiter_quotes";
 import { AutoSellOrderSpec, TelegramWebhookInfo, deleteTGMessage, sendMessageToTG, sendRequestToTG, updateTGMessage } from "../telegram";
 import { getVsTokenInfo } from "../tokens";
@@ -245,17 +245,17 @@ export class Worker {
 
     async getQuoteAndMakeStopLossRequestEditorMenu(positionRequest : PositionRequest, env : Env) : Promise<BaseMenu> {
         const quote = await quoteBuy(positionRequest, env);
-        const positionRequestAndQuote : PositionRequestAndQuote = { positionRequest: positionRequest, quote : quote };
+        const positionRequestAndQuote : PositionRequestAndMaybeQuote = { positionRequest: positionRequest, quote : quote };
         return await this.makeTrailingStopLossRequestEditorMenu(positionRequestAndQuote);
     }
 
-    makeTrailingStopLossRequestEditorMenu(positionRequestAndQuote : PositionRequestAndQuote) : BaseMenu {
+    makeTrailingStopLossRequestEditorMenu(positionRequestAndQuote : PositionRequestAndMaybeQuote) : BaseMenu {
         return new MenuEditTrailingStopLossPositionRequest(positionRequestAndQuote);
     }
 
     async getQuoteAndMakeStopLossConfirmMenu(positionRequest: PositionRequest, env : Env) : Promise<BaseMenu> {
         const quote = await quoteBuy(positionRequest, env);
-        const positionRequestAndQuote : PositionRequestAndQuote = { positionRequest: positionRequest, quote : quote };
+        const positionRequestAndQuote : PositionRequestAndMaybeQuote = { positionRequest: positionRequest, quote : quote };
         return new MenuConfirmTrailingStopLossPositionRequest(positionRequestAndQuote);
     }
 

@@ -84,6 +84,8 @@ export interface SwapSummary {
     outTokenAmt: DecimalizedAmount,
     fees: number
     fillPrice : DecimalizedAmount
+    txSignature : string
+    txSlot: number
 };
 
 export type ParsedSwapSummary = ParsedSuccessfulSwapSummary | 

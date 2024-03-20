@@ -24,6 +24,8 @@ export interface Position {
 	positionID : string
 	type: PositionType
 	status : PositionStatus
+	confirmed : boolean
+	txSignature : string
 	token: TokenInfo
 	vsToken: TokenInfo
 	vsTokenAmt: DecimalizedAmount
@@ -53,13 +55,23 @@ interface BasePositionRequest {
 	retrySellIfSlippageExceeded : boolean
 }
 
+// Pre-request before full info is retrieved (like TokenInfo and BuyQuote)
 export interface PositionPreRequest extends BasePositionRequest {
 	tokenAddress : string
 	vsTokenAddress : string
 }
 
+/*export interface BuyQuote {
+	readonly [ key : string ] : Structural
+	inTokenAmt : DecimalizedAmount
+	outTokenAmt : DecimalizedAmount
+	fillPrice : DecimalizedAmount
+}*/
+
+// Complete position request
 export interface PositionRequest extends BasePositionRequest {
 	readonly [ key : string ] : Structural
+	//buyQuote : BuyQuote
 	token : TokenInfo
 	vsToken : TokenInfo
 };
@@ -86,6 +98,7 @@ export function convertPreRequestToRequest(r : PositionPreRequest, token : Token
 		positionID : r.positionID,
 		positionType: r.positionType,
 		vsTokenAmt: r.vsTokenAmt,
+		//buyQuote : buyQuote,
 		slippagePercent: r.slippagePercent,
 		triggerPercent: r.triggerPercent,
 		retrySellIfSlippageExceeded: r.retrySellIfSlippageExceeded,

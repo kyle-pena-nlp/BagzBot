@@ -6,6 +6,7 @@ export interface Quote {
     outToken : TokenInfo
     inTokenAmt : DecimalizedAmount
     outTokenAmt : DecimalizedAmount
+    fillPrice : DecimalizedAmount
     fee : DecimalizedAmount
     feeToken : TokenInfo
     botFee : DecimalizedAmount

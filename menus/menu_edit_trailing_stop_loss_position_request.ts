@@ -1,11 +1,11 @@
-import { PositionRequestAndQuote } from "../positions";
+import { PositionRequestAndMaybeQuote, PositionRequestAndQuote } from "../positions";
 import { CallbackButton } from "../telegram";
 import { CallbackData } from "./callback_data";
 import { Menu, MenuCapabilities } from "./menu";
 import { MenuCode } from "./menu_code";
 import { renderTrailingStopLossRequestMarkdown } from "./trailing_stop_loss_helpers";
 
-export class MenuEditTrailingStopLossPositionRequest extends Menu<PositionRequestAndQuote> implements MenuCapabilities {
+export class MenuEditTrailingStopLossPositionRequest extends Menu<PositionRequestAndMaybeQuote> implements MenuCapabilities {
     renderText(): string {
         const positionRequest = this.menuData.positionRequest;
         return [

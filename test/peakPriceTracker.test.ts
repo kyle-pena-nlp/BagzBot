@@ -1,9 +1,7 @@
-import { DurableObjectStorage } from "@cloudflare/workers-types";
 import { DecimalizedAmount, dMult } from "../decimalized";
 import { PeakPricePositionTracker } from "../durable_objects/token_pair_position_tracker/trackers/peak_price_tracker";
 import { Position, PositionStatus, PositionType } from "../positions";
 import { TokenInfo, getVsTokenInfo } from "../tokens";
-import { FakeDurableObjectStorage } from "./fakeStorage";
 
 test("tracker_stores_position", () => {
     const triggerPct = 10;
@@ -115,6 +113,9 @@ function posWithPrice(initPrice : DecimalizedAmount) : Position {
         messageID: 0,
         type: PositionType.LongTrailingStopLoss,
         status: PositionStatus.Open,
+        confirmed : true,
+        txSignature : 'abcd',
+        txSlot: 0,
         token: fakeToken(),
         vsToken: getVsTokenInfo('SOL'),
         vsTokenAmt : amt_bought_in_sol, // 2 SOL

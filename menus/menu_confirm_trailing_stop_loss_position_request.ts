@@ -1,11 +1,11 @@
-import { PositionRequestAndQuote } from "../positions";
+import { PositionRequestAndMaybeQuote } from "../positions";
 import { CallbackButton } from "../telegram";
 import { CallbackData } from "./callback_data";
 import { Menu, MenuCapabilities } from "./menu";
 import { MenuCode } from "./menu_code";
 import { renderTrailingStopLossRequestMarkdown } from "./trailing_stop_loss_helpers";
 
-export class MenuConfirmTrailingStopLossPositionRequest extends Menu<PositionRequestAndQuote> implements MenuCapabilities {
+export class MenuConfirmTrailingStopLossPositionRequest extends Menu<PositionRequestAndMaybeQuote> implements MenuCapabilities {
     renderText(): string {
         return [ 
             "<b>Confirm Your Auto-Sell Position Request</b>",

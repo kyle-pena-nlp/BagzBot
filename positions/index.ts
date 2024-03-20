@@ -14,18 +14,22 @@ import {
     isPositionType,
     isSwappable
 } from "./position";
-import { PositionRequestAndQuote } from "./position_request_and_quote";
+import {
+    PositionRequestAndMaybeQuote,
+    PositionRequestAndQuote,
+    isPositionRequestAndQuote,
+    isPositionRequestAndQuoteFailure
+} from "./position_request_and_quote";
 import { Quote } from "./quote";
 
 export {
     Position,
     PositionPreRequest,
-    PositionRequest, PositionRequestAndQuote,
-    PositionStatus, PositionType, Quote, Swappable, SwappableError, convertPreRequestToRequest,
+    PositionRequest, PositionRequestAndMaybeQuote, PositionRequestAndQuote, PositionStatus, PositionType, Quote, Swappable, SwappableError, convertPreRequestToRequest,
     getInAndOutTokens,
     getSwapOfXDescription, isPosition,
-    isPositionRequest,
-    isPositionType,
+    isPositionRequest, isPositionRequestAndQuote,
+    isPositionRequestAndQuoteFailure, isPositionType,
     isSwappable
 };
 

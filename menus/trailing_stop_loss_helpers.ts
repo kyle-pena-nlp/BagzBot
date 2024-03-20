@@ -1,10 +1,10 @@
 import { toFriendlyString } from "../decimalized";
-import { PositionRequestAndQuote } from "../positions";
+import { PositionRequestAndMaybeQuote, PositionRequestAndQuote } from "../positions";
 import { isGetQuoteFailure } from "../rpc/rpc_types";
 
 const SIG_FIGS = 4;
 
-export function renderTrailingStopLossRequestMarkdown(requestAndQuote : PositionRequestAndQuote) {
+export function renderTrailingStopLossRequestMarkdown(requestAndQuote : PositionRequestAndMaybeQuote) {
     const positionRequest = requestAndQuote.positionRequest;
     const quote = requestAndQuote.quote;
     if (isGetQuoteFailure(quote)) {

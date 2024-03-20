@@ -18,6 +18,8 @@ const keysToLookFor = [
     'size',
     'token',
     'vsToken',
+    'tokenAddress',
+    'vsTokenAddress',
     'value'
 ];
 
