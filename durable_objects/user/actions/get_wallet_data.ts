@@ -1,7 +1,9 @@
-export interface GetWalletDataRequest {
+import { Wallet } from "../../../crypto"
 
+export interface GetWalletDataRequest {
+    telegramUserID: number
 }
 
 export interface GetWalletDataResponse {
-    address : string
+    wallet : Wallet
 }

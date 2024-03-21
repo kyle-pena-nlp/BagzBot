@@ -71,7 +71,7 @@ function convertToUnconfirmedPosition(positionRequest : PositionRequest, quote :
         sellSlippagePercent: positionRequest.slippagePercent,
         triggerPercent : positionRequest.triggerPercent,
         retrySellIfSlippageExceeded : positionRequest.retrySellIfSlippageExceeded,
-        fillPrice: quote.fillPrice
+        fillPrice: quote.fillPrice // this may not be the final quote on buy, but it is likely close
     };
     return position;
 }

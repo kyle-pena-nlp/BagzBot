@@ -7,7 +7,7 @@ export class MenuPleaseEnterToken extends Menu<undefined> implements MenuCapabil
     }
     renderOptions(): CallbackButton[][] {
         const options = this.emptyMenu();
-        this.insertReturnToMainButtonOnNewLine(options);
+        this.insertBackToMainButtonOnNewLine(options);
         return options;
     }
     parseMode(): "HTML" | "MarkdownV2" {

@@ -11,11 +11,10 @@ export class MenuTrailingStopLossSlippagePercent extends Menu<number> implements
         const options = this.emptyMenu();
         const defaultCustomSlippagePercentage = this.menuData;
         const submitValueCode = MenuCode.TrailingStopLossCustomSlippagePctKeypadSubmit;
-        this.insertButton(options, "0.5%", new CallbackData(submitValueCode, "0.5"), 1);
-        this.insertButton(options, "1.0%", new CallbackData(submitValueCode, "1.0"), 1);
-        this.insertButton(options, "2.0%", new CallbackData(submitValueCode, "2.0"), 1);
-        this.insertButton(options, "5.0%", new CallbackData(submitValueCode, "5.0"), 1);
-        this.insertButtonNextLine(options, "Custom", new CallbackData(MenuCode.TrailingStopLossCustomSlippagePctKeypad, defaultCustomSlippagePercentage.toString()));
+        this.insertButtonNextLine(options, "0.5%", new CallbackData(submitValueCode, "0.5"));
+        this.insertButtonSameLine(options, "1.0%", new CallbackData(submitValueCode, "1.0"));
+        this.insertButtonSameLine(options, "2.0%", new CallbackData(submitValueCode, "2.0"));
+        this.insertButtonSameLine(options, "X%", new CallbackData(MenuCode.TrailingStopLossCustomSlippagePctKeypad, defaultCustomSlippagePercentage.toString()));
         this.insertButtonNextLine(options, "Back", new CallbackData(MenuCode.TrailingStopLossRequestReturnToEditorMenu));
         return options;
     }

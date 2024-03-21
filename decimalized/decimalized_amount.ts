@@ -6,7 +6,7 @@ import { Structural } from "../util";
 // we could probably strategically swap out the dAdd/Sub/Mult/Div/Negate/Compare and friendly strings
 // with something backed by an arbitrary precision library or something else.
 
-export const MATH_DECIMAL_PLACES = 9;
+export const MATH_DECIMAL_PLACES = 15;
 
 /* See decimalized_math.ts for operations on this type */
 export interface DecimalizedAmount {

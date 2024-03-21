@@ -19,7 +19,7 @@ export class MenuViewOpenPosition extends Menu<Position> implements MenuCapabili
         const refreshPositionCallbackData = new CallbackData(MenuCode.ViewOpenPosition, this.menuData.positionID);
         this.insertButtonNextLine(options, "Refresh", refreshPositionCallbackData);
 
-        this.insertReturnToMainButtonOnNewLine(options);
+        this.insertBackToMainButtonOnNewLine(options);
 
         return options;
     }

@@ -1,5 +1,5 @@
 import { Env } from "../../env";
-import { Position, PositionRequest } from "../../positions";
+import { Position } from "../../positions";
 import { TokenInfo } from "../../tokens";
 import { Structural, groupIntoMap, makeJSONRequest, makeRequest } from "../../util";
 import { AutomaticallyClosePositionsRequest, AutomaticallyClosePositionsResponse } from "../token_pair_position_tracker/actions/automatically_close_positions";
@@ -12,7 +12,7 @@ import { GetWalletDataRequest, GetWalletDataResponse } from "./actions/get_walle
 import { ListPositionsRequest } from "./actions/list_positions";
 import { ManuallyClosePositionRequest, ManuallyClosePositionResponse } from "./actions/manually_close_position";
 import { OpenPositionRequest, OpenPositionResponse } from "./actions/open_new_position";
-import { DefaultTrailingStopLossRequestRequest } from "./actions/request_default_position_request";
+import { DefaultTrailingStopLossRequestRequest, DefaultTrailingStopLossRequestResponse } from "./actions/request_default_position_request";
 import { StoreSessionValuesRequest, StoreSessionValuesResponse } from "./actions/store_session_values";
 import { UserInitializeRequest, UserInitializeResponse } from "./actions/user_initialize";
 import { SessionKey } from "./model/session";
@@ -36,7 +36,8 @@ export enum UserDOFetchMethod {
 }
 
 export async function getWalletData(userID : number, env: Env) : Promise<GetWalletDataResponse> {
-	return await sendJSONRequestToUserDO<GetWalletDataRequest,GetWalletDataResponse>(userID, UserDOFetchMethod.getWalletData, {}, env);
+	const request : GetWalletDataRequest = { telegramUserID: userID };
+	return await sendJSONRequestToUserDO<GetWalletDataRequest,GetWalletDataResponse>(userID, UserDOFetchMethod.getWalletData, request, env);
 }
 
 export function sendClosePositionOrdersToUserDOs(request: AutomaticallyClosePositionsRequest, env : Env) {
@@ -97,13 +98,13 @@ export async function getDefaultTrailingStopLoss(telegramUserID : number,
 	chatID : number, 
 	messageID :  number,
 	token : TokenInfo, 
-	env : Env) : Promise<PositionRequest> {
+	env : Env) : Promise<DefaultTrailingStopLossRequestResponse> {
 	const body : DefaultTrailingStopLossRequestRequest = { 
 		userID: telegramUserID, 
 		chatID: chatID, 
 		messageID : messageID,
 		token : token };
-	const trailingStopLossRequest = await sendJSONRequestToUserDO<DefaultTrailingStopLossRequestRequest,PositionRequest>(telegramUserID, UserDOFetchMethod.getDefaultTrailingStopLossRequest, body, env);
+	const trailingStopLossRequest = await sendJSONRequestToUserDO<DefaultTrailingStopLossRequestRequest,DefaultTrailingStopLossRequestResponse>(telegramUserID, UserDOFetchMethod.getDefaultTrailingStopLossRequest, body, env);
 	return trailingStopLossRequest;
 }
 

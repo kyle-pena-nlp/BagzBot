@@ -1,4 +1,5 @@
-import { randomUUID } from "crypto";
+import { randomUUID } from "node:crypto";
+import { decryptPrivateKey } from "../crypto";
 import { GetTokenInfoResponse, isInvalidTokenInfoResponse } from "../durable_objects/polled_token_pair_list/actions/get_token_info";
 import { getTokenInfo } from "../durable_objects/polled_token_pair_list/polled_token_pair_list_DO_interop";
 import { OpenPositionRequest } from "../durable_objects/user/actions/open_new_position";
@@ -7,7 +8,7 @@ import { TokenSymbolAndAddress } from "../durable_objects/user/model/token_name_
 import { generateWallet, getAndMaybeInitializeUserData, getDefaultTrailingStopLoss, getPosition, getWalletData, listOpenTrailingStopLossPositions, manuallyClosePosition, readSessionObj, requestNewPosition, storeSessionObj, storeSessionObjProperty, storeSessionValues } from "../durable_objects/user/userDO_interop";
 import { Env } from "../env";
 import { logError } from "../logging";
-import { BaseMenu, MenuCode, MenuConfirmTrailingStopLossPositionRequest, MenuEditTrailingStopLossPositionRequest, MenuError, MenuFAQ, MenuHelp, MenuListPositions, MenuMain, MenuPleaseEnterToken, MenuPleaseWait, MenuTODO, MenuTrailingStopLossAutoRetrySell, MenuTrailingStopLossEntryBuyQuantity, MenuTrailingStopLossPickVsToken, MenuTrailingStopLossSlippagePercent, MenuTrailingStopLossTriggerPercent, MenuViewOpenPosition, MenuViewWallet, MenuWallet, PositiveDecimalKeypad, PositiveIntegerKeypad } from "../menus";
+import { BaseMenu, MenuCode, MenuConfirmTrailingStopLossPositionRequest, MenuEditTrailingStopLossPositionRequest, MenuError, MenuFAQ, MenuHelp, MenuListPositions, MenuMain, MenuPleaseEnterToken, MenuPleaseWait, MenuTODO, MenuTrailingStopLossAutoRetrySell, MenuTrailingStopLossEntryBuyQuantity, MenuTrailingStopLossPickVsToken, MenuTrailingStopLossSlippagePercent, MenuTrailingStopLossTriggerPercent, MenuViewDecryptedWallet, MenuViewOpenPosition, MenuWallet, PositiveDecimalKeypad, PositiveIntegerKeypad } from "../menus";
 import { PositionPreRequest, PositionRequest, convertPreRequestToRequest } from "../positions";
 import { quoteBuy } from "../rpc/jupiter_quotes";
 import { isGetQuoteFailure } from "../rpc/rpc_types";
@@ -43,7 +44,8 @@ export class Worker {
         const conversationMessageID = conversation.messageID;
 
         // get default settings for a position request
-        const defaultTSL = await getDefaultTrailingStopLoss(telegramUserID, chatID, initiatingMessageID, validateTokenResponse.tokenInfo!!, env);
+        const r = await getDefaultTrailingStopLoss(telegramUserID, chatID, initiatingMessageID, validateTokenResponse.tokenInfo, env);
+        const defaultTSL = r.prerequest;
 
         // create a 'prerequest' (with certain things missing that would be in a full request)
         const prerequest : PositionPreRequest = {
@@ -51,7 +53,7 @@ export class Worker {
             userID : telegramUserID,
             chatID: chatID,
             messageID: conversationMessageID,
-            tokenAddress: defaultTSL.token.address,
+            tokenAddress: defaultTSL.tokenAddress,
             vsToken: defaultTSL.vsToken,
             positionType : defaultTSL.positionType,
             vsTokenAmt: defaultTSL.vsTokenAmt,
@@ -109,8 +111,10 @@ export class Worker {
                 return this.createMainMenu(telegramWebhookInfo, env);
             case MenuCode.Error:
                 return new MenuError(undefined);
-            case MenuCode.ExportWallet:
-                return this.TODOstubbedMenu(env);	
+            case MenuCode.ViewDecryptedWallet:
+                const walletDataResponse = await getWalletData(telegramUserID, env);
+                const decryptedPrivateKey = await decryptPrivateKey(walletDataResponse.wallet.encryptedPrivateKey, telegramUserID, env);
+                return new MenuViewDecryptedWallet({ publicKey: walletDataResponse.wallet.publicKey, decryptedPrivateKey: decryptedPrivateKey })
             case MenuCode.FAQ:
                 return new MenuFAQ(undefined);
             case MenuCode.Help:
@@ -132,9 +136,6 @@ export class Worker {
                     await this.handleManuallyClosePosition(telegramUserID, closePositionID, env);
                 }
                 return this.createMainMenu(telegramWebhookInfo, env);
-            case MenuCode.RefreshWallet:
-                const walletData = await getWalletData(telegramUserID, env);
-                return new MenuViewWallet(walletData);
             case MenuCode.TrailingStopLossCustomSlippagePctKeypad:
                 const trailingStopLossCustomSlippagePctKeypadEntry = callbackData.menuArg||''; 
                 const trailingStopLossCustomSlippagePctKeypad = this.makeTrailingStopLossCustomSlippagePctKeypad(trailingStopLossCustomSlippagePctKeypadEntry);
@@ -276,7 +277,7 @@ export class Worker {
 
     makeTrailingStopLossCustomTriggerPercentKeypad(currentValue : string) {
         return new PositiveIntegerKeypad(
-            "${currentValue}", // intentional double quotes - syntax is parsed later
+            "${currentValue}%", // intentional double quotes - syntax is parsed later
             MenuCode.TrailingStopLossCustomTriggerPercentKeypad,
             MenuCode.TrailingStopLossCustomTriggerPercentKeypadSubmit,
             MenuCode.TrailingStopLossRequestReturnToEditorMenu,

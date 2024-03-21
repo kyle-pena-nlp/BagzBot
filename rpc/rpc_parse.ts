@@ -79,7 +79,7 @@ export async function parseSwapTransaction(
         throw new Error("Programmer error.");
     }
 
-    const fillPrice = dDiv(swapOutTokenDiff, swapInTokenDiff, MATH_DECIMAL_PLACES);
+    const fillPrice = dDiv(swapInTokenDiff, swapOutTokenDiff, MATH_DECIMAL_PLACES);
 
     const fees = parsedTransaction.meta?.fee || 0;
 

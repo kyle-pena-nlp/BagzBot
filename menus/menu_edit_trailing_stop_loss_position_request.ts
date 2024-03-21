@@ -8,7 +8,7 @@ import { renderTrailingStopLossRequestMarkdown } from "./trailing_stop_loss_help
 export class MenuEditTrailingStopLossPositionRequest extends Menu<PositionRequest> implements MenuCapabilities {
     renderText(): string {
         return [
-            `<b>[[NEW AUTO-SELL POSITION]]</b>`,
+            `<b>Create Position</b>`,
             renderTrailingStopLossRequestMarkdown(this.menuData),
             '<i>Click on any setting below to edit before Submitting</i>'
         ].join("\r\n");
@@ -16,14 +16,14 @@ export class MenuEditTrailingStopLossPositionRequest extends Menu<PositionReques
     renderOptions(): CallbackButton[][] {
         const options = this.emptyMenu();
         const positionRequest = this.menuData;
-        this.insertButtonNextLine(options, `[[REVIEW AND SUBMIT]]`, new CallbackData(MenuCode.TrailingStopLossConfirmMenu));
-        this.insertButtonNextLine(options, `Buying With: ${positionRequest.vsToken.symbol}`, new CallbackData(MenuCode.TrailingStopLossPickVsTokenMenu, positionRequest.vsToken.symbol));
-        this.insertButtonNextLine(options, `${positionRequest.vsToken.symbol} Buy Amount: ${positionRequest.vsTokenAmt}`, new CallbackData(MenuCode.TrailingStopLossEnterBuyQuantityKeypad, positionRequest.vsTokenAmt.toString()));
-        this.insertButtonNextLine(options, `Auto-Sell Trigger Percent: ${positionRequest.triggerPercent}%`, new CallbackData(MenuCode.TrailingStopLossTriggerPercentMenu, positionRequest.triggerPercent.toString()));
-        this.insertButtonNextLine(options, `Slippage Percent: ${positionRequest.slippagePercent}%`, new CallbackData(MenuCode.TrailingStopLossSlippagePctMenu, positionRequest.slippagePercent.toString()));
-        this.insertButtonNextLine(options, `Auto-Retry Sell if Slippage Tolerance Exceed? ${positionRequest.retrySellIfSlippageExceeded ? 'Yes': 'No'}`, new CallbackData(MenuCode.TrailingStopLossChooseAutoRetrySellMenu, positionRequest.retrySellIfSlippageExceeded.toString()));
-        this.insertButtonNextLine(options, `Refresh`, new CallbackData(MenuCode.TrailingStopLossRequestReturnToEditorMenu));
-        this.insertButtonNextLine(options, 'Cancel', new CallbackData(MenuCode.Close));
+        //this.insertButtonNextLine(options, `Buying With: ${positionRequest.vsToken.symbol}`, new CallbackData(MenuCode.TrailingStopLossPickVsTokenMenu, positionRequest.vsToken.symbol));
+        this.insertButtonNextLine(options, `${positionRequest.vsTokenAmt} ${positionRequest.vsToken.symbol}`, new CallbackData(MenuCode.TrailingStopLossEntryBuyQuantityMenu, positionRequest.vsTokenAmt.toString()));
+        this.insertButtonSameLine(options, `${positionRequest.triggerPercent}% Trigger`, new CallbackData(MenuCode.TrailingStopLossTriggerPercentMenu, positionRequest.triggerPercent.toString()));
+        this.insertButtonSameLine(options, `${positionRequest.slippagePercent}% Slippage`, new CallbackData(MenuCode.TrailingStopLossSlippagePctMenu, positionRequest.slippagePercent.toString()));
+        //this.insertButtonNextLine(options, `${positionRequest.retrySellIfSlippageExceeded ? 'Auto Retry Sell': 'Do Not Auto Retry Sell'}`, new CallbackData(MenuCode.TrailingStopLossChooseAutoRetrySellMenu, positionRequest.retrySellIfSlippageExceeded.toString()));
+        this.insertButtonNextLine(options, `Submit`, new CallbackData(MenuCode.TrailingStopLossConfirmMenu));
+        this.insertButtonSameLine(options, `Refresh`, new CallbackData(MenuCode.TrailingStopLossRequestReturnToEditorMenu));
+        this.insertButtonSameLine(options, 'Cancel', new CallbackData(MenuCode.Close));
         return options;
     }
     parseMode(): "HTML" | "MarkdownV2" {

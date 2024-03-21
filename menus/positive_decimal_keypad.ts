@@ -104,11 +104,9 @@ export class PositiveDecimalKeypad extends Menu<string> implements MenuCapabilit
 
     private maybeInsertKeypadButton(options : CallbackButton[][], character : string, lineNumber : number) {
         const newEntry = this.menuData + character;
-        const parses = this.doesItParse(newEntry);
-        if (parses) {
-            const callbackData = new CallbackData(this.thisMenuCode, newEntry);
-            this.insertButton(options, character, callbackData, lineNumber);
-        }
+        //const parses = this.doesItParse(newEntry);
+        const callbackData = new CallbackData(this.thisMenuCode, newEntry);
+        this.insertButton(options, character, callbackData, lineNumber);
     }
 
     private doesItParse(newEntry : string) {
@@ -136,5 +134,4 @@ export class PositiveDecimalKeypad extends Menu<string> implements MenuCapabilit
         }
         return true;
     }
-
 }

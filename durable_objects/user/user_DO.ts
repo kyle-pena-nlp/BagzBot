@@ -15,7 +15,7 @@ import { GetWalletDataRequest, GetWalletDataResponse } from "./actions/get_walle
 import { ListPositionsRequest } from "./actions/list_positions";
 import { ManuallyClosePositionRequest, ManuallyClosePositionResponse } from "./actions/manually_close_position";
 import { OpenPositionRequest, OpenPositionResponse } from "./actions/open_new_position";
-import { DefaultTrailingStopLossRequestRequest } from "./actions/request_default_position_request";
+import { DefaultTrailingStopLossRequestRequest, DefaultTrailingStopLossRequestResponse } from "./actions/request_default_position_request";
 import { StoreSessionValuesRequest, StoreSessionValuesResponse } from "./actions/store_session_values";
 import { UserInitializeRequest, UserInitializeResponse } from "./actions/user_initialize";
 import { UserData } from "./model/user_data";
@@ -209,14 +209,14 @@ export class UserDO {
         return makeJSONResponse(responseBody);
     }
 
-    handleGetDefaultTrailingStopLossRequest(defaultTrailingStopLossRequestRequest : DefaultTrailingStopLossRequestRequest) {
+    handleGetDefaultTrailingStopLossRequest(defaultTrailingStopLossRequestRequest : DefaultTrailingStopLossRequestRequest) : Response {
         const defaultTrailingStopLossRequest = structuredClone(this.defaultTrailingStopLossRequest);
         defaultTrailingStopLossRequest.userID = defaultTrailingStopLossRequestRequest.userID;
         defaultTrailingStopLossRequest.chatID = defaultTrailingStopLossRequestRequest.chatID;
         defaultTrailingStopLossRequest.messageID = defaultTrailingStopLossRequestRequest.messageID;
         defaultTrailingStopLossRequest.positionID = crypto.randomUUID();
         defaultTrailingStopLossRequest.tokenAddress = defaultTrailingStopLossRequestRequest.token.address;
-        const responseBody = defaultTrailingStopLossRequest;
+        const responseBody : DefaultTrailingStopLossRequestResponse = { prerequest: defaultTrailingStopLossRequest };
         return makeJSONResponse(responseBody);
     }
 
@@ -306,7 +306,7 @@ export class UserDO {
 
     async handleGetWalletData(request : GetWalletDataRequest) : Promise<Response> {
         return makeJSONResponse<GetWalletDataResponse>({
-            address : this.wallet.value!!.publicKey
+            wallet : this.wallet.value!!
         });
     }
 

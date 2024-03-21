@@ -15,7 +15,7 @@ export class MenuListPositions extends Menu<Position[]> implements MenuCapabilit
             const callbackData = new CallbackData(MenuCode.ViewOpenPosition, position.positionID);
             this.insertButtonNextLine(options, positionLabel, callbackData);
         }
-        this.insertReturnToMainButtonOnNewLine(options);
+        this.insertBackToMainButtonOnNewLine(options);
         return options;
     }
     parseMode(): "HTML" | "MarkdownV2" {

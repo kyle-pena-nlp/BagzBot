@@ -7,7 +7,7 @@ export class MenuTODO extends Menu<undefined> implements MenuCapabilities {
     }
     renderOptions(): CallbackButton[][] {
         const options = this.emptyMenu();
-        this.insertReturnToMainButtonOnNewLine(options);
+        this.insertBackToMainButtonOnNewLine(options);
         return options;
     }
     parseMode(): "HTML" | "MarkdownV2" {

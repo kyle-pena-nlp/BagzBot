@@ -14,8 +14,8 @@ import { MenuTrailingStopLossEntryBuyQuantity } from "./menu_trailing_stop_loss_
 import { MenuTrailingStopLossPickVsToken } from "./menu_trailing_stop_loss_pick_vs_token";
 import { MenuTrailingStopLossSlippagePercent } from "./menu_trailing_stop_loss_slippage_percent";
 import { MenuTrailingStopLossTriggerPercent } from "./menu_trailing_stop_loss_trigger_percent";
+import { MenuViewDecryptedWallet } from "./menu_view_decrypted_wallet";
 import { MenuViewOpenPosition } from "./menu_view_open_position";
-import { MenuViewWallet } from "./menu_view_wallet";
 import { MenuWallet } from "./menu_wallet";
 import { PositiveDecimalKeypad } from "./positive_decimal_keypad";
 import { PositiveIntegerKeypad } from "./positive_integer_keypad";
@@ -25,8 +25,7 @@ export {
     BaseMenu,
     MenuCode,
     MenuConfirmTrailingStopLossPositionRequest,
-    MenuEditTrailingStopLossPositionRequest,
-    MenuError,
+    MenuEditTrailingStopLossPositionRequest, MenuError,
     MenuFAQ,
     MenuHelp,
     MenuListPositions,
@@ -35,10 +34,9 @@ export {
     MenuTrailingStopLossEntryBuyQuantity,
     MenuTrailingStopLossPickVsToken,
     MenuTrailingStopLossSlippagePercent,
-    MenuTrailingStopLossTriggerPercent,
-    MenuViewOpenPosition,
-    MenuViewWallet,
+    MenuTrailingStopLossTriggerPercent, MenuViewDecryptedWallet, MenuViewOpenPosition,
     MenuWallet,
     PositiveDecimalKeypad,
     PositiveIntegerKeypad
 };
+

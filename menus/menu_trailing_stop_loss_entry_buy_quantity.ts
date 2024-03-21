@@ -6,14 +6,15 @@ import { MenuCode } from "./menu_code";
 
 export class MenuTrailingStopLossEntryBuyQuantity extends Menu<QuantityAndToken> implements MenuCapabilities {
     renderText(): string {
-        return `${this.menuData.quantity} ${this.menuData.thisTokenSymbol}`;
+        return `Choose ${this.menuData.thisTokenSymbol} quantity`;
     }
     renderOptions(): CallbackButton[][] {
+        const symbol = this.menuData.thisTokenSymbol;
         const options = this.emptyMenu();
-        this.insertButtonNextLine(options, "1%", new CallbackData(MenuCode.TrailingStopLossEnterBuyQuantitySubmit, "1"));
-        this.insertButtonNextLine(options, "5%", new CallbackData(MenuCode.TrailingStopLossEnterBuyQuantitySubmit, "5"));
-        this.insertButtonNextLine(options, "10%", new CallbackData(MenuCode.TrailingStopLossEnterBuyQuantitySubmit, "10"));
-        this.insertButtonNextLine(options, "Custom Percent", new CallbackData(MenuCode.TrailingStopLossEnterBuyQuantityKeypad, this.menuData.quantity.toString()));
+        this.insertButtonNextLine(options, `0.1 ${symbol}`, new CallbackData(MenuCode.TrailingStopLossEnterBuyQuantitySubmit, "0.1"));
+        this.insertButtonSameLine(options, `1 ${symbol}`, new CallbackData(MenuCode.TrailingStopLossEnterBuyQuantitySubmit, "1"));
+        this.insertButtonSameLine(options, `5 ${symbol}`, new CallbackData(MenuCode.TrailingStopLossEnterBuyQuantitySubmit, "5"));
+        this.insertButtonSameLine(options, `X ${symbol}`, new CallbackData(MenuCode.TrailingStopLossEnterBuyQuantityKeypad, this.menuData.quantity.toString()));
         this.insertButtonNextLine(options, "Back", new CallbackData(MenuCode.TrailingStopLossRequestReturnToEditorMenu));
         return options;
     }

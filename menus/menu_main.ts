@@ -5,14 +5,14 @@ import { MenuCode } from "./menu_code";
 
 export class MenuMain extends Menu<UserData> implements MenuCapabilities {
     renderText(): string {
-        return `Welcome ${this.menuData.telegramUserName || 'new user'}!`;
+        return `Main Menu.`;
     }
     renderOptions(): CallbackButton[][] {
         const options = this.emptyMenu();
         const hasWallet = this.menuData.hasWallet;
         if (hasWallet) {
             this.insertButtonNextLine(options, 'Wallet', this.menuCallback(MenuCode.Wallet));
-            this.insertButtonNextLine(options, 'Positions', this.menuCallback(MenuCode.ListPositions));
+            this.insertButtonSameLine(options, 'Positions', this.menuCallback(MenuCode.ListPositions));
             this.createOptionsFAQHelpMenuLine(options);
         }
         else {

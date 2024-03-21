@@ -97,15 +97,23 @@ export abstract class Menu<T> extends BaseMenu {
         options[lineNumber-1].push(button);
     }
 
+    protected insertButtonSameLine(options : CallbackButton[][], text : string, callbackData : CallbackData) {
+        if (options.length == 0) {
+            options.push([]);
+        }
+        const lineNumber = options.length;
+        this.insertButton(options, text, callbackData, lineNumber);
+    }
+
     protected insertButtonNextLine(options : CallbackButton[][], text : string, callbackData : CallbackData) {
         const lineNumber = options.length + 1;
         this.insertButton(options, text, callbackData, lineNumber);
     }
 
-    protected insertReturnToMainButtonOnNewLine(options : CallbackButton[][]) {
+    protected insertBackToMainButtonOnNewLine(options : CallbackButton[][]) {
         const lineNumber = options.length + 1;
         const callbackData = new CallbackData(MenuCode.Main, undefined);
-        this.insertButton(options, 'Main Menu', callbackData, lineNumber);
+        this.insertButton(options, 'Back', callbackData, lineNumber);
     }
 
     protected createOptionsFAQHelpMenuLine(options : CallbackButton[][]) {

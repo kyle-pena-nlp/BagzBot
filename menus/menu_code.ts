@@ -2,6 +2,7 @@ export enum MenuCode {
 	Main = "Main",
 	CreateWallet = "CreateWallet",
 	Wallet = "Wallet",
+	ViewDecryptedWallet = "ViewDecryptedWallet",
 	ListPositions = "ListPositions",
 	Invite = "Invite",
 	FAQ = "FAQ",
@@ -10,8 +11,6 @@ export enum MenuCode {
 	
 	PleaseEnterToken = "PleaseEnterToken",
 	TransferFunds = "TransferFunds",
-	RefreshWallet = "RefreshWallet",
-	ExportWallet = "ExportWallet",
 	ViewOpenPosition = "ViewOpenPosition",
 	ClosePositionManuallyAction = "ClosePositionManuallyAction",
 

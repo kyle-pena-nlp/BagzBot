@@ -1,18 +1,20 @@
-import { GetWalletDataResponse } from "../durable_objects/user/actions/get_wallet_data";
 import { CallbackButton } from "../telegram";
 import { Menu, MenuCapabilities } from "./menu";
 import { MenuCode } from "./menu_code";
 
-export class MenuWallet extends Menu<GetWalletDataResponse> implements MenuCapabilities {
+export interface ViewWalletData {
+
+};
+
+export class MenuWallet extends Menu<ViewWalletData> implements MenuCapabilities {
     renderText(): string {
-        return `Address: ${this.menuData.address}`; // TODO: balance
+        return `<b>Your Wallet.</b>`;
     }
     renderOptions(): CallbackButton[][] {
         const options = this.emptyMenu();
         this.insertButton(options, "Transfer Funds", this.menuCallback(MenuCode.TransferFunds), 1);
-        this.insertButton(options, "Refresh",        this.menuCallback(MenuCode.RefreshWallet), 2);
-        this.insertButton(options, "Export Wallet",  this.menuCallback(MenuCode.ExportWallet),  3);
-        this.insertReturnToMainButtonOnNewLine(options);
+        this.insertButton(options, "Get Private Key",  this.menuCallback(MenuCode.ViewDecryptedWallet),  3);
+        this.insertBackToMainButtonOnNewLine(options);
         return options;
     }
     parseMode(): "MarkdownV2" | "HTML" {

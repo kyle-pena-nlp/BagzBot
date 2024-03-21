@@ -1,6 +1,7 @@
 import { DurableObjectState } from "@cloudflare/workers-types";
 import { DecimalizedAmount, MATH_DECIMAL_PLACES, fromNumber } from "../../decimalized";
 import { Env } from "../../env";
+import { logError, logInfo } from "../../logging";
 import { ChangeTrackedValue, assertNever, makeJSONResponse } from "../../util";
 import { sendClosePositionOrdersToUserDOs } from "../user/userDO_interop";
 import { AutomaticallyClosePositionsRequest } from "./actions/automatically_close_positions";
@@ -12,7 +13,6 @@ import { UpdatePriceRequest, UpdatePriceResponse } from "./actions/update_price"
 import { WakeupRequest, WakeupResponse } from "./actions/wake_up";
 import { TokenPairPositionTrackerDOFetchMethod, parseTokenPairPositionTrackerDOFetchMethod } from "./token_pair_position_tracker_DO_interop";
 import { TokenPairPositionTracker } from "./trackers/token_pair_position_tracker";
-import { logError } from "../../logging";
 
 /*
     Big TODO: How do we limit concurrent outgoing requests when a dip happens?
@@ -114,6 +114,7 @@ export class TokenPairPositionTrackerDO {
     }
 
     async getPrice() : Promise<DecimalizedAmount|undefined> {
+        logInfo("Retrieving price for:", this);
         const tokenAddress = this.tokenAddress.value!!;
         const vsTokenAddress = this.vsTokenAddress.value!!;
         const url = `https://price.jup.ag/v4/price?ids=${tokenAddress}&vsToken=${vsTokenAddress}`;
