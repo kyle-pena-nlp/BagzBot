@@ -1,13 +1,12 @@
-import { PositionRequestAndMaybeQuote, PositionRequestAndQuote } from "../positions";
+import { PositionRequest } from "../positions";
 import { CallbackButton } from "../telegram";
 import { CallbackData } from "./callback_data";
 import { Menu, MenuCapabilities } from "./menu";
 import { MenuCode } from "./menu_code";
 import { renderTrailingStopLossRequestMarkdown } from "./trailing_stop_loss_helpers";
 
-export class MenuEditTrailingStopLossPositionRequest extends Menu<PositionRequestAndMaybeQuote> implements MenuCapabilities {
+export class MenuEditTrailingStopLossPositionRequest extends Menu<PositionRequest> implements MenuCapabilities {
     renderText(): string {
-        const positionRequest = this.menuData.positionRequest;
         return [
             `<b>[[NEW AUTO-SELL POSITION]]</b>`,
             renderTrailingStopLossRequestMarkdown(this.menuData),
@@ -16,7 +15,7 @@ export class MenuEditTrailingStopLossPositionRequest extends Menu<PositionReques
     }
     renderOptions(): CallbackButton[][] {
         const options = this.emptyMenu();
-        const positionRequest = this.menuData.positionRequest;
+        const positionRequest = this.menuData;
         this.insertButtonNextLine(options, `[[REVIEW AND SUBMIT]]`, new CallbackData(MenuCode.TrailingStopLossConfirmMenu));
         this.insertButtonNextLine(options, `Buying With: ${positionRequest.vsToken.symbol}`, new CallbackData(MenuCode.TrailingStopLossPickVsTokenMenu, positionRequest.vsToken.symbol));
         this.insertButtonNextLine(options, `${positionRequest.vsToken.symbol} Buy Amount: ${positionRequest.vsTokenAmt}`, new CallbackData(MenuCode.TrailingStopLossEnterBuyQuantityKeypad, positionRequest.vsTokenAmt.toString()));

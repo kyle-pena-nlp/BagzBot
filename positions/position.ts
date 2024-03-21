@@ -1,6 +1,7 @@
 import { DecimalizedAmount } from "../decimalized";
-import { TokenInfo, getVsTokenInfo } from "../tokens";
+import { TokenInfo } from "../tokens";
 import { Structural, isEnumValue } from "../util";
+import { Quote } from "./quote";
 
 export enum PositionType {
 	LongTrailingStopLoss = "Auto-Sell"
@@ -58,22 +59,15 @@ interface BasePositionRequest {
 // Pre-request before full info is retrieved (like TokenInfo and BuyQuote)
 export interface PositionPreRequest extends BasePositionRequest {
 	tokenAddress : string
-	vsTokenAddress : string
+	vsToken : TokenInfo
 }
-
-/*export interface BuyQuote {
-	readonly [ key : string ] : Structural
-	inTokenAmt : DecimalizedAmount
-	outTokenAmt : DecimalizedAmount
-	fillPrice : DecimalizedAmount
-}*/
 
 // Complete position request
 export interface PositionRequest extends BasePositionRequest {
 	readonly [ key : string ] : Structural
-	//buyQuote : BuyQuote
 	token : TokenInfo
 	vsToken : TokenInfo
+	quote : Quote
 };
 
 export type Swappable = PositionRequest | Position;
@@ -90,7 +84,7 @@ export function isSwappable(x : any) : x is Swappable {
 	return ('positionID' in x) && ('positionType' in x) && isPositionType(x['positionType']);
 }
 
-export function convertPreRequestToRequest(r : PositionPreRequest, token : TokenInfo) {
+export function convertPreRequestToRequest(r : PositionPreRequest, quote : Quote, token : TokenInfo) {
 	const positionRequest : PositionRequest = {
 		userID : r.userID,
 		chatID : r.chatID,
@@ -98,12 +92,12 @@ export function convertPreRequestToRequest(r : PositionPreRequest, token : Token
 		positionID : r.positionID,
 		positionType: r.positionType,
 		vsTokenAmt: r.vsTokenAmt,
-		//buyQuote : buyQuote,
+		quote : quote,
 		slippagePercent: r.slippagePercent,
 		triggerPercent: r.triggerPercent,
 		retrySellIfSlippageExceeded: r.retrySellIfSlippageExceeded,
 		token: token,
-		vsToken: getVsTokenInfo(r.vsTokenAddress)
+		vsToken: r.vsToken
 	};
 	return positionRequest;
 }

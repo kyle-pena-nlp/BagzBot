@@ -3,7 +3,7 @@ import { Connection } from "@solana/web3.js";
 import * as bs58 from "bs58";
 import { Wallet } from "../../crypto";
 import { Env } from "../../env";
-import { Position, PositionRequest, PositionRequestAndQuote, PositionStatus, Quote, getSwapOfXDescription } from "../../positions";
+import { Position, PositionRequest, PositionStatus, Quote, getSwapOfXDescription } from "../../positions";
 import { SwapSummary } from "../../rpc/rpc_types";
 import { TGStatusMessage } from "../../telegram";
 import { importNewPosition as importNewPositionIntoPriceTracker } from "../token_pair_position_tracker/token_pair_position_tracker_DO_interop";
@@ -11,16 +11,13 @@ import { UserPositionTracker } from "./trackers/user_position_tracker";
 import { createAndSignTx, executeAndConfirmSignedTx } from "./user_swap";
 /* markPositionAsOpen, renegeOpenPosition */
 
-export async function buy(positionRequestAndQuote: PositionRequestAndQuote,
+export async function buy(positionRequest: PositionRequest,
     wallet : Wallet, 
     userPositionTracker: UserPositionTracker, 
     env : Env) {
 
     const connection = new Connection(env.RPC_ENDPOINT_URL);
-
-    const positionRequest = positionRequestAndQuote.positionRequest;
-    const quote = positionRequestAndQuote.quote;
-
+    const quote = positionRequest.quote;
     const notificationChannel = TGStatusMessage.replaceWithNotification(positionRequest.messageID, `Initiating.`, false, positionRequest.chatID, env);
     
     // create a signed tx (which involves generating a quote & etc.)
@@ -93,8 +90,7 @@ function convertConfirmedRequestToPosition(positionRequest: PositionRequest, swa
         sellSlippagePercent: positionRequest.slippagePercent,
         triggerPercent : positionRequest.triggerPercent,
         retrySellIfSlippageExceeded : positionRequest.retrySellIfSlippageExceeded,
-        txSignature: swapSummary.txSignature,  
-        txSlot: swapSummary.txSlot,      
+        txSignature: swapSummary.txSignature,      
         vsTokenAmt : swapSummary.inTokenAmt,
         tokenAmt: swapSummary.outTokenAmt,        
         fillPrice: swapSummary.fillPrice

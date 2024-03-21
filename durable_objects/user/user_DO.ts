@@ -1,7 +1,7 @@
 import { DurableObjectState } from "@cloudflare/workers-types";
 import { Wallet, encryptPrivateKey, generateEd25519Keypair } from "../../crypto";
 import { Env } from "../../env";
-import { PositionRequest, PositionStatus, PositionType } from "../../positions";
+import { PositionPreRequest, PositionStatus, PositionType } from "../../positions";
 import { getVsTokenInfo } from "../../tokens";
 import { ChangeTrackedValue, Structural, assertNever, groupIntoMap, makeFailureResponse, makeJSONResponse, makeSuccessResponse, maybeGetJson } from "../../util";
 import { AutomaticallyClosePositionsRequest, AutomaticallyClosePositionsResponse } from "../token_pair_position_tracker/actions/automatically_close_positions";
@@ -28,6 +28,8 @@ import { sell } from "./user_sell";
 // TODO: all requests to UserDo include telegramUserID and telegramUserName
 // and ensure initialization.  That way, no purpose-specific initialization call is required
 
+const WEN_ADDRESS = 'WENWENvqqNya429ubCdR81ZmD69brwQaaBYY6p3LCpk';
+
 /* Durable Object storing state of user */
 export class UserDO {
 
@@ -45,7 +47,7 @@ export class UserDO {
     wallet : ChangeTrackedValue<Wallet|null> = new ChangeTrackedValue<Wallet|null>('wallet', null);
 
     // the default values for a trailing sotp loss
-    defaultTrailingStopLossRequest : PositionRequest;
+    defaultTrailingStopLossRequest : PositionPreRequest;
 
     // tracks variable values associated with the current messageID
     sessionTracker : SessionTracker = new SessionTracker();
@@ -64,7 +66,7 @@ export class UserDO {
             messageID: -1,
             positionID : "",
             positionType : PositionType.LongTrailingStopLoss,
-            token : getVsTokenInfo('USDC'),
+            tokenAddress : WEN_ADDRESS, // to be subbed in
             vsToken : getVsTokenInfo('SOL'),
             vsTokenAmt : parseFloat(env.DEFAULT_TLS_VS_TOKEN_FRACTION),
             slippagePercent : 5.0,
@@ -213,7 +215,7 @@ export class UserDO {
         defaultTrailingStopLossRequest.chatID = defaultTrailingStopLossRequestRequest.chatID;
         defaultTrailingStopLossRequest.messageID = defaultTrailingStopLossRequestRequest.messageID;
         defaultTrailingStopLossRequest.positionID = crypto.randomUUID();
-        defaultTrailingStopLossRequest.token = defaultTrailingStopLossRequestRequest.token;
+        defaultTrailingStopLossRequest.tokenAddress = defaultTrailingStopLossRequestRequest.token.address;
         const responseBody = defaultTrailingStopLossRequest;
         return makeJSONResponse(responseBody);
     }

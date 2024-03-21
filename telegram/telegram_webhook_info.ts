@@ -44,7 +44,7 @@ export class AutoSellOrderSpec {
 			positionID : crypto.randomUUID(),
 			positionType : PositionType.LongTrailingStopLoss,
 			tokenAddress : this.tokenAddress,
-			vsTokenAddress : this.vsTokenAddress,
+			vsToken : getVsTokenInfo(this.vsTokenAddress),
 			vsTokenAmt : this.vsTokenAmt,
 			slippagePercent : this.slippageTolerancePct,
 			triggerPercent : this.triggerPct,

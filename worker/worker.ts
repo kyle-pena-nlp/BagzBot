@@ -1,4 +1,5 @@
-import { GetTokenInfoResponse } from "../durable_objects/polled_token_pair_list/actions/get_token_info";
+import { randomUUID } from "crypto";
+import { GetTokenInfoResponse, isInvalidTokenInfoResponse } from "../durable_objects/polled_token_pair_list/actions/get_token_info";
 import { getTokenInfo } from "../durable_objects/polled_token_pair_list/polled_token_pair_list_DO_interop";
 import { OpenPositionRequest } from "../durable_objects/user/actions/open_new_position";
 import { QuantityAndToken } from "../durable_objects/user/model/quantity_and_token";
@@ -7,8 +8,9 @@ import { generateWallet, getAndMaybeInitializeUserData, getDefaultTrailingStopLo
 import { Env } from "../env";
 import { logError } from "../logging";
 import { BaseMenu, MenuCode, MenuConfirmTrailingStopLossPositionRequest, MenuEditTrailingStopLossPositionRequest, MenuError, MenuFAQ, MenuHelp, MenuListPositions, MenuMain, MenuPleaseEnterToken, MenuPleaseWait, MenuTODO, MenuTrailingStopLossAutoRetrySell, MenuTrailingStopLossEntryBuyQuantity, MenuTrailingStopLossPickVsToken, MenuTrailingStopLossSlippagePercent, MenuTrailingStopLossTriggerPercent, MenuViewOpenPosition, MenuViewWallet, MenuWallet, PositiveDecimalKeypad, PositiveIntegerKeypad } from "../menus";
-import { PositionRequest, PositionRequestAndMaybeQuote, PositionRequestAndQuote, convertPreRequestToRequest } from "../positions";
+import { PositionPreRequest, PositionRequest, convertPreRequestToRequest } from "../positions";
 import { quoteBuy } from "../rpc/jupiter_quotes";
+import { isGetQuoteFailure } from "../rpc/rpc_types";
 import { AutoSellOrderSpec, TelegramWebhookInfo, deleteTGMessage, sendMessageToTG, sendRequestToTG, updateTGMessage } from "../telegram";
 import { getVsTokenInfo } from "../tokens";
 import { Structural, assertNever, makeFakeFailedRequestResponse, makeJSONResponse, makeSuccessResponse, tryParseFloat } from "../util";
@@ -16,31 +18,71 @@ import { Structural, assertNever, makeFakeFailedRequestResponse, makeJSONRespons
 export class Worker {
 
     async handleMessage(telegramWebhookInfo : TelegramWebhookInfo, env : Env) : Promise<Response> {
+        
+        // alias some things
         const telegramUserID = telegramWebhookInfo.telegramUserID;
         const chatID = telegramWebhookInfo.chatID;
-        const messageID = telegramWebhookInfo.messageID;
-        const tokenAddress = telegramWebhookInfo.text!!;
-        const validateTokenResponse : GetTokenInfoResponse = await getTokenInfo(tokenAddress, env);
-        if (validateTokenResponse.type === 'invalid') {
-            await sendMessageToTG(chatID, `The token address '${tokenAddress}' is not a known token.`, env);
+        const initiatingMessageID = telegramWebhookInfo.messageID;
+        const initiatingMessage = telegramWebhookInfo.text||'';
+        
+        // assume the message is a token address, and fetch the token info
+        const validateTokenResponse : GetTokenInfoResponse = await getTokenInfo(initiatingMessage, env);
+        
+        // if it's not valid, early-out
+        if (isInvalidTokenInfoResponse(validateTokenResponse)) {
+            await sendMessageToTG(chatID, `The token address '${initiatingMessage}' is not a known token.`, env);
             return makeFakeFailedRequestResponse(404, "Token does not exist");
         }
-        else if (validateTokenResponse.type === 'valid') {
-            const defaultTrailingStopLossRequest = await getDefaultTrailingStopLoss(telegramUserID, chatID, messageID, validateTokenResponse.tokenInfo!!, env);
-            // send out a 'stub' message that will be updated as the request editor menu.
-            const tokenAddress = validateTokenResponse.tokenInfo!!.address;
-            const tokenSymbol  = validateTokenResponse.tokenInfo!!.symbol;
-            const tgMessageInfo = await sendMessageToTG(telegramWebhookInfo.chatID, `Token address '${tokenAddress}' (${tokenSymbol}) recognized!`, env);
-            if (!tgMessageInfo.success) {
-                return makeSuccessResponse();
-            }
-            defaultTrailingStopLossRequest.messageID = tgMessageInfo.messageID;
-            await storeSessionObj<PositionRequest>(telegramUserID, tgMessageInfo.messageID!!, defaultTrailingStopLossRequest, "PositionRequest", env);
-            const menu = await this.getQuoteAndMakeStopLossRequestEditorMenu(defaultTrailingStopLossRequest, env);
-            const request = menu.getUpdateExistingMenuRequest(chatID, tgMessageInfo.messageID!!, env);
-            await fetch(request);
-            return makeSuccessResponse();
+
+        // otherwise, read the tokenInfo, and let the user know the token exists.
+        const tokenInfo = validateTokenResponse.tokenInfo;
+        const conversation = await sendMessageToTG(telegramWebhookInfo.chatID, `Token address '${tokenInfo.address}' (${tokenInfo.symbol}) recognized!`, env);
+        if (!conversation.success) {
+            return makeFakeFailedRequestResponse(500, "Failed to send response to telegram");
         }
+        const conversationMessageID = conversation.messageID;
+
+        // get default settings for a position request
+        const defaultTSL = await getDefaultTrailingStopLoss(telegramUserID, chatID, initiatingMessageID, validateTokenResponse.tokenInfo!!, env);
+
+        // create a 'prerequest' (with certain things missing that would be in a full request)
+        const prerequest : PositionPreRequest = {
+            positionID: randomUUID(),
+            userID : telegramUserID,
+            chatID: chatID,
+            messageID: conversationMessageID,
+            tokenAddress: defaultTSL.token.address,
+            vsToken: defaultTSL.vsToken,
+            positionType : defaultTSL.positionType,
+            vsTokenAmt: defaultTSL.vsTokenAmt,
+            slippagePercent: defaultTSL.slippagePercent,
+            retrySellIfSlippageExceeded: defaultTSL.retrySellIfSlippageExceeded,
+            triggerPercent: defaultTSL.triggerPercent
+        };
+
+        // get a quote for the token being swapped to
+        const quote = await quoteBuy(prerequest, tokenInfo, env);
+
+        // if getting the quote fails, early-out
+        if (isGetQuoteFailure(quote)) {
+            await sendMessageToTG(chatID, `Could not get a quote for ${tokenInfo.symbol}.`, env);
+            return makeFakeFailedRequestResponse(404, "Token does not exist");
+        }
+
+        // now that we have a quote and tokenInfo, convert the pre-request to a request
+        const positionRequest = convertPreRequestToRequest(prerequest, quote, tokenInfo);
+
+        // store the fully formed request in session, associated with the conversation.
+        await storeSessionObj<PositionRequest>(telegramUserID, 
+            conversationMessageID, 
+            positionRequest, 
+            "PositionRequest", 
+            env);
+
+        const menu = await this.makeStopLossRequestEditorMenu(positionRequest, env);
+        const menuRequest = menu.getUpdateExistingMenuRequest(chatID, conversationMessageID, env);
+        await fetch(menuRequest);
+
         return makeSuccessResponse();
     }
 
@@ -106,7 +148,7 @@ export class Worker {
                 if (!trailingStopLossCustomSlippageSubmittedKeypadEntry) {
                     logError("Invalid slippage percent submitted", telegramWebhookInfo, trailingStopLossCustomSlippageSubmittedKeypadEntry);
                 }
-                return await this.getQuoteAndMakeStopLossRequestEditorMenu(positionRequestAfterEditingSlippagePct, env);                
+                return await this.makeStopLossRequestEditorMenu(positionRequestAfterEditingSlippagePct, env);                
             case MenuCode.TrailingStopLossEnterBuyQuantityKeypad:
                 const buyTrailingStopLossQuantityKeypadEntry = callbackData.menuArg||'';
                 const trailingStopLossEnterBuyQuantityKeypad = this.makeTrailingStopLossBuyQuantityKeypad(buyTrailingStopLossQuantityKeypadEntry);
@@ -120,16 +162,16 @@ export class Worker {
                 if (!submittedTrailingStopLossBuyQuantity) {
                     logError("Invalid buy quantity submitted", telegramWebhookInfo, trailingStopLossRequestStateAfterBuyQuantityEdited);
                 }
-                return await this.getQuoteAndMakeStopLossRequestEditorMenu(trailingStopLossRequestStateAfterBuyQuantityEdited, env);
+                return await this.makeStopLossRequestEditorMenu(trailingStopLossRequestStateAfterBuyQuantityEdited, env);
             case MenuCode.TrailingStopLossChooseAutoRetrySellMenu:
                 return new MenuTrailingStopLossAutoRetrySell(undefined);
             case MenuCode.TrailingStopLossChooseAutoRetrySellSubmit:
                 await storeSessionObjProperty(telegramUserID, messageID, "retrySellIfSlippageExceeded", callbackData.menuArg === "true", "PositionRequest", env);
                 const trailingStopLossRequestStateAfterAutoRetrySellEdited = await readSessionObj<PositionRequest>(telegramUserID, messageID, "PositionRequest", env);
-                return await this.getQuoteAndMakeStopLossRequestEditorMenu(trailingStopLossRequestStateAfterAutoRetrySellEdited, env);
+                return await this.makeStopLossRequestEditorMenu(trailingStopLossRequestStateAfterAutoRetrySellEdited, env);
             case MenuCode.TrailingStopLossConfirmMenu:
                 const trailingStopLossRequestAfterDoneEditing = await readSessionObj<PositionRequest>(telegramUserID, messageID, "PositionRequest", env);
-                return await this.getQuoteAndMakeStopLossConfirmMenu(trailingStopLossRequestAfterDoneEditing, env);
+                return await this.makeStopLossConfirmMenu(trailingStopLossRequestAfterDoneEditing, env);
             case MenuCode.TrailingStopLossCustomTriggerPercentKeypad:
                 const trailingStopLossTriggerPercentKeypadCurrentEntry = callbackData.menuArg||'';
                 const trailingStopLossCustomTriggerPercentKeypad = this.makeTrailingStopLossCustomTriggerPercentKeypad(trailingStopLossTriggerPercentKeypadCurrentEntry);
@@ -143,7 +185,7 @@ export class Worker {
                 if (!trailingStopLossCustomTriggerPercentSubmission) {
                     logError("Invalid trigger percent submitted", trailingStopLossCustomTriggerPercentSubmission, telegramWebhookInfo);
                 }
-                return await this.getQuoteAndMakeStopLossRequestEditorMenu(trailingStopLossPositionRequestAfterEditingCustomTriggerPercent, env);                
+                return await this.makeStopLossRequestEditorMenu(trailingStopLossPositionRequestAfterEditingCustomTriggerPercent, env);                
             case MenuCode.TrailingStopLossEditorFinalSubmit:
                 // TODO: do the read within UserDO to avoid the extra roundtrip
                 const positionRequestAfterFinalSubmit = await readSessionObj<PositionRequest>(telegramUserID, messageID, "PositionRequest", env);
@@ -166,10 +208,10 @@ export class Worker {
                 const vsToken = getVsTokenInfo(trailingStopLossSelectedVsToken);
                 await storeSessionValues(telegramUserID, messageID, new Map<string,Structural>([
                     ["vsToken", vsToken],
-                    ["vsTokenAddress", vsTokenAddress]
+                    //["vsTokenAddress", vsTokenAddress]
                 ]), "PositionRequest", env);
                 const trailingStopLossPositionRequestAfterSubmittingVsToken = await readSessionObj<PositionRequest>(telegramUserID, messageID, "PositionRequest", env);
-                return await this.getQuoteAndMakeStopLossRequestEditorMenu(trailingStopLossPositionRequestAfterSubmittingVsToken, env);
+                return await this.makeStopLossRequestEditorMenu(trailingStopLossPositionRequestAfterSubmittingVsToken, env);
             case MenuCode.TransferFunds:
                 // TODO
                 return this.TODOstubbedMenu(env);
@@ -189,7 +231,7 @@ export class Worker {
                 return new MenuTrailingStopLossTriggerPercent(triggerPercent);
             case MenuCode.TrailingStopLossRequestReturnToEditorMenu:
                 const z = await readSessionObj<PositionRequest>(telegramUserID, messageID, "PositionRequest", env);
-                return await this.getQuoteAndMakeStopLossRequestEditorMenu(z, env);
+                return await this.makeStopLossRequestEditorMenu(z, env);
             default:
                 assertNever(callbackData.menuCode);
                 return new MenuError(undefined);
@@ -243,20 +285,14 @@ export class Worker {
             100);
     }
 
-    async getQuoteAndMakeStopLossRequestEditorMenu(positionRequest : PositionRequest, env : Env) : Promise<BaseMenu> {
-        const quote = await quoteBuy(positionRequest, env);
-        const positionRequestAndQuote : PositionRequestAndMaybeQuote = { positionRequest: positionRequest, quote : quote };
-        return await this.makeTrailingStopLossRequestEditorMenu(positionRequestAndQuote);
+    async makeStopLossRequestEditorMenu(positionRequest : PositionRequest, env : Env) : Promise<BaseMenu> {
+        await this.refreshQuote(positionRequest, env);
+        return new MenuEditTrailingStopLossPositionRequest(positionRequest);
     }
 
-    makeTrailingStopLossRequestEditorMenu(positionRequestAndQuote : PositionRequestAndMaybeQuote) : BaseMenu {
-        return new MenuEditTrailingStopLossPositionRequest(positionRequestAndQuote);
-    }
-
-    async getQuoteAndMakeStopLossConfirmMenu(positionRequest: PositionRequest, env : Env) : Promise<BaseMenu> {
-        const quote = await quoteBuy(positionRequest, env);
-        const positionRequestAndQuote : PositionRequestAndMaybeQuote = { positionRequest: positionRequest, quote : quote };
-        return new MenuConfirmTrailingStopLossPositionRequest(positionRequestAndQuote);
+    async makeStopLossConfirmMenu(positionRequest: PositionRequest, env : Env) : Promise<BaseMenu> {
+        await this.refreshQuote(positionRequest, env);
+        return new MenuConfirmTrailingStopLossPositionRequest(positionRequest);
     }
 
     makeTrailingStopLossCustomSlippagePctKeypad(currentEntry : string) {
@@ -300,16 +336,17 @@ export class Worker {
         if (!tgMessage.success) {
             return makeSuccessResponse();
         }
-        const [commandTextResponse,menu,storeSessionObjectRequest] = await this.handleCommandInternal(command, telegramWebhookInfo, tgMessage.messageID, env);
-        const tgMessageInfo = await updateTGMessage(telegramWebhookInfo.chatID, tgMessage.messageID, commandTextResponse, env);
+        const conversationMessageID = tgMessage.messageID;
+        const [commandTextResponse,menu,storeSessionObjectRequest] = await this.handleCommandInternal(command, telegramWebhookInfo, conversationMessageID, env);
+        const tgMessageInfo = await updateTGMessage(telegramWebhookInfo.chatID, conversationMessageID, commandTextResponse, env);
         if (!tgMessageInfo.success) {
             return makeSuccessResponse();
         }
         if (storeSessionObjectRequest != null) {
-            await storeSessionObj(telegramWebhookInfo.telegramUserID, tgMessageInfo.messageID, storeSessionObjectRequest.obj, storeSessionObjectRequest.prefix, env);
+            await storeSessionObj(telegramWebhookInfo.telegramUserID, conversationMessageID, storeSessionObjectRequest.obj, storeSessionObjectRequest.prefix, env);
         }
         if (menu != null) {
-            const menuDisplayRequest = menu.getUpdateExistingMenuRequest(telegramWebhookInfo.chatID, tgMessageInfo.messageID, env);
+            const menuDisplayRequest = menu.getUpdateExistingMenuRequest(telegramWebhookInfo.chatID, conversationMessageID, env);
             fetch(menuDisplayRequest);
         }
         return makeSuccessResponse();
@@ -330,23 +367,36 @@ export class Worker {
                 }
                 const tokenAddress = autoSellOrderSpec.tokenAddress;
                 const getTokenResponse = await getTokenInfo(tokenAddress, env);
-                if (getTokenResponse.type !== 'valid') {
+                if (isInvalidTokenInfoResponse(getTokenResponse)) {
                     const autosellTokenDNEMsg = `Could not identify token '${tokenAddress}'`;
                     return [autosellTokenDNEMsg];
                 }
-                const tokenInfo = getTokenResponse.tokenInfo!!;
-                const tokenRecognizedForAutoSellOrderMsg =  `Token address '${tokenAddress}' (${tokenInfo.symbol!!}) recognized!`;
-                const positionPrerequest = autoSellOrderSpec.toPositionPreRequest();
-                const positionRequest = convertPreRequestToRequest(positionPrerequest, tokenInfo);
+                const tokenInfo = getTokenResponse.tokenInfo;
+                const tokenRecognizedForAutoSellOrderMsg =  `Token address '${tokenAddress}' (${tokenInfo.symbol}) recognized!`;
+                const prerequest = autoSellOrderSpec.toPositionPreRequest();
+                const quote = await quoteBuy(prerequest, tokenInfo, env);
+                if (isGetQuoteFailure(quote)) {
+                    return [`Unable to get a quote for ${tokenInfo.symbol}`];
+                }
+                const positionRequest = convertPreRequestToRequest(prerequest, quote, tokenInfo);
                 positionRequest.messageID = messageID; // ugh hack.
                 return [tokenRecognizedForAutoSellOrderMsg,
-                    await this.getQuoteAndMakeStopLossRequestEditorMenu(positionRequest, env),
-                    { obj: positionPrerequest, prefix: "PositionRequest" }];
+                    await this.makeStopLossRequestEditorMenu(positionRequest, env),
+                    { obj: prerequest, prefix: "PositionRequest" }];
             case '/menu':
                 const menuUserData = await getAndMaybeInitializeUserData(telegramWebhookInfo.telegramUserID, telegramWebhookInfo.telegramUserName, telegramWebhookInfo.messageID, env);
                 return ['...', new MenuMain(menuUserData)];
             default:
                 throw new Error(`Unrecognized command: ${command}`);
         }
+    }
+
+    async refreshQuote(positionRequest : PositionRequest, env : Env) : Promise<boolean> {
+        const quote = await quoteBuy(positionRequest, positionRequest.token, env);
+        if (isGetQuoteFailure(quote)) {
+            return false;
+        }
+        positionRequest.quote = quote;
+        return true;
     }
 }

@@ -1,15 +1,16 @@
 
 import { DecimalizedAmount, MATH_DECIMAL_PLACES, dDiv } from "../decimalized";
 import { Env } from "../env";
-import { Position, PositionRequest, Quote } from "../positions";
+import { Position, PositionPreRequest, PositionRequest, Quote } from "../positions";
 import { TokenInfo, getVsTokenDecimalsMultiplier, getVsTokenInfo } from "../tokens";
+import { assertNever } from "../util";
 import { JupiterQuoteAPIParams, SwapRoute } from "./jupiter_types";
 import { GetQuoteFailure, isGetQuoteFailure } from "./rpc_types";
 
-export async function quoteBuy(positionRequest : PositionRequest,  env : Env) : Promise<GetQuoteFailure|Quote> {
+export async function quoteBuy(positionRequest : PositionPreRequest|PositionRequest, token : TokenInfo,  env : Env) : Promise<GetQuoteFailure|Quote> {
     const swapRoute = await getBuyTokenSwapRoute(positionRequest, env);
     const inTokenInfo = positionRequest.vsToken;
-    const outTokenInfo = positionRequest.token;
+    const outTokenInfo = token;
     return makeQuote(swapRoute, inTokenInfo, outTokenInfo);
 }
 
@@ -58,9 +59,9 @@ async function makeQuote(swapRoute : GetQuoteFailure|SwapRoute, inTokenInfo : To
 }
 
 // TODO: unify the buy/sell method somehow to reduce code duplication
-export async function getBuyTokenSwapRoute(positionRequest : PositionRequest, env : Env) : Promise<SwapRoute|GetQuoteFailure> {
+export async function getBuyTokenSwapRoute(positionRequest : PositionPreRequest|PositionRequest, env : Env) : Promise<SwapRoute|GetQuoteFailure> {
     const vsTokenAddress = positionRequest.vsToken.address;
-    const tokenAddress = positionRequest.token.address;
+    const tokenAddress = getTokenAddress(positionRequest);
     const slippageBps = positionRequest.slippagePercent * 100;
     const vsTokenDecimalsMultiplier = getVsTokenDecimalsMultiplier(vsTokenAddress);
     const decimalizedVsTokenAmount = (positionRequest.vsTokenAmt * vsTokenDecimalsMultiplier).toString();
@@ -75,6 +76,16 @@ export async function getBuyTokenSwapRoute(positionRequest : PositionRequest, en
         swapMode: 'ExactIn' 
     };
     return await getSwapRoute(quoteAPIParams, env);
+}
+
+function getTokenAddress(p : PositionPreRequest|PositionRequest) : string {
+    if ('token' in p) {
+        return p.token.address;
+    }
+    else if ('tokenAddress' in p) {
+        return p.tokenAddress;
+    }
+    assertNever(p);
 }
 
 export async function getSellTokenSwapRoute(position : Position, env : Env) : Promise<SwapRoute|GetQuoteFailure> {

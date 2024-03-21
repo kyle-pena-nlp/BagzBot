@@ -1,7 +1,9 @@
 import { DecimalizedAmount } from "../decimalized";
 import { TokenInfo } from "../tokens";
+import { Structural } from "../util";
 
 export interface Quote {
+    readonly [ key : string ] : Structural
     inToken : TokenInfo
     outToken : TokenInfo
     inTokenAmt : DecimalizedAmount

@@ -74,7 +74,8 @@ export class PolledTokenPairListDO {
         // crude check to filter out obviously not token addresses entered by the user
         if (!this.looksLikeATokenAddress(tokenAddress)) {
             return {
-                type: 'invalid'
+                type: 'invalid',
+                tokenInfo: null
             };
         }
 
@@ -82,7 +83,8 @@ export class PolledTokenPairListDO {
         // if the token is already known to not exist, return invalid
         if (this.tokenTracker.isRepeatedlyNonExistent(tokenAddress)) {
             return {
-                type: 'invalid'
+                type: 'invalid',
+                tokenInfo: null
             };
         }
 
@@ -113,7 +115,8 @@ export class PolledTokenPairListDO {
         else {
             this.tokenTracker.markAsNonExistent(tokenAddress);
             return {
-                type: 'invalid'
+                type: 'invalid',
+                tokenInfo: null
             };
         }
     }
