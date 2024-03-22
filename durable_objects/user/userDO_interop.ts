@@ -5,16 +5,21 @@ import { Structural, groupIntoMap, makeJSONRequest, makeRequest } from "../../ut
 import { AutomaticallyClosePositionsRequest, AutomaticallyClosePositionsResponse } from "../token_pair_position_tracker/actions/automatically_close_positions";
 import { DeleteSessionRequest } from "./actions/delete_session";
 import { GenerateWalletRequest, GenerateWalletResponse } from "./actions/generate_wallet";
+import { GetAddressBookEntryRequest, GetAddressBookEntryResponse } from "./actions/get_address_book_entry";
 import { GetPositionRequest } from "./actions/get_position";
 import { GetSessionValuesRequest, GetSessionValuesWithPrefixRequest, GetSessionValuesWithPrefixResponse, SessionValuesResponse } from "./actions/get_session_values";
 import { GetUserDataRequest } from "./actions/get_user_data";
 import { GetWalletDataRequest, GetWalletDataResponse } from "./actions/get_wallet_data";
+import { ListAddressBookEntriesRequest, ListAddressBookEntriesResponse } from "./actions/list_address_book_entries";
 import { ListPositionsRequest } from "./actions/list_positions";
 import { ManuallyClosePositionRequest, ManuallyClosePositionResponse } from "./actions/manually_close_position";
 import { OpenPositionRequest, OpenPositionResponse } from "./actions/open_new_position";
+import { RemoveAddressBookEntryRequest, RemoveAddressBookEntryResponse } from "./actions/remove_address_book_entry";
 import { DefaultTrailingStopLossRequestRequest, DefaultTrailingStopLossRequestResponse } from "./actions/request_default_position_request";
+import { StoreAddressBookEntryRequest, StoreAddressBookEntryResponse } from "./actions/store_address_book_entry";
 import { StoreSessionValuesRequest, StoreSessionValuesResponse } from "./actions/store_session_values";
 import { UserInitializeRequest, UserInitializeResponse } from "./actions/user_initialize";
+import { CompletedAddressBookEntry } from "./model/address_book_entry";
 import { SessionKey } from "./model/session";
 import { UserData } from "./model/user_data";
 
@@ -32,7 +37,33 @@ export enum UserDOFetchMethod {
 	listPositions = "listPositions",
 	manuallyClosePosition = "manuallyClosePosition", // user initiated close position
 	automaticallyClosePositions = "automaticallyClosePositions", // system-initiated close position
-	getDefaultTrailingStopLossRequest = "getDefaultTrailingStopLossRequest"
+	getDefaultTrailingStopLossRequest = "getDefaultTrailingStopLossRequest",
+	storeAddressBookEntry = "storeAddressBookEntry",
+	listAddressBookEntries = "listAddressBookEntries",
+	removeAddressBookEntry = "removeAddressBookEntry",
+	getAddressBookEntry = "getAddressBookEntry"
+}
+
+export async function storeAddressBookEntry(userID : number, addressBookEntry : CompletedAddressBookEntry, env : Env) {
+	const storeAddressBookEntryRequest : StoreAddressBookEntryRequest = { addressBookEntry : addressBookEntry };
+	return await sendJSONRequestToUserDO<StoreAddressBookEntryRequest,StoreAddressBookEntryResponse>(userID, UserDOFetchMethod.storeAddressBookEntry, storeAddressBookEntryRequest, env);
+}
+
+export async function listAddressBookEntries(userID : number, env : Env) {
+	const request : ListAddressBookEntriesRequest = {};
+	return await sendJSONRequestToUserDO<ListAddressBookEntriesRequest,ListAddressBookEntriesResponse>(userID, UserDOFetchMethod.listAddressBookEntries, request, env);
+}
+
+export async function getAddressBookEntry(userID : number, addressBookEntryId : string, env : Env) : Promise<CompletedAddressBookEntry|undefined> {
+	const request : GetAddressBookEntryRequest = { addressBookEntryID: addressBookEntryId };
+	const response = await sendJSONRequestToUserDO<GetAddressBookEntryRequest,GetAddressBookEntryResponse>(userID, UserDOFetchMethod.getAddressBookEntry, request, env);
+	return response.addressBookEntry;
+}
+
+export async function removeAddressBookEntry(userID : number, addressBookEntryId : string, env : Env) : Promise<void> {
+	const request : RemoveAddressBookEntryRequest = { addressBookEntryID: addressBookEntryId };
+	const response = await sendJSONRequestToUserDO<RemoveAddressBookEntryRequest,RemoveAddressBookEntryResponse>(userID, UserDOFetchMethod.removeAddressBookEntry, request, env);
+	return;
 }
 
 export async function getWalletData(userID : number, env: Env) : Promise<GetWalletDataResponse> {

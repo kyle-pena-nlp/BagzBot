@@ -3,14 +3,17 @@ import { decryptPrivateKey } from "../crypto";
 import { GetTokenInfoResponse, isInvalidTokenInfoResponse } from "../durable_objects/polled_token_pair_list/actions/get_token_info";
 import { getTokenInfo } from "../durable_objects/polled_token_pair_list/polled_token_pair_list_DO_interop";
 import { OpenPositionRequest } from "../durable_objects/user/actions/open_new_position";
+import { AddressBookEntry, CompletedAddressBookEntry, JustAddressBookEntryID, JustAddressBookEntryName } from "../durable_objects/user/model/address_book_entry";
 import { QuantityAndToken } from "../durable_objects/user/model/quantity_and_token";
 import { TokenSymbolAndAddress } from "../durable_objects/user/model/token_name_and_address";
-import { generateWallet, getAndMaybeInitializeUserData, getDefaultTrailingStopLoss, getPosition, getWalletData, listOpenTrailingStopLossPositions, manuallyClosePosition, readSessionObj, requestNewPosition, storeSessionObj, storeSessionObjProperty, storeSessionValues } from "../durable_objects/user/userDO_interop";
+import { generateWallet, getAddressBookEntry, getAndMaybeInitializeUserData, getDefaultTrailingStopLoss, getPosition, getWalletData, listAddressBookEntries, listOpenTrailingStopLossPositions, manuallyClosePosition, readSessionObj, requestNewPosition, storeAddressBookEntry, storeSessionObj, storeSessionObjProperty, storeSessionValues } from "../durable_objects/user/userDO_interop";
 import { Env } from "../env";
 import { logError } from "../logging";
-import { BaseMenu, MenuCode, MenuConfirmTrailingStopLossPositionRequest, MenuEditTrailingStopLossPositionRequest, MenuError, MenuFAQ, MenuHelp, MenuListPositions, MenuMain, MenuPleaseEnterToken, MenuPleaseWait, MenuTODO, MenuTrailingStopLossAutoRetrySell, MenuTrailingStopLossEntryBuyQuantity, MenuTrailingStopLossPickVsToken, MenuTrailingStopLossSlippagePercent, MenuTrailingStopLossTriggerPercent, MenuViewDecryptedWallet, MenuViewOpenPosition, MenuWallet, PositiveDecimalKeypad, PositiveIntegerKeypad } from "../menus";
+import { BaseMenu, MenuCode, MenuConfirmAddressBookEntry, MenuConfirmTrailingStopLossPositionRequest, MenuContinueMessage, MenuEditTrailingStopLossPositionRequest, MenuError, MenuFAQ, MenuHelp, MenuListPositions, MenuMain, MenuPickTransferFundsRecipient, MenuPleaseEnterToken, MenuPleaseWait, MenuStartTransferFunds, MenuTODO, MenuTrailingStopLossAutoRetrySell, MenuTrailingStopLossEntryBuyQuantity, MenuTrailingStopLossPickVsToken, MenuTrailingStopLossSlippagePercent, MenuTrailingStopLossTriggerPercent, MenuTransferFundsTestOrSubmitNow, MenuViewDecryptedWallet, MenuViewOpenPosition, MenuWallet, PositiveDecimalKeypad, PositiveIntegerKeypad } from "../menus";
 import { PositionPreRequest, PositionRequest, convertPreRequestToRequest } from "../positions";
+import { ReplyQuestion } from "../reply_question";
 import { quoteBuy } from "../rpc/jupiter_quotes";
+import { CompleteTransferFundsRequest, PartialTransferFundsRequest } from "../rpc/rpc_transfer_funds";
 import { isGetQuoteFailure } from "../rpc/rpc_types";
 import { AutoSellOrderSpec, TelegramWebhookInfo, deleteTGMessage, sendMessageToTG, sendRequestToTG, updateTGMessage } from "../telegram";
 import { getVsTokenInfo } from "../tokens";
@@ -98,7 +101,7 @@ export class Worker {
     }
 
     // TODO: switch to handlers, factor handlers out into little classes (preferably into the menu classes themselves)
-    async handleCallbackQueryInternal(telegramWebhookInfo : TelegramWebhookInfo, env : Env) : Promise<BaseMenu|void> {
+    async handleCallbackQueryInternal(telegramWebhookInfo : TelegramWebhookInfo, env : Env) : Promise<BaseMenu|ReplyQuestion|void> {
         const telegramUserID = telegramWebhookInfo.telegramUserID;
         const messageID = telegramWebhookInfo.messageID;
         const chatID = telegramWebhookInfo.chatID;
@@ -218,7 +221,8 @@ export class Worker {
                 return this.TODOstubbedMenu(env);
             case MenuCode.Wallet:
                 const walletDataForWalletMenu = await getWalletData(telegramUserID, env);
-                return new MenuWallet(walletDataForWalletMenu);
+                const walletData = { address: walletDataForWalletMenu.wallet.publicKey };
+                return new MenuWallet(walletData);
             case MenuCode.Close:
                 await this.handleMenuClose(telegramWebhookInfo.chatID, telegramWebhookInfo.messageID, env);
                 return;
@@ -233,9 +237,63 @@ export class Worker {
             case MenuCode.TrailingStopLossRequestReturnToEditorMenu:
                 const z = await readSessionObj<PositionRequest>(telegramUserID, messageID, "PositionRequest", env);
                 return await this.makeStopLossRequestEditorMenu(z, env);
+            case MenuCode.AddFundsRecipientAddress:
+                const addressBookEntry : AddressBookEntry = { 
+                    addressBookEntryID : randomUUID()
+                };
+                await storeSessionObj<AddressBookEntry>(telegramUserID, messageID, addressBookEntry, "addressBookEntry", env);
+                return new ReplyQuestion("Choose a name for this recipient", MenuCode.SubmitAddressBookEntryName, MenuCode.TransferFunds);
+            case MenuCode.SubmitAddressBookEntryName:
+                const addressBookEntry2 = await readSessionObj<JustAddressBookEntryID>(telegramUserID, messageID, "addressBookEntry", env);
+                const addressBookEntry3 : JustAddressBookEntryName = { ...addressBookEntry2, name : callbackData.menuArg||'' } ;//name = callbackData.menuArg;
+                await storeSessionObj<JustAddressBookEntryName>(telegramUserID, messageID, addressBookEntry3, "addressBookEntry", env);
+                return new ReplyQuestion("Paste in the address", MenuCode.SubmitAddressBookEntryAddress, MenuCode.TransferFunds);
+            case MenuCode.SubmitAddressBookEntryAddress:
+                const addressBookEntry4 = await readSessionObj<JustAddressBookEntryName>(telegramUserID, messageID, "addressBookEntry", env);
+                const addressBookEntry5 : CompletedAddressBookEntry = { ...addressBookEntry4, address: callbackData.menuArg||'', confirmed : false };
+                await storeSessionObj<CompletedAddressBookEntry>(telegramUserID, messageID, addressBookEntry5, "addressBookEntry", env);
+                return new MenuConfirmAddressBookEntry(addressBookEntry5);
+            case MenuCode.SubmitAddressBookEntry:
+                const addressBookEntryFinal = await readSessionObj<CompletedAddressBookEntry>(telegramUserID, messageID, "addressBookEntry", env);
+                const response = await storeAddressBookEntry(telegramUserID, addressBookEntryFinal, env);
+                if (!response.success) {
+                    return new MenuContinueMessage(`Could not store address book entry`, MenuCode.TransferFunds);
+                }
+                return new MenuStartTransferFunds(undefined);
+            case MenuCode.PickTransferFundsRecipient:
+                const addressBookEntries = await listAddressBookEntries(telegramUserID, env);
+                return new MenuPickTransferFundsRecipient(addressBookEntries.addressBookEntries);
+            case MenuCode.TransferFundsRecipientSubmitted:
+                const addressBookId = callbackData.menuArg||'';
+                const selectedAddressBookEntry = await getAddressBookEntry(telegramUserID, addressBookId, env);
+                if (selectedAddressBookEntry == null) {
+                    return new MenuContinueMessage(`Address book entry not found`, MenuCode.TransferFunds);
+                }
+                const partialTransferFundsRequest : PartialTransferFundsRequest = { recipientAddress: selectedAddressBookEntry.address };
+                await storeSessionObj<PartialTransferFundsRequest>(telegramUserID, messageID, partialTransferFundsRequest, "transferFundsRequest", env);
+                return new PositiveDecimalKeypad("${currentValue} SOL", MenuCode.KeypadTransferFundsQuantity, MenuCode.SubmitTransferFundsQuantity, MenuCode.TransferFunds, "1.0", 0.0);
+            case MenuCode.KeypadTransferFundsQuantity:
+                const tfEntry = callbackData.menuArg||'';
+                return new PositiveDecimalKeypad("${currentValue} SOL", MenuCode.KeypadTransferFundsQuantity, MenuCode.SubmitTransferFundsQuantity, MenuCode.TransferFunds, tfEntry, 0.0);
+            case MenuCode.SubmitTransferFundsQuantity:
+                const tfQuantity = tryParseFloat(callbackData.menuArg||'');
+                if (tfQuantity == null) {
+                    return new MenuContinueMessage(`Invalid transfer funds quantity`, MenuCode.TransferFunds);
+                }
+                const tfFundsRequest = await readSessionObj<PartialTransferFundsRequest>(telegramUserID, messageID, "transferFundsRequest", env);
+                const completeTfFundsRequest : CompleteTransferFundsRequest = { ...tfFundsRequest, solQuantity: tfQuantity };
+                await storeSessionObj<CompleteTransferFundsRequest>(telegramUserID, messageID, completeTfFundsRequest, "transferFundsRequest", env);
+                return new MenuTransferFundsTestOrSubmitNow(completeTfFundsRequest);
+            case MenuCode.TransferFundsDoTestTransfer:
+                throw new Error("");
+            case MenuCode.TransferFundsDoTransfer:
+                throw new Error("");
+            case MenuCode.AddressBookEntryPerformTestTransfer:
+                throw new Error("");
+            case MenuCode.RemoveAddressBookEntry:
+                throw new Error("");
             default:
                 assertNever(callbackData.menuCode);
-                return new MenuError(undefined);
         }
     }
 

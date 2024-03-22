@@ -8,17 +8,22 @@ import { AutomaticallyClosePositionsRequest, AutomaticallyClosePositionsResponse
 import { wakeUpTokenPairPositionTracker } from "../token_pair_position_tracker/token_pair_position_tracker_DO_interop";
 import { DeleteSessionRequest, DeleteSessionResponse } from "./actions/delete_session";
 import { GenerateWalletRequest, GenerateWalletResponse } from "./actions/generate_wallet";
+import { GetAddressBookEntryRequest, GetAddressBookEntryResponse } from "./actions/get_address_book_entry";
 import { GetPositionRequest } from "./actions/get_position";
 import { GetSessionValuesRequest, GetSessionValuesWithPrefixRequest, GetSessionValuesWithPrefixResponse } from "./actions/get_session_values";
 import { GetUserDataRequest } from "./actions/get_user_data";
 import { GetWalletDataRequest, GetWalletDataResponse } from "./actions/get_wallet_data";
+import { ListAddressBookEntriesRequest, ListAddressBookEntriesResponse } from "./actions/list_address_book_entries";
 import { ListPositionsRequest } from "./actions/list_positions";
 import { ManuallyClosePositionRequest, ManuallyClosePositionResponse } from "./actions/manually_close_position";
 import { OpenPositionRequest, OpenPositionResponse } from "./actions/open_new_position";
+import { RemoveAddressBookEntryRequest, RemoveAddressBookEntryResponse } from "./actions/remove_address_book_entry";
 import { DefaultTrailingStopLossRequestRequest, DefaultTrailingStopLossRequestResponse } from "./actions/request_default_position_request";
+import { StoreAddressBookEntryRequest, StoreAddressBookEntryResponse } from "./actions/store_address_book_entry";
 import { StoreSessionValuesRequest, StoreSessionValuesResponse } from "./actions/store_session_values";
 import { UserInitializeRequest, UserInitializeResponse } from "./actions/user_initialize";
 import { UserData } from "./model/user_data";
+import { AddressBookEntryTracker } from "./trackers/address_book_entry_tracker";
 import { SessionTracker } from "./trackers/session_tracker";
 import { UserPositionTracker } from "./trackers/user_position_tracker";
 import { UserDOFetchMethod, parseUserDOFetchMethod } from "./userDO_interop";
@@ -54,6 +59,9 @@ export class UserDO {
 
     // tracks the positions currently open (or closing but not confirmed closed) for this user
     userPositionTracker : UserPositionTracker = new UserPositionTracker();
+
+    // tracks the address book entries to which the user can send funds
+    addressBookEntryTracker : AddressBookEntryTracker = new AddressBookEntryTracker();
 
     constructor(state : DurableObjectState, env : any) {
         // persistent state object which reaches eventual consistency
@@ -96,6 +104,7 @@ export class UserDO {
         this.wallet.initialize(storage);
         this.sessionTracker.initialize(storage);
         this.userPositionTracker.initialize(storage);
+        this.addressBookEntryTracker.initialize(storage);
     }
 
     async flushToStorage() {
@@ -104,7 +113,8 @@ export class UserDO {
             this.telegramUserName.flushToStorage(this.state.storage),
             this.wallet.flushToStorage(this.state.storage),
             this.sessionTracker.flushToStorage(this.state.storage),
-            this.userPositionTracker.flushToStorage(this.state.storage)
+            this.userPositionTracker.flushToStorage(this.state.storage),
+            this.addressBookEntryTracker.flushToStorage(this.state.storage)
         ]);
     }
 
@@ -192,11 +202,85 @@ export class UserDO {
                 this.assertUserHasWallet();
                 response = await this.handleAutomaticallyClosePositionsRequest(jsonRequestBody);
                 break;
+            case UserDOFetchMethod.storeAddressBookEntry:
+                this.assertUserIsInitialized();
+                response = await this.handleStoreAddressBookEntry(jsonRequestBody);
+                break;
+            case UserDOFetchMethod.listAddressBookEntries:
+                this.assertUserIsInitialized();
+                response = await this.handleListAddressBookEntries(jsonRequestBody);
+                break;
+            case UserDOFetchMethod.removeAddressBookEntry:
+                this.assertUserIsInitialized();
+                response = await this.handleRemoveAddressBookEntry(jsonRequestBody);
+                break;
+            case UserDOFetchMethod.getAddressBookEntry:
+                this.assertUserIsInitialized();
+                response = await this.handleGetAddressBookEntry(jsonRequestBody);
+                break;
             default:
                 assertNever(method);
         }
 
         return [method,jsonRequestBody,response];
+    }
+
+    async handleRemoveAddressBookEntry(request : RemoveAddressBookEntryRequest) : Promise<Response> {
+        const response = this._handleRemoveAddressBookEntry(request);
+        return makeJSONResponse<RemoveAddressBookEntryResponse>(response);
+    }
+
+    _handleRemoveAddressBookEntry(request : RemoveAddressBookEntryRequest) : RemoveAddressBookEntryResponse {
+        this.addressBookEntryTracker.removeById(request.addressBookEntryID);
+        return {};
+    }
+
+    async handleGetAddressBookEntry(request : GetAddressBookEntryRequest) : Promise<Response> {
+        const response = this._handleGetAddressBookEntry(request);
+        return makeJSONResponse<GetAddressBookEntryResponse>(response);
+    }
+
+    _handleGetAddressBookEntry(request : GetAddressBookEntryRequest) : GetAddressBookEntryResponse {
+        const addressBookEntry = this.addressBookEntryTracker.getById(request.addressBookEntryID);
+        return { addressBookEntry : addressBookEntry };
+    }
+
+    async handleStoreAddressBookEntry(request : StoreAddressBookEntryRequest) : Promise<Response> {
+        const response = await this._handleStoreAddressBookEntry(request);
+        return makeJSONResponse<StoreAddressBookEntryResponse>(response);
+    }
+
+    private async _handleStoreAddressBookEntry(request : StoreAddressBookEntryRequest) : Promise<StoreAddressBookEntryResponse> {
+        const entry = request.addressBookEntry;
+        const maybeEntryWithSameName = this.addressBookEntryTracker.getByName(entry.name)
+        if (maybeEntryWithSameName != null) {
+            return {
+                success: false,
+                friendlyMessage: `An address book entry with that name already exists: <code>(${maybeEntryWithSameName.address})</code>`
+            }
+        }
+        const maybeEntrySameAddress = this.addressBookEntryTracker.getByAddress(entry.address);
+        if (maybeEntrySameAddress != null) {
+            return {
+                success: false,
+                friendlyMessage: `An address book entry with that address already exists: (${maybeEntrySameAddress.name})`
+            }
+        }
+        this.addressBookEntryTracker.storeAddressBookEntries([entry]);
+        return {
+            success: true
+        }
+    }
+
+    handleListAddressBookEntries(request : ListAddressBookEntriesRequest) : Response {
+        const response = this._handleListAddressBookEntries(request);
+        return makeJSONResponse<ListAddressBookEntriesResponse>(response);
+    }
+
+    private _handleListAddressBookEntries(request : ListAddressBookEntriesRequest) : ListAddressBookEntriesResponse {
+        const addressBookEntries = this.addressBookEntryTracker.listAddressBookEntries();
+        const response : ListAddressBookEntriesResponse = { addressBookEntries: addressBookEntries };
+        return response;
     }
 
     handleGetSessionValuesWithPrefix(request : GetSessionValuesWithPrefixRequest) : Response {

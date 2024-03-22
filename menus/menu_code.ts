@@ -1,18 +1,35 @@
+// These all have to be 63 characters or less (callback_data must be less than 64 bytes)
+// Oftentimes, there is also a menuArg, so it should be substantially less than 63 if possible.
+
 export enum MenuCode {
 	Main = "Main",
 	CreateWallet = "CreateWallet",
 	Wallet = "Wallet",
-	ViewDecryptedWallet = "ViewDecryptedWallet",
-	ListPositions = "ListPositions",
+	ViewDecryptedWallet = "View.PK",
+	ListPositions = "List.POS",
 	Invite = "Invite",
 	FAQ = "FAQ",
 	Help = "Help",
 	Error = "Error",
 	
+	// address book stuff
+	SubmitAddressBookEntryName = "Submit.ABE.N",
+	SubmitAddressBookEntryAddress = "Submit.ABE.A",
+	AddressBookEntryPerformTestTransfer  = "Test.ABE.FT",
+	SubmitAddressBookEntry = "Submit.ABE",
+	RemoveAddressBookEntry = "Remove.ABE",
+	PickTransferFundsRecipient = "Pick.ABE.FT",
+	TransferFundsRecipientSubmitted = "FT.Sub",
+	KeypadTransferFundsQuantity = "FT.Keypad",
+	SubmitTransferFundsQuantity = "FT.Q.Sub",
+	TransferFundsDoTransfer = "FT.DoIt",
+	TransferFundsDoTestTransfer = "FT.TestIt",
+
 	PleaseEnterToken = "PleaseEnterToken",
 	TransferFunds = "TransferFunds",
+	AddFundsRecipientAddress = "AddFundsRecipientAddress",
 	ViewOpenPosition = "ViewOpenPosition",
-	ClosePositionManuallyAction = "ClosePositionManuallyAction",
+	ClosePositionManuallyAction = "Pos.Close.Manually",
 
     TrailingStopLossRequestReturnToEditorMenu = "TLS.ReturnEditorMenu",
 
