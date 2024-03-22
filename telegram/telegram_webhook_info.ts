@@ -1,3 +1,4 @@
+import { Env } from "../env";
 import { CallbackData } from "../menus/callback_data";
 import { PositionPreRequest, PositionType } from "../positions";
 import { getVsTokenInfo } from "../tokens";
@@ -192,23 +193,45 @@ export class TelegramWebhookInfo {
     telegramUserName : string;
     chatID : number; /* The Telegram chat ID */
     messageID : number; /* The telegram message ID */
-    messageType : 'callback'|'message'|'command'|null;
+    messageType : 'callback'|'message'|'command'|'replyToBot'|null;
     command: string|null;
 	commandTokens : TGTextEntity[]|null;
     callbackData : CallbackData|null;
+	originalMessageText : string|null;
     text : string|null;
 
-    constructor(telegramRequestBody : any) {
+    constructor(telegramRequestBody : any, env : Env) {
 		this.chatID = this.getChatID(telegramRequestBody);
-		this.messageID = this.getMessageID(telegramRequestBody);
-		this.messageType = this.getMessageType(telegramRequestBody);
+		// if is a reply to the bot, messageID is bot's original message ID.
+		// if is a callback query, messageID is bot's menu message ID.
+		// otherwise, is the actual message's message ID.
+		this.messageID = this.getMessageID(telegramRequestBody, env);
+		this.messageType = this.getMessageType(telegramRequestBody, env);
 		this.command = this.getCommandText(telegramRequestBody);
 		this.commandTokens = this.getCommandTokens(telegramRequestBody);
 		this.telegramUserID = this.getTelegramUserID(telegramRequestBody);
 		this.telegramUserName = this.getTelegramUserName(telegramRequestBody);
 		this.callbackData = this.getCallbackData(telegramRequestBody);
 		this.text = this.getMessageText(telegramRequestBody);
+		this.originalMessageText = this.getOriginalMessageText(telegramRequestBody);
 	}
+
+	getOriginalMessageID(telegramRequestBody : any) : number|null {
+		return telegramRequestBody.message?.reply_to_message?.message_id;
+	}
+
+	getOriginalMessageText(telegramRequestBody : any) : string|null {
+		return telegramRequestBody.message?.reply_to_message?.text;
+	}
+
+	getIsReplyToBotMessage(telegramRequestBody : any, env : Env) {
+		const originalMessageFrom = telegramRequestBody.message?.reply_to_message?.from;
+		const botID = (originalMessageFrom?.id||'').toString();
+		if (botID === env.TELEGRAM_BOT_ID) {
+			return true;
+		}
+		return false;
+	}	
 
 	parseAutoSellOrder() : AutoSellOrderSpec|null {
 		if (!this.commandTokens) {
@@ -226,7 +249,10 @@ export class TelegramWebhookInfo {
 		return chatID;
 	}
 
-	private getMessageID(requestBody : any) : number {
+	private getMessageID(requestBody : any, env : Env) : number {
+		if (this.getIsReplyToBotMessage(requestBody, env)) {
+			return this.getOriginalMessageID(requestBody)!!;
+		}
 		let messageID = requestBody?.callback_query?.message?.message_id;
 		if (messageID == null) {
 			messageID = requestBody?.message?.message_id;
@@ -234,9 +260,12 @@ export class TelegramWebhookInfo {
 		return messageID;
 	}
 
-	private getMessageType(requestBody : any) : 'callback'|'message'|'command'|null {
+	private getMessageType(requestBody : any, env : Env) : 'callback'|'message'|'command'|'replyToBot'|null {
 		if ('callback_query' in requestBody) {
 			return 'callback';
+		}
+		else if (this.getIsReplyToBotMessage(requestBody, env)) {
+			return 'replyToBot';
 		}
 		else if (this.hasCommandEntity(requestBody)) {
 			return 'command';

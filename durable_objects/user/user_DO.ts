@@ -231,7 +231,7 @@ export class UserDO {
     }
 
     _handleRemoveAddressBookEntry(request : RemoveAddressBookEntryRequest) : RemoveAddressBookEntryResponse {
-        this.addressBookEntryTracker.removeById(request.addressBookEntryID);
+        this.addressBookEntryTracker.delete(request.addressBookEntryID);
         return {};
     }
 
@@ -241,7 +241,7 @@ export class UserDO {
     }
 
     _handleGetAddressBookEntry(request : GetAddressBookEntryRequest) : GetAddressBookEntryResponse {
-        const addressBookEntry = this.addressBookEntryTracker.getById(request.addressBookEntryID);
+        const addressBookEntry = this.addressBookEntryTracker.get(request.addressBookEntryID);
         return { addressBookEntry : addressBookEntry };
     }
 
@@ -266,7 +266,7 @@ export class UserDO {
                 friendlyMessage: `An address book entry with that address already exists: (${maybeEntrySameAddress.name})`
             }
         }
-        this.addressBookEntryTracker.storeAddressBookEntries([entry]);
+        this.addressBookEntryTracker.set(entry.addressBookEntryID,entry);
         return {
             success: true
         }
@@ -278,7 +278,7 @@ export class UserDO {
     }
 
     private _handleListAddressBookEntries(request : ListAddressBookEntriesRequest) : ListAddressBookEntriesResponse {
-        const addressBookEntries = this.addressBookEntryTracker.listAddressBookEntries();
+        const addressBookEntries = [...this.addressBookEntryTracker.values()];
         const response : ListAddressBookEntriesResponse = { addressBookEntries: addressBookEntries };
         return response;
     }

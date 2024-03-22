@@ -2,7 +2,8 @@
 export interface Env {
 	ENVIRONMENT : string
 	TELEGRAM_BOT_SERVER_URL : string
-	TELEGRAM_BOT_TOKEN : string
+	TELEGRAM_BOT_ID : string
+	TELEGRAM_BOT_TOKEN : string	
 	TELEGRAM_BOT_WEBHOOK_SECRET_TOKEN : string
 	TELEGRAM_API_ID : string
 	TELEGRAM_API_HASH : string
@@ -26,9 +27,13 @@ export interface Env {
 	RPC_MAX_CONFIRM_EXCEPTIONS : string
 	MAX_BLOCK_FINALIZATION_TIME_MS : string
 	PK_AES_SALT : string
+	IS_BETA_CODE_GATED : string
+	BETA_CODE_GATE_EXCEPTIONS : string
+
 	UserDO : any // i'd like to strongly type this as DurableObjectNamespace, but can't for technical reasons
 	TokenPairPositionTrackerDO : any // ditto
 	PolledTokenPairListDO : any // ditto
+	BetaInviteCodesDO : any
 };
 
 /*

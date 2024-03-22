@@ -83,7 +83,7 @@ export class MapWithStorage<TValue> {
         const deletePromise = storage.delete([...this.deletedKeys]).then(() => {
             this.deletedKeys.clear();
         });
-        await Promise.all([putPromise, deletePromise]);
+        await Promise.allSettled([putPromise, deletePromise]);
     }
     private addPrefix(key : string) {
         return `${this.storageKeyPrefix}:${key}`;

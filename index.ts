@@ -1,17 +1,22 @@
 
 import { Env } from "./env";
 import { TelegramWebhookInfo } from "./telegram";
-import { Result, makeFakeFailedRequestResponse, makeSuccessResponse } from "./util";
-import { Worker } from "./worker/worker";
+import { Result, makeFakeFailedRequestResponse, makeSuccessResponse, strictParseBoolean } from "./util";
+import { Worker as Handler } from "./worker/handler";
 
 /* Durable Objects */
+import { getUserHasClaimedBetaInviteCode } from "./durable_objects/beta_invite_codes/beta_invite_code_interop";
+import { BetaInviteCodesDO } from "./durable_objects/beta_invite_codes/beta_invite_codes_DO";
 import { PolledTokenPairListDO } from "./durable_objects/polled_token_pair_list/polled_token_pair_list_DO";
 import { TokenPairPositionTrackerDO } from "./durable_objects/token_pair_position_tracker/token_pair_position_tracker_DO";
+import { maybeReadSessionObj } from "./durable_objects/user/userDO_interop";
 import { UserDO } from "./durable_objects/user/user_DO";
-
+import { MenuCode } from "./menus";
+import { ReplyQuestion, ReplyQuestionCode } from "./reply_question";
+import { SessionReplyQuestion } from "./reply_question/session_reply_question";
 
 /* Export of imported DO's (required by wrangler) */
-export { PolledTokenPairListDO, TokenPairPositionTrackerDO, UserDO };
+export { BetaInviteCodesDO, PolledTokenPairListDO, TokenPairPositionTrackerDO, UserDO };
 
 enum ERRORS {
     UNHANDLED_EXCEPTION = 500,
@@ -63,23 +68,63 @@ export default {
 			return makeFakeFailedRequestResponse(400);
 		}
 
-		const telegramWebhookInfo = new TelegramWebhookInfo(telegramRequestBody);
-		
-		const worker = new Worker();
+		// get some important info from the telegram request
+		const telegramWebhookInfo = new TelegramWebhookInfo(telegramRequestBody, env);
+		const userID = telegramWebhookInfo.telegramUserID;
+		const chatID = telegramWebhookInfo.chatID;
+		const messageID = telegramWebhookInfo.messageID;
+		const messageType = telegramRequestBody.messageType;
+
+		// make the handler
+		const handler = new Handler();
+
+		// if beta invite code gating is on
+		if (strictParseBoolean(env.IS_BETA_CODE_GATED)) {
+			// see if the user has claimed a beta code
+			const userHasClaimedBetaInviteCode = await getUserHasClaimedBetaInviteCode({ userID: telegramWebhookInfo.telegramUserID }, env);
+			// if they have not, and this incoming message isn't a response to a bot question
+			if (userHasClaimedBetaInviteCode.status === 'has-not' && messageType !== 'replyToBot') {
+				// ignore the message and tell the user they need a code
+				const replyQuestion = new ReplyQuestion(`We are in BETA!  Please enter your invite code:`, ReplyQuestionCode.EnterBetaInviteCode, MenuCode.Main);
+				replyQuestion.sendReplyQuestion(userID, chatID, messageID, env);
+				return makeSuccessResponse();
+			}
+			// otherwise, if they don't have a code, but they are responding to a bot question
+			else if (userHasClaimedBetaInviteCode.status === 'has-not' && messageType === 'replyToBot') {
+				// fetch the stored question being asked
+				const replyQuestion = await maybeReadSessionObj<SessionReplyQuestion>(userID, messageID, "replyQuestion", env);
+				// if the bot wasn't asking a question, ignore the reply
+				if (replyQuestion == null) {
+					return makeSuccessResponse();
+				}
+				// if the bot wasn't asking for a beta invite code, ignore the reply
+				if (replyQuestion.replyQuestionCode != ReplyQuestionCode.EnterBetaInviteCode) {
+					return makeSuccessResponse();
+				}
+				// otherwise, process the invite code
+				await handler.handleEnterBetaInviteCode(telegramWebhookInfo, env);
+				return makeSuccessResponse();
+			}
+		}
+
+		// handle reply-tos
+		if (messageType === 'replyToBot') {
+			return await handler.handleReplyToBot(telegramRequestBody, env);
+		}
 
 		// User clicks a menu button
-		if (telegramWebhookInfo.messageType === 'callback') {
-			return await worker.handleCallbackQuery(telegramWebhookInfo, env);
+		if (messageType === 'callback') {
+			return await handler.handleCallbackQuery(telegramWebhookInfo, env);
 		}
 
 		// User issues a command
-		if (telegramWebhookInfo.messageType === 'command') {
-			return await worker.handleCommand(telegramWebhookInfo, env);
+		if (messageType === 'command') {
+			return await handler.handleCommand(telegramWebhookInfo, env);
 		}
 		
 		// User types a message
-		if (telegramWebhookInfo.messageType === 'message') {
-			return await worker.handleMessage(telegramWebhookInfo, env);
+		if (messageType === 'message') {
+			return await handler.handleMessage(telegramWebhookInfo, env);
 		}
 		
 		// Never send anything but a 200 back to TG ---- otherwise telegram will keep trying to resend

@@ -166,6 +166,15 @@ export async function readSessionObj<TObj extends {[key : string] : Structural}>
 	return obj as TObj;
 }
 
+export async function maybeReadSessionObj<TObj extends {[key : string ] : Structural}>(telegramUserID : number, messageID : number, prefix : string, env : Env) : Promise<TObj|null> {
+	const record = await readSessionValuesWithPrefix(telegramUserID, messageID, prefix, env);
+	if (Object.keys(record).length == 0) {
+		return null;
+	}
+	const obj = stripPrefixFromRecordKeys(record, prefix);
+	return obj as TObj;
+}
+
 function stripPrefixFromRecordKeys<TObj extends {[key : string] : Structural}>(record : Record<string,Structural>, prefix : string) : TObj {
 	const replacePattern = new RegExp(`^${prefix}/`);
 	const obj : {[key:string]:Structural} = {};

@@ -14,5 +14,6 @@ vars = { ENVIRONMENT = "dev" }
 bindings = [
     {name = "UserDO", class_name = "UserDO" },
     {name = "TokenPairPositionTrackerDO", class_name = "TokenPairPositionTrackerDO" },
-    {name = "PolledTokenPairListDO", class_name = "PolledTokenPairListDO" }
+    {name = "PolledTokenPairListDO", class_name = "PolledTokenPairListDO" },
+    {name = "BetaInviteCodesDO", class_name = "BetaInviteCodesDO" }
 ]

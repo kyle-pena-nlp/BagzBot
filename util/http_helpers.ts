@@ -16,6 +16,7 @@ export async function tryReadResponseBody(x : Response) : Promise<any|null> {
     }
 }
 
+
 export function makeJSONRequest<T>(url : string, body : T) : Request {
     const json = JSON.stringify(body);
     const request = new Request(url, {

@@ -1,17 +1,19 @@
 import { randomUUID } from "node:crypto";
 import { decryptPrivateKey } from "../crypto";
+import { claimInviteCode } from "../durable_objects/beta_invite_codes/beta_invite_code_interop";
 import { GetTokenInfoResponse, isInvalidTokenInfoResponse } from "../durable_objects/polled_token_pair_list/actions/get_token_info";
 import { getTokenInfo } from "../durable_objects/polled_token_pair_list/polled_token_pair_list_DO_interop";
 import { OpenPositionRequest } from "../durable_objects/user/actions/open_new_position";
 import { AddressBookEntry, CompletedAddressBookEntry, JustAddressBookEntryID, JustAddressBookEntryName } from "../durable_objects/user/model/address_book_entry";
 import { QuantityAndToken } from "../durable_objects/user/model/quantity_and_token";
 import { TokenSymbolAndAddress } from "../durable_objects/user/model/token_name_and_address";
-import { generateWallet, getAddressBookEntry, getAndMaybeInitializeUserData, getDefaultTrailingStopLoss, getPosition, getWalletData, listAddressBookEntries, listOpenTrailingStopLossPositions, manuallyClosePosition, readSessionObj, requestNewPosition, storeAddressBookEntry, storeSessionObj, storeSessionObjProperty, storeSessionValues } from "../durable_objects/user/userDO_interop";
+import { generateWallet, getAddressBookEntry, getAndMaybeInitializeUserData, getDefaultTrailingStopLoss, getPosition, getWalletData, listAddressBookEntries, listOpenTrailingStopLossPositions, manuallyClosePosition, maybeReadSessionObj, readSessionObj, requestNewPosition, storeAddressBookEntry, storeSessionObj, storeSessionObjProperty, storeSessionValues } from "../durable_objects/user/userDO_interop";
 import { Env } from "../env";
 import { logError } from "../logging";
 import { BaseMenu, MenuCode, MenuConfirmAddressBookEntry, MenuConfirmTrailingStopLossPositionRequest, MenuContinueMessage, MenuEditTrailingStopLossPositionRequest, MenuError, MenuFAQ, MenuHelp, MenuListPositions, MenuMain, MenuPickTransferFundsRecipient, MenuPleaseEnterToken, MenuPleaseWait, MenuStartTransferFunds, MenuTODO, MenuTrailingStopLossAutoRetrySell, MenuTrailingStopLossEntryBuyQuantity, MenuTrailingStopLossPickVsToken, MenuTrailingStopLossSlippagePercent, MenuTrailingStopLossTriggerPercent, MenuTransferFundsTestOrSubmitNow, MenuViewDecryptedWallet, MenuViewOpenPosition, MenuWallet, PositiveDecimalKeypad, PositiveIntegerKeypad } from "../menus";
 import { PositionPreRequest, PositionRequest, convertPreRequestToRequest } from "../positions";
-import { ReplyQuestion } from "../reply_question";
+import { ReplyQuestion, ReplyQuestionCode } from "../reply_question";
+import { SessionReplyQuestion } from "../reply_question/session_reply_question";
 import { quoteBuy } from "../rpc/jupiter_quotes";
 import { CompleteTransferFundsRequest, PartialTransferFundsRequest } from "../rpc/rpc_transfer_funds";
 import { isGetQuoteFailure } from "../rpc/rpc_types";
@@ -92,9 +94,15 @@ export class Worker {
     }
 
     async handleCallbackQuery(telegramWebhookInfo : TelegramWebhookInfo, env : Env) : Promise<Response> {
-        const menu = await this.handleCallbackQueryInternal(telegramWebhookInfo, env);
-        if (menu != null) {
-            const menuDisplayRequest = menu.getUpdateExistingMenuRequest(telegramWebhookInfo.chatID, telegramWebhookInfo.messageID, env);
+        const menuOrReplyQuestion = await this.handleCallbackQueryInternal(telegramWebhookInfo, env);
+        if (menuOrReplyQuestion == null) {
+            return makeSuccessResponse();
+        }
+        else if ('question' in menuOrReplyQuestion) {
+            await menuOrReplyQuestion.sendReplyQuestion(telegramWebhookInfo.telegramUserID, telegramWebhookInfo.chatID, telegramWebhookInfo.messageID, env);
+        }
+        else {
+            const menuDisplayRequest = menuOrReplyQuestion.getUpdateExistingMenuRequest(telegramWebhookInfo.chatID, telegramWebhookInfo.messageID, env);
             await sendRequestToTG(menuDisplayRequest!!);
         }
         return makeSuccessResponse();
@@ -242,12 +250,12 @@ export class Worker {
                     addressBookEntryID : randomUUID()
                 };
                 await storeSessionObj<AddressBookEntry>(telegramUserID, messageID, addressBookEntry, "addressBookEntry", env);
-                return new ReplyQuestion("Choose a name for this recipient", MenuCode.SubmitAddressBookEntryName, MenuCode.TransferFunds);
+                return new ReplyQuestion("Choose a name for this recipient", ReplyQuestionCode.EnterAddressBookEntryName, MenuCode.SubmitAddressBookEntryName, MenuCode.TransferFunds);
             case MenuCode.SubmitAddressBookEntryName:
                 const addressBookEntry2 = await readSessionObj<JustAddressBookEntryID>(telegramUserID, messageID, "addressBookEntry", env);
                 const addressBookEntry3 : JustAddressBookEntryName = { ...addressBookEntry2, name : callbackData.menuArg||'' } ;//name = callbackData.menuArg;
                 await storeSessionObj<JustAddressBookEntryName>(telegramUserID, messageID, addressBookEntry3, "addressBookEntry", env);
-                return new ReplyQuestion("Paste in the address", MenuCode.SubmitAddressBookEntryAddress, MenuCode.TransferFunds);
+                return new ReplyQuestion("Paste in the address", ReplyQuestionCode.EnterTransferFundsRecipient, MenuCode.SubmitAddressBookEntryAddress, MenuCode.TransferFunds);
             case MenuCode.SubmitAddressBookEntryAddress:
                 const addressBookEntry4 = await readSessionObj<JustAddressBookEntryName>(telegramUserID, messageID, "addressBookEntry", env);
                 const addressBookEntry5 : CompletedAddressBookEntry = { ...addressBookEntry4, address: callbackData.menuArg||'', confirmed : false };
@@ -297,12 +305,12 @@ export class Worker {
         }
     }
 
-    async createMainMenu(telegramWebhookInfo : TelegramWebhookInfo, env : Env) : Promise<BaseMenu> {
+    private async createMainMenu(telegramWebhookInfo : TelegramWebhookInfo, env : Env) : Promise<BaseMenu> {
         const userData = await getAndMaybeInitializeUserData(telegramWebhookInfo.telegramUserID, telegramWebhookInfo.telegramUserName, telegramWebhookInfo.messageID, env);
         return new MenuMain(userData);
     }
 
-    async handleMenuClose(chatID : number, messageID : number, env : Env) : Promise<Response> {
+    private async handleMenuClose(chatID : number, messageID : number, env : Env) : Promise<Response> {
         const result = await deleteTGMessage(messageID, chatID, env);
         if (!result.success) {
             return makeFakeFailedRequestResponse(500, "Couldn't delete message");
@@ -312,7 +320,7 @@ export class Worker {
         }
     }
 
-    async getTrailingStopLossPositionVsTokenFromSession(telegramUserID : number, messageID : number, env : Env) : Promise<TokenSymbolAndAddress> {
+    private async getTrailingStopLossPositionVsTokenFromSession(telegramUserID : number, messageID : number, env : Env) : Promise<TokenSymbolAndAddress> {
         const positionRequest = await readSessionObj<PositionRequest>(telegramUserID, messageID, "PositionRequest", env);
         return {
             tokenSymbol: positionRequest.vsToken.symbol,
@@ -320,7 +328,7 @@ export class Worker {
         };
     }
 
-    async getTrailingStopLossPositionQuantityAndVsTokenFromSession(telegramUserID : number, messageID : number, env: Env) : Promise<QuantityAndToken> {
+    private async getTrailingStopLossPositionQuantityAndVsTokenFromSession(telegramUserID : number, messageID : number, env: Env) : Promise<QuantityAndToken> {
         const positionRequest = await readSessionObj<PositionRequest>(telegramUserID, messageID, "PositionRequest", env);
         return {
             thisTokenSymbol:  positionRequest.vsToken.symbol,
@@ -329,11 +337,11 @@ export class Worker {
         };
     }
 
-    async sendTrailingStopLossRequestToTokenPairPositionTracker(telegramUserID : number, trailingStopLossPositionRequest : OpenPositionRequest, env : Env) : Promise<void> {
+    private async sendTrailingStopLossRequestToTokenPairPositionTracker(telegramUserID : number, trailingStopLossPositionRequest : OpenPositionRequest, env : Env) : Promise<void> {
         await requestNewPosition(telegramUserID, trailingStopLossPositionRequest, env);
     }
 
-    makeTrailingStopLossCustomTriggerPercentKeypad(currentValue : string) {
+    private makeTrailingStopLossCustomTriggerPercentKeypad(currentValue : string) {
         return new PositiveIntegerKeypad(
             "${currentValue}%", // intentional double quotes - syntax is parsed later
             MenuCode.TrailingStopLossCustomTriggerPercentKeypad,
@@ -344,17 +352,17 @@ export class Worker {
             100);
     }
 
-    async makeStopLossRequestEditorMenu(positionRequest : PositionRequest, env : Env) : Promise<BaseMenu> {
+    private async makeStopLossRequestEditorMenu(positionRequest : PositionRequest, env : Env) : Promise<BaseMenu> {
         await this.refreshQuote(positionRequest, env);
         return new MenuEditTrailingStopLossPositionRequest(positionRequest);
     }
 
-    async makeStopLossConfirmMenu(positionRequest: PositionRequest, env : Env) : Promise<BaseMenu> {
+    private async makeStopLossConfirmMenu(positionRequest: PositionRequest, env : Env) : Promise<BaseMenu> {
         await this.refreshQuote(positionRequest, env);
         return new MenuConfirmTrailingStopLossPositionRequest(positionRequest);
     }
 
-    makeTrailingStopLossCustomSlippagePctKeypad(currentEntry : string) {
+    private makeTrailingStopLossCustomSlippagePctKeypad(currentEntry : string) {
         return new PositiveIntegerKeypad("${currentValue}%", // intentional double quotes - syntax is parsed later
             MenuCode.TrailingStopLossCustomSlippagePctKeypad,
             MenuCode.TrailingStopLossCustomSlippagePctKeypadSubmit,
@@ -364,7 +372,7 @@ export class Worker {
             100);
     }
 
-    makeTrailingStopLossBuyQuantityKeypad(currentEntry : string) {
+    private makeTrailingStopLossBuyQuantityKeypad(currentEntry : string) {
         return new PositiveDecimalKeypad("${currentValue}",  // intentional double quotes - syntax is parsed later
             MenuCode.TrailingStopLossEnterBuyQuantityKeypad, 
             MenuCode.TrailingStopLossEnterBuyQuantitySubmit, 
@@ -373,16 +381,16 @@ export class Worker {
             0);
     }
 
-    TODOstubbedMenu(env : Env) : BaseMenu {
+    private TODOstubbedMenu(env : Env) : BaseMenu {
         return new MenuTODO(undefined);
     }
 
-    async handleManuallyClosePosition(telegramUserID : number, positionID : string, env : Env) : Promise<Response> {
+    private async handleManuallyClosePosition(telegramUserID : number, positionID : string, env : Env) : Promise<Response> {
         const result = await manuallyClosePosition(telegramUserID, positionID, env);
         return makeSuccessResponse();
     }
 
-    async handleCreateWallet(telegramWebhookInfo : TelegramWebhookInfo, env : Env) : Promise<Response> {
+    private async handleCreateWallet(telegramWebhookInfo : TelegramWebhookInfo, env : Env) : Promise<Response> {
         const responseBody = await generateWallet(telegramWebhookInfo.telegramUserID, env);
         // todo: handle error case.
         return makeJSONResponse(responseBody);
@@ -411,7 +419,55 @@ export class Worker {
         return makeSuccessResponse();
     }
 
-    async handleCommandInternal(command : string, telegramWebhookInfo : TelegramWebhookInfo, messageID : number, env : Env) : Promise<[string,BaseMenu?,{ obj : any, prefix : string }?]> {
+    async handleReplyToBot(telegramWebhookInfo : TelegramWebhookInfo, env : Env) : Promise<Response> {
+        const telegramUserID = telegramWebhookInfo.telegramUserID;
+        const messageID = telegramWebhookInfo.messageID;
+        const replyQuestion = await maybeReadSessionObj<SessionReplyQuestion>(telegramUserID, messageID, "replyQuestion", env);
+        if (replyQuestion == null) {
+            return makeSuccessResponse();
+        }
+        const replyQuestionCode = replyQuestion.replyQuestionCode;
+        switch(replyQuestionCode) {
+            case ReplyQuestionCode.EnterBetaInviteCode:
+                return this.handleEnterBetaInviteCode(telegramWebhookInfo, env);
+            case ReplyQuestionCode.EnterTransferFundsRecipient:
+                throw new Error("");
+            case ReplyQuestionCode.EnterAddressBookEntryName:
+                throw new Error("");
+            default:
+                assertNever(replyQuestionCode);
+        }
+    }
+
+    async handleEnterBetaInviteCode(telegramWebhookInfo: TelegramWebhookInfo, env : Env) : Promise<Response> {
+        const code = (telegramWebhookInfo.text||'').trim().toUpperCase();
+        // operation is idempotent.  effect of operation is in .status of response
+        const claimInviteCodeResponse = await claimInviteCode({ userID : telegramWebhookInfo.telegramUserID, inviteCode: code }, env);
+        if (claimInviteCodeResponse.status === 'already-claimed-by-you') {
+            await sendMessageToTG(telegramWebhookInfo.chatID, `You have already claimed this invite code and are good to go!`, env);
+        }
+        else if (claimInviteCodeResponse.status === 'firsttime-claimed-by-you') {
+            // greet the new user
+            await this.sendUserWelcomeScreen(telegramWebhookInfo, env);
+        }
+        else if (claimInviteCodeResponse.status === 'claimed-by-someone-else') {
+            // tell user sorry, code is already claimed
+            await sendMessageToTG(telegramWebhookInfo.chatID, `Sorry ${telegramWebhookInfo.telegramUserName} - this invite code has already been claimed by someone else.`, env);
+        }
+        else if (claimInviteCodeResponse.status === 'code-does-not-exist') {
+            // tell user sorry, that's not a real code
+            await sendMessageToTG(telegramWebhookInfo.chatID, `Sorry ${telegramWebhookInfo.telegramUserName} - '${code}' is not a known invite code.`, env);
+        }
+        return makeSuccessResponse();
+    }
+
+    private async sendUserWelcomeScreen(telegramWebhookInfo : TelegramWebhookInfo, env : Env) {
+        // TODO: actual welcome screen
+        const request = new MenuTODO(undefined).getCreateNewMenuRequest(telegramWebhookInfo.chatID, env);
+        await fetch(request);
+    }
+
+    private async handleCommandInternal(command : string, telegramWebhookInfo : TelegramWebhookInfo, messageID : number, env : Env) : Promise<[string,BaseMenu?,{ obj : any, prefix : string }?]> {
         switch(command) {
             case '/start':
                 const userData = await getAndMaybeInitializeUserData(telegramWebhookInfo.telegramUserID, telegramWebhookInfo.telegramUserName, telegramWebhookInfo.messageID, env);
@@ -450,7 +506,7 @@ export class Worker {
         }
     }
 
-    async refreshQuote(positionRequest : PositionRequest, env : Env) : Promise<boolean> {
+    private async refreshQuote(positionRequest : PositionRequest, env : Env) : Promise<boolean> {
         const quote = await quoteBuy(positionRequest, positionRequest.token, env);
         if (isGetQuoteFailure(quote)) {
             return false;
