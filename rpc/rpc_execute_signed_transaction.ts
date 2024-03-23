@@ -37,7 +37,7 @@ export async function executeRawSignedTransaction(
     */
 
     // The loops can signal eachother to stop by setting these flags.
-    let stopSendingSignal = false;
+    let stopSendingTx = false;
     let stopConfirmingSignal = false;
 
     // if the current blockheight exceeds this, the transaction will never execute.
@@ -59,7 +59,7 @@ export async function executeRawSignedTransaction(
         let anyTxSent = false;
         
         // Until this loop is signalled to stop
-        while(!stopSendingSignal) {
+        while(!stopSendingTx) {
 
             /* Attempt to send transaction.  If sent, note that there is something to confirm (`anyTxSent`). */
             try {
@@ -70,54 +70,39 @@ export async function executeRawSignedTransaction(
                 anyTxSent = true;
             }
             catch(e) {
+                // failing once may mean RPC rate limit, for example. We can try again. But log it.
                 logError("sendRawTransaction threw an exception", e, signature);
-                const exceptionKind = parseSendRawTransactionException(e);
-                if (exceptionKind === 'InsufficientNativeTokensError') {
-                    stopConfirmingSignal = true;
-                    return TransactionExecutionError.InsufficientNativeTokensError; 
-
-                }
-                else if (exceptionKind === 'InsufficientFundsError') {
-                    stopConfirmingSignal = true;
-                    return TransactionExecutionError.InsufficientFundsError;
-                }
             }
 
             // Sleep to avoid spamming RPC.
             await sleep(REBROADCAST_DELAY_MS);
 
-            /* 
-                Poll the RPC for current blockheight.
-                If polling for blockheight fails:
-                    - Stop this loop. We must be able to poll for blockheight.
-                    - Additionally, stop confirmTx loop if no sent transactions.
-            */
-            try {
-                blockheight = await getLatestBlockheight(connection);
-            }
-            catch(e) {
-                logError("getBlockHeight threw an exception", e, signature);
-                if (!anyTxSent) {
-                    stopConfirmingSignal = true;
-                    return TransactionExecutionError.CouldNotPollBlockheightNoTxSent;
-                }
-                else {
-                    // If we can't poll blockheight, we shouldn't be retrying (how would we know when to stop?)
-                    break;
-                }  
+            // poll RPC for blockheight
+            const maybeBlockheight = await getLatestBlockheight(connection).catch(r => {
+                logError('Could not poll blockheight', r, signature);
+                return null;
+            });
+
+            // if polling failed and no transactions have been sent, don't bother trying to confirm.
+            if (maybeBlockheight == null && !anyTxSent) {
+                stopConfirmingSignal = true;
             }
 
-            /*
-                If lastValidBlockheight exceeded, stop resending - it will never confirm or finalize.
-                And if no tx ever sent successfully, signal confirmTx loop top stop trying to confirm.
-            */
+            // and if polling BH failed, stop trying to send tx. How else will we know to stop?
+            if (maybeBlockheight == null) {
+                return TransactionExecutionError.CouldNotPollBlockheightNoTxSent;
+            }
+
+            blockheight = maybeBlockheight;
+
+            // if we are passed last valid BH and no tx's were sent, don't bother confirming.
+            if (blockheight >= lastValidBlockheight && !anyTxSent) {
+                stopConfirmingSignal = true;
+            }
+
+            // and if we are passed last valid BH, don't bother trying again.
             if (blockheight >= lastValidBlockheight) {
-                // If the current blockheight exceeds last valid blockheight, stop sending
-                if (!anyTxSent) {
-                    // and don't bother confirming if nothing was ever sent
-                    stopConfirmingSignal = true;
-                }
-                return TransactionExecutionError.BlockheightExceeded;// 'transaction-blockheight-exceeded';
+                return TransactionExecutionError.BlockheightExceeded;
             }
         }
         return;
@@ -168,14 +153,14 @@ export async function executeRawSignedTransaction(
             const err = result?.err;
             if (err) {
                 logError('Transaction failed', err, signature);
-                stopSendingSignal = true;
+                stopSendingTx = true;
                 return parseSwapExecutionError(err, rawSignedTx, env);
             }
             /* If the transaction itself was confirmed or finalized, exit confirmation loop with 'transaction-confirmed' */
             const status = result?.confirmationStatus;
             const hasConfirmations = (result?.confirmations || 0) > 0;
             if ((hasConfirmations || (status === 'confirmed' || status === 'finalized'))) {
-                stopSendingSignal = true;
+                stopSendingTx = true;
                 return 'transaction-confirmed';
             }
 
@@ -189,7 +174,7 @@ export async function executeRawSignedTransaction(
             // this is a failsafe to prevent infinite looping.
             const confirmTimedOut = (Date.now() - startConfirmMS) > confirmTimeoutMS;
             if (confirmTimedOut) {
-                stopSendingSignal = true;
+                stopSendingTx = true;
                 return TransactionExecutionErrorCouldntConfirm.TimeoutCouldNotConfirm;
             }
         }
