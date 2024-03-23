@@ -1,7 +1,9 @@
 import { DurableObjectState } from "@cloudflare/workers-types";
 import { Wallet, encryptPrivateKey, generateEd25519Keypair } from "../../crypto";
+import { DecimalizedAmount } from "../../decimalized";
 import { Env } from "../../env";
 import { PositionPreRequest, PositionStatus, PositionType } from "../../positions";
+import { getSOLBalance } from "../../rpc/rpc_wallet";
 import { getVsTokenInfo } from "../../tokens";
 import { ChangeTrackedValue, Structural, assertNever, groupIntoMap, makeFailureResponse, makeJSONResponse, makeSuccessResponse, maybeGetJson, strictParseBoolean } from "../../util";
 import { listUnclaimedBetaInviteCodes } from "../beta_invite_codes/beta_invite_code_interop";
@@ -26,6 +28,7 @@ import { UserInitializeRequest, UserInitializeResponse } from "./actions/user_in
 import { UserData } from "./model/user_data";
 import { AddressBookEntryTracker } from "./trackers/address_book_entry_tracker";
 import { SessionTracker } from "./trackers/session_tracker";
+import { SOLBalanceTracker } from "./trackers/sol_balance_tracker";
 import { UserPositionTracker } from "./trackers/user_position_tracker";
 import { UserDOFetchMethod, parseUserDOFetchMethod } from "./userDO_interop";
 import { buy } from "./user_buy";
@@ -51,6 +54,8 @@ export class UserDO {
 
     // the user's wallet.
     wallet : ChangeTrackedValue<Wallet|null> = new ChangeTrackedValue<Wallet|null>('wallet', null);
+
+    solBalanceTracker : SOLBalanceTracker = new SOLBalanceTracker();
 
     // the default values for a trailing sotp loss
     defaultTrailingStopLossRequest : PositionPreRequest;
@@ -106,6 +111,7 @@ export class UserDO {
         this.sessionTracker.initialize(storage);
         this.userPositionTracker.initialize(storage);
         this.addressBookEntryTracker.initialize(storage);
+        this.solBalanceTracker.initialize(storage); // rate limits RPC calls. will refresh on access.
     }
 
     async flushToStorage() {
@@ -115,7 +121,8 @@ export class UserDO {
             this.wallet.flushToStorage(this.state.storage),
             this.sessionTracker.flushToStorage(this.state.storage),
             this.userPositionTracker.flushToStorage(this.state.storage),
-            this.addressBookEntryTracker.flushToStorage(this.state.storage)
+            this.addressBookEntryTracker.flushToStorage(this.state.storage),
+            this.solBalanceTracker.flushToStorage(this.state.storage)
         ]);
     }
 
@@ -324,7 +331,8 @@ export class UserDO {
 
     async handleGet(jsonRequestBody : GetUserDataRequest) : Promise<Response> {
         const messageID = jsonRequestBody.messageID;
-        return makeJSONResponse(await this.makeUserData(messageID));
+        const forceRefreshSOLBalance = jsonRequestBody.forceRefreshBalance;
+        return makeJSONResponse(await this.makeUserData(forceRefreshSOLBalance));
     }
 
     async handleDeleteSession(jsonRequestBody : DeleteSessionRequest) : Promise<Response> {
@@ -485,13 +493,33 @@ export class UserDO {
         }
     }    
 
-    async makeUserData(messageID : number) : Promise<UserData> {
+    async makeUserData(forceRefreshBalance : boolean) : Promise<UserData> {
         const hasInviteBetaCodes = await this.getHasBetaCodes();
+        const hasWallet = !!(this.wallet.value);
+        const address = this.wallet.value?.publicKey;
+        const maybeSOLBalance = await this.solBalanceTracker.maybeGetBalance(address, forceRefreshBalance, this.env);
         return {
-            hasWallet: !!(this.wallet.value),
+            hasWallet: hasWallet,
+            address : address,
             initialized: this.initialized(),
             telegramUserName : this.telegramUserName.value||undefined,
-            hasInviteBetaCodes: hasInviteBetaCodes
+            hasInviteBetaCodes: hasInviteBetaCodes,
+            maybeSOLBalance : maybeSOLBalance
+        };
+    }
+
+    private async maybeGetSOLBalance(forceRefreshSOLBalance : boolean) : Promise<DecimalizedAmount|undefined> {
+        const wallet = this.wallet.value;
+        if (wallet == null) {
+            return;
+        }
+        const solLamportsBalance = await getSOLBalance(wallet.publicKey, this.env).catch(r => undefined);
+        if (solLamportsBalance == null) {
+            return;
+        }
+        return {
+            tokenAmount : solLamportsBalance.toString(),
+            decimals: getVsTokenInfo('SOL').decimals
         };
     }
 

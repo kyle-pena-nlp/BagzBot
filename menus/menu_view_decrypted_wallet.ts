@@ -10,7 +10,7 @@ export class MenuViewDecryptedWallet extends Menu<DecryptedWalletData> implement
         const lines = [
             `<b>Address:</b> <code>${this.menuData.publicKey}</code>`,
             `<b>Private Key:</b> <span class="tg-spoiler">${this.menuData.decryptedPrivateKey}</span>`,
-            `<i>We do not store keys in plaintext.  All private keys are encrypted.</i>`
+            `<i>We do not store keys in plaintext.  This private key was decrypted and sent to you via secure channels over telegram.</i>`
         ];
         return lines.join('\r\n');
     }

@@ -35,3 +35,11 @@ export function strictParseInt(x : string) : number {
     }
     return result;
 }
+
+export function strictParseFloat(x : string) : number {
+    const result = tryParseFloat(x);
+    if (result == null) {
+        throw new Error(`string '${x}' is not parseable as a float`);
+    }
+    return result;
+}

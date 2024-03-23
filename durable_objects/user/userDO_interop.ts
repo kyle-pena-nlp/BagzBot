@@ -223,21 +223,31 @@ export async function storeSessionValues(telegramUserID : number, messageID : nu
 	return response;
 }
 
-export async function getAndMaybeInitializeUserData(telegramUserID : number, telegramUserName : string, messageID : number, env : Env) : Promise<UserData> {
-	const userData = await getUserData(telegramUserID, messageID, env);
+export async function getAndMaybeInitializeUserData(telegramUserID : number, telegramUserName : string, messageID : number, forceRefreshBalance : boolean, env : Env) : Promise<UserData> {
+	const userData = await getUserData(telegramUserID, messageID, forceRefreshBalance, env);
 	if (userData.initialized) {
 		return userData;
 	}
-	return await initializeAndReturnUserData(telegramUserID, messageID, telegramUserName, env);
+	return await initializeAndReturnUserData(
+		telegramUserID, 
+		messageID, 
+		forceRefreshBalance,
+		telegramUserName, 
+		env);
 }
 
-export async function initializeAndReturnUserData(telegramUserID : number, messageID : number, telegramUserName : string, env : Env) : Promise<UserData> {		
+export async function initializeAndReturnUserData(
+	telegramUserID : number, 
+	messageID : number, 
+	forceRefreshBalance : boolean,
+	telegramUserName : string, 
+	env : Env) : Promise<UserData> {		
 	await initializeUserData(telegramUserID, telegramUserName, env);
-	return await getUserData(telegramUserID, messageID, env);
+	return await getUserData(telegramUserID, messageID, forceRefreshBalance, env);
 }
 
-async function getUserData(telegramUserID : number, messageID : number, env : Env) : Promise<UserData> {
-	const body : GetUserDataRequest = { messageID : messageID };
+async function getUserData(telegramUserID : number, messageID : number, forceRefreshBalance : boolean, env : Env) : Promise<UserData> {
+	const body : GetUserDataRequest = { messageID : messageID, forceRefreshBalance : forceRefreshBalance };
 	const response = await sendJSONRequestToUserDO<GetUserDataRequest,UserData>(telegramUserID, UserDOFetchMethod.get, body, env);
 	return response;
 }

@@ -244,9 +244,8 @@ export class Worker {
                 // TODO
                 return this.TODOstubbedMenu(env);
             case MenuCode.Wallet:
-                const walletDataForWalletMenu = await getWalletData(telegramUserID, env);
-                const walletData = { address: walletDataForWalletMenu.wallet.publicKey };
-                return new MenuWallet(walletData);
+                const userData = await getAndMaybeInitializeUserData(telegramUserID, telegramWebhookInfo.telegramUserName, messageID, true, env);
+                return new MenuWallet(userData);
             case MenuCode.Close:
                 await this.handleMenuClose(telegramWebhookInfo.chatID, telegramWebhookInfo.messageID, env);
                 return;
@@ -329,7 +328,7 @@ export class Worker {
     }
 
     private async createMainMenu(telegramWebhookInfo : CallbackHandlerParams, env : Env) : Promise<BaseMenu> {
-        const userData = await getAndMaybeInitializeUserData(telegramWebhookInfo.telegramUserID, telegramWebhookInfo.telegramUserName, telegramWebhookInfo.messageID, env);
+        const userData = await getAndMaybeInitializeUserData(telegramWebhookInfo.telegramUserID, telegramWebhookInfo.telegramUserName, telegramWebhookInfo.messageID, false, env);
         return new MenuMain(userData);
     }
 
@@ -522,7 +521,7 @@ export class Worker {
     private async handleCommandInternal(command : string, telegramWebhookInfo : TelegramWebhookInfo, messageID : number, env : Env) : Promise<[string,BaseMenu?,{ obj : any, prefix : string }?]> {
         switch(command) {
             case '/start':
-                const userData = await getAndMaybeInitializeUserData(telegramWebhookInfo.telegramUserID, telegramWebhookInfo.telegramUserName, telegramWebhookInfo.messageID, env);
+                const userData = await getAndMaybeInitializeUserData(telegramWebhookInfo.telegramUserID, telegramWebhookInfo.telegramUserName, telegramWebhookInfo.messageID, false, env);
                 return ["...", new MenuMain(userData)];
             case '/help':
                 return ["...", new MenuHelp(undefined)];
@@ -551,7 +550,7 @@ export class Worker {
                     await this.makeStopLossRequestEditorMenu(positionRequest, env),
                     { obj: prerequest, prefix: "PositionRequest" }];
             case '/menu':
-                const menuUserData = await getAndMaybeInitializeUserData(telegramWebhookInfo.telegramUserID, telegramWebhookInfo.telegramUserName, telegramWebhookInfo.messageID, env);
+                const menuUserData = await getAndMaybeInitializeUserData(telegramWebhookInfo.telegramUserID, telegramWebhookInfo.telegramUserName, telegramWebhookInfo.messageID, false, env);
                 return ['...', new MenuMain(menuUserData)];
             default:
                 throw new Error(`Unrecognized command: ${command}`);

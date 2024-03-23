@@ -1,3 +1,5 @@
+import { toFriendlyString } from "../decimalized";
+import { UserData } from "../durable_objects/user/model/user_data";
 import { CallbackButton } from "../telegram";
 import { Menu, MenuCapabilities } from "./menu";
 import { MenuCode } from "./menu_code";
@@ -6,12 +8,18 @@ export interface ViewWalletData {
     address : string
 };
 
-export class MenuWallet extends Menu<ViewWalletData> implements MenuCapabilities {
+export class MenuWallet extends Menu<UserData> implements MenuCapabilities {
     renderText(): string {
-        const lines = [
-            `<code>Address: ${this.menuData.address}</code>`,
-            `<a href='https://solscan.io/account/${this.menuData.address}'>View Wallet</a>`
-        ];
+        const lines : string[] = [];
+        if (this.menuData.address != null) {
+            lines.push(`Address: <code>${this.menuData.address||''}</code>`);
+        }
+        if (this.menuData.maybeSOLBalance != null) {
+            lines.push(`Balance: ${toFriendlyString(this.menuData.maybeSOLBalance, 4)} SOL`);
+        }
+        if (this.menuData.address != null) {
+            lines.push(`<a href='https://solscan.io/account/${this.menuData.address}'>View Wallet</a>`);
+        }
         return lines.join("\r\n");
     }
     renderOptions(): CallbackButton[][] {

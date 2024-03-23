@@ -1,3 +1,4 @@
+import { toFriendlyString } from "../decimalized";
 import { UserData } from "../durable_objects/user/model/user_data";
 import { CallbackButton } from "../telegram";
 import { Menu, MenuCapabilities } from "./menu";
@@ -5,7 +6,12 @@ import { MenuCode } from "./menu_code";
 
 export class MenuMain extends Menu<UserData> implements MenuCapabilities {
     renderText(): string {
-        return `Main Menu.`;
+        if (this.menuData.maybeSOLBalance != null) {
+            return `<b>Main Menu</b> | ${toFriendlyString(this.menuData.maybeSOLBalance, 4)} SOL in wallet.`;
+        }
+        else {
+            return `<b>Main Menu</b>`;
+        }
     }
     renderOptions(): CallbackButton[][] {
         const options = this.emptyMenu();

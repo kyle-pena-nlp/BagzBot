@@ -14,7 +14,7 @@ import {
     tryReadResponseBody
 } from "./http_helpers";
 import { MapWithStorage } from "./map_with_storage";
-import { strictParseInt, tryParseFloat, tryParseInt } from "./numbers";
+import { strictParseFloat, strictParseInt, tryParseFloat, tryParseInt } from "./numbers";
 import { Result } from "./result";
 import { safe } from "./safe";
 import { setDifference, setIntersection, setUnion } from "./set_operations";
@@ -22,8 +22,7 @@ import { pause, sleep } from "./sleep";
 import { Structural, structuralEquals } from "./structural";
 
 export {
-    ChangeTrackedValue, MapWithStorage,
-    Result, Structural, assertNever, expBackoff, groupIntoMap,
+    ChangeTrackedValue, MapWithStorage, Result, Structural, assertNever, expBackoff, groupIntoMap,
     groupIntoRecord, isEnumValue, makeFailureResponse,
     makeFakeFailedRequestResponse,
     makeJSONRequest,
@@ -34,7 +33,7 @@ export {
     setDifference,
     setIntersection,
     setUnion,
-    sleep, strictParseBoolean, strictParseInt, structuralEquals, tryParseFloat,
+    sleep, strictParseBoolean, strictParseFloat, strictParseInt, structuralEquals, tryParseFloat,
     tryParseInt, tryReadResponseBody
 };
 
