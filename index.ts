@@ -73,7 +73,7 @@ export default {
 		const userID = telegramWebhookInfo.telegramUserID;
 		const chatID = telegramWebhookInfo.chatID;
 		const messageID = telegramWebhookInfo.messageID;
-		const messageType = telegramRequestBody.messageType;
+		const messageType = telegramWebhookInfo.messageType;
 
 		// make the handler
 		const handler = new Handler();
@@ -86,7 +86,7 @@ export default {
 			if (userHasClaimedBetaInviteCode.status === 'has-not' && messageType !== 'replyToBot') {
 				// ignore the message and tell the user they need a code
 				const replyQuestion = new ReplyQuestion(`We are in BETA!  Please enter your invite code:`, ReplyQuestionCode.EnterBetaInviteCode, MenuCode.Main);
-				replyQuestion.sendReplyQuestion(userID, chatID, messageID, env);
+				await replyQuestion.sendReplyQuestion(userID, chatID, messageID, env);
 				return makeSuccessResponse();
 			}
 			// otherwise, if they don't have a code, but they are responding to a bot question

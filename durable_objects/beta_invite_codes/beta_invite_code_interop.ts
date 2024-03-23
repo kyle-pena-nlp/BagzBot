@@ -51,7 +51,9 @@ export type MarkBetaInviteCodeAsSentResponse = { }
 async function sendJSONRequestToDO<TRequest,TResponseData>(r : WithMethod<TRequest,BetaInviteCodesMethod>, env : Env) : Promise<TResponseData> {
     const url = `http://betaInviteCodes.blah/${r.method.toString()}`;
     const request = makeJSONRequest(url, r.data);
-    const durableObject = env.BetaInviteCodesDO;
+	const namespace = env.BetaInviteCodesDO as DurableObjectNamespace;
+	const id = namespace.idFromName('singleton');
+	const durableObject = namespace.get(id);
     const response = (await durableObject.fetch(request)) as Response;
     const responseBody = await response.json();
     return responseBody as TResponseData;
