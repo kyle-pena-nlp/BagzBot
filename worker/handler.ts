@@ -470,6 +470,8 @@ export class Worker {
                 break;
             case ReplyQuestionCode.EnterBuyQuantity:
                 break;
+            case ReplyQuestionCode.EnterTriggerPercent:
+                break;
             default:
                 assertNever(replyQuestionCode);
         }
