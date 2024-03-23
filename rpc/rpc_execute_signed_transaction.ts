@@ -2,8 +2,8 @@ import { Connection, SignatureStatus, VersionedTransaction } from "@solana/web3.
 import * as bs58 from "bs58";
 import { Buffer } from "node:buffer";
 import { Env } from "../env";
-import { logError } from "../logging";
-import { sleep } from "../util";
+import { logDebug, logError } from "../logging";
+import { assertNever, sleep } from "../util";
 import { getLastValidBlockheight, getLatestBlockheight } from "./rpc_common";
 import { parseInstructionError } from "./rpc_parse_instruction_error";
 import {
@@ -122,52 +122,65 @@ export async function executeRawSignedTransaction(
         while(!stopConfirmingSignal) {
             
             /* Check the status on the signature */
-            let result : SignatureStatus|null = null;
-            try {
+            let result : SignatureStatus|'DNE'|'method-failed' = 'DNE';
                 
-                // get signature status
-                result = (await connection.getSignatureStatuses([signature], {
-                    searchTransactionHistory: false
-                })).value[0];
+            // get signature status
+            const sigStatOpts = { searchTransactionHistory: false }; // TODO: should this change?
+            result = await connection.getSignatureStatus(signature, sigStatOpts)
+                .then(res => { return (res.value == null) ? 'DNE' : res.value })
+                .catch(e => {
+                    logError("getSignatureStatus threw an exception", e, signature)
+                    return 'method-failed'
+                });
+            
+            // if getSignatureStatus itself failed, increment exception count.
+            if (result === 'method-failed') {
+                confirmExceptions += 1; 
+            }
+            
+            await sleep(REATTEMPT_CONFIRM_DELAY);
 
-                // if the tx doesn't exist yet
-                const txDoesNotExistYet = result == null;
-                if (txDoesNotExistYet) {
-                    // if tx DNE and blockheight exceeded, tx was dropped (TODO: is this certainly true?)
-                    const currentBlockheight = await getLatestBlockheight(connection).catch((reason) => null);
-                    if (currentBlockheight && (currentBlockheight > lastValidBlockheight)) {
-                        logError("No transaction found", signature);
-                        return TransactionExecutionError.TransactionDropped;// 'transaction-dropped';
-                    }
-                    if (!currentBlockheight) {
-                        logError('Could not poll currentBlockheight', signature);
-                    } 
+            // if the tx doesn't exist...
+            if (result === 'DNE') {
+                // get the current blockheight
+                const currentBH = await getLatestBlockheight(connection).catch((e) => {
+                    logError('Could not poll BH', e, signature)
+                    return null;
+                });
+                // and if the current BH exceeds last valid BH, then TX will never exist (i.o.w., TX dropped)
+                if (currentBH && currentBH > lastValidBlockheight) {
+                    logError("Tx dropped", signature);
+                    return TransactionExecutionError.TransactionDropped;
                 }
             }
-            catch(e) {
-                confirmExceptions++;
-                logError('getSignatureStatuses threw an exception', e, signature);
-            }
 
-            /* If the transaction itself failed, exit confirmation loop with 'transaction-failed'. */
-            const err = result?.err;
-            if (err) {
-                logError('Transaction failed', err, signature);
-                stopSendingTx = true;
-                return parseSwapExecutionError(err, rawSignedTx, env);
-            }
-            /* If the transaction itself was confirmed or finalized, exit confirmation loop with 'transaction-confirmed' */
-            const status = result?.confirmationStatus;
-            const hasConfirmations = (result?.confirmations || 0) > 0;
-            if ((hasConfirmations || (status === 'confirmed' || status === 'finalized'))) {
-                stopSendingTx = true;
-                return 'transaction-confirmed';
-            }
+            // if we actually got a signature status...
+            if (result !== 'DNE' && result !== 'method-failed') {
+                
+                const txStatus = getTxStatus(result);
 
-            await sleep(REATTEMPT_CONFIRM_DELAY);
+                if (txStatus === 'failed') {
+                    stopSendingTx = true;
+                    logDebug("Tx failed", signature);
+                    return parseSwapExecutionError(result.err, rawSignedTx, env);
+                }
+                else if (txStatus === 'succeeded') {
+                    stopSendingTx = true;
+                    logDebug("Tx succeeded", signature);
+                    return 'transaction-confirmed';
+                }
+                else if (txStatus === 'unconfirmed') {
+                    logDebug("Tx unconfirmed", signature);
+                }
+                else {
+                    assertNever(txStatus);
+                }
+            }
 
             /* i.e.; RPC is down. */
             if (confirmExceptions >= maxConfirmExceptions) {
+                stopSendingTx = true;
+                logError("Too many exceptions when trying to confirm", signature);                
                 return TransactionExecutionErrorCouldntConfirm.CouldNotConfirmTooManyExceptions; //'confirmation-too-many-exceptions';
             }
 
@@ -175,6 +188,7 @@ export async function executeRawSignedTransaction(
             const confirmTimedOut = (Date.now() - startConfirmMS) > confirmTimeoutMS;
             if (confirmTimedOut) {
                 stopSendingTx = true;
+                logError("Timed out trying to confirm tx", signature);
                 return TransactionExecutionErrorCouldntConfirm.TimeoutCouldNotConfirm;
             }
         }
@@ -191,12 +205,6 @@ export async function executeRawSignedTransaction(
         signature: signature
     };
 }
-
-function parseSendRawTransactionException(e : any) : string|null {
-    // TODO: detect insufficient funds correctly (or other important info)
-    return null;
-}
-
 
 function parseSwapExecutionError(err : any, rawSignedTx : VersionedTransaction, env : Env) : SwapExecutionError {
     const instructionError = err?.InstructionError;
@@ -220,3 +228,28 @@ function determineTxConfirmationFinalStatus(
     return confirmStatus || sendStatus || TransactionExecutionErrorCouldntConfirm.Unknown;
 }
 
+
+function getTxStatus(status : SignatureStatus) : 'failed'|'unconfirmed'|'succeeded' {
+                
+    // If the status has an err object, failed!
+    const err = status.err;
+    if (err) {
+        return 'failed';
+    }
+    
+    // If the transaction itself was confirmed or finalized, (but no error), success!
+    const confirmationStatus = status.confirmationStatus;
+    if (confirmationStatus === 'confirmed' || confirmationStatus === 'finalized') {
+        return 'succeeded';
+    }
+
+    // If the tx has at least one confirmation (but no error), success!
+    const hasConfirmations = (status.confirmations || 0) > 0;
+    if (hasConfirmations) {
+        return 'succeeded';
+    }
+
+    // otherwise, no error, but no confirmations or confirmationStatus in (confirmed,finalized)
+    // ...that means unconfirmed.
+    return 'unconfirmed';
+}
