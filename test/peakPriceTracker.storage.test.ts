@@ -231,7 +231,9 @@ function posWithPrice(initPrice : DecimalizedAmount) : Position {
         fillPrice : initPrice,
         sellSlippagePercent: 2,
         triggerPercent: 5,
-        retrySellIfSlippageExceeded: true
+        retrySellIfSlippageExceeded: true,
+        txSignature: 'some-sig',
+        confirmed: true
     }
 }
 
