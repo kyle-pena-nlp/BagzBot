@@ -1,6 +1,6 @@
 import { ReplyQuestion } from "./reply_question";
 import { ReplyQuestionCode } from "./reply_question_code";
-import { SessionReplyQuestion } from "./session_reply_question";
+import { ReplyQuestionData, replyQuestionHasNextSteps } from "./reply_question_data";
 
-export { ReplyQuestion, ReplyQuestionCode, SessionReplyQuestion as ReplyRequest };
+export { ReplyQuestion, ReplyQuestionCode, ReplyQuestionData as ReplyRequest, replyQuestionHasNextSteps };
 

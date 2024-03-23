@@ -9,12 +9,12 @@ export class MenuTrailingStopLossTriggerPercent extends Menu<number> implements 
     }
     renderOptions(): CallbackButton[][] {
         const options = this.emptyMenu();
-        const submitCode = MenuCode.TrailingStopLossCustomTriggerPercentKeypadSubmit;
+        const submitCode = MenuCode.SubmitTriggerPct;
         const defaultCustomTriggerPercent = this.menuData;
         this.insertButtonNextLine(options, "1%", new CallbackData(submitCode,  "1"));
         this.insertButtonSameLine(options, "5%", new CallbackData(submitCode,  "5"));
         this.insertButtonSameLine(options, "10%", new CallbackData(submitCode, "10"));
-        this.insertButtonSameLine(options, "X%", new CallbackData(MenuCode.TrailingStopLossCustomTriggerPercentKeypad, defaultCustomTriggerPercent.toString()));
+        this.insertButtonSameLine(options, "X%", new CallbackData(MenuCode.CustomTriggerPct, defaultCustomTriggerPercent.toString()));
         this.insertButtonNextLine(options, "Back", new CallbackData(MenuCode.TrailingStopLossRequestReturnToEditorMenu));
         return options;
     }

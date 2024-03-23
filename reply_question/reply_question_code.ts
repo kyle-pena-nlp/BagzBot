@@ -1,5 +1,9 @@
 export enum ReplyQuestionCode {
     EnterBetaInviteCode = "EnterBetaInviteCode",
     EnterTransferFundsRecipient = "EnterTransferFundsRecipient",
-    EnterAddressBookEntryName = "EnterAddressBookEntryName"
+    EnterAddressBookEntryName = "EnterAddressBookEntryName",
+
+    EnterSlippagePercent = "EnterSlippagePercent",
+    EnterBuyQuantity = "EnterBuyQuantity",
+    EnterTriggerPercent = "EnterTriggerPercent"
 }

@@ -12,7 +12,7 @@ export class MenuOpenPosition extends Menu<TokenInfo> implements MenuCapabilitie
     renderOptions(): CallbackButton[][] {
         const options = this.emptyMenu();
 
-        const buyWithAutoSellCallback = new CallbackData(MenuCode.TrailingStopLossEnterBuyQuantityKeypad, this.menuData.address);
+        const buyWithAutoSellCallback = new CallbackData(MenuCode.CustomBuyQuantity, this.menuData.address);
         this.insertButton(options, "Buy With Auto-Sell", buyWithAutoSellCallback, 1);
 
         return options;

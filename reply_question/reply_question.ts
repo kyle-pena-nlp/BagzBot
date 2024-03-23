@@ -3,19 +3,28 @@ import { Env } from "../env";
 import { MenuCode } from "../menus";
 import { sendQuestionToTG } from "../telegram/telegram_helpers";
 import { ReplyQuestionCode } from "./reply_question_code";
-import { SessionReplyQuestion } from "./session_reply_question";
+import { ReplyQuestionData } from "./reply_question_data";
+
+export interface ReplyQuestionCallback {
+    linkedMessageID : number // optionally associates this reply with an original message
+    nextMenuCode : MenuCode
+}
 
 export class ReplyQuestion {
     question : string
+    
     replyQuestionCode : ReplyQuestionCode
-    nextMenuCode : MenuCode
-    backMenuCode: MenuCode|undefined
+    linkedMessageID ?: number
+    nextMenuCode ?: MenuCode
     parseMode: 'HTML'|'MarkdownV2'
-    constructor(question : string, replyQuestionCode: ReplyQuestionCode, nextMenuCode : MenuCode, backMenuCode ?: MenuCode, parseMode : 'HTML'|'MarkdownV2' = 'HTML') {
+    constructor(question : string,
+        replyQuestionCode: ReplyQuestionCode, 
+        callback ?: ReplyQuestionCallback,
+        parseMode : 'HTML'|'MarkdownV2' = 'HTML') {
         this.question = question;
         this.replyQuestionCode = replyQuestionCode;
-        this.nextMenuCode = nextMenuCode;
-        this.backMenuCode = backMenuCode;
+        this.linkedMessageID = callback?.linkedMessageID;
+        this.nextMenuCode = callback?.nextMenuCode;
         this.parseMode = parseMode;
     }
     async sendReplyQuestion(telegramUserID : number, chatID : number, env : Env) {
@@ -23,12 +32,14 @@ export class ReplyQuestion {
         if (!tgSentMessageInfo.success) {
             return;
         }
-        const replyQuestionCallbackData = { 
+        const replyQuestionCallbackData : ReplyQuestionData = { 
+            messageQuestionID : tgSentMessageInfo.messageID,
             replyQuestionCode: this.replyQuestionCode,
-            nextMenuCode : this.nextMenuCode,
-            backMenuCode : this.backMenuCode
+            linkedMessageID: this.linkedMessageID,
+            nextMenuCode : this.nextMenuCode
         };  
-        // TODO: how to resolve possibility that user could respond before storage is completed?      
-        await storeSessionObj<SessionReplyQuestion>(telegramUserID, tgSentMessageInfo.messageID, replyQuestionCallbackData, "replyQuestion", env);
+        // TODO: how to resolve possibility that user could respond before storage is completed?  
+        // Some kind of incoming message blocking here?  But per-user, so we don't lock the whole app.    
+        await storeSessionObj<ReplyQuestionData>(telegramUserID, tgSentMessageInfo.messageID, replyQuestionCallbackData, "replyQuestion", env);
     }
 }

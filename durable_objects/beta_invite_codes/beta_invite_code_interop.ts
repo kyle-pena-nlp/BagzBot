@@ -14,7 +14,7 @@ export function parseBetaInviteCodeMethod(value : string) : BetaInviteCodesMetho
 }
 
 export type ClaimInviteCodeRequest = WithUserID<{inviteCode: string}>
-export type ClaimInviteCodeResponse = { status : 'firsttime-claimed-by-you'|'already-claimed-by-you'|'claimed-by-someone-else'|'code-does-not-exist' }
+export type ClaimInviteCodeResponse = { status : 'firsttime-claimed-by-you'|'you-already-claimed-different-code'|'already-claimed-by-you'|'claimed-by-someone-else'|'code-does-not-exist' }
 
 export async function claimInviteCode(request : WithUserID<{ inviteCode : string }>, env : Env) : Promise<ClaimInviteCodeResponse> {
     const r = { method : BetaInviteCodesMethod.Claim, data : request };

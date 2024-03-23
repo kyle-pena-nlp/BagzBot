@@ -11,9 +11,8 @@ import { PolledTokenPairListDO } from "./durable_objects/polled_token_pair_list/
 import { TokenPairPositionTrackerDO } from "./durable_objects/token_pair_position_tracker/token_pair_position_tracker_DO";
 import { maybeReadSessionObj } from "./durable_objects/user/userDO_interop";
 import { UserDO } from "./durable_objects/user/user_DO";
-import { MenuCode } from "./menus";
 import { ReplyQuestion, ReplyQuestionCode } from "./reply_question";
-import { SessionReplyQuestion } from "./reply_question/session_reply_question";
+import { ReplyQuestionData } from "./reply_question/reply_question_data";
 
 /* Export of imported DO's (required by wrangler) */
 export { BetaInviteCodesDO, PolledTokenPairListDO, TokenPairPositionTrackerDO, UserDO };
@@ -75,6 +74,8 @@ export default {
 		const chatID = telegramWebhookInfo.chatID;
 		const messageID = telegramWebhookInfo.messageID;
 		const messageType = telegramWebhookInfo.messageType;
+		const command = telegramWebhookInfo.command;
+		const commandTokens = telegramWebhookInfo.commandTokens;
 
 		// make the handler
 		const handler = new Handler();
@@ -84,38 +85,42 @@ export default {
 			// see if the user has claimed a beta code
 			const userHasClaimedBetaInviteCode = await getUserHasClaimedBetaInviteCode({ userID: telegramWebhookInfo.telegramUserID }, env);
 			// if they have not, and this incoming message isn't a response to a bot question
-			if (userHasClaimedBetaInviteCode.status === 'has-not' && messageType !== 'replyToBot') {
+			if (userHasClaimedBetaInviteCode.status === 'has-not' && messageType === 'command' && command === '/start' && commandTokens?.[1] != null) {
+				await handler.handleEnterBetaInviteCode(telegramWebhookInfo, commandTokens?.[1]?.text||'', env);
+				return makeSuccessResponse();
+			}
+			else if (userHasClaimedBetaInviteCode.status === 'has-not' && messageType !== 'replyToBot') {
 				// ignore the message and tell the user they need a code
-				const replyQuestion = new ReplyQuestion(`Hi ${telegramUserName}, we are in BETA!  Please enter your invite code:`, ReplyQuestionCode.EnterBetaInviteCode, MenuCode.Main);
+				const replyQuestion = new ReplyQuestion(`Hi ${telegramUserName}, we are in BETA!  Please enter your invite code:`, ReplyQuestionCode.EnterBetaInviteCode);
 				await replyQuestion.sendReplyQuestion(userID, chatID, env);
 				return makeSuccessResponse();
 			}
 			// otherwise, if they don't have a code, but they are responding to a bot question
 			else if (userHasClaimedBetaInviteCode.status === 'has-not' && messageType === 'replyToBot') {
 				// fetch the stored question being asked
-				const replyQuestion = await maybeReadSessionObj<SessionReplyQuestion>(userID, messageID, "replyQuestion", env);
+				const replyQuestionData = await maybeReadSessionObj<ReplyQuestionData>(userID, messageID, "replyQuestion", env);
 				// if the bot wasn't asking a question, ignore the reply
-				if (replyQuestion == null) {
+				if (replyQuestionData == null) {
 					return makeSuccessResponse();
 				}
 				// if the bot wasn't asking for a beta invite code, ignore the reply
-				if (replyQuestion.replyQuestionCode != ReplyQuestionCode.EnterBetaInviteCode) {
+				if (replyQuestionData.replyQuestionCode != ReplyQuestionCode.EnterBetaInviteCode) {
 					return makeSuccessResponse();
 				}
 				// otherwise, process the invite code
-				await handler.handleEnterBetaInviteCode(telegramWebhookInfo, env);
+				await handler.handleEnterBetaInviteCode(telegramWebhookInfo, telegramWebhookInfo.text||'', env);
 				return makeSuccessResponse();
 			}
 		}
 
 		// handle reply-tos
 		if (messageType === 'replyToBot') {
-			return await handler.handleReplyToBot(telegramRequestBody, env);
+			return await handler.handleReplyToBot(telegramWebhookInfo, env);
 		}
 
 		// User clicks a menu button
 		if (messageType === 'callback') {
-			return await handler.handleCallbackQuery(telegramWebhookInfo, env);
+			return await handler.handleCallback(telegramWebhookInfo.toCallbackHandlerData(), env);
 		}
 
 		// User issues a command

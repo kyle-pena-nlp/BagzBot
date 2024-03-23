@@ -4,22 +4,25 @@ import { claimInviteCode, listUnclaimedBetaInviteCodes } from "../durable_object
 import { GetTokenInfoResponse, isInvalidTokenInfoResponse } from "../durable_objects/polled_token_pair_list/actions/get_token_info";
 import { getTokenInfo } from "../durable_objects/polled_token_pair_list/polled_token_pair_list_DO_interop";
 import { OpenPositionRequest } from "../durable_objects/user/actions/open_new_position";
-import { AddressBookEntry, CompletedAddressBookEntry, JustAddressBookEntryID, JustAddressBookEntryName } from "../durable_objects/user/model/address_book_entry";
+import { CompletedAddressBookEntry, JustAddressBookEntryID, JustAddressBookEntryName } from "../durable_objects/user/model/address_book_entry";
 import { QuantityAndToken } from "../durable_objects/user/model/quantity_and_token";
 import { TokenSymbolAndAddress } from "../durable_objects/user/model/token_name_and_address";
 import { generateWallet, getAddressBookEntry, getAndMaybeInitializeUserData, getDefaultTrailingStopLoss, getPosition, getWalletData, listAddressBookEntries, listOpenTrailingStopLossPositions, manuallyClosePosition, maybeReadSessionObj, readSessionObj, requestNewPosition, storeAddressBookEntry, storeSessionObj, storeSessionObjProperty, storeSessionValues } from "../durable_objects/user/userDO_interop";
 import { Env } from "../env";
-import { logError } from "../logging";
 import { BaseMenu, MenuBetaInviteFriends, MenuCode, MenuConfirmAddressBookEntry, MenuConfirmTrailingStopLossPositionRequest, MenuContinueMessage, MenuEditTrailingStopLossPositionRequest, MenuError, MenuFAQ, MenuHelp, MenuListPositions, MenuMain, MenuPickTransferFundsRecipient, MenuPleaseEnterToken, MenuPleaseWait, MenuStartTransferFunds, MenuTODO, MenuTrailingStopLossAutoRetrySell, MenuTrailingStopLossEntryBuyQuantity, MenuTrailingStopLossPickVsToken, MenuTrailingStopLossSlippagePercent, MenuTrailingStopLossTriggerPercent, MenuTransferFundsTestOrSubmitNow, MenuViewDecryptedWallet, MenuViewOpenPosition, MenuWallet, PositiveDecimalKeypad, PositiveIntegerKeypad } from "../menus";
+import { CallbackData } from "../menus/callback_data";
 import { PositionPreRequest, PositionRequest, convertPreRequestToRequest } from "../positions";
 import { ReplyQuestion, ReplyQuestionCode } from "../reply_question";
-import { SessionReplyQuestion } from "../reply_question/session_reply_question";
+import { ReplyQuestionData, replyQuestionHasNextSteps } from "../reply_question/reply_question_data";
 import { quoteBuy } from "../rpc/jupiter_quotes";
 import { CompleteTransferFundsRequest, PartialTransferFundsRequest } from "../rpc/rpc_transfer_funds";
 import { isGetQuoteFailure } from "../rpc/rpc_types";
 import { AutoSellOrderSpec, TelegramWebhookInfo, deleteTGMessage, sendMessageToTG, sendRequestToTG, updateTGMessage } from "../telegram";
 import { getVsTokenInfo } from "../tokens";
 import { Structural, assertNever, makeFakeFailedRequestResponse, makeJSONResponse, makeSuccessResponse, tryParseFloat } from "../util";
+import { CallbackHandlerData as CallbackHandlerParams } from "./model/callback_handler_data";
+
+
 
 export class Worker {
 
@@ -93,7 +96,7 @@ export class Worker {
         return makeSuccessResponse();
     }
 
-    async handleCallbackQuery(telegramWebhookInfo : TelegramWebhookInfo, env : Env) : Promise<Response> {
+    async handleCallback(telegramWebhookInfo : CallbackHandlerParams, env : Env) : Promise<Response> {
         const menuOrReplyQuestion = await this.handleCallbackQueryInternal(telegramWebhookInfo, env);
         if (menuOrReplyQuestion == null) {
             return makeSuccessResponse();
@@ -109,7 +112,7 @@ export class Worker {
     }
 
     // TODO: switch to handlers, factor handlers out into little classes (preferably into the menu classes themselves)
-    async handleCallbackQueryInternal(telegramWebhookInfo : TelegramWebhookInfo, env : Env) : Promise<BaseMenu|ReplyQuestion|void> {
+    async handleCallbackQueryInternal(telegramWebhookInfo : CallbackHandlerParams, env : Env) : Promise<BaseMenu|ReplyQuestion|void> {
         const telegramUserID = telegramWebhookInfo.telegramUserID;
         const messageID = telegramWebhookInfo.messageID;
         const chatID = telegramWebhookInfo.chatID;
@@ -147,33 +150,41 @@ export class Worker {
                     await this.handleManuallyClosePosition(telegramUserID, closePositionID, env);
                 }
                 return this.createMainMenu(telegramWebhookInfo, env);
-            case MenuCode.TrailingStopLossCustomSlippagePctKeypad:
-                const trailingStopLossCustomSlippagePctKeypadEntry = callbackData.menuArg||''; 
-                const trailingStopLossCustomSlippagePctKeypad = this.makeTrailingStopLossCustomSlippagePctKeypad(trailingStopLossCustomSlippagePctKeypadEntry);
-                return trailingStopLossCustomSlippagePctKeypad;
-            case MenuCode.TrailingStopLossCustomSlippagePctKeypadSubmit:
-                const trailingStopLossCustomSlippageSubmittedKeypadEntry = tryParseFloat(callbackData.menuArg!!);
-                if (trailingStopLossCustomSlippageSubmittedKeypadEntry) {
-                    await storeSessionObjProperty(telegramUserID, messageID, "slippagePercent", trailingStopLossCustomSlippageSubmittedKeypadEntry, "PositionRequest", env);
+            case MenuCode.CustomSlippagePct:
+                const slippagePercentQuestion = new ReplyQuestion(
+                    "Enter the desired slippage percent", 
+                    ReplyQuestionCode.EnterSlippagePercent, 
+                    { 
+                        nextMenuCode: MenuCode.SubmitSlippagePct, 
+                        linkedMessageID: messageID
+                    });
+                return slippagePercentQuestion;
+            case MenuCode.SubmitSlippagePct:
+                const slipPctEntry = tryParseFloat(callbackData.menuArg||'');
+                if (!slipPctEntry || slipPctEntry <= 0.0) {
+                    return new MenuContinueMessage(`Sorry - '${callbackData.menuArg||''}' is not a valid percentage.`, MenuCode.TrailingStopLossSlippagePctMenu);
+                }
+                if (slipPctEntry) {
+                    await storeSessionObjProperty(telegramUserID, messageID, "slippagePercent", slipPctEntry, "PositionRequest", env);
                 }
                 const positionRequestAfterEditingSlippagePct = await readSessionObj<PositionRequest>(telegramUserID, messageID, "PositionRequest", env);
-                if (!trailingStopLossCustomSlippageSubmittedKeypadEntry) {
-                    logError("Invalid slippage percent submitted", telegramWebhookInfo, trailingStopLossCustomSlippageSubmittedKeypadEntry);
-                }
                 return await this.makeStopLossRequestEditorMenu(positionRequestAfterEditingSlippagePct, env);                
-            case MenuCode.TrailingStopLossEnterBuyQuantityKeypad:
-                const buyTrailingStopLossQuantityKeypadEntry = callbackData.menuArg||'';
-                const trailingStopLossEnterBuyQuantityKeypad = this.makeTrailingStopLossBuyQuantityKeypad(buyTrailingStopLossQuantityKeypadEntry);
-                return trailingStopLossEnterBuyQuantityKeypad;
-            case MenuCode.TrailingStopLossEnterBuyQuantitySubmit:
-                const submittedTrailingStopLossBuyQuantity = tryParseFloat(callbackData.menuArg!!);
-                if (submittedTrailingStopLossBuyQuantity) {
-                    await storeSessionObjProperty(telegramUserID, messageID, "vsTokenAmt", submittedTrailingStopLossBuyQuantity, "PositionRequest", env);
+            case MenuCode.CustomBuyQuantity:
+                const buyQuantityQuestion  = new ReplyQuestion(
+                    "Enter the quantity of SOL to buy", 
+                    ReplyQuestionCode.EnterBuyQuantity, 
+                    {
+                        nextMenuCode: MenuCode.SubmitBuyQuantity,
+                        linkedMessageID: messageID
+                    });
+                return buyQuantityQuestion
+            case MenuCode.SubmitBuyQuantity:
+                const submittedBuyQuantity = tryParseFloat(callbackData.menuArg!!);
+                if (!submittedBuyQuantity || submittedBuyQuantity <= 0.0) {
+                    return new MenuContinueMessage(`Sorry - '${callbackData.menuArg||''}' is not a valid quantity of SOL to buy.`, MenuCode.TrailingStopLossSlippagePctMenu);
                 }
+                await storeSessionObjProperty(telegramUserID, messageID, "vsTokenAmt", submittedBuyQuantity, "PositionRequest", env);
                 const trailingStopLossRequestStateAfterBuyQuantityEdited = await readSessionObj<PositionRequest>(telegramUserID, messageID, "PositionRequest", env);
-                if (!submittedTrailingStopLossBuyQuantity) {
-                    logError("Invalid buy quantity submitted", telegramWebhookInfo, trailingStopLossRequestStateAfterBuyQuantityEdited);
-                }
                 return await this.makeStopLossRequestEditorMenu(trailingStopLossRequestStateAfterBuyQuantityEdited, env);
             case MenuCode.TrailingStopLossChooseAutoRetrySellMenu:
                 return new MenuTrailingStopLossAutoRetrySell(undefined);
@@ -184,20 +195,25 @@ export class Worker {
             case MenuCode.TrailingStopLossConfirmMenu:
                 const trailingStopLossRequestAfterDoneEditing = await readSessionObj<PositionRequest>(telegramUserID, messageID, "PositionRequest", env);
                 return await this.makeStopLossConfirmMenu(trailingStopLossRequestAfterDoneEditing, env);
-            case MenuCode.TrailingStopLossCustomTriggerPercentKeypad:
-                const trailingStopLossTriggerPercentKeypadCurrentEntry = callbackData.menuArg||'';
-                const trailingStopLossCustomTriggerPercentKeypad = this.makeTrailingStopLossCustomTriggerPercentKeypad(trailingStopLossTriggerPercentKeypadCurrentEntry);
-                return trailingStopLossCustomTriggerPercentKeypad;
-            case MenuCode.TrailingStopLossCustomTriggerPercentKeypadSubmit:
-                const trailingStopLossCustomTriggerPercentSubmission = tryParseFloat(callbackData.menuArg!!);
-                if (trailingStopLossCustomTriggerPercentSubmission) {
-                    await storeSessionObjProperty(telegramUserID, messageID, "triggerPercent", trailingStopLossCustomTriggerPercentSubmission, "PositionRequest", env);
+            case MenuCode.CustomTriggerPct:
+                const triggerPctQuestion = new ReplyQuestion(
+                    "Enter a custom trigger percent",
+                    ReplyQuestionCode.EnterTriggerPercent,
+                    {
+                        nextMenuCode: MenuCode.SubmitTriggerPct,
+                        linkedMessageID: messageID
+                    });
+                return triggerPctQuestion;
+            case MenuCode.SubmitTriggerPct:
+                const triggerPctEntry = tryParseFloat(callbackData.menuArg!!);
+                if (!triggerPctEntry || triggerPctEntry < 0) {
+                    return new MenuContinueMessage(
+                        `Sorry - '${callbackData.menuArg||''}' is not a valid percentage`,
+                        MenuCode.TrailingStopLossTriggerPercentMenu);
                 }
-                const trailingStopLossPositionRequestAfterEditingCustomTriggerPercent = await readSessionObj<PositionRequest>(telegramUserID, messageID, "PositionRequest", env);
-                if (!trailingStopLossCustomTriggerPercentSubmission) {
-                    logError("Invalid trigger percent submitted", trailingStopLossCustomTriggerPercentSubmission, telegramWebhookInfo);
-                }
-                return await this.makeStopLossRequestEditorMenu(trailingStopLossPositionRequestAfterEditingCustomTriggerPercent, env);                
+                await storeSessionObjProperty(telegramUserID, messageID, "triggerPercent", triggerPctEntry, "PositionRequest", env);
+                const updatedTSL = await readSessionObj<PositionRequest>(telegramUserID, messageID, "PositionRequest", env);
+                return await this.makeStopLossRequestEditorMenu(updatedTSL, env);                
             case MenuCode.TrailingStopLossEditorFinalSubmit:
                 // TODO: do the read within UserDO to avoid the extra roundtrip
                 const positionRequestAfterFinalSubmit = await readSessionObj<PositionRequest>(telegramUserID, messageID, "PositionRequest", env);
@@ -246,16 +262,16 @@ export class Worker {
                 const z = await readSessionObj<PositionRequest>(telegramUserID, messageID, "PositionRequest", env);
                 return await this.makeStopLossRequestEditorMenu(z, env);
             case MenuCode.AddFundsRecipientAddress:
-                const addressBookEntry : AddressBookEntry = { 
+                const addressBookEntry : JustAddressBookEntryID = { 
                     addressBookEntryID : randomUUID()
                 };
-                await storeSessionObj<AddressBookEntry>(telegramUserID, messageID, addressBookEntry, "addressBookEntry", env);
-                return new ReplyQuestion("Choose a name for this recipient", ReplyQuestionCode.EnterAddressBookEntryName, MenuCode.SubmitAddressBookEntryName, MenuCode.TransferFunds);
+                await storeSessionObj<JustAddressBookEntryID>(telegramUserID, messageID, addressBookEntry, "addressBookEntry", env);
+                return new ReplyQuestion("Choose a name for this recipient", ReplyQuestionCode.EnterAddressBookEntryName, { nextMenuCode: MenuCode.SubmitAddressBookEntryName, linkedMessageID: messageID });
             case MenuCode.SubmitAddressBookEntryName:
                 const addressBookEntry2 = await readSessionObj<JustAddressBookEntryID>(telegramUserID, messageID, "addressBookEntry", env);
                 const addressBookEntry3 : JustAddressBookEntryName = { ...addressBookEntry2, name : callbackData.menuArg||'' } ;//name = callbackData.menuArg;
                 await storeSessionObj<JustAddressBookEntryName>(telegramUserID, messageID, addressBookEntry3, "addressBookEntry", env);
-                return new ReplyQuestion("Paste in the address", ReplyQuestionCode.EnterTransferFundsRecipient, MenuCode.SubmitAddressBookEntryAddress, MenuCode.TransferFunds);
+                return new ReplyQuestion("Paste in the address", ReplyQuestionCode.EnterTransferFundsRecipient, { nextMenuCode: MenuCode.SubmitAddressBookEntryAddress, linkedMessageID: messageID });
             case MenuCode.SubmitAddressBookEntryAddress:
                 const addressBookEntry4 = await readSessionObj<JustAddressBookEntryName>(telegramUserID, messageID, "addressBookEntry", env);
                 const addressBookEntry5 : CompletedAddressBookEntry = { ...addressBookEntry4, address: callbackData.menuArg||'', confirmed : false };
@@ -305,13 +321,14 @@ export class Worker {
                 if (!unclaimedBetaCodes.success) {
                     return this.createMainMenu(telegramWebhookInfo, env);
                 }
-                return new MenuBetaInviteFriends(unclaimedBetaCodes.data.betaInviteCodes);
+                const botUserName = env.TELEGRAM_BOT_USERNAME;
+                return new MenuBetaInviteFriends({betaInviteCodes: unclaimedBetaCodes.data.betaInviteCodes, botUserName: botUserName });
             default:
                 assertNever(callbackData.menuCode);
         }
     }
 
-    private async createMainMenu(telegramWebhookInfo : TelegramWebhookInfo, env : Env) : Promise<BaseMenu> {
+    private async createMainMenu(telegramWebhookInfo : CallbackHandlerParams, env : Env) : Promise<BaseMenu> {
         const userData = await getAndMaybeInitializeUserData(telegramWebhookInfo.telegramUserID, telegramWebhookInfo.telegramUserName, telegramWebhookInfo.messageID, env);
         return new MenuMain(userData);
     }
@@ -343,15 +360,11 @@ export class Worker {
         };
     }
 
-    private async sendTrailingStopLossRequestToTokenPairPositionTracker(telegramUserID : number, trailingStopLossPositionRequest : OpenPositionRequest, env : Env) : Promise<void> {
-        await requestNewPosition(telegramUserID, trailingStopLossPositionRequest, env);
-    }
-
     private makeTrailingStopLossCustomTriggerPercentKeypad(currentValue : string) {
         return new PositiveIntegerKeypad(
             "${currentValue}%", // intentional double quotes - syntax is parsed later
-            MenuCode.TrailingStopLossCustomTriggerPercentKeypad,
-            MenuCode.TrailingStopLossCustomTriggerPercentKeypadSubmit,
+            MenuCode.CustomTriggerPct,
+            MenuCode.SubmitTriggerPct,
             MenuCode.TrailingStopLossRequestReturnToEditorMenu,
             currentValue,
             1,
@@ -370,8 +383,8 @@ export class Worker {
 
     private makeTrailingStopLossCustomSlippagePctKeypad(currentEntry : string) {
         return new PositiveIntegerKeypad("${currentValue}%", // intentional double quotes - syntax is parsed later
-            MenuCode.TrailingStopLossCustomSlippagePctKeypad,
-            MenuCode.TrailingStopLossCustomSlippagePctKeypadSubmit,
+            MenuCode.CustomSlippagePct,
+            MenuCode.SubmitSlippagePct,
             MenuCode.TrailingStopLossRequestReturnToEditorMenu,
             currentEntry,
             0,
@@ -380,8 +393,8 @@ export class Worker {
 
     private makeTrailingStopLossBuyQuantityKeypad(currentEntry : string) {
         return new PositiveDecimalKeypad("${currentValue}",  // intentional double quotes - syntax is parsed later
-            MenuCode.TrailingStopLossEnterBuyQuantityKeypad, 
-            MenuCode.TrailingStopLossEnterBuyQuantitySubmit, 
+            MenuCode.CustomBuyQuantity, 
+            MenuCode.SubmitBuyQuantity, 
             MenuCode.TrailingStopLossRequestReturnToEditorMenu,
             currentEntry, 
             0);
@@ -396,7 +409,7 @@ export class Worker {
         return makeSuccessResponse();
     }
 
-    private async handleCreateWallet(telegramWebhookInfo : TelegramWebhookInfo, env : Env) : Promise<Response> {
+    private async handleCreateWallet(telegramWebhookInfo : CallbackHandlerParams, env : Env) : Promise<Response> {
         const responseBody = await generateWallet(telegramWebhookInfo.telegramUserID, env);
         // todo: handle error case.
         return makeJSONResponse(responseBody);
@@ -426,27 +439,56 @@ export class Worker {
     }
 
     async handleReplyToBot(telegramWebhookInfo : TelegramWebhookInfo, env : Env) : Promise<Response> {
+        const userAnswer = telegramWebhookInfo.text||'';
+
+        // read the callback data tucked away about the reply question
         const telegramUserID = telegramWebhookInfo.telegramUserID;
-        const messageID = telegramWebhookInfo.messageID;
-        const replyQuestion = await maybeReadSessionObj<SessionReplyQuestion>(telegramUserID, messageID, "replyQuestion", env);
-        if (replyQuestion == null) {
+        const questionMessageID = telegramWebhookInfo.messageID;
+        const replyQuestionData = await maybeReadSessionObj<ReplyQuestionData>(telegramUserID, questionMessageID, "replyQuestion", env);
+        if (replyQuestionData == null) {
             return makeSuccessResponse();
         }
-        const replyQuestionCode = replyQuestion.replyQuestionCode;
+
+        // delete the question and reply messages from the chat (otherwise, it looks weird)
+        const userReplyMessageID = telegramWebhookInfo.realMessageID;
+        if (userReplyMessageID) {
+            await deleteTGMessage(userReplyMessageID, telegramWebhookInfo.chatID, env);
+        }
+        await deleteTGMessage(questionMessageID, telegramWebhookInfo.chatID, env);
+
+        // handle whatever special logic the reply code entails
+        const replyQuestionCode = replyQuestionData.replyQuestionCode;
         switch(replyQuestionCode) {
             case ReplyQuestionCode.EnterBetaInviteCode:
-                return this.handleEnterBetaInviteCode(telegramWebhookInfo, env);
+                await this.handleEnterBetaInviteCode(telegramWebhookInfo, userAnswer||'', env);
+                break;
             case ReplyQuestionCode.EnterTransferFundsRecipient:
-                throw new Error("");
+                break;
             case ReplyQuestionCode.EnterAddressBookEntryName:
-                throw new Error("");
+                break;
+            case ReplyQuestionCode.EnterSlippagePercent:
+                break;
+            case ReplyQuestionCode.EnterBuyQuantity:
+                break;
             default:
                 assertNever(replyQuestionCode);
         }
+        // If the reply question has callback data, delegate to the handleCallback method
+        if (replyQuestionHasNextSteps(replyQuestionData)) {
+            const callbackHandlerParams : CallbackHandlerParams = {
+                telegramUserID: telegramUserID,
+                telegramUserName: telegramWebhookInfo.telegramUserName,
+                chatID: telegramWebhookInfo.chatID,
+                messageID: replyQuestionData.linkedMessageID,
+                callbackData: new CallbackData(replyQuestionData.nextMenuCode, userAnswer)
+            }
+            return await this.handleCallback(callbackHandlerParams, env);
+        }
+        return makeSuccessResponse();
     }
 
-    async handleEnterBetaInviteCode(telegramWebhookInfo: TelegramWebhookInfo, env : Env) : Promise<Response> {
-        const code = (telegramWebhookInfo.text||'').trim().toUpperCase();
+    async handleEnterBetaInviteCode(telegramWebhookInfo: TelegramWebhookInfo, code : string, env : Env) {
+        code = code.trim().toUpperCase();
         // operation is idempotent.  effect of operation is in .status of response
         const claimInviteCodeResponse = await claimInviteCode({ userID : telegramWebhookInfo.telegramUserID, inviteCode: code }, env);
         if (claimInviteCodeResponse.status === 'already-claimed-by-you') {
@@ -464,7 +506,9 @@ export class Worker {
             // tell user sorry, that's not a real code
             await sendMessageToTG(telegramWebhookInfo.chatID, `Sorry ${telegramWebhookInfo.telegramUserName} - '${code}' is not a known invite code.`, env);
         }
-        return makeSuccessResponse();
+        else if (claimInviteCodeResponse.status === 'you-already-claimed-different-code') {
+            await sendMessageToTG(telegramWebhookInfo.chatID, `You have already claimed a different beta code!`, env);
+        }
     }
 
     private async sendUserWelcomeScreen(telegramWebhookInfo : TelegramWebhookInfo, env : Env) {

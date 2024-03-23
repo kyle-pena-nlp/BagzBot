@@ -37,8 +37,8 @@ export enum MenuCode {
 
 	// Trailing Stop Loss: set buy quantity in vsToken units
 	TrailingStopLossEntryBuyQuantityMenu = "TSL.BuyQuantityMenu",
-	TrailingStopLossEnterBuyQuantityKeypad = "TSL.BuyQuantityKeypad",
-	TrailingStopLossEnterBuyQuantitySubmit = "TSL.BuyQuantitySubmit",
+	CustomBuyQuantity = "TSL.BuyQuantityKeypad",
+	SubmitBuyQuantity = "TSL.BuyQuantitySubmit",
 
 	// Trailing Stop Loss: set vsToken UI
 	TrailingStopLossPickVsTokenMenu = "TSL.VsTokenMenu",
@@ -46,13 +46,13 @@ export enum MenuCode {
 	
 	// Trailing Stop Loss: set slippage tolerance UI
 	TrailingStopLossSlippagePctMenu = "TSL.SlippagePctMenu",
-	TrailingStopLossCustomSlippagePctKeypad = "TSL.SlippagePctKeypad",
-	TrailingStopLossCustomSlippagePctKeypadSubmit = "TSL.SlippageSubmit",
+	CustomSlippagePct = "TSL.SlippagePctKeypad",
+	SubmitSlippagePct = "TSL.SlippageSubmit",
 
 	// Trailing Stop Loss: set trigger percent UI
 	TrailingStopLossTriggerPercentMenu = "TSL.TriggerPercentMenu",
-	TrailingStopLossCustomTriggerPercentKeypad = "TSL.TriggerPercentKeypad", 
-	TrailingStopLossCustomTriggerPercentKeypadSubmit = "TSL.TriggerPercentKeypadSubmit", 
+	CustomTriggerPct = "TSL.TriggerPercentKeypad", 
+	SubmitTriggerPct = "TSL.TriggerPercentKeypadSubmit", 
 
 	// Trailing Stop Loss: auto-retry sell if slippage tolerance exceeded?
 	TrailingStopLossChooseAutoRetrySellMenu = "TSL.AutoRetrySellMenu",

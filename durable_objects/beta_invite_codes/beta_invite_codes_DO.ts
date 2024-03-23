@@ -95,13 +95,24 @@ export class BetaInviteCodesDO {
             inviteCodes = [...inviteCodes, ...newCodes];
         }
         // filter to unclaimed, unsent
-        const unsentCodes = inviteCodes.filter(c => !c.claimed && !c.sent).map(c => c.code);
+        const unsentCodes = inviteCodes.filter(c => c.claimer == null && !c.sent).map(c => c.code);
         return { success: true, data : { betaInviteCodes: unsentCodes } };
     }
 
     private async handleClaimBetaInviteCode(request : ClaimInviteCodeRequest) : Promise<ClaimInviteCodeResponse> {
         const userID = request.userID;
         const code = request.inviteCode;
+        const myCode = this.betaInviteCodesTracker.getByClaimer(userID);
+        if (myCode != null && myCode.code != code) {
+            return {
+                status: 'you-already-claimed-different-code'
+            };
+        }
+        else if (myCode != null && myCode.code === code) {
+            return {
+                status: 'already-claimed-by-you'
+            };
+        }
         const inviteCode = this.betaInviteCodesTracker.get(code);
         if (inviteCode == null) {
             return {
@@ -109,16 +120,9 @@ export class BetaInviteCodesDO {
             };
         }
         if (inviteCode.claimer != null) {
-            if (inviteCode.claimer === userID) {
-                return {
-                    status: 'already-claimed-by-you'
-                };
-            }
-            else {
-                return {
-                    status: 'claimed-by-someone-else'
-                };
-            }
+            return {
+                status: 'claimed-by-someone-else'
+            };
         }
         else if (inviteCode.claimer == null) {
             inviteCode.claimer = request.userID;

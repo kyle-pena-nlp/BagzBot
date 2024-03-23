@@ -9,6 +9,7 @@ export interface ViewWalletData {
 export class MenuWallet extends Menu<ViewWalletData> implements MenuCapabilities {
     renderText(): string {
         const lines = [
+            `<code>Address: ${this.menuData.address}</code>`,
             `<a href='https://solscan.io/account/${this.menuData.address}'>View Wallet</a>`
         ];
         return lines.join("\r\n");

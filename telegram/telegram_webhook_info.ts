@@ -2,6 +2,7 @@ import { Env } from "../env";
 import { CallbackData } from "../menus/callback_data";
 import { PositionPreRequest, PositionType } from "../positions";
 import { getVsTokenInfo } from "../tokens";
+import { CallbackHandlerData } from "../worker/model/callback_handler_data";
 import { TGTextEntity, TGTextEntityType } from "./telegram_helpers";
 
 export class AutoSellOrderSpec {
@@ -192,7 +193,8 @@ export class TelegramWebhookInfo {
     telegramUserID : number;
     telegramUserName : string;
     chatID : number; /* The Telegram chat ID */
-    messageID : number; /* The telegram message ID */
+    messageID : number; /* The telegram message ID (see comments) */
+	realMessageID : number|undefined;
     messageType : 'callback'|'message'|'command'|'replyToBot'|null;
     command: string|null;
 	commandTokens : TGTextEntity[]|null;
@@ -205,7 +207,8 @@ export class TelegramWebhookInfo {
 		// if is a reply to the bot, messageID is bot's original message ID.
 		// if is a callback query, messageID is bot's menu message ID.
 		// otherwise, is the actual message's message ID.
-		this.messageID = this.getMessageID(telegramRequestBody, env);
+		this.messageID = this.getEffectiveMessageID(telegramRequestBody, env);
+		this.realMessageID = telegramRequestBody?.message?.message_id;
 		this.messageType = this.getMessageType(telegramRequestBody, env);
 		this.command = this.getCommandText(telegramRequestBody);
 		this.commandTokens = this.getCommandTokens(telegramRequestBody);
@@ -241,6 +244,17 @@ export class TelegramWebhookInfo {
 		return parsedResult;
 	}
 
+	toCallbackHandlerData() : CallbackHandlerData {
+		const result : CallbackHandlerData = {
+			telegramUserID: this.telegramUserID,
+			telegramUserName: this.telegramUserName,
+			chatID : this.chatID,
+			messageID: this.messageID,
+			callbackData: this.callbackData!!
+		};
+		return result;
+	}
+
 	private getChatID(requestBody : any) : number {
 		let chatID = requestBody?.callback_query?.message?.chat?.id;
 		if (chatID == null) {
@@ -249,7 +263,7 @@ export class TelegramWebhookInfo {
 		return chatID;
 	}
 
-	private getMessageID(requestBody : any, env : Env) : number {
+	private getEffectiveMessageID(requestBody : any, env : Env) : number {
 		if (this.getIsReplyToBotMessage(requestBody, env)) {
 			return this.getOriginalMessageID(requestBody)!!;
 		}
@@ -334,11 +348,15 @@ export class TelegramWebhookInfo {
 			}
 			const entityType = this.getTGEntityType(entity.type);
 			const entityText = text.substring(entity.offset, entity.offset + entity.length);
+			endOfLastToken = entity.offset + entity.length;
 			tgTextEntities.push({
 				type: entityType,
 				text: entityText
 			});
 		}
+		const trailingText = text.substring(endOfLastToken);
+		const trailingTokens = trailingText.split(/\s+/).filter(s => s);
+		tgTextEntities.push(...trailingTokens.map(w => { return { type: TGTextEntityType.text, text: w }; }));
 		return tgTextEntities;
 	}
 

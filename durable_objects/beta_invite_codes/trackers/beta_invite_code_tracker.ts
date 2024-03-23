@@ -28,7 +28,6 @@ export class BetaInviteCodesTracker extends MapWithStorage<BetaInviteCode> {
                 issuerUserID: issuerUserID,
                 code: newCode,
                 sent: false,
-                claimed: false,
                 claimer : null,
                 depth: depth                
             };
