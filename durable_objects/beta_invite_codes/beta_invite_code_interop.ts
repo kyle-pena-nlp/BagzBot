@@ -4,7 +4,7 @@ import { ResponseOf, WithMethod, WithUserID } from "../../util/builder_types";
 
 export enum BetaInviteCodesMethod {
     Claim = "Claim",
-    ListUnsentCodes = "ListUnclaimedCodes",
+    ListUnclaimedCodes = "ListUnclaimedCodes",
     MarkAsSent = "MarkAsSent",
     HasUserClaimedBetaInviteCode = "HasUserClaimedBetaInviteCode"
 }
@@ -25,8 +25,8 @@ export async function claimInviteCode(request : WithUserID<{ inviteCode : string
 export type ListUnclaimedBetaCodesRequest = WithUserID<{}>;
 export type ListUnclaimedBetaCodesResponse = { betaInviteCodes : string[] };
 
-export async function listUnclaimedBetaInviteCodesRequest(request : ListUnclaimedBetaCodesRequest, env : Env) : Promise<ResponseOf<ListUnclaimedBetaCodesResponse>> {
-    const r = { method : BetaInviteCodesMethod.Claim, data : request };
+export async function listUnclaimedBetaInviteCodes(request : ListUnclaimedBetaCodesRequest, env : Env) : Promise<ResponseOf<ListUnclaimedBetaCodesResponse>> {
+    const r = { method : BetaInviteCodesMethod.ListUnclaimedCodes, data : request };
     const response = await sendJSONRequestToDO<ListUnclaimedBetaCodesRequest,ResponseOf<ListUnclaimedBetaCodesResponse>>(r, env);
     return response;
 }

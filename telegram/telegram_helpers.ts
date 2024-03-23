@@ -74,18 +74,32 @@ export function escapeTGText(text : string, parseMode : 'MarkdownV2'|'HTML') : s
     return text;
 }
 
+export async function sendQuestionToTG(chatID : number,
+    question: string,
+    env: Env,
+    parseMode : 'HTML'|'MarkdownV2' = 'HTML') : Promise<TgMessageSentInfo> {
+    const request = makeTelegramSendQuestionRequest(chatID, question, env, parseMode);
+    return await transformToTGMessageSentInfo(fetch(request));
+}
 
+function makeTelegramSendQuestionRequest(chatID : number, question : string, env : Env, parseMode : 'HTML'|'MarkdownV2') {
+    const method = 'sendMessage';
+    const url = makeTelegramBotUrl(method, env);
+    const body : any = { 
+        chat_id: chatID,
+        text: question,
+        parse_mode: parseMode,
+        reply_markup: {
+            force_reply: true,
+            input_field_placeholder: "Enter beta invite code"
+        }           
+    };        
+    const request = makeJSONRequest(url, body);
+    return request;
+}
 
-
-
-export async function updateTGMessage(chatID : number, 
-    messageID : number, 
-    text : string, 
-    env : Env,
-    parseMode : 'HTML'|'MarkdownV2' = 'HTML', 
-    includeDismissButton : boolean = false) : Promise<TgMessageSentInfo> {
-    const request = makeTelegramUpdateMessageRequest(chatID, messageID, text, env, parseMode, includeDismissButton);
-    return await fetch(request).then(async (response) => {
+async function transformToTGMessageSentInfo(response : Promise<Response>) : Promise<TgMessageSentInfo> {
+    return response.then(async (response) => {
         if (response.ok) {
             const responseJSON : any = await response.json();
             const success : SuccessfulTgMessageSentInfo = {
@@ -106,6 +120,16 @@ export async function updateTGMessage(chatID : number,
     });
 }
 
+export async function updateTGMessage(chatID : number, 
+    messageID : number, 
+    text : string, 
+    env : Env,
+    parseMode : 'HTML'|'MarkdownV2' = 'HTML', 
+    includeDismissButton : boolean = false) : Promise<TgMessageSentInfo> {
+    const request = makeTelegramUpdateMessageRequest(chatID, messageID, text, env, parseMode, includeDismissButton);
+    return await transformToTGMessageSentInfo(fetch(request));
+}
+
 export async function sendMessageToTG(chatID : number, 
     text : string, 
     env : Env,
@@ -113,24 +137,7 @@ export async function sendMessageToTG(chatID : number,
     includeDismissButton : boolean = false) : Promise<TgMessageSentInfo> {
     
     const request = makeTelegramSendMessageRequest(chatID, text, env, parseMode, includeDismissButton);
-    return await fetch(request).then(async (response) => {
-        if (response.ok) {
-            const responseJSON : any = await response.json();
-            const success : SuccessfulTgMessageSentInfo = {
-                success: true,
-                chatID : responseJSON.result?.chat.id,
-                messageID: responseJSON.result?.message_id
-            };
-            return success;
-        }
-        else {
-            const failure : FailedTgMessageSentInfo = { success: false };
-            return failure;
-        }
-    }).catch(() => {
-        const failure : FailedTgMessageSentInfo = { success: false};
-        return failure;
-    });
+    return await transformToTGMessageSentInfo(fetch(request));
 }
 
 export async function deleteTGMessage(messageID : number, chatID : number, env : Env) : Promise<DeleteTGMessageResponse> {
@@ -216,7 +223,7 @@ function addDismissButton(requestBody: any) {
 }
 
 
-async function tryGetTGDescription(response : Response) : Promise<string|undefined> {
+export async function tryGetTGDescription(response : Response) : Promise<string|undefined> {
     try {
         const responseBody : any = await response.json();
         return responseBody.description;

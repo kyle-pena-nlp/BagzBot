@@ -11,6 +11,8 @@ export enum MenuCode {
 	FAQ = "FAQ",
 	Help = "Help",
 	Error = "Error",
+
+	BetaGateInviteFriends = "BetaGateInviteFriends",
 	
 	// address book stuff
 	SubmitAddressBookEntryName = "Submit.ABE.N",

@@ -49,8 +49,8 @@ export class BetaInviteCodesDO {
         switch(method) {
             case BetaInviteCodesMethod.Claim:
                 return await this.handleClaimBetaInviteCode(jsonRequestBody);
-            case BetaInviteCodesMethod.ListUnsentCodes:
-                return await this.handleListUnsentCodes(jsonRequestBody);
+            case BetaInviteCodesMethod.ListUnclaimedCodes:
+                return await this.handleListUnclaimedCodes(jsonRequestBody);
             case BetaInviteCodesMethod.MarkAsSent:
                 return await this.handleMarkAsSent(jsonRequestBody);
             case BetaInviteCodesMethod.HasUserClaimedBetaInviteCode:
@@ -80,7 +80,7 @@ export class BetaInviteCodesDO {
         return { success: true, data: {} };
     }
 
-    private async handleListUnsentCodes(request : ListUnsentBetaCodesRequest) : Promise<ResponseOf<ListUnsentBetaCodesResponse>> {
+    private async handleListUnclaimedCodes(request : ListUnsentBetaCodesRequest) : Promise<ResponseOf<ListUnsentBetaCodesResponse>> {
         const me = request.userID;
         // get all codes issued by me
         let inviteCodes : BetaInviteCode[] = this.betaInviteCodesTracker.listByIssuer(me);

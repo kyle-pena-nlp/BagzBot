@@ -33,6 +33,7 @@ export class BetaInviteCodesTracker extends MapWithStorage<BetaInviteCode> {
                 depth: depth                
             };
             this.set(betaInviteCode.code, betaInviteCode);
+            result.push(betaInviteCode);
         }
         return result;
     }

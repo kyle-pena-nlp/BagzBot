@@ -1,8 +1,7 @@
 import { storeSessionObj } from "../durable_objects/user/userDO_interop";
 import { Env } from "../env";
 import { MenuCode } from "../menus";
-import { makeTelegramBotUrl } from "../telegram";
-import { makeJSONRequest } from "../util";
+import { sendQuestionToTG } from "../telegram/telegram_helpers";
 import { ReplyQuestionCode } from "./reply_question_code";
 import { SessionReplyQuestion } from "./session_reply_question";
 
@@ -19,31 +18,17 @@ export class ReplyQuestion {
         this.backMenuCode = backMenuCode;
         this.parseMode = parseMode;
     }
-    async sendReplyQuestion(telegramUserID : number, chatID : number, messageID : number, env : Env) : Promise<Response> {
+    async sendReplyQuestion(telegramUserID : number, chatID : number, env : Env) {
+        const tgSentMessageInfo = await sendQuestionToTG(chatID, this.question, env, this.parseMode);
+        if (!tgSentMessageInfo.success) {
+            return;
+        }
         const replyQuestionCallbackData = { 
             replyQuestionCode: this.replyQuestionCode,
             nextMenuCode : this.nextMenuCode,
             backMenuCode : this.backMenuCode
-        };
-        await storeSessionObj<SessionReplyQuestion>(telegramUserID, messageID, replyQuestionCallbackData, "replyQuestion", env);
-        const request = this.getReplyQuestionRequest(chatID, messageID, env);
-        const response = await fetch(request);
-        return response;
-    }
-    private getReplyQuestionRequest(chatID : number, messageID : number, env : Env) {
-        const method = 'sendMessage';
-        const url = makeTelegramBotUrl(method, env);
-        const body : any = { 
-            chat_id: chatID,
-            reply_parameters: {
-                message_id : messageID,
-                chat_id : chatID,
-                text: this.question,
-                parse_mode: this.parseMode,
-                allow_sending_without_reply: false
-            }           
-        };        
-        const request = makeJSONRequest(url, body);
-        return request;
+        };  
+        // TODO: how to resolve possibility that user could respond before storage is completed?      
+        await storeSessionObj<SessionReplyQuestion>(telegramUserID, tgSentMessageInfo.messageID, replyQuestionCallbackData, "replyQuestion", env);
     }
 }

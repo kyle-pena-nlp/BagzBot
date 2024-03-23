@@ -11,7 +11,7 @@ export class MapWithStorage<TValue> {
     }
     set(key : string, value : TValue) {
         this.items.set(this.addPrefix(key), value);
-        this.dirtyTracking.add(key);
+        this.dirtyTracking.add(this.addPrefix(key));
     }
     clear() {
         const allKeys = [...this.items.keys()];

@@ -3,7 +3,8 @@ import { Wallet, encryptPrivateKey, generateEd25519Keypair } from "../../crypto"
 import { Env } from "../../env";
 import { PositionPreRequest, PositionStatus, PositionType } from "../../positions";
 import { getVsTokenInfo } from "../../tokens";
-import { ChangeTrackedValue, Structural, assertNever, groupIntoMap, makeFailureResponse, makeJSONResponse, makeSuccessResponse, maybeGetJson } from "../../util";
+import { ChangeTrackedValue, Structural, assertNever, groupIntoMap, makeFailureResponse, makeJSONResponse, makeSuccessResponse, maybeGetJson, strictParseBoolean } from "../../util";
+import { listUnclaimedBetaInviteCodes } from "../beta_invite_codes/beta_invite_code_interop";
 import { AutomaticallyClosePositionsRequest, AutomaticallyClosePositionsResponse } from "../token_pair_position_tracker/actions/automatically_close_positions";
 import { wakeUpTokenPairPositionTracker } from "../token_pair_position_tracker/token_pair_position_tracker_DO_interop";
 import { DeleteSessionRequest, DeleteSessionResponse } from "./actions/delete_session";
@@ -323,7 +324,7 @@ export class UserDO {
 
     async handleGet(jsonRequestBody : GetUserDataRequest) : Promise<Response> {
         const messageID = jsonRequestBody.messageID;
-        return makeJSONResponse(this.makeUserData(messageID));
+        return makeJSONResponse(await this.makeUserData(messageID));
     }
 
     async handleDeleteSession(jsonRequestBody : DeleteSessionRequest) : Promise<Response> {
@@ -484,14 +485,24 @@ export class UserDO {
         }
     }    
 
-    makeUserData(messageID : number) : UserData {
-        
-        const session = this.sessionTracker.getSessionValues(messageID);
+    async makeUserData(messageID : number) : Promise<UserData> {
+        const hasInviteBetaCodes = await this.getHasBetaCodes();
         return {
             hasWallet: !!(this.wallet.value),
             initialized: this.initialized(),
             telegramUserName : this.telegramUserName.value||undefined,
-            session: session
+            hasInviteBetaCodes: hasInviteBetaCodes
         };
+    }
+
+    private async getHasBetaCodes() {
+        const isBetaInviteCodeGated = strictParseBoolean(this.env.IS_BETA_CODE_GATED);
+        if (isBetaInviteCodeGated) {
+            const betaCodes = await listUnclaimedBetaInviteCodes({ userID : this.telegramUserID.value!! }, this.env)
+            if (betaCodes.success) {
+                return betaCodes.data.betaInviteCodes.length > 0;
+            }
+        }
+        return false;
     }
 }

@@ -1,4 +1,5 @@
 import { BaseMenu } from "./menu";
+import { MenuBetaInviteFriends } from "./menu_beta_invite_friends";
 import { MenuCode } from "./menu_code";
 import { MenuConfirmAddressBookEntry } from "./menu_confirm_address_book_entry";
 import { MenuConfirmTrailingStopLossPositionRequest } from "./menu_confirm_trailing_stop_loss_position_request";
@@ -27,7 +28,7 @@ import { PositiveIntegerKeypad } from "./positive_integer_keypad";
 import { MenuTODO } from "./todo_menu";
 
 export {
-    BaseMenu, MenuCode, MenuConfirmAddressBookEntry, MenuConfirmTrailingStopLossPositionRequest, MenuContinueMessage, MenuEditTrailingStopLossPositionRequest, MenuError, MenuFAQ, MenuHelp,
+    BaseMenu, MenuBetaInviteFriends, MenuCode, MenuConfirmAddressBookEntry, MenuConfirmTrailingStopLossPositionRequest, MenuContinueMessage, MenuEditTrailingStopLossPositionRequest, MenuError, MenuFAQ, MenuHelp,
     MenuListPositions, MenuMain, MenuPickTransferFundsRecipient, MenuPleaseEnterToken, MenuPleaseWait, MenuTransferFundsMainMenu as MenuStartTransferFunds, MenuTODO, MenuTrailingStopLossAutoRetrySell,
     MenuTrailingStopLossEntryBuyQuantity,
     MenuTrailingStopLossPickVsToken,

@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { decryptPrivateKey } from "../crypto";
-import { claimInviteCode } from "../durable_objects/beta_invite_codes/beta_invite_code_interop";
+import { claimInviteCode, listUnclaimedBetaInviteCodes } from "../durable_objects/beta_invite_codes/beta_invite_code_interop";
 import { GetTokenInfoResponse, isInvalidTokenInfoResponse } from "../durable_objects/polled_token_pair_list/actions/get_token_info";
 import { getTokenInfo } from "../durable_objects/polled_token_pair_list/polled_token_pair_list_DO_interop";
 import { OpenPositionRequest } from "../durable_objects/user/actions/open_new_position";
@@ -10,7 +10,7 @@ import { TokenSymbolAndAddress } from "../durable_objects/user/model/token_name_
 import { generateWallet, getAddressBookEntry, getAndMaybeInitializeUserData, getDefaultTrailingStopLoss, getPosition, getWalletData, listAddressBookEntries, listOpenTrailingStopLossPositions, manuallyClosePosition, maybeReadSessionObj, readSessionObj, requestNewPosition, storeAddressBookEntry, storeSessionObj, storeSessionObjProperty, storeSessionValues } from "../durable_objects/user/userDO_interop";
 import { Env } from "../env";
 import { logError } from "../logging";
-import { BaseMenu, MenuCode, MenuConfirmAddressBookEntry, MenuConfirmTrailingStopLossPositionRequest, MenuContinueMessage, MenuEditTrailingStopLossPositionRequest, MenuError, MenuFAQ, MenuHelp, MenuListPositions, MenuMain, MenuPickTransferFundsRecipient, MenuPleaseEnterToken, MenuPleaseWait, MenuStartTransferFunds, MenuTODO, MenuTrailingStopLossAutoRetrySell, MenuTrailingStopLossEntryBuyQuantity, MenuTrailingStopLossPickVsToken, MenuTrailingStopLossSlippagePercent, MenuTrailingStopLossTriggerPercent, MenuTransferFundsTestOrSubmitNow, MenuViewDecryptedWallet, MenuViewOpenPosition, MenuWallet, PositiveDecimalKeypad, PositiveIntegerKeypad } from "../menus";
+import { BaseMenu, MenuBetaInviteFriends, MenuCode, MenuConfirmAddressBookEntry, MenuConfirmTrailingStopLossPositionRequest, MenuContinueMessage, MenuEditTrailingStopLossPositionRequest, MenuError, MenuFAQ, MenuHelp, MenuListPositions, MenuMain, MenuPickTransferFundsRecipient, MenuPleaseEnterToken, MenuPleaseWait, MenuStartTransferFunds, MenuTODO, MenuTrailingStopLossAutoRetrySell, MenuTrailingStopLossEntryBuyQuantity, MenuTrailingStopLossPickVsToken, MenuTrailingStopLossSlippagePercent, MenuTrailingStopLossTriggerPercent, MenuTransferFundsTestOrSubmitNow, MenuViewDecryptedWallet, MenuViewOpenPosition, MenuWallet, PositiveDecimalKeypad, PositiveIntegerKeypad } from "../menus";
 import { PositionPreRequest, PositionRequest, convertPreRequestToRequest } from "../positions";
 import { ReplyQuestion, ReplyQuestionCode } from "../reply_question";
 import { SessionReplyQuestion } from "../reply_question/session_reply_question";
@@ -99,7 +99,7 @@ export class Worker {
             return makeSuccessResponse();
         }
         else if ('question' in menuOrReplyQuestion) {
-            await menuOrReplyQuestion.sendReplyQuestion(telegramWebhookInfo.telegramUserID, telegramWebhookInfo.chatID, telegramWebhookInfo.messageID, env);
+            await menuOrReplyQuestion.sendReplyQuestion(telegramWebhookInfo.telegramUserID, telegramWebhookInfo.chatID, env);
         }
         else {
             const menuDisplayRequest = menuOrReplyQuestion.getUpdateExistingMenuRequest(telegramWebhookInfo.chatID, telegramWebhookInfo.messageID, env);
@@ -300,6 +300,12 @@ export class Worker {
                 throw new Error("");
             case MenuCode.RemoveAddressBookEntry:
                 throw new Error("");
+            case MenuCode.BetaGateInviteFriends:
+                const unclaimedBetaCodes = await listUnclaimedBetaInviteCodes({ userID : telegramUserID }, env);
+                if (!unclaimedBetaCodes.success) {
+                    return this.createMainMenu(telegramWebhookInfo, env);
+                }
+                return new MenuBetaInviteFriends(unclaimedBetaCodes.data.betaInviteCodes);
             default:
                 assertNever(callbackData.menuCode);
         }

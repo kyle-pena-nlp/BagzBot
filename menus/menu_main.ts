@@ -13,6 +13,9 @@ export class MenuMain extends Menu<UserData> implements MenuCapabilities {
         if (hasWallet) {
             this.insertButtonNextLine(options, 'Wallet', this.menuCallback(MenuCode.Wallet));
             this.insertButtonSameLine(options, 'Positions', this.menuCallback(MenuCode.ListPositions));
+            if (this.menuData.hasInviteBetaCodes) {
+                this.insertButtonNextLine(options, "Invite Friends To Beta", this.menuCallback(MenuCode.BetaGateInviteFriends));
+            }
             this.createOptionsFAQHelpMenuLine(options);
         }
         else {
