@@ -4,7 +4,7 @@ import { DecimalizedAmount } from "../../decimalized";
 import { Env } from "../../env";
 import { PositionPreRequest, PositionStatus, PositionType } from "../../positions";
 import { getSOLBalance } from "../../rpc/rpc_wallet";
-import { getVsTokenInfo } from "../../tokens";
+import { WEN_ADDRESS, getVsTokenInfo } from "../../tokens";
 import { ChangeTrackedValue, Structural, assertNever, groupIntoMap, makeFailureResponse, makeJSONResponse, makeSuccessResponse, maybeGetJson, strictParseBoolean } from "../../util";
 import { listUnclaimedBetaInviteCodes } from "../beta_invite_codes/beta_invite_code_interop";
 import { AutomaticallyClosePositionsRequest, AutomaticallyClosePositionsResponse } from "../token_pair_position_tracker/actions/automatically_close_positions";
@@ -37,7 +37,7 @@ import { sell } from "./user_sell";
 // TODO: all requests to UserDo include telegramUserID and telegramUserName
 // and ensure initialization.  That way, no purpose-specific initialization call is required
 
-const WEN_ADDRESS = 'WENWENvqqNya429ubCdR81ZmD69brwQaaBYY6p3LCpk';
+
 
 /* Durable Object storing state of user */
 export class UserDO {
@@ -55,6 +55,7 @@ export class UserDO {
     // the user's wallet.
     wallet : ChangeTrackedValue<Wallet|null> = new ChangeTrackedValue<Wallet|null>('wallet', null);
 
+    // keeps track of sol balance and when last refreshed.  Gets (rate-limited) latest balance on access.
     solBalanceTracker : SOLBalanceTracker = new SOLBalanceTracker();
 
     // the default values for a trailing sotp loss
@@ -68,6 +69,9 @@ export class UserDO {
 
     // tracks the address book entries to which the user can send funds
     addressBookEntryTracker : AddressBookEntryTracker = new AddressBookEntryTracker();
+
+    // has the user signed legal?
+    hasSignedLegal : ChangeTrackedValue<boolean> = new ChangeTrackedValue<boolean>('hasSignedLegal', false);
 
     constructor(state : DurableObjectState, env : any) {
         // persistent state object which reaches eventual consistency
@@ -112,6 +116,7 @@ export class UserDO {
         this.userPositionTracker.initialize(storage);
         this.addressBookEntryTracker.initialize(storage);
         this.solBalanceTracker.initialize(storage); // rate limits RPC calls. will refresh on access.
+        this.hasSignedLegal.initialize(storage);
     }
 
     async flushToStorage() {
@@ -122,7 +127,8 @@ export class UserDO {
             this.sessionTracker.flushToStorage(this.state.storage),
             this.userPositionTracker.flushToStorage(this.state.storage),
             this.addressBookEntryTracker.flushToStorage(this.state.storage),
-            this.solBalanceTracker.flushToStorage(this.state.storage)
+            this.solBalanceTracker.flushToStorage(this.state.storage),
+            this.hasSignedLegal.flushToStorage(this.state.storage)
         ]);
     }
 
@@ -302,13 +308,15 @@ export class UserDO {
     }
 
     handleGetDefaultTrailingStopLossRequest(defaultTrailingStopLossRequestRequest : DefaultTrailingStopLossRequestRequest) : Response {
-        const defaultTrailingStopLossRequest = structuredClone(this.defaultTrailingStopLossRequest);
-        defaultTrailingStopLossRequest.userID = defaultTrailingStopLossRequestRequest.userID;
-        defaultTrailingStopLossRequest.chatID = defaultTrailingStopLossRequestRequest.chatID;
-        defaultTrailingStopLossRequest.messageID = defaultTrailingStopLossRequestRequest.messageID;
-        defaultTrailingStopLossRequest.positionID = crypto.randomUUID();
-        defaultTrailingStopLossRequest.tokenAddress = defaultTrailingStopLossRequestRequest.token.address;
-        const responseBody : DefaultTrailingStopLossRequestResponse = { prerequest: defaultTrailingStopLossRequest };
+        const defaultPrerequest = structuredClone(this.defaultTrailingStopLossRequest);
+        defaultPrerequest.userID = defaultTrailingStopLossRequestRequest.userID;
+        defaultPrerequest.chatID = defaultTrailingStopLossRequestRequest.chatID;
+        defaultPrerequest.messageID = defaultTrailingStopLossRequestRequest.messageID;
+        defaultPrerequest.positionID = crypto.randomUUID();
+        if (defaultTrailingStopLossRequestRequest.token != null) {
+            defaultPrerequest.tokenAddress = defaultTrailingStopLossRequestRequest.token.address;
+        }
+        const responseBody : DefaultTrailingStopLossRequestResponse = { prerequest: defaultPrerequest };
         return makeJSONResponse(responseBody);
     }
 

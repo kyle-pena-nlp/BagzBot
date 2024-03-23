@@ -9,11 +9,12 @@ import {
     getVsTokenDecimalsMultiplier,
     getVsTokenInfo,
 } from "./vs_tokens";
+import { WEN_ADDRESS } from "./wen";
 
 export {
     SOL_ADDRESS,
     StagedTokenInfo,
-    TokenInfo, deriveFeeAccount,
-    deriveTokenAccount, getVsTokenDecimalsMultiplier, getVsTokenInfo,
+    TokenInfo, WEN_ADDRESS, deriveFeeAccount,
+    deriveTokenAccount, getVsTokenDecimalsMultiplier, getVsTokenInfo
 };
 

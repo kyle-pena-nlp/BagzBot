@@ -211,7 +211,7 @@ function makeTelegramUpdateMessageRequest(chatID : number,
 function addDismissButton(requestBody: any) {
     const dismissButton : CallbackButton = {
         text: "Dismiss",
-        callback_data: new CallbackData(MenuCode.Close).toString()
+        callback_data: new CallbackData(MenuCode.Main).toString()
     };
     const dismissButtonKeyboard : CallbackButton[][] = [[dismissButton]];
     return {

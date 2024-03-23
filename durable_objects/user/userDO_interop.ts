@@ -127,9 +127,9 @@ export async function getPosition(telegramUserID : number, positionID : string, 
 
 export async function getDefaultTrailingStopLoss(telegramUserID : number, 
 	chatID : number, 
-	messageID :  number,
-	token : TokenInfo, 
-	env : Env) : Promise<DefaultTrailingStopLossRequestResponse> {
+	messageID :  number, 
+	env : Env,
+	token ?: TokenInfo) : Promise<DefaultTrailingStopLossRequestResponse> {
 	const body : DefaultTrailingStopLossRequestRequest = { 
 		userID: telegramUserID, 
 		chatID: chatID, 

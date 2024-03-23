@@ -11,6 +11,7 @@ export enum MenuCode {
 	FAQ = "FAQ",
 	Help = "Help",
 	Error = "Error",
+	NewPosition = "NewPosition",
 
 	BetaGateInviteFriends = "BetaGateInviteFriends",
 	

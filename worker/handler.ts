@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { decryptPrivateKey } from "../crypto";
 import { claimInviteCode, listUnclaimedBetaInviteCodes } from "../durable_objects/beta_invite_codes/beta_invite_code_interop";
-import { GetTokenInfoResponse, isInvalidTokenInfoResponse } from "../durable_objects/polled_token_pair_list/actions/get_token_info";
+import { GetTokenInfoResponse, isInvalidTokenInfoResponse, isValidTokenInfoResponse } from "../durable_objects/polled_token_pair_list/actions/get_token_info";
 import { getTokenInfo } from "../durable_objects/polled_token_pair_list/polled_token_pair_list_DO_interop";
 import { OpenPositionRequest } from "../durable_objects/user/actions/open_new_position";
 import { CompletedAddressBookEntry, JustAddressBookEntryID, JustAddressBookEntryName } from "../durable_objects/user/model/address_book_entry";
@@ -9,6 +9,7 @@ import { QuantityAndToken } from "../durable_objects/user/model/quantity_and_tok
 import { TokenSymbolAndAddress } from "../durable_objects/user/model/token_name_and_address";
 import { generateWallet, getAddressBookEntry, getAndMaybeInitializeUserData, getDefaultTrailingStopLoss, getPosition, getWalletData, listAddressBookEntries, listOpenTrailingStopLossPositions, manuallyClosePosition, maybeReadSessionObj, readSessionObj, requestNewPosition, storeAddressBookEntry, storeSessionObj, storeSessionObjProperty, storeSessionValues } from "../durable_objects/user/userDO_interop";
 import { Env } from "../env";
+import { logError } from "../logging";
 import { BaseMenu, MenuBetaInviteFriends, MenuCode, MenuConfirmAddressBookEntry, MenuConfirmTrailingStopLossPositionRequest, MenuContinueMessage, MenuEditTrailingStopLossPositionRequest, MenuError, MenuFAQ, MenuHelp, MenuListPositions, MenuMain, MenuPickTransferFundsRecipient, MenuPleaseEnterToken, MenuPleaseWait, MenuStartTransferFunds, MenuTODO, MenuTrailingStopLossAutoRetrySell, MenuTrailingStopLossEntryBuyQuantity, MenuTrailingStopLossPickVsToken, MenuTrailingStopLossSlippagePercent, MenuTrailingStopLossTriggerPercent, MenuTransferFundsTestOrSubmitNow, MenuViewDecryptedWallet, MenuViewOpenPosition, MenuWallet, PositiveDecimalKeypad, PositiveIntegerKeypad } from "../menus";
 import { CallbackData } from "../menus/callback_data";
 import { PositionPreRequest, PositionRequest, convertPreRequestToRequest } from "../positions";
@@ -18,7 +19,7 @@ import { quoteBuy } from "../rpc/jupiter_quotes";
 import { CompleteTransferFundsRequest, PartialTransferFundsRequest } from "../rpc/rpc_transfer_funds";
 import { isGetQuoteFailure } from "../rpc/rpc_types";
 import { AutoSellOrderSpec, TelegramWebhookInfo, deleteTGMessage, sendMessageToTG, sendRequestToTG, updateTGMessage } from "../telegram";
-import { getVsTokenInfo } from "../tokens";
+import { WEN_ADDRESS, getVsTokenInfo } from "../tokens";
 import { Structural, assertNever, makeFakeFailedRequestResponse, makeJSONResponse, makeSuccessResponse, tryParseFloat } from "../util";
 import { CallbackHandlerData as CallbackHandlerParams } from "./model/callback_handler_data";
 
@@ -52,7 +53,7 @@ export class Worker {
         const conversationMessageID = conversation.messageID;
 
         // get default settings for a position request
-        const r = await getDefaultTrailingStopLoss(telegramUserID, chatID, initiatingMessageID, validateTokenResponse.tokenInfo, env);
+        const r = await getDefaultTrailingStopLoss(telegramUserID, chatID, initiatingMessageID, env);
         const defaultTSL = r.prerequest;
 
         // create a 'prerequest' (with certain things missing that would be in a full request)
@@ -123,6 +124,24 @@ export class Worker {
             case MenuCode.CreateWallet:
                 await this.handleCreateWallet(telegramWebhookInfo, env);
                 return this.createMainMenu(telegramWebhookInfo, env);
+            case MenuCode.NewPosition:
+                const pr = await getDefaultTrailingStopLoss(telegramUserID, chatID, messageID, env);
+                const newPrerequest = pr.prerequest;
+                let tokenInfoResponse = await getTokenInfo(newPrerequest.tokenAddress, env);
+                if (!isValidTokenInfoResponse(tokenInfoResponse)) {
+                    tokenInfoResponse = await getTokenInfo(WEN_ADDRESS, env);
+                    if (!isValidTokenInfoResponse(tokenInfoResponse)) {
+                        logError(`User could not open position editor because ${WEN_ADDRESS} DNE`, telegramWebhookInfo);
+                        return new MenuContinueMessage(`Editor could not be opened due to an unexpected error.`, MenuCode.Main);
+                    }
+                }
+                const quote = await quoteBuy(newPrerequest, tokenInfoResponse.tokenInfo, env);
+                const tokenInfo = tokenInfoResponse.tokenInfo;
+                if (isGetQuoteFailure(quote)) {
+                    return new MenuContinueMessage(`Could not get a quote for ${tokenInfo.symbol}. Please try again soon.`, MenuCode.Main);
+                }
+                const request = convertPreRequestToRequest(newPrerequest, quote, tokenInfoResponse.tokenInfo);
+                return new MenuEditTrailingStopLossPositionRequest(request);
             case MenuCode.Error:
                 return new MenuError(undefined);
             case MenuCode.ViewDecryptedWallet:

@@ -5,7 +5,7 @@ export interface DefaultTrailingStopLossRequestRequest {
 	userID : number,
 	chatID: number,
 	messageID : number,
-	token : TokenInfo
+	token ?: TokenInfo
 }
 
 export interface DefaultTrailingStopLossRequestResponse {
