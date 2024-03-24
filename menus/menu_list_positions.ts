@@ -1,3 +1,4 @@
+import { toFriendlyString } from "../decimalized";
 import { Position } from "../positions";
 import { CallbackButton } from "../telegram";
 import { CallbackData } from "./callback_data";
@@ -11,7 +12,7 @@ export class MenuListPositions extends Menu<Position[]> implements MenuCapabilit
     renderOptions(): CallbackButton[][] {
         const options = this.emptyMenu();
         for (const position of this.menuData) {
-            const positionLabel = `${position.token.symbol} - ${position.tokenAmt.toString()}`;
+            const positionLabel = `${position.token.symbol} - ${toFriendlyString(position.tokenAmt,4)}`;
             const callbackData = new CallbackData(MenuCode.ViewOpenPosition, position.positionID);
             this.insertButtonNextLine(options, positionLabel, callbackData);
         }

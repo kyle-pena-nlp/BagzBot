@@ -27,7 +27,7 @@ export enum TransactionExecutionError {
 export enum TransactionExecutionErrorCouldntConfirm {
     CouldNotConfirmTooManyExceptions = "CouldNotConfirmTooManyExceptions",
     TimeoutCouldNotConfirm = "TimeoutCouldNotConfirm",
-    Unknown = "Unknown"
+    UnknownCouldNotConfirm = "UnknownCouldNotConfirm"
 }
 
 

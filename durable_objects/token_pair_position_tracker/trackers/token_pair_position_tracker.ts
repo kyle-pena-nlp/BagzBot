@@ -1,5 +1,5 @@
 import { DecimalizedAmount } from "../../../decimalized";
-import { logDebug, logError } from "../../../logging";
+import { logError } from "../../../logging";
 import { Position, PositionRequest, PositionStatus } from "../../../positions";
 import { MapWithStorage } from "../../../util";
 import { PeakPricePositionTracker } from "./peak_price_tracker";
@@ -175,7 +175,6 @@ export class TokenPairPositionTracker {
             logError("Flushing to storage failed for TokenPairPositionTracker", this);
             return;
         }).then(() => {
-            logDebug("Flushing to storage successful for TokenPairPositionTracker", this);
             return;
         });
     }

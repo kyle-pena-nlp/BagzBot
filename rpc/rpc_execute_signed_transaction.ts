@@ -4,7 +4,6 @@ import { Buffer } from "node:buffer";
 import { Env } from "../env";
 import { logDebug, logError } from "../logging";
 import { assertNever, sleep } from "../util";
-import { getLastValidBlockheight, getLatestBlockheight } from "./rpc_common";
 import { parseInstructionError } from "./rpc_parse_instruction_error";
 import {
     PreparseSwapResult,
@@ -14,14 +13,14 @@ import {
 } from "./rpc_types";
 
 
-export async function executeRawSignedTransaction(
+export async function executeAndMaybeConfirmTx(
     positionID : string,
     rawSignedTx : VersionedTransaction, 
     connection : Connection,
     env : Env) : Promise<PreparseSwapResult> {
 
     // Define some settings
-    const maxConfirmExceptions = parseInt(env.RPC_MAX_CONFIRM_EXCEPTIONS,10);
+    const maxConfirmRpcExceptions = parseInt(env.RPC_MAX_CONFIRM_EXCEPTIONS,10);
     const REBROADCAST_DELAY_MS = parseInt(env.RPC_REBROADCAST_DELAY_MS, 10);
     const REATTEMPT_CONFIRM_DELAY = parseInt(env.RPC_REATTEMPT_CONFIRM_DELAY, 10);
     const confirmTimeoutMS = parseInt(env.RPC_CONFIRM_TIMEOUT_MS, 10);
@@ -38,74 +37,73 @@ export async function executeRawSignedTransaction(
 
     // The loops can signal eachother to stop by setting these flags.
     let stopSendingTx = false;
-    let stopConfirmingSignal = false;
+    let stopConfirming = false;
 
-    // if the current blockheight exceeds this, the transaction will never execute.
-    const lastValidBlockheight = await getLastValidBlockheight(connection).catch((reason) => null);
-    if (!lastValidBlockheight) {
-        return { 
-            positionID: positionID, 
-            status: TransactionExecutionError.CouldNotDetermineMaxBlockheight, 
-            signature : signature 
-        };
-    }
+    // the blockhash that acts as the nonce for the tx
+    const txRecentBlockhash = rawSignedTx.message.recentBlockhash;
+
+    // whether at least 1 tx has been sent.
+    let anyTxSent = false;
 
     const resendTxTask = (async () => {
 
-        // The current blockheight (will be repolled after every send attempt)
-        let blockheight : number = -1;
-
         // Whether or not at least one tx got successfully sent to RPC
-        let anyTxSent = false;
+        let rpcExceptions = 0;
+
+        let returnStatus : TransactionExecutionError|undefined = undefined;
         
         // Until this loop is signalled to stop
         while(!stopSendingTx) {
 
-            /* Attempt to send transaction.  If sent, note that there is something to confirm (`anyTxSent`). */
-            try {
-                await connection.sendRawTransaction(txBuffer, {
-                    skipPreflight : true,
-                    maxRetries: 0
-                });
+            // try to send the tx. if it sends w/o exception, set anyTxSent to true.
+            logDebug("Attempting to send tx")
+            await connection.sendRawTransaction(txBuffer, {
+                skipPreflight : true,
+                maxRetries: 0
+            }).then(_ => {
                 anyTxSent = true;
-            }
-            catch(e) {
-                // failing once may mean RPC rate limit, for example. We can try again. But log it.
+                logDebug("Tx successfully sent.")
+            })
+            .catch(e => {
+                rpcExceptions += 1;
                 logError("sendRawTransaction threw an exception", e, signature);
+            });
+
+            // see if the blockhash the tx was signed with is still valid
+            const blockhashValid = await getIsBlockhashValid(txRecentBlockhash, connection);
+
+            // if calling the RPC failed (rate-limited?), increment failure count.
+            if (blockhashValid == null) {
+                logDebug("Send loop - could not check blockhash")
+                rpcExceptions += 1;
+            }
+
+            // if there have been too many RPC exceptions, stop re-sending
+            if (rpcExceptions > 10) {
+                // TODO: more appropriate status
+                logDebug("Too many exceptions sending tx");
+                returnStatus = TransactionExecutionError.CouldNotDetermineMaxBlockheight;
+                break;
+            }
+
+            // if the blockhash used to sign the tx is no longer valid, stop re-sending
+            if (blockhashValid === false) {
+                logDebug("send loop - blockhash expired - stopping send tx");
+                returnStatus = TransactionExecutionError.BlockheightExceeded;
+                break;
             }
 
             // Sleep to avoid spamming RPC.
             await sleep(REBROADCAST_DELAY_MS);
-
-            // poll RPC for blockheight
-            const maybeBlockheight = await getLatestBlockheight(connection).catch(r => {
-                logError('Could not poll blockheight', r, signature);
-                return null;
-            });
-
-            // if polling failed and no transactions have been sent, don't bother trying to confirm.
-            if (maybeBlockheight == null && !anyTxSent) {
-                stopConfirmingSignal = true;
-            }
-
-            // and if polling BH failed, stop trying to send tx. How else will we know to stop?
-            if (maybeBlockheight == null) {
-                return TransactionExecutionError.CouldNotPollBlockheightNoTxSent;
-            }
-
-            blockheight = maybeBlockheight;
-
-            // if we are passed last valid BH and no tx's were sent, don't bother confirming.
-            if (blockheight >= lastValidBlockheight && !anyTxSent) {
-                stopConfirmingSignal = true;
-            }
-
-            // and if we are passed last valid BH, don't bother trying again.
-            if (blockheight >= lastValidBlockheight) {
-                return TransactionExecutionError.BlockheightExceeded;
-            }
         }
-        return;
+
+        // confirmation is a worthy activity only if at least one tx was sent to the RPC
+        if (!anyTxSent) {
+            logDebug("No tx sent - stopping confirmation loop");
+            stopConfirming = true;
+        }
+
+        return returnStatus;
     })();
 
     /*
@@ -116,88 +114,105 @@ export async function executeRawSignedTransaction(
     */
     const confirmTransactionTask = (async () => {
 
-        let confirmExceptions = 0;
-        const startConfirmMS = Date.now();
+        let rpcExceptions = 0;
+        let returnStatus : TransactionExecutionError | 
+            TransactionExecutionErrorCouldntConfirm | 
+            SwapExecutionError | 
+            'transaction-confirmed' | 
+            undefined = undefined;
         
-        while(!stopConfirmingSignal) {
+        while(!stopConfirming) {
+
+            // don't bother confirming if at least 1 tx hasn't been sent. check again real soon.
+            if (!anyTxSent) {
+                await sleep(100);
+                continue;
+            }
             
-            /* Check the status on the signature */
-            let result : SignatureStatus|'DNE'|'method-failed' = 'DNE';
-                
             // get signature status
+            // note: MAX_RECENT_BLOCKHASHES = 300, which is greater than MAX_VALID_BLOCKHEIGHT = +150
+            logDebug("confirm loop - getting signature status");
             const sigStatOpts = { searchTransactionHistory: false }; // TODO: should this change?
-            result = await connection.getSignatureStatus(signature, sigStatOpts)
-                .then(res => { return (res.value == null) ? 'DNE' : res.value })
+            const signatureStatus : SignatureStatus|'tx-does-not-exist'|'get-signature-status-method-failed' = await connection.getSignatureStatus(signature, sigStatOpts)
+                .then(res => { return (res.value == null) ? 'tx-does-not-exist' : res.value })
                 .catch(e => {
                     logError("getSignatureStatus threw an exception", e, signature)
-                    return 'method-failed'
+                    return 'get-signature-status-method-failed'
                 });
-            
-            // if getSignatureStatus itself failed, increment exception count.
-            if (result === 'method-failed') {
-                confirmExceptions += 1; 
-            }
-            
-            await sleep(REATTEMPT_CONFIRM_DELAY);
 
-            // if the tx doesn't exist...
-            if (result === 'DNE') {
-                // get the current blockheight
-                const currentBH = await getLatestBlockheight(connection).catch((e) => {
-                    logError('Could not poll BH', e, signature)
-                    return null;
-                });
-                // and if the current BH exceeds last valid BH, then TX will never exist (i.o.w., TX dropped)
-                if (currentBH && currentBH > lastValidBlockheight) {
-                    logError("Tx dropped", signature);
-                    return TransactionExecutionError.TransactionDropped;
+            // if we successfully got the signature status...
+            const isSignatureStatus = typeof signatureStatus === 'object' && 'slot' in signatureStatus;
+            if (isSignatureStatus) {
+                // parse it.
+                const simpleTxSigStatus = interpretTxSignatureStatus(signatureStatus);
+                // if the tx failed, end confirmation loop, indicate parsed error
+                if (simpleTxSigStatus === 'failed') {
+                    logDebug("confirm loop - tx failed", signature);                    
+                    returnStatus = parseSwapExecutionError(signatureStatus.err, rawSignedTx, env);
+                    break;
                 }
-            }
-
-            // if we actually got a signature status...
-            if (result !== 'DNE' && result !== 'method-failed') {
-                
-                const txStatus = getTxStatus(result);
-
-                if (txStatus === 'failed') {
-                    stopSendingTx = true;
-                    logDebug("Tx failed", signature);
-                    return parseSwapExecutionError(result.err, rawSignedTx, env);
+                // if the tx failed, end confirmation loop, indicate success
+                else if (simpleTxSigStatus === 'succeeded') {
+                    logDebug("confirm loop - tx succeeded", signature);
+                    returnStatus = 'transaction-confirmed';
+                    break;
                 }
-                else if (txStatus === 'succeeded') {
-                    stopSendingTx = true;
-                    logDebug("Tx succeeded", signature);
-                    return 'transaction-confirmed';
-                }
-                else if (txStatus === 'unconfirmed') {
-                    logDebug("Tx unconfirmed", signature);
+                // if the tx is still unconfirmed, keep going.
+                else if (simpleTxSigStatus === 'unconfirmed') {
+                    logDebug("confirm loop - tx unconfirmed - reattempting confirmation", signature);
                 }
                 else {
-                    assertNever(txStatus);
+                    assertNever(simpleTxSigStatus);
                 }
             }
+            else if (signatureStatus === 'tx-does-not-exist') {
+                const isValidBlockhash = await getIsBlockhashValid(txRecentBlockhash, connection);
+                // if tx sig status DNE and blockhash still valid, reattempt confirmation.
+                if (isValidBlockhash === true) {
+                    logDebug("Tx DNE yet blockhash still valid - reattempting confirmation");
+                }
+                // if tx sig status DNE and blockhash expired, tx was dropped.
+                else if (isValidBlockhash === false) {
+                    logError("Tx dropped", signature);
+                    returnStatus = TransactionExecutionError.TransactionDropped;
+                    break;
+                }
+                // if failed to get blockhash status, increment exception count
+                else if (isValidBlockhash == null) {
+                    logError("Error occurred determining if blockhash is valid")
+                    rpcExceptions +=1;
+                }
+                else {
+                    assertNever(isValidBlockhash);
+                }
+            }
+            // if could not get sig status due to RPC error, increment exception count
+            else if (signatureStatus === 'get-signature-status-method-failed') {
+                logDebug('confirm loop - failure determining sig status')
+                rpcExceptions += 1;
+            }
+            else {
+                assertNever(signatureStatus);
+            }
 
-            /* i.e.; RPC is down. */
-            if (confirmExceptions >= maxConfirmExceptions) {
-                stopSendingTx = true;
+            /* if too many exception, could not confirm. stop reattempting confirmation */
+            if (rpcExceptions >= maxConfirmRpcExceptions) {
                 logError("Too many exceptions when trying to confirm", signature);                
-                return TransactionExecutionErrorCouldntConfirm.CouldNotConfirmTooManyExceptions; //'confirmation-too-many-exceptions';
+                returnStatus = TransactionExecutionErrorCouldntConfirm.CouldNotConfirmTooManyExceptions; //'confirmation-too-many-exceptions';
+                break;
             }
 
-            // this is a failsafe to prevent infinite looping.
-            const confirmTimedOut = (Date.now() - startConfirmMS) > confirmTimeoutMS;
-            if (confirmTimedOut) {
-                stopSendingTx = true;
-                logError("Timed out trying to confirm tx", signature);
-                return TransactionExecutionErrorCouldntConfirm.TimeoutCouldNotConfirm;
-            }
+            await sleep(REATTEMPT_CONFIRM_DELAY);
         }
-        return;
+        logDebug('confirm loop - stopping send of tx')
+        stopSendingTx = true;
+        return returnStatus;
     })();
 
     const confirmStatus = await confirmTransactionTask;
     const sendStatus = await resendTxTask;
-    const finalStatus = determineTxConfirmationFinalStatus(sendStatus, confirmStatus);
+
+    const finalStatus = determineTxConfirmationFinalStatus(anyTxSent, sendStatus, confirmStatus);
 
     return { 
         positionID : positionID, 
@@ -223,13 +238,36 @@ function parseSwapExecutionError(err : any, rawSignedTx : VersionedTransaction, 
 
 
 function determineTxConfirmationFinalStatus(
+    anyTxSent : boolean,
     sendStatus : TransactionExecutionError|undefined, 
     confirmStatus : TransactionExecutionError|TransactionExecutionErrorCouldntConfirm|SwapExecutionError|'transaction-confirmed'|undefined) : SwapExecutionError | TransactionExecutionError | TransactionExecutionErrorCouldntConfirm | 'transaction-confirmed' {
-    return confirmStatus || sendStatus || TransactionExecutionErrorCouldntConfirm.Unknown;
+    
+    if (!anyTxSent) {
+        return TransactionExecutionError.TransactionFailedOtherReason
+    }
+    else if (confirmStatus != null) {
+        return confirmStatus;
+    }
+    else if (sendStatus != null) {
+        return sendStatus;
+    }
+    else {
+        return TransactionExecutionErrorCouldntConfirm.UnknownCouldNotConfirm;
+    }
 }
 
+async function getIsBlockhashValid(txRecentBlockhash : string, connection : Connection) {
+    return await connection.isBlockhashValid(txRecentBlockhash, { commitment: 'processed' })
+        .then(result => {
+            return result.value;
+        })
+        .catch(e => {
+            logError("Unable to determine if blockhash is valid", e);
+            return null;
+        });
+}
 
-function getTxStatus(status : SignatureStatus) : 'failed'|'unconfirmed'|'succeeded' {
+function interpretTxSignatureStatus(status : SignatureStatus) : 'failed'|'unconfirmed'|'succeeded' {
                 
     // If the status has an err object, failed!
     const err = status.err;
@@ -243,11 +281,12 @@ function getTxStatus(status : SignatureStatus) : 'failed'|'unconfirmed'|'succeed
         return 'succeeded';
     }
 
+    // I think having at least 1 confirmation is too optimistic and getParsed will fail.
     // If the tx has at least one confirmation (but no error), success!
-    const hasConfirmations = (status.confirmations || 0) > 0;
+    /*const hasConfirmations = (status.confirmations || 0) > 0;
     if (hasConfirmations) {
         return 'succeeded';
-    }
+    }*/
 
     // otherwise, no error, but no confirmations or confirmationStatus in (confirmed,finalized)
     // ...that means unconfirmed.

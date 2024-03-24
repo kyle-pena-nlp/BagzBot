@@ -1,8 +1,8 @@
 import { DurableObjectState } from "@cloudflare/workers-types";
-import { DecimalizedAmount, MATH_DECIMAL_PLACES, fromNumber } from "../../decimalized";
+import { DecimalizedAmount } from "../../decimalized";
 import { Env } from "../../env";
-import { logError, logInfo } from "../../logging";
-import { ChangeTrackedValue, assertNever, makeJSONResponse } from "../../util";
+import { logDebug, logError } from "../../logging";
+import { ChangeTrackedValue, assertNever, makeJSONResponse, makeSuccessResponse } from "../../util";
 import { sendClosePositionOrdersToUserDOs } from "../user/userDO_interop";
 import { AutomaticallyClosePositionsRequest } from "./actions/automatically_close_positions";
 import { HasPairAddresses } from "./actions/has_pair_addresses";
@@ -12,6 +12,7 @@ import { MarkPositionAsClosingRequest, MarkPositionAsClosingResponse } from "./a
 import { UpdatePriceRequest, UpdatePriceResponse } from "./actions/update_price";
 import { WakeupRequest, WakeupResponse } from "./actions/wake_up";
 import { TokenPairPositionTrackerDOFetchMethod, parseTokenPairPositionTrackerDOFetchMethod } from "./token_pair_position_tracker_DO_interop";
+import { CurrentPriceTracker } from "./trackers/current_price_tracker";
 import { TokenPairPositionTracker } from "./trackers/token_pair_position_tracker";
 
 /*
@@ -42,6 +43,8 @@ export class TokenPairPositionTrackerDO {
     // this performs all the book keeping and determines what RPC actions to take
     tokenPairPositionTracker : TokenPairPositionTracker = new TokenPairPositionTracker();
     
+    currentPriceTracker : CurrentPriceTracker = new CurrentPriceTracker();
+
     env : Env;
 
     constructor(state : DurableObjectState, env : Env) {
@@ -59,13 +62,15 @@ export class TokenPairPositionTrackerDO {
         this.tokenAddress.initialize(entries);
         this.vsTokenAddress.initialize(entries);
         this.tokenPairPositionTracker.initialize(entries);
+        this.currentPriceTracker.initialize(entries);
     }
 
     async flushToStorage() {
         await Promise.allSettled([
             this.tokenAddress.flushToStorage(this.state.storage),
             this.vsTokenAddress.flushToStorage(this.state.storage),
-            this.tokenPairPositionTracker.flushToStorage(this.state.storage)
+            this.tokenPairPositionTracker.flushToStorage(this.state.storage),
+            this.currentPriceTracker.flushToStorage(this.state.storage)
         ]);
     }
 
@@ -93,9 +98,9 @@ export class TokenPairPositionTrackerDO {
         const beginExecutionTime = Date.now();
         await this.state.storage.deleteAlarm();
         try {
-            const price = await this.getPrice();
+            const price = await this.currentPriceTracker.getPrice();
             if (price != null) {
-                this.updatePrice(price);
+                this.updatePositionTracker(price);
             }
             else {
                 logError("Could not retrieve price", this);
@@ -113,21 +118,6 @@ export class TokenPairPositionTrackerDO {
         }
     }
 
-    async getPrice() : Promise<DecimalizedAmount|undefined> {
-        logInfo("Retrieving price for:", this);
-        const tokenAddress = this.tokenAddress.value!!;
-        const vsTokenAddress = this.vsTokenAddress.value!!;
-        const url = `https://price.jup.ag/v4/price?ids=${tokenAddress}&vsToken=${vsTokenAddress}`;
-        const response = await fetch(url);
-        if (!response.ok) {
-            return;
-        }
-        const responseBody : any = (await response.json());
-        const price = responseBody.data[tokenAddress].price;
-        const decimalizedPrice = fromNumber(price, MATH_DECIMAL_PLACES);
-        return decimalizedPrice;
-    }
-
     async scheduleNextPoll(begin : number) {
         this.isPolling = true;
         const end = Date.now();
@@ -142,14 +132,20 @@ export class TokenPairPositionTrackerDO {
     }
 
     async fetch(request : Request) : Promise<Response> {
-
         const [method,body] = await this.validateFetchRequest(request);
-        const response = await this._fetch(method,body);
-        if (this.shouldBePolling() && !this.isPolling) {
-            this.scheduleNextPoll(Date.now());
+        try {
+            const response = await this._fetch(method,body);
+            if (this.shouldBePolling() && !this.isPolling) {
+                this.scheduleNextPoll(Date.now());
+            }
+            return response;
         }
-        await this.flushToStorage();
-        return response;
+        catch(e : any) {
+        }
+        finally {
+            await this.flushToStorage();
+        }
+        return makeSuccessResponse();
     }
 
     async _fetch(method : TokenPairPositionTrackerDOFetchMethod, body : any) : Promise<Response> {
@@ -164,9 +160,16 @@ export class TokenPairPositionTrackerDO {
                 return await this.handleMarkPositionAsClosed(body);
             case TokenPairPositionTrackerDOFetchMethod.wakeUp:
                 return await this.handleWakeup(body);
+            case TokenPairPositionTrackerDOFetchMethod.getTokenPrice:
+                return await this.handleGetTokenPrice(body);
             default:
                 assertNever(method);
         }
+    }
+
+    async handleGetTokenPrice(body : {}) : Promise<Response> {
+        const price = await this.currentPriceTracker.getPrice();
+        return makeJSONResponse<{ price : DecimalizedAmount|undefined }>({ price : price });
     }
 
     async handleWakeup(body : WakeupRequest) {
@@ -203,6 +206,7 @@ export class TokenPairPositionTrackerDO {
         if (method == null) {
             throw new Error(`Unknown method ${method}`);
         }
+        logDebug(`token pair position tracker - executing ${method}`);
         return [method,jsonBody];
     }
 
@@ -215,16 +219,17 @@ export class TokenPairPositionTrackerDO {
     async handleUpdatePrice(request : UpdatePriceRequest) : Promise<Response> {
         this.ensureIsInitialized(request);
         const newPrice = request.price;
-        this.updatePrice(newPrice);
+        const actionsToTake = this.updatePositionTracker(newPrice);
+        const closePositionsRequest : AutomaticallyClosePositionsRequest = { positions: actionsToTake.positionsToClose };
+        sendClosePositionOrdersToUserDOs(closePositionsRequest, this.env);
         const responseBody : UpdatePriceResponse = {};
         return makeJSONResponse(responseBody);
     }
 
-    async updatePrice(newPrice : DecimalizedAmount) {
+    updatePositionTracker(newPrice : DecimalizedAmount) {
         // fire and forget so we don't block subsequent update-price ticks
         const positionsToClose = this.tokenPairPositionTracker.updatePrice(newPrice);
-        const request : AutomaticallyClosePositionsRequest = { positions: positionsToClose.positionsToClose };
-        sendClosePositionOrdersToUserDOs(request, this.env);
+        return positionsToClose;
     }
     
     ensureIsInitialized(x : HasPairAddresses) {

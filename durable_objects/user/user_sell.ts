@@ -139,7 +139,7 @@ async function tryToConfirmPriorBuyInOrderToSell(position : Position,
 
     // if it still didn't work, it never will
     if (isUnknownTransactionParseSummary(maybeParsed)) {
-        logError("Tx did not exist for last-minute buy confirmation before sell", position);
+        logError("Could not confirm existence of buy transaction before executing sell", position);
         return;
     }
 

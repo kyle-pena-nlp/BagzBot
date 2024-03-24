@@ -7,7 +7,8 @@ export class UserPositionTracker {
     constructor() {
     }
     initialize(entries : Map<string,any>) {
-        for (const entryKey of (entries.keys())) {
+        const entryKeys = [...entries.keys()];
+        for (const entryKey of (entryKeys)) {
             const positionIDKey = PositionIDKey.parse(entryKey);
             if (positionIDKey != null) {
                 const position = entries.get(positionIDKey.toString());
@@ -30,7 +31,7 @@ export class UserPositionTracker {
         const deletePromise = storage.delete([...this.deletedKeys]).then(() => {
             this.deletedKeys.clear();
         });
-        await Promise.all([putPromise, deletePromise]);
+        await Promise.allSettled([putPromise, deletePromise]);
     }
     storePositions(positions: Position[]) {
         for (const position of positions) {

@@ -20,7 +20,10 @@ const keysToLookFor = [
     'vsToken',
     'tokenAddress',
     'vsTokenAddress',
-    'value'
+    'value',
+    'code',
+    'data',
+    'err'
 ];
 
 const fnsToLookFor = [

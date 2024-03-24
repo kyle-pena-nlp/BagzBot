@@ -2,6 +2,7 @@ import { DurableObjectState } from "@cloudflare/workers-types";
 import { Wallet, encryptPrivateKey, generateEd25519Keypair } from "../../crypto";
 import { DecimalizedAmount } from "../../decimalized";
 import { Env } from "../../env";
+import { logError } from "../../logging";
 import { PositionPreRequest, PositionStatus, PositionType } from "../../positions";
 import { getSOLBalance } from "../../rpc/rpc_wallet";
 import { WEN_ADDRESS, getVsTokenInfo } from "../../tokens";
@@ -141,7 +142,8 @@ export class UserDO {
             const [method,jsonRequestBody,response] = await this._fetch(request);
             return response;
         }
-        catch {
+        catch(e) {
+            logError("Error in userDO fetch", e, this.telegramUserID);
             return makeSuccessResponse();
         }
         finally {
@@ -416,7 +418,7 @@ export class UserDO {
         const positionRequest = openPositionRequest.positionRequest;       
         // deliberate fire-and-forget.  callbacks will handle state management.
         // TODO AM: store buyQuote on request.  Update when appropriate from menu.
-        buy(positionRequest, this.wallet.value!!, this.userPositionTracker, this.env);
+        await buy(positionRequest, this.wallet.value!!, this.userPositionTracker, this.env);
         return makeJSONResponse<OpenPositionResponse>({});
     }
     
@@ -433,8 +435,7 @@ export class UserDO {
         else if (position.status === PositionStatus.Closed) {
             return makeJSONResponse<ManuallyClosePositionResponse>({ message: 'Position already closed.' });
         }
-        // deliberate fire-and-forget
-        sell(position.positionID, this.wallet.value!!, this.userPositionTracker, this.env);
+        await sell(position.positionID, this.wallet.value!!, this.userPositionTracker, this.env);
         return makeJSONResponse<ManuallyClosePositionResponse>({ message: 'Position will now be closed. '});
     }
 

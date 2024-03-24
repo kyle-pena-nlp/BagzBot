@@ -14,6 +14,7 @@ import {
     isPositionType,
     isSwappable
 } from "./position";
+import { PositionAndCurrentValue, PositionAndMaybeCurrentValue } from "./position_and_current_value";
 import {
     PositionRequestAndMaybeQuote,
     PositionRequestAndQuote,
@@ -23,8 +24,7 @@ import {
 import { Quote } from "./quote";
 
 export {
-    Position,
-    PositionPreRequest,
+    Position, PositionAndCurrentValue, PositionAndMaybeCurrentValue, PositionPreRequest,
     PositionRequest, PositionRequestAndMaybeQuote, PositionRequestAndQuote, PositionStatus, PositionType, Quote, Swappable, SwappableError, convertPreRequestToRequest,
     getInAndOutTokens,
     getSwapOfXDescription, isPosition,

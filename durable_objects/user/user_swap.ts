@@ -2,15 +2,15 @@ import { Connection, VersionedTransaction } from "@solana/web3.js";
 import * as bs58 from "bs58";
 import { UserAddress, Wallet, toUserAddress } from "../../crypto";
 import { Env } from "../../env";
-import { logError, logInfo } from "../../logging";
+import { logDebug, logError, logInfo } from "../../logging";
 import { Swappable, getSwapOfXDescription, isPosition, isPositionRequest } from "../../positions";
 import { getBuyTokenSwapRoute, getSellTokenSwapRoute } from "../../rpc/jupiter_quotes";
 import { serializeSwapRouteTransaction } from "../../rpc/jupiter_serialize";
 import { SwapRoute } from "../../rpc/jupiter_types";
-import { executeRawSignedTransaction } from "../../rpc/rpc_execute_signed_transaction";
-import { parseBuySwapTransaction, parseSellSwapTransaction, waitForBlockFinalizationAndParse } from "../../rpc/rpc_parse";
+import { executeAndMaybeConfirmTx } from "../../rpc/rpc_execute_signed_transaction";
+import { parseBuySwapTransaction, parseSellSwapTransaction } from "../../rpc/rpc_parse";
 import { signTransaction } from "../../rpc/rpc_sign_tx";
-import { GetQuoteFailure, ParsedSuccessfulSwapSummary, ParsedSwapSummary, PreparseConfirmedSwapResult, PreparseSwapResult, SwapExecutionError, TransactionExecutionError, TransactionExecutionErrorCouldntConfirm, UnknownTransactionParseSummary, isConfirmed as isConfirmedTxExecution, isFailedSwapTxExecution, isFailedTxExecution, isGetQuoteFailure, isSuccessfullyParsedSwapSummary, isSwapExecutionErrorParseSwapSummary, isTransactionPreparationFailure, isUnconfirmedTxExecution, isUnknownTransactionParseSummary } from "../../rpc/rpc_types";
+import { GetQuoteFailure, ParsedSuccessfulSwapSummary, ParsedSwapSummary, PreparseConfirmedSwapResult, PreparseSwapResult, SwapExecutionError, TransactionExecutionError, TransactionExecutionErrorCouldntConfirm, UnknownTransactionParseSummary, isConfirmed as isConfirmedTxExecution, isFailedSwapTxExecution, isFailedTxExecution, isGetQuoteFailure, isSuccessfullyParsedSwapSummary, isSwapExecutionErrorParseSwapSummary, isTransactionPreparationFailure, isUnknownTransactionParseSummary } from "../../rpc/rpc_types";
 import { TGStatusMessage, UpdateableNotification } from "../../telegram";
 import { assertNever } from "../../util";
 /* markPositionAsOpen, renegeOpenPosition */
@@ -66,7 +66,7 @@ export async function executeAndConfirmSignedTx(s: Swappable,
     wallet : Wallet, 
     env : Env,
     notificationChannel : UpdateableNotification,
-    connection : Connection) : Promise<ParsedSuccessfulSwapSummary|undefined> {
+    connection : Connection) : Promise<ParsedSuccessfulSwapSummary|'could-not-retrieve-tx'|'tx-failed'|'swap-failed'> {
 
     const swapOfX = getSwapOfXDescription(s);
     const SwapOfX = getSwapOfXDescription(s, true);
@@ -75,21 +75,16 @@ export async function executeAndConfirmSignedTx(s: Swappable,
     const signature = bs58.encode(signedTx.signatures[0]);
     const userAddress = toUserAddress(wallet);
 
-    // attempt to execute tx
+    // attempt to execute and confirm tx
     TGStatusMessage.queue(notificationChannel, `Executing transaction... (this could take a moment)`, false);
-    let maybeExecutedTx = await executeRawSignedTransaction(s.positionID, signedTx, connection, env)
-        .catch(r => { 
-            logError('Initial execution unexpected failure, converting to unconfirmed', s, r);
-            return makeUnknownStatusResult(s, signedTx); 
-        });
+    let maybeExecutedTx = await executeAndMaybeConfirmTx(s.positionID, signedTx, connection, env);
 
-
-    // transaction definetely failed to execute
+    // transaction didn't go through
     if (isFailedTxExecution(maybeExecutedTx)) {
         logError('Transaction execution failed', s, maybeExecutedTx);
         const msg = makeTransactionFailedErrorMessage(s, maybeExecutedTx.status);
         TGStatusMessage.queue(notificationChannel, msg, true);
-        return;        
+        return 'tx-failed';        
     }
 
     // transaction went through, but swap failed
@@ -97,39 +92,26 @@ export async function executeAndConfirmSignedTx(s: Swappable,
         logError('Swap failed', s, maybeExecutedTx);
         const msg = makeSwapSummaryFailedMessage(maybeExecutedTx.status, s);
         TGStatusMessage.queue(notificationChannel, msg, true);
-        return;
+        return 'swap-failed';
     }    
 
     let parsedSwapSummary : ParsedSwapSummary|null = null;
 
-    // parse if transaction went through
+    // tx went through, attempt parse.
     if (isConfirmedTxExecution(maybeExecutedTx)) {
-        logInfo('Transaction confirmed', s, maybeExecutedTx);
-        parsedSwapSummary = await parseSwapTransaction(s, maybeExecutedTx, userAddress, connection, env).catch(r => null);
-    }
-
-    // if unable to confirm if tx went through, wait and try to parse
-    if (isUnconfirmedTxExecution(maybeExecutedTx)) {
-        logInfo('Transaction unconfirmed', s, maybeExecutedTx);
-        const msg = makeTransactionUnconfirmedMessage(s, maybeExecutedTx.status);
-        TGStatusMessage.queue(notificationChannel, msg, false);
-        parsedSwapSummary = await waitForBlockFinalizationAndParse(s, signature, userAddress, connection, env).catch(r => null);
+        logDebug('Transaction confirmed - preparing to parse', s, maybeExecutedTx);
+        parsedSwapSummary = await parseSwapTransaction(s, maybeExecutedTx, userAddress, connection, env).catch(r => {
+            logError("Error retrieving transaction", r)
+            return null;
+        });
     }
     
-    // if the act of retrieving the parsed transaction failed altogether...
+    // if the act of retrieving the parsed transaction failed...
     if (parsedSwapSummary == null) {
         logError('Unexpected error retrieving transaction', s, { signature : signature });
         const msg = `There was a problem retrieving information about your transaction.`;
         TGStatusMessage.queue(notificationChannel, msg, true);
-        return;
-    }
-    
-    // if the RPC *still* says the TX doesn't exist
-    if (isUnknownTransactionParseSummary(parsedSwapSummary)) {
-        logError('Transaction could not be found', s, parsedSwapSummary, { signature : signature });
-        const txNotFoundMsg = makeTxNotFoundMessage(parsedSwapSummary, s);
-        TGStatusMessage.queue(notificationChannel, txNotFoundMsg, true);
-        return;
+        return 'could-not-retrieve-tx';
     }
 
     // if parsing the confirmed tx shows there was a problem with the swap
@@ -137,14 +119,21 @@ export async function executeAndConfirmSignedTx(s: Swappable,
         logError('Swap execution error', s, parsedSwapSummary);
         const failedMsg = makeSwapSummaryFailedMessage(parsedSwapSummary.status, s);
         TGStatusMessage.queue(notificationChannel, failedMsg, true);
-        return;
+        return 'swap-failed';
     }
 
-    // if everythint went ok
+    // if everything went ok
     if (isSuccessfullyParsedSwapSummary(parsedSwapSummary)) {
         logInfo('Swap successful', s, parsedSwapSummary);
         const msg = `${SwapOfX} was successful.`;
         TGStatusMessage.queue(notificationChannel, msg, false);
+    }
+
+    if (isUnknownTransactionParseSummary(parsedSwapSummary)) {
+        logInfo('Tx did not exist', s, parsedSwapSummary);
+        const msg = `Could not confirm ${SwapOfX}.`;
+        TGStatusMessage.queue(notificationChannel, msg, false);
+        return 'could-not-retrieve-tx';
     }
 
     return parsedSwapSummary;
@@ -209,11 +198,11 @@ function parseSwapTransaction(s : Swappable, confirmedTx : PreparseConfirmedSwap
     }
 }
 
-function makeUnknownStatusResult(s: Swappable, signedTx : VersionedTransaction) : PreparseSwapResult {
+function makeUncofirmedTxStatusResult(s: Swappable, signedTx : VersionedTransaction) : PreparseSwapResult {
     const signature = bs58.encode(signedTx.signatures[0]);
     const maybeExecutedTx = { 
         positionID : s.positionID, 
-        status: TransactionExecutionErrorCouldntConfirm.Unknown, 
+        status: TransactionExecutionErrorCouldntConfirm.UnknownCouldNotConfirm, 
         signature: signature 
     };
     return maybeExecutedTx;
@@ -257,7 +246,7 @@ function makeTransactionUnconfirmedMessage(s: Swappable, status: TransactionExec
             return `${swapOfXCaps} could not be confirmed.  ${weWillRetry}.`;
         case TransactionExecutionErrorCouldntConfirm.TimeoutCouldNotConfirm:
             return `${swapOfXCaps} could not be confirmed within time limit. ${weWillRetry}.`;
-        case TransactionExecutionErrorCouldntConfirm.Unknown:
+        case TransactionExecutionErrorCouldntConfirm.UnknownCouldNotConfirm:
             return `Something went wrong and ${swapOfX} could not be confirmed.  ${weWillRetry}.`;
         default:
             assertNever(status);

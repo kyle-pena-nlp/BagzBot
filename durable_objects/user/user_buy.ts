@@ -11,6 +11,9 @@ import { UserPositionTracker } from "./trackers/user_position_tracker";
 import { createAndSignTx, executeAndConfirmSignedTx } from "./user_swap";
 /* markPositionAsOpen, renegeOpenPosition */
 
+
+
+
 export async function buy(positionRequest: PositionRequest,
     wallet : Wallet, 
     userPositionTracker: UserPositionTracker, 
@@ -40,17 +43,24 @@ export async function buy(positionRequest: PositionRequest,
     userPositionTracker.storePositions([convertToUnconfirmedPosition(positionRequest, quote, signature)]);
     
     const parsedSwapSummary = await executeAndConfirmSignedTx(positionRequest, signedTx, wallet, env, notificationChannel, connection);
-    if (parsedSwapSummary) {
+    if (parsedSwapSummary === 'could-not-retrieve-tx') {
+        const unconfirmedPosition = convertToUnconfirmedPosition(positionRequest, quote, signature);
+        userPositionTracker.storePositions([unconfirmedPosition]);
+        // TODO: link to view position menu
+    }
+    else if (parsedSwapSummary === 'swap-failed') {
+        userPositionTracker.removePositions([positionRequest.positionID]);
+    }
+    else if (parsedSwapSummary === 'tx-failed') {
+        userPositionTracker.removePositions([positionRequest.positionID]);
+    }
+    else {
         const newPosition = convertConfirmedRequestToPosition(positionRequest, parsedSwapSummary.swapSummary);
         userPositionTracker.storePositions([newPosition]);
         await importNewPositionIntoPriceTracker(newPosition, env);
         TGStatusMessage.queue(notificationChannel, `Peak Price is now being tracked. Position will be unwound when price dips below ${positionRequest.triggerPercent}% of peak.`, true);    
+        // TODO: link to view position menu
     }
-    else {
-        // buy failed, remove position from user tracking.
-        userPositionTracker.removePositions([positionRequest.positionID]);
-    }
-
     await TGStatusMessage.finalize(notificationChannel);
 }
 

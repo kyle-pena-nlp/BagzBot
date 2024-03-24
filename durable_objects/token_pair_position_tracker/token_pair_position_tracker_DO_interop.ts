@@ -1,3 +1,4 @@
+import { DecimalizedAmount } from "../../decimalized";
 import { Env } from "../../env";
 import { Position } from "../../positions";
 import { makeJSONRequest, makeRequest } from "../../util";
@@ -11,7 +12,8 @@ export enum TokenPairPositionTrackerDOFetchMethod {
 	updatePrice = "updatePrice",
 	importNewOpenPositions = "importNewOpenPositions",
 	markPositionAsClosing = "markPositionAsClosing",
-	markPositionAsClosed = "markPositionAsClosed"
+	markPositionAsClosed = "markPositionAsClosed",
+	getTokenPrice = "getTokenPrice"
 }
 
 /* This should be called on cold-start */
@@ -80,7 +82,15 @@ async function sendJSONRequestToTokenPairPositionTracker<TRequestBody,TResponseB
 	const jsonRequest = makeJSONRequest(`http://tokenPairPositionTracker/${method.toString()}`, requestBody);
 	const response = await tokenPairPositionTrackerDO.fetch(jsonRequest);
 	const responseBody = await response.json();
-	return responseBody as TRequestBody;
+	return responseBody as TResponseBody;
+}
+
+// TODO: replace with non-anonymous interfaces
+export async function getTokenPrice(tokenAddress : string, vsTokenAddress : string, env : Env) : Promise<DecimalizedAmount|undefined> {
+	const method = TokenPairPositionTrackerDOFetchMethod.getTokenPrice;
+	const requestBody = {};
+	const priceResponse = await sendJSONRequestToTokenPairPositionTracker<{},{price : DecimalizedAmount|undefined }>(method, requestBody, tokenAddress, vsTokenAddress, env);
+	return priceResponse.price;
 }
 
 function getTokenPairPositionTrackerDO(tokenAddress : string, vsTokenAddress : string, env : Env) {

@@ -71,7 +71,8 @@ export async function getWalletData(userID : number, env: Env) : Promise<GetWall
 	return await sendJSONRequestToUserDO<GetWalletDataRequest,GetWalletDataResponse>(userID, UserDOFetchMethod.getWalletData, request, env);
 }
 
-export function sendClosePositionOrdersToUserDOs(request: AutomaticallyClosePositionsRequest, env : Env) {
+// TODO: batching?
+export async function sendClosePositionOrdersToUserDOs(request: AutomaticallyClosePositionsRequest, env : Env) {
 	const positionsGroupedByUser = groupIntoMap(request.positions, (p : Position) => p.userID);
 	const promises = [];
 	const method = UserDOFetchMethod.automaticallyClosePositions;
@@ -81,7 +82,7 @@ export function sendClosePositionOrdersToUserDOs(request: AutomaticallyClosePosi
 		const promise = sendJSONRequestToUserDO<AutomaticallyClosePositionsRequest,AutomaticallyClosePositionsResponse>(userID, method, individualRequestForUserDO, env);
 		promises.push(promise);
 	}
-	return Promise.allSettled(promises);
+	return await Promise.allSettled(promises);
 }
 
 export function parseUserDOFetchMethod(value : string) : UserDOFetchMethod|null {
