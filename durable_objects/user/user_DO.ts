@@ -10,9 +10,8 @@ import { ChangeTrackedValue, Structural, assertNever, groupIntoMap, makeFailureR
 import { listUnclaimedBetaInviteCodes } from "../beta_invite_codes/beta_invite_code_interop";
 import { AutomaticallyClosePositionsRequest, AutomaticallyClosePositionsResponse } from "../token_pair_position_tracker/actions/automatically_close_positions";
 import { wakeUpTokenPairPositionTracker } from "../token_pair_position_tracker/token_pair_position_tracker_DO_interop";
-import { BaseUserAction } from "./actions/base_user_action";
+import { BaseUserDORequest } from "./actions/base_user_action";
 import { DeleteSessionRequest, DeleteSessionResponse } from "./actions/delete_session";
-import { GenerateWalletRequest, GenerateWalletResponse } from "./actions/generate_wallet";
 import { GetAddressBookEntryRequest, GetAddressBookEntryResponse } from "./actions/get_address_book_entry";
 import { GetImpersonatedUserIDRequest, GetImpersonatedUserIDResponse } from "./actions/get_impersonated_user_id";
 import { GetLegalAgreementStatusRequest, GetLegalAgreementStatusResponse } from "./actions/get_legal_agreement_status";
@@ -158,7 +157,7 @@ export class UserDO {
 
     }
 
-    async ensureIsInitialized(userAction : BaseUserAction) {
+    async ensureIsInitialized(userAction : BaseUserDORequest) {
         // make sure telegramUserID is populated
         if (this.telegramUserID.value == null) {
             this.telegramUserID.value = userAction.telegramUserID;
@@ -175,10 +174,13 @@ export class UserDO {
 
     async _fetch(request : Request) : Promise<[UserDOFetchMethod,any,Response]> {
 
-        const [method,userAction] = await this.validateFetchRequest(request);
+        const [method,userRequest] = await this.validateFetchRequest(request);
         let response : Response|null = null;
 
-        await this.ensureIsInitialized(userAction);
+        await this.ensureIsInitialized(userRequest);
+
+        // it's ugly but better than a complicated type setup or a bunch of casts
+        const userAction = userRequest as any;
 
         switch(method) {
             case UserDOFetchMethod.get:
@@ -188,85 +190,63 @@ export class UserDO {
                 response = await this.handleInitialize(userAction);            
                 break;
             case UserDOFetchMethod.storeSessionValues:
-                this.assertUserIsInitialized();
                 response = await this.handleStoreSessionValues(userAction);
                 break;
             case UserDOFetchMethod.getSessionValues:
-                this.assertUserIsInitialized();
                 response = await this.handleGetSessionValues(userAction);
                 break;
             case UserDOFetchMethod.getSessionValuesWithPrefix:
-                this.assertUserIsInitialized();
                 response = this.handleGetSessionValuesWithPrefix(userAction);
                 break;
             case UserDOFetchMethod.getDefaultTrailingStopLossRequest:
-                this.assertUserIsInitialized();
                 response = this.handleGetDefaultTrailingStopLossRequest(userAction);
                 break;
             case UserDOFetchMethod.deleteSession:
-                this.assertUserIsInitialized();
                 response = await this.handleDeleteSession(userAction);
                 break;
-            case UserDOFetchMethod.createWallet:
-                this.assertUserIsInitialized();
-                response = await this.handleGenerateWallet(userAction);
-                break;
             case UserDOFetchMethod.getWalletData:
-                this.assertUserIsInitialized();
                 this.assertUserHasWallet();
                 response = await this.handleGetWalletData(userAction);
                 break;
             case UserDOFetchMethod.openNewPosition:
-                this.assertUserIsInitialized();
                 this.assertUserHasWallet();
                 response = await this.handleOpenNewPosition(userAction);
                 break;
             case UserDOFetchMethod.getPosition:
-                this.assertUserIsInitialized();
                 this.assertUserHasWallet();
                 response = await this.handleGetPosition(userAction);
                 break;
             case UserDOFetchMethod.listPositions:
-                this.assertUserIsInitialized();
                 this.assertUserHasWallet();
                 response = await this.handleListPositions(userAction);
                 break;
             case UserDOFetchMethod.manuallyClosePosition:
-                this.assertUserIsInitialized();
                 this.assertUserHasWallet();
                 response = await this.handleManuallyClosePositionRequest(userAction);
                 break;
             case UserDOFetchMethod.automaticallyClosePositions:
-                this.assertUserIsInitialized();
                 this.assertUserHasWallet();
                 response = await this.handleAutomaticallyClosePositionsRequest(userAction);
                 break;
             case UserDOFetchMethod.storeAddressBookEntry:
-                this.assertUserIsInitialized();
                 response = await this.handleStoreAddressBookEntry(userAction);
                 break;
             case UserDOFetchMethod.listAddressBookEntries:
-                this.assertUserIsInitialized();
                 response = await this.handleListAddressBookEntries(userAction);
                 break;
             case UserDOFetchMethod.removeAddressBookEntry:
-                this.assertUserIsInitialized();
                 response = await this.handleRemoveAddressBookEntry(userAction);
                 break;
             case UserDOFetchMethod.getAddressBookEntry:
-                this.assertUserIsInitialized();
                 response = await this.handleGetAddressBookEntry(userAction);
                 break;
             case UserDOFetchMethod.getLegalAgreementStatus:
-                this.assertUserIsInitialized();
                 response = await this.handleGetLegalAgreementStatus(userAction);
                 break;
             case UserDOFetchMethod.storeLegalAgreementStatus:
-                this.assertUserIsInitialized();
                 response = await this.handleStoreLegalAgreementStatus(userAction);
                 break;
             case UserDOFetchMethod.getImpersonatedUserID:
-                this.assertUserIsInitialized();
                 response = await this.handleGetImpersonatedUserID(userAction);
                 break;
             default:
@@ -436,26 +416,6 @@ export class UserDO {
         return makeJSONResponse<UserInitializeResponse>({});
     }
 
-    async handleGenerateWallet(generateWalletRequest : GenerateWalletRequest) : Promise<Response> {
-        if (!this.initialized()) {
-            return makeJSONResponse<GenerateWalletResponse>({ success: false });
-        }
-        try {
-            if (!this.wallet.value) {
-                const { publicKey, privateKey } = await generateEd25519Keypair();
-                this.wallet.value = {
-                    telegramUserID: this.telegramUserID.value!!,
-                    publicKey: publicKey,
-                    encryptedPrivateKey: await encryptPrivateKey(privateKey, this.telegramUserID.value!!, this.env)
-                };
-            }
-            return makeJSONResponse<GenerateWalletResponse>({ success: true });
-        }
-        catch {
-            return makeJSONResponse<GenerateWalletResponse>({ success : false });
-        }
-    }
-
     async generateWallet() : Promise<Wallet> {
         const { publicKey, privateKey } = await generateEd25519Keypair();
         return {
@@ -526,7 +486,7 @@ export class UserDO {
         return makeJSONResponse<AutomaticallyClosePositionsResponse>({});
     }
 
-    async validateFetchRequest(request : Request) : Promise<[UserDOFetchMethod,BaseUserAction]> {
+    async validateFetchRequest(request : Request) : Promise<[UserDOFetchMethod,BaseUserDORequest]> {
         const jsonBody : any = await maybeGetJson(request);
         if (!('telegramUserID' in jsonBody)) {
             throw new Error("All requests to UserDO must include telegramUserID");

@@ -1,6 +1,6 @@
-import { BaseUserAction } from "./base_user_action";
+import { BaseUserDORequest } from "./base_user_action";
 
-export interface UserInitializeRequest  extends BaseUserAction {
+export interface UserInitializeRequest  extends BaseUserDORequest {
 	telegramUserName : string
 };
 

@@ -1,7 +1,7 @@
 import { Structural } from "../../../util";
-import { BaseUserAction } from "./base_user_action";
+import { BaseUserDORequest } from "./base_user_action";
 
-export interface StoreSessionValuesRequest  extends BaseUserAction {
+export interface StoreSessionValuesRequest  extends BaseUserDORequest {
 	messageID: number
 	sessionValues : Record<string,Structural>
 };

@@ -1,6 +1,6 @@
-import { BaseUserAction } from "./base_user_action";
+import { BaseUserDORequest } from "./base_user_action";
 
-export interface RemoveAddressBookEntryRequest  extends BaseUserAction {
+export interface RemoveAddressBookEntryRequest  extends BaseUserDORequest {
     addressBookEntryID : string
 }
 

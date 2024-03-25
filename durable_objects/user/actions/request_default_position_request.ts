@@ -1,8 +1,8 @@
 import { PositionPreRequest } from "../../../positions";
 import { TokenInfo } from "../../../tokens";
-import { BaseUserAction } from "./base_user_action";
+import { BaseUserDORequest } from "./base_user_action";
 
-export interface DefaultTrailingStopLossRequestRequest  extends BaseUserAction {
+export interface DefaultTrailingStopLossRequestRequest  extends BaseUserDORequest {
 	telegramUserID : number,
 	chatID: number,
 	messageID : number,

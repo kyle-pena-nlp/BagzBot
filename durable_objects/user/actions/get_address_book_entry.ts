@@ -1,7 +1,7 @@
-import { CompletedAddressBookEntry } from "../model/address_book_entry"
-import { BaseUserAction } from "./base_user_action";
+import { CompletedAddressBookEntry } from "../model/address_book_entry";
+import { BaseUserDORequest } from "./base_user_action";
 
-export interface GetAddressBookEntryRequest  extends BaseUserAction {
+export interface GetAddressBookEntryRequest  extends BaseUserDORequest {
     addressBookEntryID : string
 }
 

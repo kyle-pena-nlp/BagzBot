@@ -1,6 +1,6 @@
-import { BaseUserAction } from "./base_user_action";
+import { BaseUserDORequest } from "./base_user_action";
 
-export interface StoreLegalAgreementStatusRequest  extends BaseUserAction {
+export interface StoreLegalAgreementStatusRequest  extends BaseUserDORequest {
 	status : 'agreed'|'refused'
 }
 

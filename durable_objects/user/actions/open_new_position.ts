@@ -1,7 +1,7 @@
 import { PositionRequest } from "../../../positions";
-import { BaseUserAction } from "./base_user_action";
+import { BaseUserDORequest } from "./base_user_action";
 
-export interface OpenPositionRequest  extends BaseUserAction {
+export interface OpenPositionRequest  extends BaseUserDORequest {
     chatID : number
     positionRequest: PositionRequest
 }

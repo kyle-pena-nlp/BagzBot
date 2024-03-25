@@ -4,7 +4,6 @@ import { TokenInfo } from "../../tokens";
 import { Structural, groupIntoMap, makeJSONRequest, makeRequest } from "../../util";
 import { AutomaticallyClosePositionsRequest, AutomaticallyClosePositionsResponse } from "../token_pair_position_tracker/actions/automatically_close_positions";
 import { DeleteSessionRequest } from "./actions/delete_session";
-import { GenerateWalletRequest, GenerateWalletResponse } from "./actions/generate_wallet";
 import { GetAddressBookEntryRequest, GetAddressBookEntryResponse } from "./actions/get_address_book_entry";
 import { GetImpersonatedUserIDRequest, GetImpersonatedUserIDResponse } from "./actions/get_impersonated_user_id";
 import { GetLegalAgreementStatusRequest, GetLegalAgreementStatusResponse } from "./actions/get_legal_agreement_status";
@@ -32,7 +31,6 @@ export enum UserDOFetchMethod {
 	getSessionValues = "getSessionValues",
 	getSessionValuesWithPrefix = "getSessionValuesWithPrefix",
 	deleteSession = "deleteSession",
-	createWallet = "createWallet",
 	getWalletData = "getWalletData",
 	openNewPosition = "openNewPosition",
 	getPosition = "getPosition",
@@ -252,12 +250,6 @@ export async function storeSessionValues(telegramUserID : number, messageID : nu
 export async function getUserData(telegramUserID : number, messageID : number, forceRefreshBalance : boolean, env : Env) : Promise<UserData> {
 	const body : GetUserDataRequest = { telegramUserID, messageID, forceRefreshBalance };
 	const response = await sendJSONRequestToUserDO<GetUserDataRequest,UserData>(telegramUserID, UserDOFetchMethod.get, body, env);
-	return response;
-}
-
-export async function generateWallet(telegramUserID : number, env : Env) : Promise<GenerateWalletResponse> {
-	const body: GenerateWalletRequest = { telegramUserID };
-	const response = await sendJSONRequestToUserDO<GenerateWalletRequest,GenerateWalletResponse>(telegramUserID, UserDOFetchMethod.createWallet, body, env);
 	return response;
 }
 

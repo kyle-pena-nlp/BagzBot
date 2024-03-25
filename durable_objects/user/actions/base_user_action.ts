@@ -1,3 +1,3 @@
-export interface BaseUserAction {
+export interface BaseUserDORequest {
     telegramUserID :  number
 }

@@ -1,6 +1,6 @@
-import { BaseUserAction } from "./base_user_action";
+import { BaseUserDORequest } from "./base_user_action";
 
-export interface ManuallyClosePositionRequest  extends BaseUserAction {
+export interface ManuallyClosePositionRequest  extends BaseUserDORequest {
 	positionID : string
 }
 

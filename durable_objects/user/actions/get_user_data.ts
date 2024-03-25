@@ -1,6 +1,6 @@
-import { BaseUserAction } from "./base_user_action";
+import { BaseUserDORequest } from "./base_user_action";
 
-export interface GetUserDataRequest extends BaseUserAction {
+export interface GetUserDataRequest extends BaseUserDORequest {
 	messageID : number
 	forceRefreshBalance: boolean
 };
