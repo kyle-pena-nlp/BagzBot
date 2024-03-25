@@ -18,6 +18,10 @@ export enum MenuCode {
 	WelcomeScreenPart2 = "WelcomeScreenPart2",
 
 	BetaGateInviteFriends = "BetaGateInviteFriends",
+
+	LegalAgreement = "LegalAgreement",
+	LegalAgreementAgree = "LegalAgreementAgree",
+	LegalAgreementRefuse = "LegalAgreementRefuse",
 	
 	// address book stuff
 	SubmitAddressBookEntryName = "Submit.ABE.N",

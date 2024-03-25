@@ -112,6 +112,10 @@ def configure_bot_commands(bot_token, bot_secret_token):
                 'description': 'Displays the welcome screen for this bot'
             },
             {
+                'command': 'legal_agreement',
+                'description': 'Displays the legal agreement'
+            },            
+            {
                 'command': 'help',
                 'description': 'Displays information about this bot'
             }            

@@ -13,6 +13,7 @@ import { wakeUpTokenPairPositionTracker } from "../token_pair_position_tracker/t
 import { DeleteSessionRequest, DeleteSessionResponse } from "./actions/delete_session";
 import { GenerateWalletRequest, GenerateWalletResponse } from "./actions/generate_wallet";
 import { GetAddressBookEntryRequest, GetAddressBookEntryResponse } from "./actions/get_address_book_entry";
+import { GetLegalAgreementStatusRequest, GetLegalAgreementStatusResponse } from "./actions/get_legal_agreement_status";
 import { GetPositionRequest } from "./actions/get_position";
 import { GetSessionValuesRequest, GetSessionValuesWithPrefixRequest, GetSessionValuesWithPrefixResponse } from "./actions/get_session_values";
 import { GetUserDataRequest } from "./actions/get_user_data";
@@ -24,6 +25,7 @@ import { OpenPositionRequest, OpenPositionResponse } from "./actions/open_new_po
 import { RemoveAddressBookEntryRequest, RemoveAddressBookEntryResponse } from "./actions/remove_address_book_entry";
 import { DefaultTrailingStopLossRequestRequest, DefaultTrailingStopLossRequestResponse } from "./actions/request_default_position_request";
 import { StoreAddressBookEntryRequest, StoreAddressBookEntryResponse } from "./actions/store_address_book_entry";
+import { StoreLegalAgreementStatusRequest, StoreLegalAgreementStatusResponse } from "./actions/store_legal_agreement_status";
 import { StoreSessionValuesRequest, StoreSessionValuesResponse } from "./actions/store_session_values";
 import { UserInitializeRequest, UserInitializeResponse } from "./actions/user_initialize";
 import { UserData } from "./model/user_data";
@@ -72,7 +74,7 @@ export class UserDO {
     addressBookEntryTracker : AddressBookEntryTracker = new AddressBookEntryTracker();
 
     // has the user signed legal?
-    hasSignedLegal : ChangeTrackedValue<boolean> = new ChangeTrackedValue<boolean>('hasSignedLegal', false);
+    legalAgreementStatus : ChangeTrackedValue<'agreed'|'refused'|'has-not-responded'> = new ChangeTrackedValue<'agreed'|'refused'|'has-not-responded'>('hasSignedLegal', 'has-not-responded');
 
     constructor(state : DurableObjectState, env : any) {
         // persistent state object which reaches eventual consistency
@@ -117,7 +119,7 @@ export class UserDO {
         this.userPositionTracker.initialize(storage);
         this.addressBookEntryTracker.initialize(storage);
         this.solBalanceTracker.initialize(storage); // rate limits RPC calls. will refresh on access.
-        this.hasSignedLegal.initialize(storage);
+        this.legalAgreementStatus.initialize(storage);
     }
 
     async flushToStorage() {
@@ -129,7 +131,7 @@ export class UserDO {
             this.userPositionTracker.flushToStorage(this.state.storage),
             this.addressBookEntryTracker.flushToStorage(this.state.storage),
             this.solBalanceTracker.flushToStorage(this.state.storage),
-            this.hasSignedLegal.flushToStorage(this.state.storage)
+            this.legalAgreementStatus.flushToStorage(this.state.storage)
         ]);
     }
 
@@ -234,11 +236,30 @@ export class UserDO {
                 this.assertUserIsInitialized();
                 response = await this.handleGetAddressBookEntry(jsonRequestBody);
                 break;
+            case UserDOFetchMethod.getLegalAgreementStatus:
+                this.assertUserIsInitialized();
+                response = await this.handleGetLegalAgreementStatus(jsonRequestBody);
+                break;
+            case UserDOFetchMethod.storeLegalAgreementStatus:
+                this.assertUserIsInitialized();
+                response = await this.handleStoreLegalAgreementStatus(jsonRequestBody);
+                break;
             default:
                 assertNever(method);
         }
 
         return [method,jsonRequestBody,response];
+    }
+
+    async handleGetLegalAgreementStatus(request : GetLegalAgreementStatusRequest) : Promise<Response> {
+        const responseBody : GetLegalAgreementStatusResponse = { status: this.legalAgreementStatus.value };
+        return makeJSONResponse(responseBody);
+    }
+
+    async handleStoreLegalAgreementStatus(request : StoreLegalAgreementStatusRequest) : Promise<Response> {
+        this.legalAgreementStatus.value = request.status;
+        const responseBody : StoreLegalAgreementStatusResponse = {};
+        return makeJSONResponse(responseBody);
     }
 
     async handleRemoveAddressBookEntry(request : RemoveAddressBookEntryRequest) : Promise<Response> {

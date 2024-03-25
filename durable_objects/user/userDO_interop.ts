@@ -6,6 +6,7 @@ import { AutomaticallyClosePositionsRequest, AutomaticallyClosePositionsResponse
 import { DeleteSessionRequest } from "./actions/delete_session";
 import { GenerateWalletRequest, GenerateWalletResponse } from "./actions/generate_wallet";
 import { GetAddressBookEntryRequest, GetAddressBookEntryResponse } from "./actions/get_address_book_entry";
+import { GetLegalAgreementStatusRequest, GetLegalAgreementStatusResponse } from "./actions/get_legal_agreement_status";
 import { GetPositionRequest } from "./actions/get_position";
 import { GetSessionValuesRequest, GetSessionValuesWithPrefixRequest, GetSessionValuesWithPrefixResponse, SessionValuesResponse } from "./actions/get_session_values";
 import { GetUserDataRequest } from "./actions/get_user_data";
@@ -17,6 +18,7 @@ import { OpenPositionRequest, OpenPositionResponse } from "./actions/open_new_po
 import { RemoveAddressBookEntryRequest, RemoveAddressBookEntryResponse } from "./actions/remove_address_book_entry";
 import { DefaultTrailingStopLossRequestRequest, DefaultTrailingStopLossRequestResponse } from "./actions/request_default_position_request";
 import { StoreAddressBookEntryRequest, StoreAddressBookEntryResponse } from "./actions/store_address_book_entry";
+import { StoreLegalAgreementStatusRequest, StoreLegalAgreementStatusResponse } from "./actions/store_legal_agreement_status";
 import { StoreSessionValuesRequest, StoreSessionValuesResponse } from "./actions/store_session_values";
 import { UserInitializeRequest, UserInitializeResponse } from "./actions/user_initialize";
 import { CompletedAddressBookEntry } from "./model/address_book_entry";
@@ -41,7 +43,23 @@ export enum UserDOFetchMethod {
 	storeAddressBookEntry = "storeAddressBookEntry",
 	listAddressBookEntries = "listAddressBookEntries",
 	removeAddressBookEntry = "removeAddressBookEntry",
-	getAddressBookEntry = "getAddressBookEntry"
+	getAddressBookEntry = "getAddressBookEntry",
+	storeLegalAgreementStatus = "storeLegalAgreementStatus",
+	getLegalAgreementStatus = "getLegalAgreementStatus",
+}
+
+
+
+export async function storeLegalAgreementStatus(telegramUserID : number, status : 'agreed'|'refused', env : Env) : Promise<StoreLegalAgreementStatusResponse> {
+	const request : StoreLegalAgreementStatusRequest = { status : status };
+	return await sendJSONRequestToUserDO<StoreLegalAgreementStatusRequest,StoreLegalAgreementStatusResponse>(telegramUserID, UserDOFetchMethod.storeLegalAgreementStatus, request, env);
+}
+
+
+
+export async function getLegalAgreementStatus(telegramUserID : number, env : Env) : Promise<GetLegalAgreementStatusResponse> {
+	const request : GetLegalAgreementStatusRequest = {};
+	return await sendJSONRequestToUserDO<GetLegalAgreementStatusRequest,GetLegalAgreementStatusResponse>(telegramUserID, UserDOFetchMethod.getLegalAgreementStatus, request, env);
 }
 
 export async function storeAddressBookEntry(userID : number, addressBookEntry : CompletedAddressBookEntry, env : Env) {

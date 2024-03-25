@@ -1,7 +1,7 @@
 
 import { Env } from "./env";
 import { TelegramWebhookInfo } from "./telegram";
-import { Result, makeFakeFailedRequestResponse, makeSuccessResponse, strictParseBoolean } from "./util";
+import { Result, assertNever, makeFakeFailedRequestResponse, makeSuccessResponse, strictParseBoolean } from "./util";
 import { Worker as Handler } from "./worker/handler";
 
 /* Durable Objects */
@@ -9,8 +9,9 @@ import { getUserHasClaimedBetaInviteCode } from "./durable_objects/beta_invite_c
 import { BetaInviteCodesDO } from "./durable_objects/beta_invite_codes/beta_invite_codes_DO";
 import { PolledTokenPairListDO } from "./durable_objects/polled_token_pair_list/polled_token_pair_list_DO";
 import { TokenPairPositionTrackerDO } from "./durable_objects/token_pair_position_tracker/token_pair_position_tracker_DO";
-import { maybeReadSessionObj } from "./durable_objects/user/userDO_interop";
+import { getLegalAgreementStatus, maybeReadSessionObj } from "./durable_objects/user/userDO_interop";
 import { UserDO } from "./durable_objects/user/user_DO";
+import { LegalAgreement } from "./menus";
 import { ReplyQuestion, ReplyQuestionCode } from "./reply_question";
 import { ReplyQuestionData } from "./reply_question/reply_question_data";
 
@@ -70,6 +71,12 @@ export default {
 		const telegramWebhookInfo = new TelegramWebhookInfo(telegramRequestBody, env);
 		const messageType = telegramWebhookInfo.messageType;
 		const handler = new Handler(context, env);
+		
+		// enforce legal agreement gating
+		const legalAgreementGatingAction = await this.enforceLegalAgreementGating(telegramWebhookInfo, handler, env);
+		if (legalAgreementGatingAction !== 'proceed') {
+			return makeSuccessResponse();
+		}
 
 		// enforce beta code gating (if enabled).
 		const betaEntryGateAction = await this.maybeEnforceBetaGating(telegramWebhookInfo, handler, env);
@@ -150,6 +157,28 @@ export default {
         const error_code_string = (error_code || '').toString();
         console.log(`${ip_address} :: ${error_code_string} :: ${addl_info}`);
     },
+
+	async enforceLegalAgreementGating(telegramWebhookInfo : TelegramWebhookInfo, handler : Handler, env : Env) : Promise<'proceed'|'do-not-proceed'> {
+		// TODO: finish this (allowing proper things thru)
+		const telegramUserID = telegramWebhookInfo.telegramUserID;
+		const chatID = telegramWebhookInfo.chatID;
+		const response = await getLegalAgreementStatus(telegramUserID, env);
+		const legalAgreementStatus = response.status;
+		if (legalAgreementStatus === 'agreed') {
+			return 'proceed';
+		}
+		else if (legalAgreementStatus === 'refused') {
+			return 'do-not-proceed';
+		}
+		else if (legalAgreementStatus === 'has-not-responded') {
+			const legalAgreementMenuRequest = new LegalAgreement(undefined).getCreateNewMenuRequest(chatID, env);
+			await fetch(legalAgreementMenuRequest);
+			return 'do-not-proceed';
+		}
+		else {
+			assertNever(legalAgreementStatus);
+		}
+	}
 
 	async maybeEnforceBetaGating(telegramWebhookInfo: TelegramWebhookInfo, handler: Handler, env : Env) : Promise<'proceed'|'beta-restricted'|'beta-code-entered'> {
 

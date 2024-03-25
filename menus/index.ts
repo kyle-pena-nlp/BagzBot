@@ -1,3 +1,4 @@
+import { LegalAgreement } from "./legal_agreement";
 import { BaseMenu } from "./menu";
 import { MenuBetaInviteFriends } from "./menu_beta_invite_friends";
 import { MenuCode } from "./menu_code";
@@ -30,7 +31,7 @@ import { WelcomeScreenPart1 } from "./welcome_screen_part_1";
 import { WelcomeScreenPart2 } from "./welcome_screen_part_2";
 
 export {
-    BaseMenu, MenuBetaInviteFriends, MenuCode, MenuConfirmAddressBookEntry, MenuConfirmTrailingStopLossPositionRequest, MenuContinueMessage, MenuEditTrailingStopLossPositionRequest, MenuError, MenuFAQ, MenuHelp,
+    BaseMenu, LegalAgreement, MenuBetaInviteFriends, MenuCode, MenuConfirmAddressBookEntry, MenuConfirmTrailingStopLossPositionRequest, MenuContinueMessage, MenuEditTrailingStopLossPositionRequest, MenuError, MenuFAQ, MenuHelp,
     MenuListPositions, MenuMain, MenuPickTransferFundsRecipient, MenuPleaseEnterToken, MenuPleaseWait, MenuTransferFundsMainMenu as MenuStartTransferFunds, MenuTODO, MenuTrailingStopLossAutoRetrySell,
     MenuTrailingStopLossEntryBuyQuantity,
     MenuTrailingStopLossPickVsToken,

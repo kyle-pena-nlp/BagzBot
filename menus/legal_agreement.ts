@@ -3,13 +3,14 @@ import { CallbackData } from "./callback_data";
 import { Menu, MenuCapabilities } from "./menu";
 import { MenuCode } from "./menu_code";
 
-export class WelcomeScreenPart2 extends Menu<undefined> implements MenuCapabilities {
+export class LegalAgreement extends Menu<undefined> implements MenuCapabilities {
     renderText(): string {
-        return 'Welcome screen content part 2';
+        return 'Legal Stuff Here';
     }
     renderOptions(): CallbackButton[][] {
         const options = this.emptyMenu();
-        this.insertButtonNextLine(options, "Get Started!", new CallbackData(MenuCode.Main));
+        this.insertButtonNextLine(options, "Agree", new CallbackData(MenuCode.LegalAgreementAgree));
+        this.insertButtonNextLine(options, "Agree", new CallbackData(MenuCode.LegalAgreementRefuse));
         return options;
     }
     parseMode(): "MarkdownV2" | "HTML" {
