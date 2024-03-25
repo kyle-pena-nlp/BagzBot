@@ -7,7 +7,10 @@ import { MenuCode } from "./menu_code";
 export class MenuMain extends Menu<UserData> implements MenuCapabilities {
     renderText(): string {
         if (this.menuData.maybeSOLBalance != null) {
-            return `<b>Main Menu</b> | ${toFriendlyString(this.menuData.maybeSOLBalance, 4)} SOL in wallet.`;
+            return [
+                `<b>Main Menu</b> | ${toFriendlyString(this.menuData.maybeSOLBalance, 4)} SOL in wallet.`,
+                `<code>${this.menuData.address}</code>`
+            ].join('\r\n');
         }
         else {
             return `<b>Main Menu</b>`;

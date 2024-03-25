@@ -6,6 +6,7 @@ import { AutomaticallyClosePositionsRequest, AutomaticallyClosePositionsResponse
 import { DeleteSessionRequest } from "./actions/delete_session";
 import { GenerateWalletRequest, GenerateWalletResponse } from "./actions/generate_wallet";
 import { GetAddressBookEntryRequest, GetAddressBookEntryResponse } from "./actions/get_address_book_entry";
+import { GetImpersonatedUserIDRequest, GetImpersonatedUserIDResponse } from "./actions/get_impersonated_user_id";
 import { GetLegalAgreementStatusRequest, GetLegalAgreementStatusResponse } from "./actions/get_legal_agreement_status";
 import { GetPositionRequest } from "./actions/get_position";
 import { GetSessionValuesRequest, GetSessionValuesWithPrefixRequest, GetSessionValuesWithPrefixResponse, SessionValuesResponse } from "./actions/get_session_values";
@@ -46,16 +47,20 @@ export enum UserDOFetchMethod {
 	getAddressBookEntry = "getAddressBookEntry",
 	storeLegalAgreementStatus = "storeLegalAgreementStatus",
 	getLegalAgreementStatus = "getLegalAgreementStatus",
+	getImpersonatedUserID = "getImpersonatedUserID"
 }
 
 
+export async function getImpersonatedUserID(telegramUserID : number, env : Env) : Promise<number|undefined> {
+	const request : GetImpersonatedUserIDRequest = {};
+	const response = await sendJSONRequestToUserDO<GetImpersonatedUserIDRequest,GetImpersonatedUserIDResponse>(telegramUserID, UserDOFetchMethod.getImpersonatedUserID, request, env);
+	return response.impersonatedUserID;
+}
 
 export async function storeLegalAgreementStatus(telegramUserID : number, status : 'agreed'|'refused', env : Env) : Promise<StoreLegalAgreementStatusResponse> {
 	const request : StoreLegalAgreementStatusRequest = { status : status };
 	return await sendJSONRequestToUserDO<StoreLegalAgreementStatusRequest,StoreLegalAgreementStatusResponse>(telegramUserID, UserDOFetchMethod.storeLegalAgreementStatus, request, env);
 }
-
-
 
 export async function getLegalAgreementStatus(telegramUserID : number, env : Env) : Promise<GetLegalAgreementStatusResponse> {
 	const request : GetLegalAgreementStatusRequest = {};

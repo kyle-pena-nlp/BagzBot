@@ -1,7 +1,9 @@
+import { isAnAdminUserID, isTheSuperAdminUserID } from "../admins";
 import { Env } from "../env";
 import { CallbackData } from "../menus/callback_data";
 import { PositionPreRequest, PositionType } from "../positions";
 import { getVsTokenInfo } from "../tokens";
+import { assertNever } from "../util";
 import { CallbackHandlerData } from "../worker/model/callback_handler_data";
 import { TGTextEntity, TGTextEntityType } from "./telegram_helpers";
 
@@ -53,60 +55,6 @@ export class AutoSellOrderSpec {
 			retrySellIfSlippageExceeded : this.autoRetrySellIfSlippageExceeded || true
 		};
 		return positionRequest;
-	}
-
-	static parse(msg : TelegramWebhookInfo) : AutoSellOrderSpec|null {
-
-		const tokens = msg.commandTokens!!;
-
-		const vsTokenAmt : number|null = AutoSellOrderSpec.maybeParseFloat(tokens[1]);
-		if (vsTokenAmt == null) {
-			return null;
-		}
-		
-		const vsTokenAddress : string|null = AutoSellOrderSpec.maybeParseVsTokenAddress(tokens[2]||null);
-		if (vsTokenAddress == null) {
-			return null;
-		}
-		
-		const ofKeyword = AutoSellOrderSpec.maybeParseKeyword(tokens[4], "OF");
-		if (ofKeyword == null) {
-			return null;
-		}
-		
-		const tokenAddress : string|null = tokens[3]?.text||null;
-		if (tokenAddress == null) {
-			return null;
-		}
-		
-		const percentKeyword = AutoSellOrderSpec.maybeParseKeyword(tokens[4], 'TRIGGER');
-		if (percentKeyword == null) {
-			return null;
-		}
-
-		const triggerPercent = AutoSellOrderSpec.maybeParsePercent(tokens[5]);
-		if (triggerPercent == null) {
-			return null;
-		}
-
-		const slippageKeyword = AutoSellOrderSpec.maybeParseKeyword(tokens[6], 'SLIPPAGE');
-		if (slippageKeyword == null) {
-			return null;
-		}
-
-		const slippageTolerancePercent = AutoSellOrderSpec.maybeParsePercent(tokens[7]);
-		if (slippageTolerancePercent == null) {
-			return null;
-		}
-
-		// these can be left out, but if they are included, they should have the right keyword.
-		const autoRetryKeyword = AutoSellOrderSpec.maybeParseKeyword(tokens[8], 'RETRYSELL');
-		const autoRetry = AutoSellOrderSpec.maybeParseBoolean(tokens[9])||undefined;
-		if (autoRetry != null && autoRetryKeyword == null) {
-			return null;
-		}
-		
-		return new AutoSellOrderSpec(msg.telegramUserID, msg.chatID, msg.messageID, tokenAddress, vsTokenAddress, vsTokenAmt, triggerPercent, slippageTolerancePercent, autoRetry);
 	}
 
 	static describeFormat() : string {
@@ -190,7 +138,8 @@ export class AutoSellOrderSpec {
 
 export class TelegramWebhookInfo {
 
-    telegramUserID : number;
+    private _impersonatedUserID : number; // the userID on whose behalf the action are performed
+	private _realUserID : number; // different from above only if impersonating
     telegramUserName : string;
     chatID : number; /* The Telegram chat ID */
     messageID : number; /* The telegram message ID (see comments) */
@@ -203,31 +152,57 @@ export class TelegramWebhookInfo {
     text : string|null;
 
     constructor(telegramRequestBody : any, env : Env) {
-		this.chatID = this.getChatID(telegramRequestBody);
-		// if is a reply to the bot, messageID is bot's original message ID.
-		// if is a callback query, messageID is bot's menu message ID.
-		// otherwise, is the actual message's message ID.
-		this.messageID = this.getEffectiveMessageID(telegramRequestBody, env);
+		this.chatID = this.extractChatID(telegramRequestBody);
+		this._impersonatedUserID = this.extractTelegramUserID(telegramRequestBody);
+		this._realUserID = this.extractTelegramUserID(telegramRequestBody);		
+		this.messageID = this.extractEffectiveMessageID(telegramRequestBody, env);
 		this.realMessageID = telegramRequestBody?.message?.message_id;
-		this.messageType = this.getMessageType(telegramRequestBody, env);
-		this.command = this.getCommandText(telegramRequestBody);
-		this.commandTokens = this.getCommandTokens(telegramRequestBody);
-		this.telegramUserID = this.getTelegramUserID(telegramRequestBody);
-		this.telegramUserName = this.getTelegramUserName(telegramRequestBody);
-		this.callbackData = this.getCallbackData(telegramRequestBody);
-		this.text = this.getMessageText(telegramRequestBody);
-		this.originalMessageText = this.getOriginalMessageText(telegramRequestBody);
+		this.messageType = this.extractMessageType(telegramRequestBody, env);
+		this.command = this.extractCommandText(telegramRequestBody);
+		this.commandTokens = this.extractCommandTokens(telegramRequestBody);
+		this.telegramUserName = this.extractTelegramUserName(telegramRequestBody);
+		this.callbackData = this.extractCallbackData(telegramRequestBody);
+		this.text = this.extractMessageText(telegramRequestBody);
+		this.originalMessageText = this.extractOriginalMessageText(telegramRequestBody);
 	}
 
-	getOriginalMessageID(telegramRequestBody : any) : number|null {
+	getTelegramUserID(purpose : 'messaging'|'app-logic') : number {
+		if (purpose === 'messaging') {
+			return this._realUserID;
+		}
+		else if (purpose === 'app-logic') {
+			return this._impersonatedUserID;
+		}
+		else {
+			assertNever(purpose);
+		}
+	}
+
+	impersonate(userToImpersonateID : number, env : Env) : 'now-impersonating-user'|'not-permitted' {
+		if (!isAnAdminUserID(this._realUserID, env)) {
+			return 'not-permitted';
+		}
+		const impersonatingAnAdmin = isAnAdminUserID(userToImpersonateID, env);
+		if (impersonatingAnAdmin && !isTheSuperAdminUserID(this._realUserID, env)) {
+			return 'not-permitted';
+		}
+		this._impersonatedUserID = userToImpersonateID;
+		return 'now-impersonating-user';
+	}
+
+	unimpersonate(env : Env) {
+		this._impersonatedUserID = this._realUserID;
+	}
+
+	private extractOriginalMessageID(telegramRequestBody : any) : number|null {
 		return telegramRequestBody.message?.reply_to_message?.message_id;
 	}
 
-	getOriginalMessageText(telegramRequestBody : any) : string|null {
+	private extractOriginalMessageText(telegramRequestBody : any) : string|null {
 		return telegramRequestBody.message?.reply_to_message?.text;
 	}
 
-	getIsReplyToBotMessage(telegramRequestBody : any, env : Env) {
+	private extractIsReplyToBotMessage(telegramRequestBody : any, env : Env) {
 		const originalMessageFrom = telegramRequestBody.message?.reply_to_message?.from;
 		const botID = (originalMessageFrom?.id||'').toString();
 		if (botID === env.TELEGRAM_BOT_ID) {
@@ -236,17 +211,9 @@ export class TelegramWebhookInfo {
 		return false;
 	}	
 
-	parseAutoSellOrder() : AutoSellOrderSpec|null {
-		if (!this.commandTokens) {
-			return null;
-		}
-		const parsedResult = AutoSellOrderSpec.parse(this);
-		return parsedResult;
-	}
-
 	toCallbackHandlerData() : CallbackHandlerData {
 		const result : CallbackHandlerData = {
-			telegramUserID: this.telegramUserID,
+			telegramUserID: this._impersonatedUserID,
 			telegramUserName: this.telegramUserName,
 			chatID : this.chatID,
 			messageID: this.messageID,
@@ -255,7 +222,7 @@ export class TelegramWebhookInfo {
 		return result;
 	}
 
-	private getChatID(requestBody : any) : number {
+	private extractChatID(requestBody : any) : number {
 		let chatID = requestBody?.callback_query?.message?.chat?.id;
 		if (chatID == null) {
 			chatID = requestBody?.message?.chat?.id;
@@ -263,9 +230,9 @@ export class TelegramWebhookInfo {
 		return chatID;
 	}
 
-	private getEffectiveMessageID(requestBody : any, env : Env) : number {
-		if (this.getIsReplyToBotMessage(requestBody, env)) {
-			return this.getOriginalMessageID(requestBody)!!;
+	private extractEffectiveMessageID(requestBody : any, env : Env) : number {
+		if (this.extractIsReplyToBotMessage(requestBody, env)) {
+			return this.extractOriginalMessageID(requestBody)!!;
 		}
 		let messageID = requestBody?.callback_query?.message?.message_id;
 		if (messageID == null) {
@@ -274,11 +241,11 @@ export class TelegramWebhookInfo {
 		return messageID;
 	}
 
-	private getMessageType(requestBody : any, env : Env) : 'callback'|'message'|'command'|'replyToBot'|null {
+	private extractMessageType(requestBody : any, env : Env) : 'callback'|'message'|'command'|'replyToBot'|null {
 		if ('callback_query' in requestBody) {
 			return 'callback';
 		}
-		else if (this.getIsReplyToBotMessage(requestBody, env)) {
+		else if (this.extractIsReplyToBotMessage(requestBody, env)) {
 			return 'replyToBot';
 		}
 		else if (this.hasCommandEntity(requestBody)) {
@@ -292,11 +259,11 @@ export class TelegramWebhookInfo {
 		}
 	}
 
-	private getMessageText(telegramRequestBody : any) : string|null {
+	private extractMessageText(telegramRequestBody : any) : string|null {
 		return telegramRequestBody.message?.text||null;
 	}
 
-	private getCallbackData(telegramRequestBody : any) : CallbackData|null {
+	private extractCallbackData(telegramRequestBody : any) : CallbackData|null {
 		const callbackDataString = telegramRequestBody?.callback_query?.data;
 		if (!callbackDataString) {
 			return null;
@@ -307,11 +274,11 @@ export class TelegramWebhookInfo {
 	}
 
 	private hasCommandEntity(requestBody : any) {
-		const commandText = this.getCommandText(requestBody);
+		const commandText = this.extractCommandText(requestBody);
 		return commandText;
 	}
     
-	private getCommandText(requestBody : any) : string|null {
+	private extractCommandText(requestBody : any) : string|null {
 		const text = requestBody?.message?.text || '';
 		const entities = requestBody?.message?.entities;
 		if (!entities) {
@@ -326,7 +293,7 @@ export class TelegramWebhookInfo {
 		return null;
 	}
 
-	private getCommandTokens(requestBody : any) : TGTextEntity[]|null {
+	private extractCommandTokens(requestBody : any) : TGTextEntity[]|null {
 		const text = (requestBody?.message?.text || '') as string;
 		const entities = requestBody?.message?.entities as RawTGTextEntity[]|null;
 		if (!entities) {
@@ -346,7 +313,7 @@ export class TelegramWebhookInfo {
 				});
 				tgTextEntities.push(...tokens);
 			}
-			const entityType = this.getTGEntityType(entity.type);
+			const entityType = this.interpretTGEntityType(entity.type);
 			const entityText = text.substring(entity.offset, entity.offset + entity.length);
 			endOfLastToken = entity.offset + entity.length;
 			tgTextEntities.push({
@@ -360,7 +327,7 @@ export class TelegramWebhookInfo {
 		return tgTextEntities;
 	}
 
-	private getTGEntityType(type : string) : TGTextEntityType {
+	private interpretTGEntityType(type : string) : TGTextEntityType {
 		switch(type) {
 			case 'hashtag':
 				return TGTextEntityType.hashtag;
@@ -377,7 +344,7 @@ export class TelegramWebhookInfo {
 		}
 	}
 
-	private getTelegramUserID(telegramRequestBody : any) : number {
+	private extractTelegramUserID(telegramRequestBody : any) : number {
 		let userID : number = telegramRequestBody?.message?.from?.id!!;
 		if (!userID) {
 			userID = telegramRequestBody?.callback_query?.from?.id!!;
@@ -385,7 +352,7 @@ export class TelegramWebhookInfo {
 		return userID;
 	}
 
-	private getTelegramUserName(requestBody : any) : string {
+	private extractTelegramUserName(requestBody : any) : string {
 		const fromParentObj = requestBody?.message || requestBody?.callback_query;
 		const firstName : string = fromParentObj.from?.first_name!!;
 		const lastName : string = fromParentObj.from?.last_name!!;
@@ -399,3 +366,4 @@ interface RawTGTextEntity {
 	offset : number
 	length : number
 }
+

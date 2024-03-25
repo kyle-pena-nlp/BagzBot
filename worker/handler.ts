@@ -42,13 +42,12 @@ export class Worker {
     }
 
     // I am interpreting any message sent to handleMessage as a token address
-    async handleMessage(telegramWebhookInfo : TelegramWebhookInfo) : Promise<Response> {
+    async handleMessage(info : TelegramWebhookInfo) : Promise<Response> {
         
         // alias some things
-        const telegramUserID = telegramWebhookInfo.telegramUserID;
-        const chatID = telegramWebhookInfo.chatID;
-        const initiatingMessageID = telegramWebhookInfo.messageID;
-        const initiatingMessage = telegramWebhookInfo.text||'';
+        const chatID = info.chatID;
+        const initiatingMessageID = info.messageID;
+        const initiatingMessage = info.text||'';
 
         const tokenAddressParser = new TokenAddressExtractor()
         const maybeTokenAddress = tokenAddressParser.maybeExtractTokenAddress(initiatingMessage);
@@ -69,7 +68,7 @@ export class Worker {
 
         // otherwise, read the tokenInfo, and let the user know the token exists.
         const tokenInfo = validateTokenResponse.tokenInfo;
-        const conversation = await sendMessageToTG(telegramWebhookInfo.chatID, `Token address '${tokenInfo.address}' (${tokenInfo.symbol}) recognized!`, this.env);
+        const conversation = await sendMessageToTG(info.chatID, `Token address '${tokenInfo.address}' (${tokenInfo.symbol}) recognized!`, this.env);
         if (!conversation.success) {
             return makeFakeFailedRequestResponse(500, "Failed to send response to telegram");
         }
@@ -136,17 +135,16 @@ export class Worker {
     }
 
     // TODO: switch to handlers, factor handlers out into little classes (preferably into the menu classes themselves)
-    async handleCallbackQueryInternal(telegramWebhookInfo : CallbackHandlerParams) : Promise<BaseMenu|ReplyQuestion|void> {
-        const telegramUserID = telegramWebhookInfo.telegramUserID;
-        const messageID = telegramWebhookInfo.messageID;
-        const chatID = telegramWebhookInfo.chatID;
-        const callbackData = telegramWebhookInfo.callbackData!!;
+    async handleCallbackQueryInternal(info : CallbackHandlerParams) : Promise<BaseMenu|ReplyQuestion|void> {
+        const messageID = info.messageID;
+        const chatID = info.chatID;
+        const callbackData = info.callbackData!!;
         switch(callbackData.menuCode) {
             case MenuCode.Main:
-                return this.createMainMenu(telegramWebhookInfo, this.env);
+                return this.createMainMenu(info, this.env);
             case MenuCode.CreateWallet:
-                await this.handleCreateWallet(telegramWebhookInfo, this.env);
-                return this.createMainMenu(telegramWebhookInfo, this.env);
+                await this.handleCreateWallet(info, this.env);
+                return this.createMainMenu(info, this.env);
             case MenuCode.NewPosition:
                 const pr = await getDefaultTrailingStopLoss(telegramUserID, chatID, messageID, this.env);
                 const newPrerequest = pr.prerequest;
@@ -154,7 +152,7 @@ export class Worker {
                 if (!isValidTokenInfoResponse(tokenInfoResponse)) {
                     tokenInfoResponse = await getTokenInfo(WEN_ADDRESS, this.env);
                     if (!isValidTokenInfoResponse(tokenInfoResponse)) {
-                        logError(`User could not open position editor because ${WEN_ADDRESS} DNE`, telegramWebhookInfo);
+                        logError(`User could not open position editor because ${WEN_ADDRESS} DNE`, info);
                         return new MenuContinueMessage(`Editor could not be opened due to an unexpected error.`, MenuCode.Main);
                     }
                 }
@@ -200,7 +198,7 @@ export class Worker {
                 if (closePositionID != null) {
                     await this.handleManuallyClosePosition(telegramUserID, closePositionID, this.env);
                 }
-                return this.createMainMenu(telegramWebhookInfo, this.env);
+                return this.createMainMenu(info, this.env);
             case MenuCode.CustomSlippagePct:
                 const slippagePercentQuestion = new ReplyQuestion(
                     "Enter the desired slippage percent", 
@@ -308,10 +306,10 @@ export class Worker {
                 // TODO
                 return this.TODOstubbedMenu(this.env);
             case MenuCode.Wallet:
-                const userData = await getAndMaybeInitializeUserData(telegramUserID, telegramWebhookInfo.telegramUserName, messageID, true, this.env);
+                const userData = await getAndMaybeInitializeUserData(telegramUserID, info.telegramUserName, messageID, true, this.env);
                 return new MenuWallet(userData);
             case MenuCode.Close:
-                await this.handleMenuClose(telegramWebhookInfo.chatID, telegramWebhookInfo.messageID, this.env);
+                await this.handleMenuClose(info.chatID, info.messageID, this.env);
                 return;
             case MenuCode.TrailingStopLossSlippagePctMenu:
                 const x = await readSessionObj<PositionRequest>(telegramUserID, messageID, POSITION_REQUEST_STORAGE_KEY, this.env);
@@ -400,7 +398,7 @@ export class Worker {
             case MenuCode.BetaGateInviteFriends:
                 const unclaimedBetaCodes = await listUnclaimedBetaInviteCodes({ userID : telegramUserID }, this.env);
                 if (!unclaimedBetaCodes.success) {
-                    return this.createMainMenu(telegramWebhookInfo, this.env);
+                    return this.createMainMenu(info, this.env);
                 }
                 const botUserName = this.env.TELEGRAM_BOT_USERNAME;
                 return new MenuBetaInviteFriends({betaInviteCodes: unclaimedBetaCodes.data.betaInviteCodes, botUserName: botUserName });
@@ -540,7 +538,7 @@ export class Worker {
             return makeSuccessResponse();
         }
         if (storeSessionObjectRequest != null) {
-            await storeSessionObj(telegramWebhookInfo.telegramUserID, conversationMessageID, storeSessionObjectRequest.obj, storeSessionObjectRequest.prefix, this.env);
+            await storeSessionObj(telegramWebhookInfo.getTelegramUserID('app-logic'), conversationMessageID, storeSessionObjectRequest.obj, storeSessionObjectRequest.prefix, this.env);
         }
         if (menu != null) {
             const menuDisplayRequest = menu.getUpdateExistingMenuRequest(telegramWebhookInfo.chatID, conversationMessageID, this.env);
@@ -549,29 +547,28 @@ export class Worker {
         return makeSuccessResponse();
     }
 
-    async handleReplyToBot(telegramWebhookInfo : TelegramWebhookInfo) : Promise<Response> {
-        const userAnswer = telegramWebhookInfo.text||'';
+    async handleReplyToBot(info : TelegramWebhookInfo) : Promise<Response> {
+        const userAnswer = info.text||'';
 
         // read the callback data tucked away about the reply question
-        const telegramUserID = telegramWebhookInfo.telegramUserID;
-        const questionMessageID = telegramWebhookInfo.messageID;
-        const replyQuestionData = await maybeReadSessionObj<ReplyQuestionData>(telegramUserID, questionMessageID, "replyQuestion", this.env);
+        const questionMessageID = info.messageID;
+        const replyQuestionData = await maybeReadSessionObj<ReplyQuestionData>(info.getTelegramUserID('messaging'), questionMessageID, "replyQuestion", this.env);
         if (replyQuestionData == null) {
             return makeSuccessResponse();
         }
 
         // delete the question and reply messages from the chat (otherwise, it looks weird)
-        const userReplyMessageID = telegramWebhookInfo.realMessageID;
+        const userReplyMessageID = info.realMessageID;
         if (userReplyMessageID) {
-            await deleteTGMessage(userReplyMessageID, telegramWebhookInfo.chatID, this.env);
+            await deleteTGMessage(userReplyMessageID, info.chatID, this.env);
         }
-        await deleteTGMessage(questionMessageID, telegramWebhookInfo.chatID, this.env);
+        await deleteTGMessage(questionMessageID, info.chatID, this.env);
 
         // handle whatever special logic the reply code entails
         const replyQuestionCode = replyQuestionData.replyQuestionCode;
         switch(replyQuestionCode) {
             case ReplyQuestionCode.EnterBetaInviteCode:
-                await this.handleEnterBetaInviteCode(telegramWebhookInfo, userAnswer||'', this.env);
+                await this.handleEnterBetaInviteCode(info, userAnswer||'', this.env);
                 break;
             case ReplyQuestionCode.EnterTransferFundsRecipient:
                 break;
@@ -591,9 +588,9 @@ export class Worker {
         // If the reply question has callback data, delegate to the handleCallback method
         if (replyQuestionHasNextSteps(replyQuestionData)) {
             const callbackHandlerParams : CallbackHandlerParams = {
-                telegramUserID: telegramUserID,
-                telegramUserName: telegramWebhookInfo.telegramUserName,
-                chatID: telegramWebhookInfo.chatID,
+                telegramUserID: info.getTelegramUserID('messaging'),
+                telegramUserName: info.telegramUserName,
+                chatID: info.chatID,
                 messageID: replyQuestionData.linkedMessageID,
                 callbackData: new CallbackData(replyQuestionData.nextMenuCode, userAnswer)
             }
@@ -641,6 +638,8 @@ export class Worker {
                 return ['...', new MenuMain(menuUserData)];
             case '/welcome_screen':
                 return ['...', new WelcomeScreenPart1(undefined)];
+            case '/legal_agreement':
+                return ['...', new LegalAgreement(undefined)];
             case '/help':
                 return ['...', new MenuHelp(undefined)];
             default:

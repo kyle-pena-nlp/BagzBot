@@ -31,6 +31,8 @@ export interface Env {
 	IS_BETA_CODE_GATED : string
 	BETA_CODE_GATE_EXCEPTIONS : string
 	WALLET_BALANCE_REFRESH_INTERVAL_MS : string
+	ADMIN_TELEGRAM_USER_IDS: string
+	SUPER_ADMIN_USER_ID : string
 
 	UserDO : any // i'd like to strongly type this as DurableObjectNamespace, but can't for technical reasons
 	TokenPairPositionTrackerDO : any // ditto

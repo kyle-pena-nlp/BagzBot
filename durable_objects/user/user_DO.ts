@@ -13,6 +13,7 @@ import { wakeUpTokenPairPositionTracker } from "../token_pair_position_tracker/t
 import { DeleteSessionRequest, DeleteSessionResponse } from "./actions/delete_session";
 import { GenerateWalletRequest, GenerateWalletResponse } from "./actions/generate_wallet";
 import { GetAddressBookEntryRequest, GetAddressBookEntryResponse } from "./actions/get_address_book_entry";
+import { GetImpersonatedUserIDRequest, GetImpersonatedUserIDResponse } from "./actions/get_impersonated_user_id";
 import { GetLegalAgreementStatusRequest, GetLegalAgreementStatusResponse } from "./actions/get_legal_agreement_status";
 import { GetPositionRequest } from "./actions/get_position";
 import { GetSessionValuesRequest, GetSessionValuesWithPrefixRequest, GetSessionValuesWithPrefixResponse } from "./actions/get_session_values";
@@ -51,6 +52,8 @@ export class UserDO {
 
     // user's ID
     telegramUserID : ChangeTrackedValue<number|null> = new ChangeTrackedValue<number|null>('telegramUserID', null);
+
+    impersonatedUserID : ChangeTrackedValue<number|undefined> = new ChangeTrackedValue<number|undefined>("impersonatedUserID", undefined);
 
     // user's name
     telegramUserName : ChangeTrackedValue<string|null> = new ChangeTrackedValue<string|null>('telegramUserName', null);
@@ -113,6 +116,7 @@ export class UserDO {
     async loadStateFromStorage() {
         const storage = await this.state.storage.list();
         this.telegramUserID.initialize(storage);
+        this.impersonatedUserID.initialize(storage);
         this.telegramUserName.initialize(storage);
         this.wallet.initialize(storage);
         this.sessionTracker.initialize(storage);
@@ -125,6 +129,7 @@ export class UserDO {
     async flushToStorage() {
         await Promise.allSettled([
             this.telegramUserID.flushToStorage(this.state.storage),
+            this.impersonatedUserID.flushToStorage(this.state.storage),
             this.telegramUserName.flushToStorage(this.state.storage),
             this.wallet.flushToStorage(this.state.storage),
             this.sessionTracker.flushToStorage(this.state.storage),
@@ -244,11 +249,20 @@ export class UserDO {
                 this.assertUserIsInitialized();
                 response = await this.handleStoreLegalAgreementStatus(jsonRequestBody);
                 break;
+            case UserDOFetchMethod.getImpersonatedUserID:
+                this.assertUserIsInitialized();
+                response = await this.handleGetImpersonatedUserID(jsonRequestBody);
+                break;
             default:
                 assertNever(method);
         }
 
         return [method,jsonRequestBody,response];
+    }
+
+    async handleGetImpersonatedUserID(request : GetImpersonatedUserIDRequest) : Promise<Response> {
+        const responseBody : GetImpersonatedUserIDResponse = { impersonatedUserID : await this.impersonatedUserID.value };
+        return makeJSONResponse(responseBody);
     }
 
     async handleGetLegalAgreementStatus(request : GetLegalAgreementStatusRequest) : Promise<Response> {
