@@ -11,7 +11,7 @@ import { PolledTokenPairListDO } from "./durable_objects/polled_token_pair_list/
 import { TokenPairPositionTrackerDO } from "./durable_objects/token_pair_position_tracker/token_pair_position_tracker_DO";
 import { getLegalAgreementStatus, maybeReadSessionObj } from "./durable_objects/user/userDO_interop";
 import { UserDO } from "./durable_objects/user/user_DO";
-import { LegalAgreement } from "./menus";
+import { LegalAgreement, MenuCode } from "./menus";
 import { ReplyQuestion, ReplyQuestionCode } from "./reply_question";
 import { ReplyQuestionData } from "./reply_question/reply_question_data";
 
@@ -162,14 +162,24 @@ export default {
 		// TODO: finish this (allowing proper things thru)
 		const telegramUserID = telegramWebhookInfo.telegramUserID;
 		const chatID = telegramWebhookInfo.chatID;
+		const callbackData = telegramWebhookInfo.callbackData;
 		const response = await getLegalAgreementStatus(telegramUserID, env);
 		const legalAgreementStatus = response.status;
+		const LegalAgreementMenuCodes = [ MenuCode.LegalAgreement, MenuCode.LegalAgreementAgree, MenuCode.LegalAgreementRefuse ];
 		if (legalAgreementStatus === 'agreed') {
 			return 'proceed';
 		}
+		else if (legalAgreementStatus === 'refused' && callbackData !== null && LegalAgreementMenuCodes.includes(callbackData.menuCode)) {
+			return 'proceed';
+		}
+		// TODO: permit legal agreement menu codes if refused
 		else if (legalAgreementStatus === 'refused') {
 			return 'do-not-proceed';
 		}
+		else if (legalAgreementStatus === 'has-not-responded'  && callbackData !== null && LegalAgreementMenuCodes.includes(callbackData.menuCode)) {
+			return 'proceed';
+		}
+		// TODO: permit legal agreement menu codes if has-not-responded
 		else if (legalAgreementStatus === 'has-not-responded') {
 			const legalAgreementMenuRequest = new LegalAgreement(undefined).getCreateNewMenuRequest(chatID, env);
 			await fetch(legalAgreementMenuRequest);
@@ -178,7 +188,7 @@ export default {
 		else {
 			assertNever(legalAgreementStatus);
 		}
-	}
+	},
 
 	async maybeEnforceBetaGating(telegramWebhookInfo: TelegramWebhookInfo, handler: Handler, env : Env) : Promise<'proceed'|'beta-restricted'|'beta-code-entered'> {
 
