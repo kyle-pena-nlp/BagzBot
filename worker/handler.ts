@@ -12,7 +12,7 @@ import { TokenSymbolAndAddress } from "../durable_objects/user/model/token_name_
 import { generateWallet, getAddressBookEntry, getAndMaybeInitializeUserData, getDefaultTrailingStopLoss, getPosition, getWalletData, listAddressBookEntries, listOpenTrailingStopLossPositions, manuallyClosePosition, maybeReadSessionObj, readSessionObj, requestNewPosition, storeAddressBookEntry, storeSessionObj, storeSessionObjProperty, storeSessionValues } from "../durable_objects/user/userDO_interop";
 import { Env } from "../env";
 import { logError } from "../logging";
-import { BaseMenu, MenuBetaInviteFriends, MenuCode, MenuConfirmAddressBookEntry, MenuConfirmTrailingStopLossPositionRequest, MenuContinueMessage, MenuEditTrailingStopLossPositionRequest, MenuError, MenuFAQ, MenuHelp, MenuListPositions, MenuMain, MenuPickTransferFundsRecipient, MenuPleaseEnterToken, MenuStartTransferFunds, MenuTODO, MenuTrailingStopLossAutoRetrySell, MenuTrailingStopLossEntryBuyQuantity, MenuTrailingStopLossPickVsToken, MenuTrailingStopLossSlippagePercent, MenuTrailingStopLossTriggerPercent, MenuTransferFundsTestOrSubmitNow, MenuViewDecryptedWallet, MenuViewOpenPosition, MenuWallet, PositiveDecimalKeypad, PositiveIntegerKeypad } from "../menus";
+import { BaseMenu, MenuBetaInviteFriends, MenuCode, MenuConfirmAddressBookEntry, MenuConfirmTrailingStopLossPositionRequest, MenuContinueMessage, MenuEditTrailingStopLossPositionRequest, MenuError, MenuFAQ, MenuHelp, MenuListPositions, MenuMain, MenuPickTransferFundsRecipient, MenuPleaseEnterToken, MenuStartTransferFunds, MenuTODO, MenuTrailingStopLossAutoRetrySell, MenuTrailingStopLossEntryBuyQuantity, MenuTrailingStopLossPickVsToken, MenuTrailingStopLossSlippagePercent, MenuTrailingStopLossTriggerPercent, MenuTransferFundsTestOrSubmitNow, MenuViewDecryptedWallet, MenuViewOpenPosition, MenuWallet, PositiveDecimalKeypad, PositiveIntegerKeypad, WelcomeScreenPart1, WelcomeScreenPart2 } from "../menus";
 import { CallbackData } from "../menus/callback_data";
 import { PositionPreRequest, PositionRequest, convertPreRequestToRequest } from "../positions";
 import { ReplyQuestion, ReplyQuestionCode } from "../reply_question";
@@ -20,7 +20,7 @@ import { ReplyQuestionData, replyQuestionHasNextSteps } from "../reply_question/
 import { quoteBuy } from "../rpc/jupiter_quotes";
 import { CompleteTransferFundsRequest, PartialTransferFundsRequest } from "../rpc/rpc_transfer_funds";
 import { isGetQuoteFailure } from "../rpc/rpc_types";
-import { AutoSellOrderSpec, TelegramWebhookInfo, deleteTGMessage, sendMessageToTG, sendRequestToTG, updateTGMessage } from "../telegram";
+import { TelegramWebhookInfo, deleteTGMessage, sendMessageToTG, sendRequestToTG, updateTGMessage } from "../telegram";
 import { WEN_ADDRESS, getVsTokenInfo } from "../tokens";
 import { Structural, assertNever, makeFakeFailedRequestResponse, makeJSONResponse, makeSuccessResponse, tryParseFloat } from "../util";
 import { CallbackHandlerData as CallbackHandlerParams } from "./model/callback_handler_data";
@@ -439,6 +439,10 @@ export class Worker {
                 positionRequest.quote = maybeQuote;
                 await storeSessionObj<PositionRequest>(telegramUserID, messageID, positionRequest, POSITION_REQUEST_STORAGE_KEY, this.env);
                 return new MenuEditTrailingStopLossPositionRequest(positionRequest);
+            case MenuCode.WelcomeScreenPart1:
+                return new WelcomeScreenPart1(undefined);
+            case MenuCode.WelcomeScreenPart2:
+                return new WelcomeScreenPart2(undefined);
             default:
                 assertNever(callbackData.menuCode);
         }
@@ -623,35 +627,13 @@ export class Worker {
             case '/start':
                 const userData = await getAndMaybeInitializeUserData(telegramWebhookInfo.telegramUserID, telegramWebhookInfo.telegramUserName, telegramWebhookInfo.messageID, false, env);
                 return ["...", new MenuMain(userData)];
-            case '/help':
-                return ["...", new MenuHelp(undefined)];
-            case '/autosell':
-                const autoSellOrderSpec = telegramWebhookInfo.parseAutoSellOrder();
-                if (autoSellOrderSpec == null) {
-                    const autosellBadFormatMsg = `Auto-Sell order specification is incorrect.  Correct format is: ${AutoSellOrderSpec.describeFormat()}`;
-                    return [autosellBadFormatMsg];
-                }
-                const tokenAddress = autoSellOrderSpec.tokenAddress;
-                const getTokenResponse = await getTokenInfo(tokenAddress, env);
-                if (isInvalidTokenInfoResponse(getTokenResponse)) {
-                    const autosellTokenDNEMsg = `Could not identify token '${tokenAddress}'`;
-                    return [autosellTokenDNEMsg];
-                }
-                const tokenInfo = getTokenResponse.tokenInfo;
-                const tokenRecognizedForAutoSellOrderMsg =  `Token address '${tokenAddress}' (${tokenInfo.symbol}) recognized!`;
-                const prerequest = autoSellOrderSpec.toPositionPreRequest();
-                const quote = await quoteBuy(prerequest, tokenInfo, env);
-                if (isGetQuoteFailure(quote)) {
-                    return [`Unable to get a quote for ${tokenInfo.symbol}`];
-                }
-                const positionRequest = convertPreRequestToRequest(prerequest, quote, tokenInfo);
-                positionRequest.messageID = messageID; // ugh hack.
-                return [tokenRecognizedForAutoSellOrderMsg,
-                    await this.makeStopLossRequestEditorMenu(positionRequest, env),
-                    { obj: prerequest, prefix: POSITION_REQUEST_STORAGE_KEY }];
             case '/menu':
                 const menuUserData = await getAndMaybeInitializeUserData(telegramWebhookInfo.telegramUserID, telegramWebhookInfo.telegramUserName, telegramWebhookInfo.messageID, false, env);
                 return ['...', new MenuMain(menuUserData)];
+            case '/welcome_screen':
+                return ['...', new WelcomeScreenPart1(undefined)];
+            case '/help':
+                return ['...', new MenuHelp(undefined)];
             default:
                 throw new Error(`Unrecognized command: ${command}`);
         }

@@ -69,6 +69,7 @@ def migrate_and_configure_bot_for_local_server(bot_token, bot_secret_token):
     try:
         log_bot_out_of_prod_telegram(bot_token)
         register_bot_on_local_bot_api_server(bot_token, bot_secret_token)
+        configure_bot_commands(bot_token, bot_secret_token)
         configure_webhook_for_local_bot(bot_token, bot_secret_token)
     except Exception as e:
         print(e)
@@ -92,6 +93,41 @@ def register_bot_on_local_bot_api_server(bot_token, bot_secret_token):
 def get_local_telegram_bot_api_url(bot_token):
     return f'{LOCAL_TELEGRAM_BOT_API_SERVER_ADDRESS}/bot{bot_token}'
 
+def configure_bot_commands(bot_token, bot_secret_token):
+
+    local_telegram_bot_api_url = get_local_telegram_bot_api_url(bot_token)
+
+    data = {
+        'commands': [
+            {
+                'command': 'start',
+                'description': 'Starts a conversation with this bot'
+            },
+            {
+                'command': 'menu',
+                'description': 'Displays the main menu'
+            },
+            {
+                'command': 'welcome_screen',
+                'description': 'Displays the welcome screen for this bot'
+            },
+            {
+                'command': 'help',
+                'description': 'Displays information about this bot'
+            }            
+        ],
+        'scope': {
+            'type': 'all_private_chats'
+        }
+    }
+    headers = {
+        "Content-Type": "application/json"
+    }
+
+    response = requests.post(f'{local_telegram_bot_api_url}/setMyCommands', data=json.dumps(data), headers = headers)
+    if (not response.ok):
+        print(response.text)
+        raise Exception(response.text)
 
 def configure_webhook_for_local_bot(bot_token, bot_secret_token):
 

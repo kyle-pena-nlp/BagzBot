@@ -26,6 +26,8 @@ import { MenuWallet } from "./menu_wallet";
 import { PositiveDecimalKeypad } from "./positive_decimal_keypad";
 import { PositiveIntegerKeypad } from "./positive_integer_keypad";
 import { MenuTODO } from "./todo_menu";
+import { WelcomeScreenPart1 } from "./welcome_screen_part_1";
+import { WelcomeScreenPart2 } from "./welcome_screen_part_2";
 
 export {
     BaseMenu, MenuBetaInviteFriends, MenuCode, MenuConfirmAddressBookEntry, MenuConfirmTrailingStopLossPositionRequest, MenuContinueMessage, MenuEditTrailingStopLossPositionRequest, MenuError, MenuFAQ, MenuHelp,
@@ -36,6 +38,6 @@ export {
     MenuTrailingStopLossTriggerPercent, MenuTransferFundsTestOrSubmitNow, MenuViewDecryptedWallet, MenuViewOpenPosition,
     MenuWallet,
     PositiveDecimalKeypad,
-    PositiveIntegerKeypad
+    PositiveIntegerKeypad, WelcomeScreenPart1, WelcomeScreenPart2
 };
 

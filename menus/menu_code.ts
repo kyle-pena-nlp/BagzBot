@@ -13,6 +13,10 @@ export enum MenuCode {
 	Error = "Error",
 	NewPosition = "NewPosition",
 
+	// welcome screen
+	WelcomeScreenPart1 = "WelcomeScreenPart1",
+	WelcomeScreenPart2 = "WelcomeScreenPart2",
+
 	BetaGateInviteFriends = "BetaGateInviteFriends",
 	
 	// address book stuff
