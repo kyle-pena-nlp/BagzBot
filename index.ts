@@ -195,7 +195,10 @@ export default {
 			// ignore the message and tell the user they need a code
 			const replyQuestion = new ReplyQuestion(`Hi ${telegramUserName}, we are in BETA!  Please enter your invite code:`, 
 				ReplyQuestionCode.EnterBetaInviteCode,
-				handler.context);
+				handler.context,
+				{
+					timeoutMS: 30000
+				});
 			await replyQuestion.sendReplyQuestion(userID, chatID, env);
 			return 'beta-restricted';
 		}

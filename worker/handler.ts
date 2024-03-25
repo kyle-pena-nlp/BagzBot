@@ -404,6 +404,41 @@ export class Worker {
                 }
                 const botUserName = this.env.TELEGRAM_BOT_USERNAME;
                 return new MenuBetaInviteFriends({betaInviteCodes: unclaimedBetaCodes.data.betaInviteCodes, botUserName: botUserName });
+            case MenuCode.EditPositionChangeToken:
+                return new ReplyQuestion("Enter address of new token:", 
+                    ReplyQuestionCode.EditPositionChangeToken, 
+                    this.context, 
+                    {
+                        callback: {
+                            linkedMessageID: messageID,
+                            nextMenuCode: MenuCode.EditPositionChangeTokenSubmit
+                        },
+                        timeoutMS: QUESTION_TIMEOUT_MS
+                });
+            case MenuCode.EditPositionChangeTokenSubmit:
+                const maybeTokenAddress = (callbackData.menuArg||'').trim();
+                const tokenAddressExtractor = new TokenAddressExtractor();
+                const newTokenAddress = tokenAddressExtractor.maybeExtractTokenAddress(maybeTokenAddress);
+                if (newTokenAddress == null) {
+                    return new MenuContinueMessage(`Sorry - we couldn't interpret this as a token address.`, MenuCode.TrailingStopLossRequestReturnToEditorMenu);
+                }
+                const positionRequest = await readSessionObj<PositionRequest>(telegramUserID, messageID, POSITION_REQUEST_STORAGE_KEY, this.env);
+                if (positionRequest.token.address === newTokenAddress) {
+                    return new MenuEditTrailingStopLossPositionRequest(positionRequest);
+                }                
+                const tokenValidationInfo = await getTokenInfo(newTokenAddress, this.env);
+                if (isInvalidTokenInfoResponse(tokenValidationInfo)) {
+                    return new MenuContinueMessage(`Sorry - ${newTokenAddress} was not recognized as a valid token`, MenuCode.TrailingStopLossRequestReturnToEditorMenu);
+                }
+                const newTokenInfo = tokenValidationInfo.tokenInfo;
+                positionRequest.token = newTokenInfo;
+                const maybeQuote = await quoteBuy(positionRequest, newTokenInfo, this.env);
+                if (isGetQuoteFailure(maybeQuote)) {
+                    return new MenuContinueMessage(`Sorry - could not get a quote for $${newTokenInfo.symbol}`, MenuCode.TrailingStopLossRequestReturnToEditorMenu);
+                }
+                positionRequest.quote = maybeQuote;
+                await storeSessionObj<PositionRequest>(telegramUserID, messageID, positionRequest, POSITION_REQUEST_STORAGE_KEY, this.env);
+                return new MenuEditTrailingStopLossPositionRequest(positionRequest);
             default:
                 assertNever(callbackData.menuCode);
         }
@@ -533,6 +568,8 @@ export class Worker {
             case ReplyQuestionCode.EnterBuyQuantity:
                 break;
             case ReplyQuestionCode.EnterTriggerPercent:
+                break;
+            case ReplyQuestionCode.EditPositionChangeToken:
                 break;
             default:
                 assertNever(replyQuestionCode);

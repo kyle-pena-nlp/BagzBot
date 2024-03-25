@@ -5,5 +5,7 @@ export enum ReplyQuestionCode {
 
     EnterSlippagePercent = "EnterSlippagePercent",
     EnterBuyQuantity = "EnterBuyQuantity",
-    EnterTriggerPercent = "EnterTriggerPercent"
+    EnterTriggerPercent = "EnterTriggerPercent",
+    EditPositionChangeToken = "EditPositionChangeToken"
+    
 }

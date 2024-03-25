@@ -17,6 +17,7 @@ export class MenuEditTrailingStopLossPositionRequest extends Menu<PositionReques
         const options = this.emptyMenu();
         const positionRequest = this.menuData;
         //this.insertButtonNextLine(options, `Buying With: ${positionRequest.vsToken.symbol}`, new CallbackData(MenuCode.TrailingStopLossPickVsTokenMenu, positionRequest.vsToken.symbol));
+        this.insertButtonNextLine(options, `Change Token`, new CallbackData(MenuCode.EditPositionChangeToken));
         this.insertButtonNextLine(options, `${positionRequest.vsTokenAmt} ${positionRequest.vsToken.symbol}`, new CallbackData(MenuCode.TrailingStopLossEntryBuyQuantityMenu, positionRequest.vsTokenAmt.toString()));
         this.insertButtonSameLine(options, `${positionRequest.triggerPercent}% Trigger`, new CallbackData(MenuCode.TrailingStopLossTriggerPercentMenu, positionRequest.triggerPercent.toString()));
         this.insertButtonSameLine(options, `${positionRequest.slippagePercent}% Slippage`, new CallbackData(MenuCode.TrailingStopLossSlippagePctMenu, positionRequest.slippagePercent.toString()));

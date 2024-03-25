@@ -41,6 +41,10 @@ export enum MenuCode {
 	CustomBuyQuantity = "TSL.BuyQuantityKeypad",
 	SubmitBuyQuantity = "TSL.BuyQuantitySubmit",
 
+	// switch which token you are buying
+	EditPositionChangeToken = "EditPositionChangeToken",
+	EditPositionChangeTokenSubmit = "EditPositionChangeTokenSubmit",
+
 	// Trailing Stop Loss: set vsToken UI
 	TrailingStopLossPickVsTokenMenu = "TSL.VsTokenMenu",
 	TrailingStopLossPickVsTokenMenuSubmit = "TSL.VsTokenMenuSubmit",
