@@ -18,7 +18,7 @@ import { ReplyQuestionData } from "./reply_question/reply_question_data";
 export { BetaInviteCodesDO, PolledTokenPairListDO, TokenPairPositionTrackerDO, UserDO };
 
 enum ERRORS {
-    UNHANDLED_EXCEPTION = 500,
+   UNHANDLED_EXCEPTION = 500,
    MISMATCHED_SECRET_TOKEN = 1000,
    COULDNT_PARSE_REQUEST_BODY_JSON = 1500,
    NO_RESPONSE = 2000,
@@ -71,9 +71,9 @@ export default {
 		const messageType = telegramWebhookInfo.messageType;
 		const handler = new Handler();
 
-		// enforce beta code gating (if enabled). TODO: factor side-effects out of this method.
+		// enforce beta code gating (if enabled).
 		const betaEntryGateAction = await this.maybeEnforceBetaGating(telegramWebhookInfo, handler, env);
-		if (betaEntryGateAction === 'beta-restricted') {
+		if (betaEntryGateAction !== 'proceed') {
 			return makeSuccessResponse();
 		}
 
@@ -151,7 +151,7 @@ export default {
         console.log(`${ip_address} :: ${error_code_string} :: ${addl_info}`);
     },
 
-	async maybeEnforceBetaGating(telegramWebhookInfo: TelegramWebhookInfo, handler: Handler, env : Env) : Promise<'proceed'|'beta-restricted'> {
+	async maybeEnforceBetaGating(telegramWebhookInfo: TelegramWebhookInfo, handler: Handler, env : Env) : Promise<'proceed'|'beta-restricted'|'beta-code-entered'> {
 
 		if (!strictParseBoolean(env.IS_BETA_CODE_GATED)) {
 			return 'proceed';
@@ -167,33 +167,37 @@ export default {
 
 		// see if the user has claimed a beta code
 		const userHasClaimedBetaInviteCode = await getUserHasClaimedBetaInviteCode({ userID: telegramWebhookInfo.telegramUserID }, env);
-		// if they have not, and this incoming message isn't a response to a bot question
+		
+		// if the user is beta gated and this is a response to the '/start' command...
 		if (userHasClaimedBetaInviteCode.status === 'has-not' && messageType === 'command' && command === '/start' && commandTokens?.[1] != null) {
+			// treat the parameter to the '/start' command like a beta code. do not continue processing.
 			await handler.handleEnterBetaInviteCode(telegramWebhookInfo, commandTokens?.[1]?.text||'', env);
-			return 'beta-restricted';
+			return 'beta-code-entered';
 		}
-		else if (userHasClaimedBetaInviteCode.status === 'has-not' && messageType !== 'replyToBot') {
+		// if the user is beta-gated and they are responding to a bot message (which might be: "enter a beta code")
+		else if (userHasClaimedBetaInviteCode.status === 'has-not' && messageType === 'replyToBot') {
+			// fetch the stored question being asked
+			const replyQuestionData = await maybeReadSessionObj<ReplyQuestionData>(userID, messageID, "replyQuestion", env);
+			// if there is no question being asked... do not proceed.
+			if (replyQuestionData == null) {
+				return 'beta-restricted';
+			}
+			// if the question wasn't 'give me a beta code'... do not proceed.
+			if (replyQuestionData.replyQuestionCode != ReplyQuestionCode.EnterBetaInviteCode) {
+				return 'beta-restricted';
+			}
+			// otherwise, process the beta code. do not proceed.
+			await handler.handleEnterBetaInviteCode(telegramWebhookInfo, telegramWebhookInfo.text||'', env);
+			return 'beta-code-entered';
+		}		
+		// otherwise, if the user is beta gated
+		else if (userHasClaimedBetaInviteCode.status === 'has-not') {
 			// ignore the message and tell the user they need a code
 			const replyQuestion = new ReplyQuestion(`Hi ${telegramUserName}, we are in BETA!  Please enter your invite code:`, ReplyQuestionCode.EnterBetaInviteCode);
 			await replyQuestion.sendReplyQuestion(userID, chatID, env);
 			return 'beta-restricted';
 		}
-		// otherwise, if they don't have a code, but they are responding to a bot question
-		else if (userHasClaimedBetaInviteCode.status === 'has-not' && messageType === 'replyToBot') {
-			// fetch the stored question being asked
-			const replyQuestionData = await maybeReadSessionObj<ReplyQuestionData>(userID, messageID, "replyQuestion", env);
-			// if the bot wasn't asking a question, ignore the reply
-			if (replyQuestionData == null) {
-				return 'beta-restricted';
-			}
-			// if the bot wasn't asking for a beta invite code, ignore the reply
-			if (replyQuestionData.replyQuestionCode != ReplyQuestionCode.EnterBetaInviteCode) {
-				return 'beta-restricted';
-			}
-			// otherwise, process the invite code
-			await handler.handleEnterBetaInviteCode(telegramWebhookInfo, telegramWebhookInfo.text||'', env);
-			return 'beta-restricted';
-		}
+
 
 		return 'proceed';
 	}

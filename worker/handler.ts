@@ -24,11 +24,15 @@ import { AutoSellOrderSpec, TelegramWebhookInfo, deleteTGMessage, sendMessageToT
 import { WEN_ADDRESS, getVsTokenInfo } from "../tokens";
 import { Structural, assertNever, makeFakeFailedRequestResponse, makeJSONResponse, makeSuccessResponse, tryParseFloat } from "../util";
 import { CallbackHandlerData as CallbackHandlerParams } from "./model/callback_handler_data";
+import { TokenAddressExtractor } from "./token_address_extractor";
 
-const POSITION_REQUEST = "PositionRequest";
+
+
+const POSITION_REQUEST_STORAGE_KEY = "PositionRequest";
 
 export class Worker {
 
+    // I am interpreting any message sent to handleMessage as a token address
     async handleMessage(telegramWebhookInfo : TelegramWebhookInfo, env : Env) : Promise<Response> {
         
         // alias some things
@@ -36,9 +40,17 @@ export class Worker {
         const chatID = telegramWebhookInfo.chatID;
         const initiatingMessageID = telegramWebhookInfo.messageID;
         const initiatingMessage = telegramWebhookInfo.text||'';
+
+        const tokenAddressParser = new TokenAddressExtractor()
+        const maybeTokenAddress = tokenAddressParser.maybeExtractTokenAddress(initiatingMessage);
         
+        if (maybeTokenAddress == null) {
+            await sendMessageToTG(chatID, `'${initiatingMessage.trim()}' does not appear to be a valid token address`, env);
+            return makeFakeFailedRequestResponse(404, "Token does not exist");
+        }
+
         // assume the message is a token address, and fetch the token info
-        const validateTokenResponse : GetTokenInfoResponse = await getTokenInfo(initiatingMessage, env);
+        const validateTokenResponse : GetTokenInfoResponse = await getTokenInfo(maybeTokenAddress, env);
         
         // if it's not valid, early-out
         if (isInvalidTokenInfoResponse(validateTokenResponse)) {
@@ -89,7 +101,7 @@ export class Worker {
         await storeSessionObj<PositionRequest>(telegramUserID, 
             conversationMessageID, 
             positionRequest, 
-            POSITION_REQUEST, 
+            POSITION_REQUEST_STORAGE_KEY, 
             env);
 
         const menu = await this.makeStopLossRequestEditorMenu(positionRequest, env);
@@ -143,7 +155,7 @@ export class Worker {
                     return new MenuContinueMessage(`Could not get a quote for ${tokenInfo.symbol}. Please try again soon.`, MenuCode.Main);
                 }
                 const request = convertPreRequestToRequest(newPrerequest, quote, tokenInfoResponse.tokenInfo);
-                await storeSessionObj<PositionRequest>(telegramUserID, messageID, request, POSITION_REQUEST, env);
+                await storeSessionObj<PositionRequest>(telegramUserID, messageID, request, POSITION_REQUEST_STORAGE_KEY, env);
                 return new MenuEditTrailingStopLossPositionRequest(request);
             case MenuCode.Error:
                 return new MenuError(undefined);
@@ -195,9 +207,9 @@ export class Worker {
                     return new MenuContinueMessage(`Sorry - '${callbackData.menuArg||''}' is not a valid percentage.`, MenuCode.TrailingStopLossSlippagePctMenu);
                 }
                 if (slipPctEntry) {
-                    await storeSessionObjProperty(telegramUserID, messageID, "slippagePercent", slipPctEntry, POSITION_REQUEST, env);
+                    await storeSessionObjProperty(telegramUserID, messageID, "slippagePercent", slipPctEntry, POSITION_REQUEST_STORAGE_KEY, env);
                 }
-                const positionRequestAfterEditingSlippagePct = await readSessionObj<PositionRequest>(telegramUserID, messageID, POSITION_REQUEST, env);
+                const positionRequestAfterEditingSlippagePct = await readSessionObj<PositionRequest>(telegramUserID, messageID, POSITION_REQUEST_STORAGE_KEY, env);
                 return await this.makeStopLossRequestEditorMenu(positionRequestAfterEditingSlippagePct, env);                
             case MenuCode.CustomBuyQuantity:
                 const buyQuantityQuestion  = new ReplyQuestion(
@@ -213,17 +225,17 @@ export class Worker {
                 if (!submittedBuyQuantity || submittedBuyQuantity <= 0.0) {
                     return new MenuContinueMessage(`Sorry - '${callbackData.menuArg||''}' is not a valid quantity of SOL to buy.`, MenuCode.TrailingStopLossSlippagePctMenu);
                 }
-                await storeSessionObjProperty(telegramUserID, messageID, "vsTokenAmt", submittedBuyQuantity, POSITION_REQUEST, env);
-                const trailingStopLossRequestStateAfterBuyQuantityEdited = await readSessionObj<PositionRequest>(telegramUserID, messageID, POSITION_REQUEST, env);
+                await storeSessionObjProperty(telegramUserID, messageID, "vsTokenAmt", submittedBuyQuantity, POSITION_REQUEST_STORAGE_KEY, env);
+                const trailingStopLossRequestStateAfterBuyQuantityEdited = await readSessionObj<PositionRequest>(telegramUserID, messageID, POSITION_REQUEST_STORAGE_KEY, env);
                 return await this.makeStopLossRequestEditorMenu(trailingStopLossRequestStateAfterBuyQuantityEdited, env);
             case MenuCode.TrailingStopLossChooseAutoRetrySellMenu:
                 return new MenuTrailingStopLossAutoRetrySell(undefined);
             case MenuCode.TrailingStopLossChooseAutoRetrySellSubmit:
-                await storeSessionObjProperty(telegramUserID, messageID, "retrySellIfSlippageExceeded", callbackData.menuArg === "true", POSITION_REQUEST, env);
-                const trailingStopLossRequestStateAfterAutoRetrySellEdited = await readSessionObj<PositionRequest>(telegramUserID, messageID, POSITION_REQUEST, env);
+                await storeSessionObjProperty(telegramUserID, messageID, "retrySellIfSlippageExceeded", callbackData.menuArg === "true", POSITION_REQUEST_STORAGE_KEY, env);
+                const trailingStopLossRequestStateAfterAutoRetrySellEdited = await readSessionObj<PositionRequest>(telegramUserID, messageID, POSITION_REQUEST_STORAGE_KEY, env);
                 return await this.makeStopLossRequestEditorMenu(trailingStopLossRequestStateAfterAutoRetrySellEdited, env);
             case MenuCode.TrailingStopLossConfirmMenu:
-                const trailingStopLossRequestAfterDoneEditing = await readSessionObj<PositionRequest>(telegramUserID, messageID, POSITION_REQUEST, env);
+                const trailingStopLossRequestAfterDoneEditing = await readSessionObj<PositionRequest>(telegramUserID, messageID, POSITION_REQUEST_STORAGE_KEY, env);
                 return await this.makeStopLossConfirmMenu(trailingStopLossRequestAfterDoneEditing, env);
             case MenuCode.CustomTriggerPct:
                 const triggerPctQuestion = new ReplyQuestion(
@@ -241,12 +253,12 @@ export class Worker {
                         `Sorry - '${callbackData.menuArg||''}' is not a valid percentage`,
                         MenuCode.TrailingStopLossTriggerPercentMenu);
                 }
-                await storeSessionObjProperty(telegramUserID, messageID, "triggerPercent", triggerPctEntry, POSITION_REQUEST, env);
-                const updatedTSL = await readSessionObj<PositionRequest>(telegramUserID, messageID, POSITION_REQUEST, env);
+                await storeSessionObjProperty(telegramUserID, messageID, "triggerPercent", triggerPctEntry, POSITION_REQUEST_STORAGE_KEY, env);
+                const updatedTSL = await readSessionObj<PositionRequest>(telegramUserID, messageID, POSITION_REQUEST_STORAGE_KEY, env);
                 return await this.makeStopLossRequestEditorMenu(updatedTSL, env);                
             case MenuCode.TrailingStopLossEditorFinalSubmit:
                 // TODO: do the read within UserDO to avoid the extra roundtrip
-                const positionRequestAfterFinalSubmit = await readSessionObj<PositionRequest>(telegramUserID, messageID, POSITION_REQUEST, env);
+                const positionRequestAfterFinalSubmit = await readSessionObj<PositionRequest>(telegramUserID, messageID, POSITION_REQUEST_STORAGE_KEY, env);
                 const positionRequestRequest : OpenPositionRequest = { 
                     chatID: chatID, 
                     userID: telegramUserID, 
@@ -267,8 +279,8 @@ export class Worker {
                 await storeSessionValues(telegramUserID, messageID, new Map<string,Structural>([
                     ["vsToken", vsToken],
                     //["vsTokenAddress", vsTokenAddress]
-                ]), POSITION_REQUEST, env);
-                const trailingStopLossPositionRequestAfterSubmittingVsToken = await readSessionObj<PositionRequest>(telegramUserID, messageID, POSITION_REQUEST, env);
+                ]), POSITION_REQUEST_STORAGE_KEY, env);
+                const trailingStopLossPositionRequestAfterSubmittingVsToken = await readSessionObj<PositionRequest>(telegramUserID, messageID, POSITION_REQUEST_STORAGE_KEY, env);
                 return await this.makeStopLossRequestEditorMenu(trailingStopLossPositionRequestAfterSubmittingVsToken, env);
             case MenuCode.TransferFunds:
                 // TODO
@@ -280,15 +292,15 @@ export class Worker {
                 await this.handleMenuClose(telegramWebhookInfo.chatID, telegramWebhookInfo.messageID, env);
                 return;
             case MenuCode.TrailingStopLossSlippagePctMenu:
-                const x = await readSessionObj<PositionRequest>(telegramUserID, messageID, POSITION_REQUEST, env);
+                const x = await readSessionObj<PositionRequest>(telegramUserID, messageID, POSITION_REQUEST_STORAGE_KEY, env);
                 const slippagePercent = x.slippagePercent;
                 return new MenuTrailingStopLossSlippagePercent(slippagePercent);
             case MenuCode.TrailingStopLossTriggerPercentMenu:
-                const y = await readSessionObj<PositionRequest>(telegramUserID, messageID, POSITION_REQUEST, env);
+                const y = await readSessionObj<PositionRequest>(telegramUserID, messageID, POSITION_REQUEST_STORAGE_KEY, env);
                 const triggerPercent = y.triggerPercent;
                 return new MenuTrailingStopLossTriggerPercent(triggerPercent);
             case MenuCode.TrailingStopLossRequestReturnToEditorMenu:
-                const z = await readSessionObj<PositionRequest>(telegramUserID, messageID, POSITION_REQUEST, env);
+                const z = await readSessionObj<PositionRequest>(telegramUserID, messageID, POSITION_REQUEST_STORAGE_KEY, env);
                 return await this.makeStopLossRequestEditorMenu(z, env);
             case MenuCode.AddFundsRecipientAddress:
                 const addressBookEntry : JustAddressBookEntryID = { 
@@ -373,7 +385,7 @@ export class Worker {
     }
 
     private async getTrailingStopLossPositionVsTokenFromSession(telegramUserID : number, messageID : number, env : Env) : Promise<TokenSymbolAndAddress> {
-        const positionRequest = await readSessionObj<PositionRequest>(telegramUserID, messageID, POSITION_REQUEST, env);
+        const positionRequest = await readSessionObj<PositionRequest>(telegramUserID, messageID, POSITION_REQUEST_STORAGE_KEY, env);
         return {
             tokenSymbol: positionRequest.vsToken.symbol,
             tokenAddress: positionRequest.vsToken.address
@@ -381,7 +393,7 @@ export class Worker {
     }
 
     private async getTrailingStopLossPositionQuantityAndVsTokenFromSession(telegramUserID : number, messageID : number, env: Env) : Promise<QuantityAndToken> {
-        const positionRequest = await readSessionObj<PositionRequest>(telegramUserID, messageID, POSITION_REQUEST, env);
+        const positionRequest = await readSessionObj<PositionRequest>(telegramUserID, messageID, POSITION_REQUEST_STORAGE_KEY, env);
         return {
             thisTokenSymbol:  positionRequest.vsToken.symbol,
             thisTokenAddress: positionRequest.vsToken.address,
@@ -578,7 +590,7 @@ export class Worker {
                 positionRequest.messageID = messageID; // ugh hack.
                 return [tokenRecognizedForAutoSellOrderMsg,
                     await this.makeStopLossRequestEditorMenu(positionRequest, env),
-                    { obj: prerequest, prefix: POSITION_REQUEST }];
+                    { obj: prerequest, prefix: POSITION_REQUEST_STORAGE_KEY }];
             case '/menu':
                 const menuUserData = await getAndMaybeInitializeUserData(telegramWebhookInfo.telegramUserID, telegramWebhookInfo.telegramUserName, telegramWebhookInfo.messageID, false, env);
                 return ['...', new MenuMain(menuUserData)];
