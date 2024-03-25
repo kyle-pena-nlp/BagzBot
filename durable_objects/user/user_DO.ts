@@ -10,6 +10,7 @@ import { ChangeTrackedValue, Structural, assertNever, groupIntoMap, makeFailureR
 import { listUnclaimedBetaInviteCodes } from "../beta_invite_codes/beta_invite_code_interop";
 import { AutomaticallyClosePositionsRequest, AutomaticallyClosePositionsResponse } from "../token_pair_position_tracker/actions/automatically_close_positions";
 import { wakeUpTokenPairPositionTracker } from "../token_pair_position_tracker/token_pair_position_tracker_DO_interop";
+import { BaseUserAction } from "./actions/base_user_action";
 import { DeleteSessionRequest, DeleteSessionResponse } from "./actions/delete_session";
 import { GenerateWalletRequest, GenerateWalletResponse } from "./actions/generate_wallet";
 import { GetAddressBookEntryRequest, GetAddressBookEntryResponse } from "./actions/get_address_book_entry";
@@ -49,17 +50,17 @@ export class UserDO {
     // boilerplate DO stuff
     env : Env;
     state: DurableObjectState;
+    loadFromStorageFailed : boolean|undefined = undefined
 
     // user's ID
     telegramUserID : ChangeTrackedValue<number|null> = new ChangeTrackedValue<number|null>('telegramUserID', null);
 
+    // if the user is impersonating someone, this is populated.
+    // all other properties pertain to the 'real user' per telegramUserID, not the impersonated user
     impersonatedUserID : ChangeTrackedValue<number|undefined> = new ChangeTrackedValue<number|undefined>("impersonatedUserID", undefined);
 
-    // user's name
-    telegramUserName : ChangeTrackedValue<string|null> = new ChangeTrackedValue<string|null>('telegramUserName', null);
-
-    // the user's wallet.
-    wallet : ChangeTrackedValue<Wallet|null> = new ChangeTrackedValue<Wallet|null>('wallet', null);
+    // the user's wallet
+    wallet : ChangeTrackedValue<Wallet|null> = new ChangeTrackedValue<Wallet|null>('wallet', null, true);
 
     // keeps track of sol balance and when last refreshed.  Gets (rate-limited) latest balance on access.
     solBalanceTracker : SOLBalanceTracker = new SOLBalanceTracker();
@@ -115,10 +116,9 @@ export class UserDO {
 
     async loadStateFromStorage() {
         const storage = await this.state.storage.list();
+        this.wallet.initialize(storage);
         this.telegramUserID.initialize(storage);
         this.impersonatedUserID.initialize(storage);
-        this.telegramUserName.initialize(storage);
-        this.wallet.initialize(storage);
         this.sessionTracker.initialize(storage);
         this.userPositionTracker.initialize(storage);
         this.addressBookEntryTracker.initialize(storage);
@@ -130,7 +130,6 @@ export class UserDO {
         await Promise.allSettled([
             this.telegramUserID.flushToStorage(this.state.storage),
             this.impersonatedUserID.flushToStorage(this.state.storage),
-            this.telegramUserName.flushToStorage(this.state.storage),
             this.wallet.flushToStorage(this.state.storage),
             this.sessionTracker.flushToStorage(this.state.storage),
             this.userPositionTracker.flushToStorage(this.state.storage),
@@ -141,7 +140,7 @@ export class UserDO {
     }
 
     initialized() : boolean {
-        return (this.telegramUserID.value != null) && (this.telegramUserName.value != null);
+        return (this.telegramUserID.value != null);
     }
 
     async fetch(request : Request) : Promise<Response> {
@@ -159,105 +158,122 @@ export class UserDO {
 
     }
 
+    async ensureIsInitialized(userAction : BaseUserAction) {
+        // make sure telegramUserID is populated
+        if (this.telegramUserID.value == null) {
+            this.telegramUserID.value = userAction.telegramUserID;
+        }
+        else if (this.telegramUserID.value != null && this.telegramUserID.value != userAction.telegramUserID) {
+            throw new Error(`telegram user IDs didn't match (request: ${userAction.telegramUserID}, state: ${this.telegramUserID.value})`);
+        }
+        // make sure the user certainly has no wallet (even if init of UserDO fails)
+        // if initialization was attempted and the wallet was not initialized...
+        if (this.wallet.initializationAttempted && !this.wallet.initialized) {
+            this.wallet.value = await this.generateWallet();
+        }
+    }
+
     async _fetch(request : Request) : Promise<[UserDOFetchMethod,any,Response]> {
 
-        const [method,jsonRequestBody] = await this.validateFetchRequest(request);
+        const [method,userAction] = await this.validateFetchRequest(request);
         let response : Response|null = null;
+
+        await this.ensureIsInitialized(userAction);
 
         switch(method) {
             case UserDOFetchMethod.get:
-                response = await this.handleGet(jsonRequestBody);            
+                response = await this.handleGet(userAction);            
                 break;
             case UserDOFetchMethod.initialize:
-                response = await this.handleInitialize(jsonRequestBody);            
+                response = await this.handleInitialize(userAction);            
                 break;
             case UserDOFetchMethod.storeSessionValues:
                 this.assertUserIsInitialized();
-                response = await this.handleStoreSessionValues(jsonRequestBody);
+                response = await this.handleStoreSessionValues(userAction);
                 break;
             case UserDOFetchMethod.getSessionValues:
                 this.assertUserIsInitialized();
-                response = await this.handleGetSessionValues(jsonRequestBody);
+                response = await this.handleGetSessionValues(userAction);
                 break;
             case UserDOFetchMethod.getSessionValuesWithPrefix:
                 this.assertUserIsInitialized();
-                response = this.handleGetSessionValuesWithPrefix(jsonRequestBody);
+                response = this.handleGetSessionValuesWithPrefix(userAction);
                 break;
             case UserDOFetchMethod.getDefaultTrailingStopLossRequest:
                 this.assertUserIsInitialized();
-                response = this.handleGetDefaultTrailingStopLossRequest(jsonRequestBody);
+                response = this.handleGetDefaultTrailingStopLossRequest(userAction);
                 break;
             case UserDOFetchMethod.deleteSession:
                 this.assertUserIsInitialized();
-                response = await this.handleDeleteSession(jsonRequestBody);
+                response = await this.handleDeleteSession(userAction);
                 break;
             case UserDOFetchMethod.createWallet:
                 this.assertUserIsInitialized();
-                response = await this.handleGenerateWallet({});
+                response = await this.handleGenerateWallet(userAction);
                 break;
             case UserDOFetchMethod.getWalletData:
                 this.assertUserIsInitialized();
                 this.assertUserHasWallet();
-                response = await this.handleGetWalletData(jsonRequestBody);
+                response = await this.handleGetWalletData(userAction);
                 break;
             case UserDOFetchMethod.openNewPosition:
                 this.assertUserIsInitialized();
                 this.assertUserHasWallet();
-                response = await this.handleOpenNewPosition(jsonRequestBody);
+                response = await this.handleOpenNewPosition(userAction);
                 break;
             case UserDOFetchMethod.getPosition:
                 this.assertUserIsInitialized();
                 this.assertUserHasWallet();
-                response = await this.handleGetPosition(jsonRequestBody);
+                response = await this.handleGetPosition(userAction);
                 break;
             case UserDOFetchMethod.listPositions:
                 this.assertUserIsInitialized();
                 this.assertUserHasWallet();
-                response = await this.handleListPositions(jsonRequestBody);
+                response = await this.handleListPositions(userAction);
                 break;
             case UserDOFetchMethod.manuallyClosePosition:
                 this.assertUserIsInitialized();
                 this.assertUserHasWallet();
-                response = await this.handleManuallyClosePositionRequest(jsonRequestBody);
+                response = await this.handleManuallyClosePositionRequest(userAction);
                 break;
             case UserDOFetchMethod.automaticallyClosePositions:
                 this.assertUserIsInitialized();
                 this.assertUserHasWallet();
-                response = await this.handleAutomaticallyClosePositionsRequest(jsonRequestBody);
+                response = await this.handleAutomaticallyClosePositionsRequest(userAction);
                 break;
             case UserDOFetchMethod.storeAddressBookEntry:
                 this.assertUserIsInitialized();
-                response = await this.handleStoreAddressBookEntry(jsonRequestBody);
+                response = await this.handleStoreAddressBookEntry(userAction);
                 break;
             case UserDOFetchMethod.listAddressBookEntries:
                 this.assertUserIsInitialized();
-                response = await this.handleListAddressBookEntries(jsonRequestBody);
+                response = await this.handleListAddressBookEntries(userAction);
                 break;
             case UserDOFetchMethod.removeAddressBookEntry:
                 this.assertUserIsInitialized();
-                response = await this.handleRemoveAddressBookEntry(jsonRequestBody);
+                response = await this.handleRemoveAddressBookEntry(userAction);
                 break;
             case UserDOFetchMethod.getAddressBookEntry:
                 this.assertUserIsInitialized();
-                response = await this.handleGetAddressBookEntry(jsonRequestBody);
+                response = await this.handleGetAddressBookEntry(userAction);
                 break;
             case UserDOFetchMethod.getLegalAgreementStatus:
                 this.assertUserIsInitialized();
-                response = await this.handleGetLegalAgreementStatus(jsonRequestBody);
+                response = await this.handleGetLegalAgreementStatus(userAction);
                 break;
             case UserDOFetchMethod.storeLegalAgreementStatus:
                 this.assertUserIsInitialized();
-                response = await this.handleStoreLegalAgreementStatus(jsonRequestBody);
+                response = await this.handleStoreLegalAgreementStatus(userAction);
                 break;
             case UserDOFetchMethod.getImpersonatedUserID:
                 this.assertUserIsInitialized();
-                response = await this.handleGetImpersonatedUserID(jsonRequestBody);
+                response = await this.handleGetImpersonatedUserID(userAction);
                 break;
             default:
                 assertNever(method);
         }
 
-        return [method,jsonRequestBody,response];
+        return [method,userAction,response];
     }
 
     async handleGetImpersonatedUserID(request : GetImpersonatedUserIDRequest) : Promise<Response> {
@@ -346,7 +362,7 @@ export class UserDO {
 
     handleGetDefaultTrailingStopLossRequest(defaultTrailingStopLossRequestRequest : DefaultTrailingStopLossRequestRequest) : Response {
         const defaultPrerequest = structuredClone(this.defaultTrailingStopLossRequest);
-        defaultPrerequest.userID = defaultTrailingStopLossRequestRequest.userID;
+        defaultPrerequest.userID = defaultTrailingStopLossRequestRequest.telegramUserID;
         defaultPrerequest.chatID = defaultTrailingStopLossRequestRequest.chatID;
         defaultPrerequest.messageID = defaultTrailingStopLossRequestRequest.messageID;
         defaultPrerequest.positionID = crypto.randomUUID();
@@ -417,7 +433,6 @@ export class UserDO {
             return makeSuccessResponse("User already initialized");
         }
         this.telegramUserID.value = userInitializeRequest.telegramUserID;
-        this.telegramUserName.value = userInitializeRequest.telegramUserName;
         return makeJSONResponse<UserInitializeResponse>({});
     }
 
@@ -439,7 +454,15 @@ export class UserDO {
         catch {
             return makeJSONResponse<GenerateWalletResponse>({ success : false });
         }
-        
+    }
+
+    async generateWallet() : Promise<Wallet> {
+        const { publicKey, privateKey } = await generateEd25519Keypair();
+        return {
+            telegramUserID: this.telegramUserID.value!!,
+            publicKey: publicKey,
+            encryptedPrivateKey: await encryptPrivateKey(privateKey, this.telegramUserID.value!!, this.env)
+        };        
     }
 
     async handleGetWalletData(request : GetWalletDataRequest) : Promise<Response> {
@@ -503,8 +526,11 @@ export class UserDO {
         return makeJSONResponse<AutomaticallyClosePositionsResponse>({});
     }
 
-    async validateFetchRequest(request : Request) : Promise<[UserDOFetchMethod,any]> {
+    async validateFetchRequest(request : Request) : Promise<[UserDOFetchMethod,BaseUserAction]> {
         const jsonBody : any = await maybeGetJson(request);
+        if (!('telegramUserID' in jsonBody)) {
+            throw new Error("All requests to UserDO must include telegramUserID");
+        }
         const methodName = new URL(request.url).pathname.substring(1);
         const method : UserDOFetchMethod|null = parseUserDOFetchMethod(methodName);
         if (method == null) {
@@ -546,7 +572,6 @@ export class UserDO {
             hasWallet: hasWallet,
             address : address,
             initialized: this.initialized(),
-            telegramUserName : this.telegramUserName.value||undefined,
             hasInviteBetaCodes: hasInviteBetaCodes,
             maybeSOLBalance : maybeSOLBalance
         };

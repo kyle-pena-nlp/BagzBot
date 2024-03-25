@@ -1,4 +1,6 @@
-export interface GetImpersonatedUserIDRequest {
+import { BaseUserAction } from "./base_user_action";
+
+export interface GetImpersonatedUserIDRequest  extends BaseUserAction {
 
 }
 

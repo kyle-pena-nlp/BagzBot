@@ -1,4 +1,6 @@
-export interface GetLegalAgreementStatusRequest {
+import { BaseUserAction } from "./base_user_action";
+
+export interface GetLegalAgreementStatusRequest  extends BaseUserAction {
 
 }
 

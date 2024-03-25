@@ -1,7 +1,7 @@
-import { Wallet } from "../../../crypto"
+import { Wallet } from "../../../crypto";
+import { BaseUserAction } from "./base_user_action";
 
-export interface GetWalletDataRequest {
-    telegramUserID: number
+export interface GetWalletDataRequest  extends BaseUserAction {
 }
 
 export interface GetWalletDataResponse {

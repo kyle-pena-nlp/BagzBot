@@ -16,6 +16,7 @@ import { logError } from "./logging";
 import { LegalAgreement, MenuCode } from "./menus";
 import { ReplyQuestion, ReplyQuestionCode } from "./reply_question";
 import { ReplyQuestionData } from "./reply_question/reply_question_data";
+import { CallbackHandlerParams } from "./worker/model/callback_handler_params";
 
 /* Export of imported DO's (required by wrangler) */
 export { BetaInviteCodesDO, PolledTokenPairListDO, TokenPairPositionTrackerDO, UserDO };
@@ -72,8 +73,9 @@ export default {
 		// get some important info from the telegram request
 		const telegramWebhookInfo = new TelegramWebhookInfo(telegramRequestBody, env);
 
-		if (isAnAdminUserID(telegramWebhookInfo._realUserID, env) || isTheSuperAdminUserID(telegramWebhookInfo._realUserID, env)) {
-			const impersonatedUserID = await getImpersonatedUserID(telegramWebhookInfo._realUserID, env);
+		// do user impersonation, if an admin or *the* super admin is impersonating another user
+		if (isAnAdminUserID(telegramWebhookInfo.getTelegramUserID('real'), env) || isTheSuperAdminUserID(telegramWebhookInfo.getTelegramUserID('real'), env)) {
+			const impersonatedUserID = (await getImpersonatedUserID(telegramWebhookInfo.getTelegramUserID('real'), env)).impersonatedUserID;
 			if (impersonatedUserID !=  null) {
 				const impersonationSuccess = telegramWebhookInfo.impersonate(impersonatedUserID, env);
 				if (impersonationSuccess === 'not-permitted') {
@@ -82,6 +84,7 @@ export default {
 			}
 		}
 
+		// alias some things
 		const messageType = telegramWebhookInfo.messageType;
 		const handler = new Handler(context, env);
 		
@@ -104,7 +107,7 @@ export default {
 
 		// User clicks a menu button
 		if (messageType === 'callback') {
-			return await handler.handleCallback(telegramWebhookInfo.toCallbackHandlerData());
+			return await handler.handleCallback(new CallbackHandlerParams(telegramWebhookInfo));
 		}
 
 		// User issues a command
@@ -173,11 +176,12 @@ export default {
 
 	async enforceLegalAgreementGating(telegramWebhookInfo : TelegramWebhookInfo, handler : Handler, env : Env) : Promise<'proceed'|'do-not-proceed'> {
 		// TODO: finish this (allowing proper things thru)
-		telegramWebhookInfo._realUserID;
 		const chatID = telegramWebhookInfo.chatID;
 		const callbackData = telegramWebhookInfo.callbackData;
 		const command = telegramWebhookInfo.command;
-		const response = await getLegalAgreementStatus(telegramWebhookInfo._realUserID, env);
+		// Of note: I am using real User ID for legal agreement gating.
+		// That way, we can't circumvent legal agreement by impersonating.
+		const response = await getLegalAgreementStatus(telegramWebhookInfo.getTelegramUserID('real'), env);
 		const legalAgreementStatus = response.status;
 		const LegalAgreementMenuCodes = [ MenuCode.LegalAgreement, MenuCode.LegalAgreementAgree, MenuCode.LegalAgreementRefuse ];
 		if (legalAgreementStatus === 'agreed') {
@@ -213,7 +217,6 @@ export default {
 			return 'proceed';
 		}
 
-		const telegramUserName = info.telegramUserName;
 		const messageID = info.messageID;
 		const chatID = info.chatID;
 		const messageType = info.messageType;
@@ -221,7 +224,7 @@ export default {
 		const commandTokens = info.commandTokens;
 
 		// see if the user has claimed a beta code
-		const userHasClaimedBetaInviteCode = await getUserHasClaimedBetaInviteCode({ userID: info._realUserID }, env);
+		const userHasClaimedBetaInviteCode = await getUserHasClaimedBetaInviteCode({ userID: info.getTelegramUserID() }, env);
 		
 		// if the user is beta gated and this is a response to the '/start' command...
 		if (userHasClaimedBetaInviteCode.status === 'has-not' && messageType === 'command' && command === '/start' && commandTokens?.[1] != null) {
@@ -232,7 +235,7 @@ export default {
 		// if the user is beta-gated and they are responding to a bot message (which might be: "enter a beta code")
 		else if (userHasClaimedBetaInviteCode.status === 'has-not' && messageType === 'replyToBot') {
 			// fetch the stored question being asked
-			const replyQuestionData = await maybeReadSessionObj<ReplyQuestionData>(info._realUserID, messageID, "replyQuestion", env);
+			const replyQuestionData = await maybeReadSessionObj<ReplyQuestionData>(info.getTelegramUserID('real'), messageID, "replyQuestion", env);
 			// if there is no question being asked... do not proceed.
 			if (replyQuestionData == null) {
 				return 'beta-restricted';
@@ -248,13 +251,13 @@ export default {
 		// otherwise, if the user is beta gated
 		else if (userHasClaimedBetaInviteCode.status === 'has-not') {
 			// ignore the message and tell the user they need a code
-			const replyQuestion = new ReplyQuestion(`Hi ${telegramUserName}, we are in BETA!  Please enter your invite code:`, 
+			const replyQuestion = new ReplyQuestion(`Hi ${info.getTelegramUserName()}, we are in BETA!  Please enter your invite code:`, 
 				ReplyQuestionCode.EnterBetaInviteCode,
 				handler.context,
 				{
 					timeoutMS: 30000
 				});
-			await replyQuestion.sendReplyQuestion(info._realUserID, chatID, env);
+			await replyQuestion.sendReplyQuestion(info.getTelegramUserID('real'), chatID, env);
 			return 'beta-restricted';
 		}
 

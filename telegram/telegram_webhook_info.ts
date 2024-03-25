@@ -1,155 +1,23 @@
 import { isAnAdminUserID, isTheSuperAdminUserID } from "../admins";
 import { Env } from "../env";
 import { CallbackData } from "../menus/callback_data";
-import { PositionPreRequest, PositionType } from "../positions";
-import { getVsTokenInfo } from "../tokens";
-import { assertNever } from "../util";
-import { CallbackHandlerData } from "../worker/model/callback_handler_data";
 import { TGTextEntity, TGTextEntityType } from "./telegram_helpers";
 
-export class AutoSellOrderSpec {
-
-	userID : number;
-	chatID : number;
-	messageID : number;
-	tokenAddress : string;
-	vsTokenAddress : string;
-	vsTokenAmt : number;
-	triggerPct : number;
-	slippageTolerancePct : number;
-	autoRetrySellIfSlippageExceeded? : boolean;
-	
-	constructor(
-		userID : number,
-		chatID : number,
-		messageID : number,
-		tokenAddress : string, 
-		vsTokenAddress : string, 
-		vsTokenAmt : number, 
-		triggerPct : number, 
-		slippageTolerancePct : number, 
-		autoRetrySellIfSlippageExceeded? : boolean) {
-		this.userID = userID;
-		this.chatID = chatID;
-		this.messageID = messageID;
-		this.tokenAddress = tokenAddress;
-		this.vsTokenAddress = vsTokenAddress;
-		this.vsTokenAmt = vsTokenAmt;
-		this.triggerPct = triggerPct;
-		this.slippageTolerancePct = slippageTolerancePct;
-		this.autoRetrySellIfSlippageExceeded = autoRetrySellIfSlippageExceeded;
-	}
-
-	toPositionPreRequest() : PositionPreRequest {
-		const positionRequest : PositionPreRequest = {
-			userID : this.userID,
-			chatID : this.chatID,
-			messageID : this.messageID,
-			positionID : crypto.randomUUID(),
-			positionType : PositionType.LongTrailingStopLoss,
-			tokenAddress : this.tokenAddress,
-			vsToken : getVsTokenInfo(this.vsTokenAddress),
-			vsTokenAmt : this.vsTokenAmt,
-			slippagePercent : this.slippageTolerancePct,
-			triggerPercent : this.triggerPct,
-			retrySellIfSlippageExceeded : this.autoRetrySellIfSlippageExceeded || true
-		};
-		return positionRequest;
-	}
-
-	static describeFormat() : string {
-		return '/autosell 1.5 SOL of [tokenAddress] trigger 5% slippage 0.5% retrysell yes';
-	}
-
-
-	private static maybeParseVsTokenAddress(entity : TGTextEntity) : string|null {
-		if (entity.type != TGTextEntityType.text) {
-			return null;
-		}
-		const text = entity.text;
-		try {
-			const vsTokenAddress = getVsTokenInfo(text).address;
-			return vsTokenAddress;
-		}
-		catch {
-			return null;
-		}
-	}
-
-	private static maybeParseBoolean(entity : TGTextEntity) : boolean|null {
-		if (entity.type != TGTextEntityType.text) {
-			return null;
-		}
-		const text = entity.text.toLowerCase();
-		if (text === 'yes' || text === 'true' || text === 'y') {
-			return true;
-		}
-		else if (text === 'no' || text === 'false' || text === 'n') {
-			return false;
-		}
-		else {
-			return null;
-		}
-	}
-
-	private static maybeParsePercent(entity : TGTextEntity) : number|null {
-		if (entity.type != TGTextEntityType.text) {
-			return null;
-		}
-		let text = entity.text;
-		if (text.endsWith("%")) {
-			text = text.substring(0, text.length-1);
-		}
-		try {
-			const value = parseFloat(text);
-			return value;
-		}
-		catch {
-			return null;
-		}
-	}
-
-	private static maybeParseKeyword(entity : TGTextEntity, keyword : string) : string|null {
-		if (entity.type != TGTextEntityType.text) {
-			return null;
-		}
-		let text = entity.text.toLowerCase();
-		if (keyword === text) {
-			return keyword;
-		}
-		else {
-			return null;
-		}
-	}	
-
-	private static maybeParseFloat(entity : TGTextEntity) : number|null {
-		if (entity.type != TGTextEntityType.text) {
-			return null;
-		}
-		try {
-			const value = parseFloat(entity.text);
-			return value;
-		}
-		catch {
-			return null;
-		}
-	}	
-}
-
+// Interprets and parses a telegram webhook request.
 export class TelegramWebhookInfo {
 
     private _impersonatedUserID : number; // the userID on whose behalf the action are performed
 	private _realUserID : number; // different from above only if impersonating
-    telegramUserName : string;
+    private _telegramUserName : string;
     chatID : number; /* The Telegram chat ID */
-    messageID : number; /* The telegram message ID (see comments) */
-	realMessageID : number|undefined;
-    messageType : 'callback'|'message'|'command'|'replyToBot'|null;
+    messageID : number; /* The message ID, but the original message ID if a callback or response */
+	realMessageID : number|undefined; /* The actual message ID */
+    messageType : 'callback'|'message'|'command'|'replyToBot'|null; // determined dynamically from request
     command: string|null;
-	commandTokens : TGTextEntity[]|null;
-    callbackData : CallbackData|null;
-	originalMessageText : string|null;
-    text : string|null;
+	commandTokens : TGTextEntity[]|null; // parsed from request
+    callbackData : CallbackData|null; // parsed from request
+	originalMessageText : string|null; // the original message text if it is a response to a message
+    text : string|null; // the text of the message
 
     constructor(telegramRequestBody : any, env : Env) {
 		this.chatID = this.extractChatID(telegramRequestBody);
@@ -160,21 +28,32 @@ export class TelegramWebhookInfo {
 		this.messageType = this.extractMessageType(telegramRequestBody, env);
 		this.command = this.extractCommandText(telegramRequestBody);
 		this.commandTokens = this.extractCommandTokens(telegramRequestBody);
-		this.telegramUserName = this.extractTelegramUserName(telegramRequestBody);
+		this._telegramUserName = this.extractTelegramUserName(telegramRequestBody);
 		this.callbackData = this.extractCallbackData(telegramRequestBody);
 		this.text = this.extractMessageText(telegramRequestBody);
 		this.originalMessageText = this.extractOriginalMessageText(telegramRequestBody);
 	}
 
-	getTelegramUserID(purpose : 'messaging'|'app-logic') : number {
-		if (purpose === 'messaging') {
+	getTelegramUserID(kind : 'impersonated'|'real' = 'impersonated') : number {
+		if (kind === 'real') {
 			return this._realUserID;
 		}
-		else if (purpose === 'app-logic') {
+		else {
+			// this value is almost always the same as _realUserID
+			// the exception would be when an admin is impersonating another user
 			return this._impersonatedUserID;
 		}
+	}
+
+	getTelegramUserName(kind : 'real'|'impersonated' = 'impersonated') : string {
+		if (kind === 'real') {
+			return this._telegramUserName;
+		}
+		else if (this._realUserID !== this._impersonatedUserID) {
+			return `[IMPERSONATING ${this._impersonatedUserID}]`;
+		}
 		else {
-			assertNever(purpose);
+			return this._telegramUserName;
 		}
 	}
 
@@ -210,17 +89,6 @@ export class TelegramWebhookInfo {
 		}
 		return false;
 	}	
-
-	toCallbackHandlerData() : CallbackHandlerData {
-		const result : CallbackHandlerData = {
-			telegramUserID: this._impersonatedUserID,
-			telegramUserName: this.telegramUserName,
-			chatID : this.chatID,
-			messageID: this.messageID,
-			callbackData: this.callbackData!!
-		};
-		return result;
-	}
 
 	private extractChatID(requestBody : any) : number {
 		let chatID = requestBody?.callback_query?.message?.chat?.id;

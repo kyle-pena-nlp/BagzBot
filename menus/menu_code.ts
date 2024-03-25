@@ -3,7 +3,6 @@
 
 export enum MenuCode {
 	Main = "Main",
-	CreateWallet = "CreateWallet",
 	Wallet = "Wallet",
 	ViewDecryptedWallet = "View.PK",
 	ListPositions = "List.POS",

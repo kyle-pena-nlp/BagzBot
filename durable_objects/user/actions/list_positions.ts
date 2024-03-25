@@ -1,3 +1,4 @@
+import { BaseUserAction } from "./base_user_action";
 
-export interface ListPositionsRequest {
+export interface ListPositionsRequest  extends BaseUserAction {
 }

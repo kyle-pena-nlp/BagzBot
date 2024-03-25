@@ -28,10 +28,6 @@ export class MenuMain extends Menu<UserData> implements MenuCapabilities {
             }
             this.createOptionsFAQHelpMenuLine(options);
         }
-        else {
-            this.insertButtonNextLine(options, 'Create Your Personal Wallet', this.menuCallback(MenuCode.CreateWallet));
-            this.createOptionsFAQHelpMenuLine(options);
-        }
         this.insertCloseButtonNextLine(options);
         return options;
     }

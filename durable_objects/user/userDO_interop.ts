@@ -21,7 +21,6 @@ import { DefaultTrailingStopLossRequestRequest, DefaultTrailingStopLossRequestRe
 import { StoreAddressBookEntryRequest, StoreAddressBookEntryResponse } from "./actions/store_address_book_entry";
 import { StoreLegalAgreementStatusRequest, StoreLegalAgreementStatusResponse } from "./actions/store_legal_agreement_status";
 import { StoreSessionValuesRequest, StoreSessionValuesResponse } from "./actions/store_session_values";
-import { UserInitializeRequest, UserInitializeResponse } from "./actions/user_initialize";
 import { CompletedAddressBookEntry } from "./model/address_book_entry";
 import { SessionKey } from "./model/session";
 import { UserData } from "./model/user_data";
@@ -51,47 +50,47 @@ export enum UserDOFetchMethod {
 }
 
 
-export async function getImpersonatedUserID(telegramUserID : number, env : Env) : Promise<number|undefined> {
-	const request : GetImpersonatedUserIDRequest = {};
+export async function getImpersonatedUserID(telegramUserID : number, env : Env) : Promise<GetImpersonatedUserIDResponse> {
+	const request : GetImpersonatedUserIDRequest = { telegramUserID };
 	const response = await sendJSONRequestToUserDO<GetImpersonatedUserIDRequest,GetImpersonatedUserIDResponse>(telegramUserID, UserDOFetchMethod.getImpersonatedUserID, request, env);
-	return response.impersonatedUserID;
+	return response;
 }
 
 export async function storeLegalAgreementStatus(telegramUserID : number, status : 'agreed'|'refused', env : Env) : Promise<StoreLegalAgreementStatusResponse> {
-	const request : StoreLegalAgreementStatusRequest = { status : status };
+	const request : StoreLegalAgreementStatusRequest = { telegramUserID, status : status };
 	return await sendJSONRequestToUserDO<StoreLegalAgreementStatusRequest,StoreLegalAgreementStatusResponse>(telegramUserID, UserDOFetchMethod.storeLegalAgreementStatus, request, env);
 }
 
 export async function getLegalAgreementStatus(telegramUserID : number, env : Env) : Promise<GetLegalAgreementStatusResponse> {
-	const request : GetLegalAgreementStatusRequest = {};
+	const request : GetLegalAgreementStatusRequest = { telegramUserID };
 	return await sendJSONRequestToUserDO<GetLegalAgreementStatusRequest,GetLegalAgreementStatusResponse>(telegramUserID, UserDOFetchMethod.getLegalAgreementStatus, request, env);
 }
 
-export async function storeAddressBookEntry(userID : number, addressBookEntry : CompletedAddressBookEntry, env : Env) {
-	const storeAddressBookEntryRequest : StoreAddressBookEntryRequest = { addressBookEntry : addressBookEntry };
-	return await sendJSONRequestToUserDO<StoreAddressBookEntryRequest,StoreAddressBookEntryResponse>(userID, UserDOFetchMethod.storeAddressBookEntry, storeAddressBookEntryRequest, env);
+export async function storeAddressBookEntry(telegramUserID : number, addressBookEntry : CompletedAddressBookEntry, env : Env) {
+	const storeAddressBookEntryRequest : StoreAddressBookEntryRequest = { telegramUserID, addressBookEntry };
+	return await sendJSONRequestToUserDO<StoreAddressBookEntryRequest,StoreAddressBookEntryResponse>(telegramUserID, UserDOFetchMethod.storeAddressBookEntry, storeAddressBookEntryRequest, env);
 }
 
-export async function listAddressBookEntries(userID : number, env : Env) {
-	const request : ListAddressBookEntriesRequest = {};
-	return await sendJSONRequestToUserDO<ListAddressBookEntriesRequest,ListAddressBookEntriesResponse>(userID, UserDOFetchMethod.listAddressBookEntries, request, env);
+export async function listAddressBookEntries(telegramUserID : number, env : Env) {
+	const request : ListAddressBookEntriesRequest = { telegramUserID };
+	return await sendJSONRequestToUserDO<ListAddressBookEntriesRequest,ListAddressBookEntriesResponse>(telegramUserID, UserDOFetchMethod.listAddressBookEntries, request, env);
 }
 
-export async function getAddressBookEntry(userID : number, addressBookEntryId : string, env : Env) : Promise<CompletedAddressBookEntry|undefined> {
-	const request : GetAddressBookEntryRequest = { addressBookEntryID: addressBookEntryId };
-	const response = await sendJSONRequestToUserDO<GetAddressBookEntryRequest,GetAddressBookEntryResponse>(userID, UserDOFetchMethod.getAddressBookEntry, request, env);
+export async function getAddressBookEntry(telegramUserID : number, addressBookEntryID : string, env : Env) : Promise<CompletedAddressBookEntry|undefined> {
+	const request : GetAddressBookEntryRequest = { telegramUserID, addressBookEntryID };
+	const response = await sendJSONRequestToUserDO<GetAddressBookEntryRequest,GetAddressBookEntryResponse>(telegramUserID, UserDOFetchMethod.getAddressBookEntry, request, env);
 	return response.addressBookEntry;
 }
 
-export async function removeAddressBookEntry(userID : number, addressBookEntryId : string, env : Env) : Promise<void> {
-	const request : RemoveAddressBookEntryRequest = { addressBookEntryID: addressBookEntryId };
-	const response = await sendJSONRequestToUserDO<RemoveAddressBookEntryRequest,RemoveAddressBookEntryResponse>(userID, UserDOFetchMethod.removeAddressBookEntry, request, env);
+export async function removeAddressBookEntry(telegramUserID : number, addressBookEntryID : string, env : Env) : Promise<void> {
+	const request : RemoveAddressBookEntryRequest = { telegramUserID, addressBookEntryID };
+	const response = await sendJSONRequestToUserDO<RemoveAddressBookEntryRequest,RemoveAddressBookEntryResponse>(telegramUserID, UserDOFetchMethod.removeAddressBookEntry, request, env);
 	return;
 }
 
-export async function getWalletData(userID : number, env: Env) : Promise<GetWalletDataResponse> {
-	const request : GetWalletDataRequest = { telegramUserID: userID };
-	return await sendJSONRequestToUserDO<GetWalletDataRequest,GetWalletDataResponse>(userID, UserDOFetchMethod.getWalletData, request, env);
+export async function getWalletData(telegramUserID : number, env: Env) : Promise<GetWalletDataResponse> {
+	const request : GetWalletDataRequest = { telegramUserID };
+	return await sendJSONRequestToUserDO<GetWalletDataRequest,GetWalletDataResponse>(telegramUserID, UserDOFetchMethod.getWalletData, request, env);
 }
 
 // TODO: batching?
@@ -138,13 +137,13 @@ export function getUserDO(telegramUserID : number, env : Env) : any {
 }
 
 export async function listOpenTrailingStopLossPositions(telegramUserID : number, env : Env) : Promise<Position[]> {
-	const body  : ListPositionsRequest = {};
+	const body  : ListPositionsRequest = { telegramUserID };
 	const positions = await sendJSONRequestToUserDO<ListPositionsRequest,Position[]>(telegramUserID, UserDOFetchMethod.listPositions, body, env);
 	return positions;
 }
 
 export async function getPosition(telegramUserID : number, positionID : string, env : Env) : Promise<Position> {
-	const body : GetPositionRequest = { positionID : positionID };
+	const body : GetPositionRequest = { telegramUserID, positionID };
 	const position = await sendJSONRequestToUserDO<GetPositionRequest,Position>(telegramUserID, UserDOFetchMethod.getPosition, body, env);
 	return position;
 }
@@ -155,7 +154,7 @@ export async function getDefaultTrailingStopLoss(telegramUserID : number,
 	env : Env,
 	token ?: TokenInfo) : Promise<DefaultTrailingStopLossRequestResponse> {
 	const body : DefaultTrailingStopLossRequestRequest = { 
-		userID: telegramUserID, 
+		telegramUserID: telegramUserID, 
 		chatID: chatID, 
 		messageID : messageID,
 		token : token };
@@ -164,7 +163,7 @@ export async function getDefaultTrailingStopLoss(telegramUserID : number,
 }
 
 export async function deleteSession(telegramUserID : number, messageID : number, env : Env) {
-	const deleteSessionRequestBody : DeleteSessionRequest = { messageID: messageID };
+	const deleteSessionRequestBody : DeleteSessionRequest = { telegramUserID, messageID };
 	const request = makeUserDOFetchRequest(UserDOFetchMethod.deleteSession, deleteSessionRequestBody);
 	const userDO = getUserDO(telegramUserID, env);
 	return await userDO.fetch(request);
@@ -172,7 +171,8 @@ export async function deleteSession(telegramUserID : number, messageID : number,
 
 export async function getSessionState(telegramUserID : number, messageID : number, sessionKeys : SessionKey[], env : Env) {
 	const body : GetSessionValuesRequest = {
-		messageID: messageID,
+		telegramUserID,
+		messageID,
 		sessionKeys: sessionKeys.map(x => { return x.toString(); })	
 	};
 	const sessionValuesResponse = await sendJSONRequestToUserDO<GetSessionValuesRequest,SessionValuesResponse>(telegramUserID, UserDOFetchMethod.getSessionValues, body, env);
@@ -211,8 +211,9 @@ function stripPrefixFromRecordKeys<TObj extends {[key : string] : Structural}>(r
 
 async function readSessionValuesWithPrefix(telegramUserID : number, messageID : number, prefix : string, env : Env) : Promise<any> {
 	const body : GetSessionValuesWithPrefixRequest = {
-		messageID : messageID,
-		prefix: prefix
+		telegramUserID,
+		messageID,
+		prefix
 	};
 	const response = await sendJSONRequestToUserDO<GetSessionValuesWithPrefixRequest,GetSessionValuesWithPrefixResponse>(telegramUserID, UserDOFetchMethod.getSessionValuesWithPrefix, body, env);
 	return response.values;
@@ -228,7 +229,7 @@ export async function storeSessionObj<TObj extends {[key : string] : Structural}
 }
 
 export async function manuallyClosePosition(telegramUserID : number, positionID : string, env : Env) : Promise<ManuallyClosePositionResponse> {
-	const body = { positionID : positionID };
+	const body = { telegramUserID, positionID };
 	const response = await sendJSONRequestToUserDO<ManuallyClosePositionRequest,ManuallyClosePositionResponse>(telegramUserID, UserDOFetchMethod.manuallyClosePosition, body, env);
 	return response;
 }
@@ -240,50 +241,22 @@ export async function storeSessionValues(telegramUserID : number, messageID : nu
 		sessionValuesRecord[fullSessionKey] = value;
 	}
 	const body : StoreSessionValuesRequest = {
-		messageID: messageID,
+		telegramUserID,
+		messageID,
 		sessionValues: sessionValuesRecord
 	};
 	const response = await sendJSONRequestToUserDO<StoreSessionValuesRequest,StoreSessionValuesResponse>(telegramUserID, UserDOFetchMethod.storeSessionValues, body, env);
 	return response;
 }
 
-export async function getAndMaybeInitializeUserData(telegramUserID : number, telegramUserName : string, messageID : number, forceRefreshBalance : boolean, env : Env) : Promise<UserData> {
-	const userData = await getUserData(telegramUserID, messageID, forceRefreshBalance, env);
-	if (userData.initialized) {
-		return userData;
-	}
-	return await initializeAndReturnUserData(
-		telegramUserID, 
-		messageID, 
-		forceRefreshBalance,
-		telegramUserName, 
-		env);
-}
-
-export async function initializeAndReturnUserData(
-	telegramUserID : number, 
-	messageID : number, 
-	forceRefreshBalance : boolean,
-	telegramUserName : string, 
-	env : Env) : Promise<UserData> {		
-	await initializeUserData(telegramUserID, telegramUserName, env);
-	return await getUserData(telegramUserID, messageID, forceRefreshBalance, env);
-}
-
-async function getUserData(telegramUserID : number, messageID : number, forceRefreshBalance : boolean, env : Env) : Promise<UserData> {
-	const body : GetUserDataRequest = { messageID : messageID, forceRefreshBalance : forceRefreshBalance };
+export async function getUserData(telegramUserID : number, messageID : number, forceRefreshBalance : boolean, env : Env) : Promise<UserData> {
+	const body : GetUserDataRequest = { telegramUserID, messageID, forceRefreshBalance };
 	const response = await sendJSONRequestToUserDO<GetUserDataRequest,UserData>(telegramUserID, UserDOFetchMethod.get, body, env);
 	return response;
 }
 
-async function initializeUserData(telegramUserID : number, telegramUserName : string, env : Env) : Promise<UserInitializeResponse> {
-	const body : UserInitializeRequest = { telegramUserID : telegramUserID, telegramUserName: telegramUserName };
-	const response = await sendJSONRequestToUserDO<UserInitializeRequest,UserInitializeResponse>(telegramUserID, UserDOFetchMethod.initialize, body, env);
-	return response;
-}
-
 export async function generateWallet(telegramUserID : number, env : Env) : Promise<GenerateWalletResponse> {
-	const body: GenerateWalletRequest = {};
+	const body: GenerateWalletRequest = { telegramUserID };
 	const response = await sendJSONRequestToUserDO<GenerateWalletRequest,GenerateWalletResponse>(telegramUserID, UserDOFetchMethod.createWallet, body, env);
 	return response;
 }

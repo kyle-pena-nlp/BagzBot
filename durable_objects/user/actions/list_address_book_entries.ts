@@ -1,6 +1,7 @@
 import { CompletedAddressBookEntry } from "../model/address_book_entry";
+import { BaseUserAction } from "./base_user_action";
 
-export interface ListAddressBookEntriesRequest {
+export interface ListAddressBookEntriesRequest  extends BaseUserAction {
 }
 
 export interface ListAddressBookEntriesResponse {

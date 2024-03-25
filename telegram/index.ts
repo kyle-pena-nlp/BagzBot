@@ -12,10 +12,11 @@ import {
     updateTGMessage
 } from "./telegram_helpers";
 import { TGStatusMessage, UpdateableNotification } from "./telegram_status_message";
-import { AutoSellOrderSpec, TelegramWebhookInfo } from "./telegram_webhook_info";
+import { TelegramWebhookInfo } from "./telegram_webhook_info";
 
 export {
-    AutoSellOrderSpec, CallbackButton,
+    CallbackButton,
     DeleteTGMessageResponse, TGStatusMessage, TGTextEntity,
     TGTextEntityType, TelegramWebhookInfo, TgMessageSentInfo, UpdateableNotification, deleteTGMessage, escapeTGText, makeTelegramBotUrl, sendMessageToTG, sendRequestToTG, updateTGMessage
 };
+
