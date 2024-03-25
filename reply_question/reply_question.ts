@@ -5,6 +5,12 @@ import { sendQuestionToTG } from "../telegram/telegram_helpers";
 import { ReplyQuestionCode } from "./reply_question_code";
 import { ReplyQuestionData } from "./reply_question_data";
 
+export interface ReplyQuestionOptions {
+    callback ?: ReplyQuestionCallback
+    parseMode ?: 'HTML'|'MarkdownV2'
+    timeoutMS ?: number
+}
+
 export interface ReplyQuestionCallback {
     linkedMessageID : number // optionally associates this reply with an original message
     nextMenuCode : MenuCode
@@ -14,21 +20,26 @@ export class ReplyQuestion {
     question : string
     
     replyQuestionCode : ReplyQuestionCode
+    context : FetchEvent
     linkedMessageID ?: number
     nextMenuCode ?: MenuCode
     parseMode: 'HTML'|'MarkdownV2'
+    timeoutMS : number|undefined
     constructor(question : string,
         replyQuestionCode: ReplyQuestionCode, 
-        callback ?: ReplyQuestionCallback,
-        parseMode : 'HTML'|'MarkdownV2' = 'HTML') {
+        context : FetchEvent,
+        opts ?: ReplyQuestionOptions) {
         this.question = question;
         this.replyQuestionCode = replyQuestionCode;
-        this.linkedMessageID = callback?.linkedMessageID;
-        this.nextMenuCode = callback?.nextMenuCode;
-        this.parseMode = parseMode;
+        this.context = context;
+        opts = opts || {};
+        this.linkedMessageID = opts?.callback?.linkedMessageID;
+        this.nextMenuCode = opts?.callback?.nextMenuCode;
+        this.parseMode = opts?.parseMode || 'HTML';
+        this.timeoutMS = opts?.timeoutMS;
     }
     async sendReplyQuestion(telegramUserID : number, chatID : number, env : Env) {
-        const tgSentMessageInfo = await sendQuestionToTG(chatID, this.question, env, this.parseMode);
+        const tgSentMessageInfo = await sendQuestionToTG(chatID, this.question, this.context, env, this.parseMode, this.timeoutMS);
         if (!tgSentMessageInfo.success) {
             return;
         }

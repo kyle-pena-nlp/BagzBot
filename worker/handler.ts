@@ -29,6 +29,7 @@ import { TokenAddressExtractor } from "./token_address_extractor";
 
 
 const POSITION_REQUEST_STORAGE_KEY = "PositionRequest";
+const QUESTION_TIMEOUT_MS = 10000
 
 export class Worker {
 
@@ -120,7 +121,7 @@ export class Worker {
     }
 
     async handleCallback(telegramWebhookInfo : CallbackHandlerParams) : Promise<Response> {
-        const menuOrReplyQuestion = await this.handleCallbackQueryInternal(telegramWebhookInfo, this.env);
+        const menuOrReplyQuestion = await this.handleCallbackQueryInternal(telegramWebhookInfo);
         if (menuOrReplyQuestion == null) {
             return makeSuccessResponse();
         }
@@ -204,9 +205,14 @@ export class Worker {
                 const slippagePercentQuestion = new ReplyQuestion(
                     "Enter the desired slippage percent", 
                     ReplyQuestionCode.EnterSlippagePercent, 
+                    this.context,
                     { 
-                        nextMenuCode: MenuCode.SubmitSlippagePct, 
-                        linkedMessageID: messageID
+                        callback: 
+                        { 
+                            nextMenuCode: MenuCode.SubmitSlippagePct, 
+                            linkedMessageID: messageID
+                        },
+                        timeoutMS: QUESTION_TIMEOUT_MS
                     });
                 return slippagePercentQuestion;
             case MenuCode.SubmitSlippagePct:
@@ -223,9 +229,13 @@ export class Worker {
                 const buyQuantityQuestion  = new ReplyQuestion(
                     "Enter the quantity of SOL to buy", 
                     ReplyQuestionCode.EnterBuyQuantity, 
-                    {
-                        nextMenuCode: MenuCode.SubmitBuyQuantity,
-                        linkedMessageID: messageID
+                    this.context,
+                    { 
+                        callback : {
+                            nextMenuCode: MenuCode.SubmitBuyQuantity,
+                            linkedMessageID: messageID
+                        },
+                        timeoutMS: QUESTION_TIMEOUT_MS
                     });
                 return buyQuantityQuestion
             case MenuCode.SubmitBuyQuantity:
@@ -249,9 +259,13 @@ export class Worker {
                 const triggerPctQuestion = new ReplyQuestion(
                     "Enter a custom trigger percent",
                     ReplyQuestionCode.EnterTriggerPercent,
-                    {
-                        nextMenuCode: MenuCode.SubmitTriggerPct,
-                        linkedMessageID: messageID
+                    this.context,
+                    { 
+                        callback : {
+                            nextMenuCode: MenuCode.SubmitTriggerPct,
+                            linkedMessageID: messageID
+                        },
+                        timeoutMS: QUESTION_TIMEOUT_MS
                     });
                 return triggerPctQuestion;
             case MenuCode.SubmitTriggerPct:
@@ -315,13 +329,31 @@ export class Worker {
                     addressBookEntryID : randomUUID()
                 };
                 await storeSessionObj<JustAddressBookEntryID>(telegramUserID, messageID, addressBookEntry, "addressBookEntry", this.env);
-                return new ReplyQuestion("Choose a name for this recipient", ReplyQuestionCode.EnterAddressBookEntryName, { nextMenuCode: MenuCode.SubmitAddressBookEntryName, linkedMessageID: messageID });
+                return new ReplyQuestion("Choose a name for this recipient", 
+                    ReplyQuestionCode.EnterAddressBookEntryName, 
+                    this.context, 
+                    { 
+                        callback: { 
+                            nextMenuCode: MenuCode.SubmitAddressBookEntryName, 
+                            linkedMessageID: messageID 
+                        },
+                        timeoutMS: QUESTION_TIMEOUT_MS
+                    });
             case MenuCode.SubmitAddressBookEntryName:
                 const addressBookEntry2 = await readSessionObj<JustAddressBookEntryID>(telegramUserID, messageID, "addressBookEntry", this.env);
                 const addressBookEntry3 : JustAddressBookEntryName = { ...addressBookEntry2, name : callbackData.menuArg||'' } ;//name = callbackData.menuArg;
                 await storeSessionObj<JustAddressBookEntryName>(telegramUserID, messageID, addressBookEntry3, "addressBookEntry", this.env);
-                return new ReplyQuestion("Paste in the address", ReplyQuestionCode.EnterTransferFundsRecipient, { nextMenuCode: MenuCode.SubmitAddressBookEntryAddress, linkedMessageID: messageID });
-            case MenuCode.SubmitAddressBookEntryAddress:
+                return new ReplyQuestion("Paste in the address", 
+                    ReplyQuestionCode.EnterTransferFundsRecipient, 
+                    this.context, 
+                    { 
+                        callback: { 
+                            nextMenuCode: MenuCode.SubmitAddressBookEntryAddress, 
+                            linkedMessageID: messageID 
+                        },
+                        timeoutMS: QUESTION_TIMEOUT_MS
+                    });
+            case MenuCode.SubmitAddressBookEntryAddress: 
                 const addressBookEntry4 = await readSessionObj<JustAddressBookEntryName>(telegramUserID, messageID, "addressBookEntry", this.env);
                 const addressBookEntry5 : CompletedAddressBookEntry = { ...addressBookEntry4, address: callbackData.menuArg||'', confirmed : false };
                 await storeSessionObj<CompletedAddressBookEntry>(telegramUserID, messageID, addressBookEntry5, "addressBookEntry", this.env);
@@ -428,25 +460,6 @@ export class Worker {
     private async makeStopLossConfirmMenu(positionRequest: PositionRequest, env : Env) : Promise<BaseMenu> {
         await this.refreshQuote(positionRequest, env);
         return new MenuConfirmTrailingStopLossPositionRequest(positionRequest);
-    }
-
-    private makeTrailingStopLossCustomSlippagePctKeypad(currentEntry : string) {
-        return new PositiveIntegerKeypad("${currentValue}%", // intentional double quotes - syntax is parsed later
-            MenuCode.CustomSlippagePct,
-            MenuCode.SubmitSlippagePct,
-            MenuCode.TrailingStopLossRequestReturnToEditorMenu,
-            currentEntry,
-            0,
-            100);
-    }
-
-    private makeTrailingStopLossBuyQuantityKeypad(currentEntry : string) {
-        return new PositiveDecimalKeypad("${currentValue}",  // intentional double quotes - syntax is parsed later
-            MenuCode.CustomBuyQuantity, 
-            MenuCode.SubmitBuyQuantity, 
-            MenuCode.TrailingStopLossRequestReturnToEditorMenu,
-            currentEntry, 
-            0);
     }
 
     private TODOstubbedMenu(env : Env) : BaseMenu {

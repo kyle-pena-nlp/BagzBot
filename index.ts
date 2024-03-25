@@ -193,7 +193,9 @@ export default {
 		// otherwise, if the user is beta gated
 		else if (userHasClaimedBetaInviteCode.status === 'has-not') {
 			// ignore the message and tell the user they need a code
-			const replyQuestion = new ReplyQuestion(`Hi ${telegramUserName}, we are in BETA!  Please enter your invite code:`, ReplyQuestionCode.EnterBetaInviteCode);
+			const replyQuestion = new ReplyQuestion(`Hi ${telegramUserName}, we are in BETA!  Please enter your invite code:`, 
+				ReplyQuestionCode.EnterBetaInviteCode,
+				handler.context);
 			await replyQuestion.sendReplyQuestion(userID, chatID, env);
 			return 'beta-restricted';
 		}

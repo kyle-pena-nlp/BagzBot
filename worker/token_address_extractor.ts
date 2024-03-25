@@ -1,7 +1,7 @@
 import * as bs58 from "bs58";
 
 export class TokenAddressExtractor {
-    
+
     constructor() {
     }
 
