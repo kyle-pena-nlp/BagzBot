@@ -32,9 +32,9 @@ enum ERRORS {
  */
 export default {
 
-	async fetch(req : Request, env : Env) {
+	async fetch(req : Request, env : Env, context : FetchEvent) {
 		try {
-			const response = await this._fetch(req, env);
+			const response = await this._fetch(req, context, env);
 			if (!response) {
 				this.logWebhookRequestFailure(req, ERRORS.NO_RESPONSE, {});
 				return makeFakeFailedRequestResponse(500);
@@ -47,7 +47,7 @@ export default {
 		}
 	},
 
-	async _fetch(req : Request, env : Env) : Promise<Response> {
+	async _fetch(req : Request, context : FetchEvent, env : Env) : Promise<Response> {
 
 		// First, validate that this req is coming from the telegram bot's webhook by checking secret key.
 		const webhookRequestValidation = this.validateFetchRequest(req,env);
@@ -69,7 +69,7 @@ export default {
 		// get some important info from the telegram request
 		const telegramWebhookInfo = new TelegramWebhookInfo(telegramRequestBody, env);
 		const messageType = telegramWebhookInfo.messageType;
-		const handler = new Handler();
+		const handler = new Handler(context, env);
 
 		// enforce beta code gating (if enabled).
 		const betaEntryGateAction = await this.maybeEnforceBetaGating(telegramWebhookInfo, handler, env);
@@ -79,22 +79,22 @@ export default {
 
 		// handle reply-tos
 		if (messageType === 'replyToBot') {
-			return await handler.handleReplyToBot(telegramWebhookInfo, env);
+			return await handler.handleReplyToBot(telegramWebhookInfo);
 		}
 
 		// User clicks a menu button
 		if (messageType === 'callback') {
-			return await handler.handleCallback(telegramWebhookInfo.toCallbackHandlerData(), env);
+			return await handler.handleCallback(telegramWebhookInfo.toCallbackHandlerData());
 		}
 
 		// User issues a command
 		if (messageType === 'command') {
-			return await handler.handleCommand(telegramWebhookInfo, env);
+			return await handler.handleCommand(telegramWebhookInfo);
 		}
 		
 		// User types a message
 		if (messageType === 'message') {
-			return await handler.handleMessage(telegramWebhookInfo, env);
+			return await handler.handleMessage(telegramWebhookInfo);
 		}
 		
 		// Never send anything but a 200 back to TG ---- otherwise telegram will keep trying to resend

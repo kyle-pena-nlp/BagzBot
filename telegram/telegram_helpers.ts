@@ -1,7 +1,7 @@
 import { Env } from "../env";
 import { MenuCode } from "../menus";
 import { CallbackData } from "../menus/callback_data";
-import { makeFakeFailedRequestResponse, makeJSONRequest, makeSuccessResponse } from "../util";
+import { makeFakeFailedRequestResponse, makeJSONRequest, makeSuccessResponse, sleep } from "../util";
 import { CallbackButton } from "./callback_button";
 
 export interface DeleteTGMessageResponse {
@@ -77,9 +77,20 @@ export function escapeTGText(text : string, parseMode : 'MarkdownV2'|'HTML') : s
 export async function sendQuestionToTG(chatID : number,
     question: string,
     env: Env,
-    parseMode : 'HTML'|'MarkdownV2' = 'HTML') : Promise<TgMessageSentInfo> {
+    parseMode : 'HTML'|'MarkdownV2' = 'HTML',
+    timeout_ms : number = 10000) : Promise<TgMessageSentInfo> {
     const request = makeTelegramSendQuestionRequest(chatID, question, env, parseMode);
-    return await transformToTGMessageSentInfo(fetch(request));
+    return await transformToTGMessageSentInfo(fetch(request)).then(async result => {
+        if (result.success) {
+            if (timeout_ms > 0) {
+                // deliberate lack of 'await' here.
+                sleep(timeout_ms).then(async () => {
+                    await deleteTGMessage(result.messageID, chatID, env);
+                });
+            }
+        }
+        return result;
+    });
 }
 
 function makeTelegramSendQuestionRequest(chatID : number, question : string, env : Env, parseMode : 'HTML'|'MarkdownV2') {

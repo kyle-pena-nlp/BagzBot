@@ -37,7 +37,10 @@ export class ReplyQuestion {
             replyQuestionCode: this.replyQuestionCode,
             linkedMessageID: this.linkedMessageID,
             nextMenuCode : this.nextMenuCode
-        };  
+        }; 
+        // Problem: Reply questions don't work if the user responds before this is stored.
+        // Yet, the question is sent to the user *before* this is stored.
+        // How can I mitigate this risk? 
         // TODO: how to resolve possibility that user could respond before storage is completed?  
         // Some kind of incoming message blocking here?  But per-user, so we don't lock the whole app.    
         await storeSessionObj<ReplyQuestionData>(telegramUserID, tgSentMessageInfo.messageID, replyQuestionCallbackData, "replyQuestion", env);
