@@ -9,7 +9,7 @@ import { OpenPositionRequest } from "../durable_objects/user/actions/open_new_po
 import { CompletedAddressBookEntry, JustAddressBookEntryID, JustAddressBookEntryName } from "../durable_objects/user/model/address_book_entry";
 import { QuantityAndToken } from "../durable_objects/user/model/quantity_and_token";
 import { TokenSymbolAndAddress } from "../durable_objects/user/model/token_name_and_address";
-import { getAddressBookEntry, getDefaultTrailingStopLoss, getPosition, getUserData, getWalletData, listAddressBookEntries, listOpenTrailingStopLossPositions, manuallyClosePosition, maybeReadSessionObj, readSessionObj, requestNewPosition, storeAddressBookEntry, storeLegalAgreementStatus, storeSessionObj, storeSessionObjProperty, storeSessionValues } from "../durable_objects/user/userDO_interop";
+import { getAddressBookEntry, getDefaultTrailingStopLoss, getPosition, getUserData, getWalletData, impersonateUser, listAddressBookEntries, listOpenTrailingStopLossPositions, manuallyClosePosition, maybeReadSessionObj, readSessionObj, requestNewPosition, storeAddressBookEntry, storeLegalAgreementStatus, storeSessionObj, storeSessionObjProperty, storeSessionValues, unimpersonateUser } from "../durable_objects/user/userDO_interop";
 import { Env } from "../env";
 import { logError } from "../logging";
 import { BaseMenu, LegalAgreement, MenuBetaInviteFriends, MenuCode, MenuConfirmAddressBookEntry, MenuConfirmTrailingStopLossPositionRequest, MenuContinueMessage, MenuEditTrailingStopLossPositionRequest, MenuError, MenuFAQ, MenuHelp, MenuListPositions, MenuMain, MenuPickTransferFundsRecipient, MenuPleaseEnterToken, MenuStartTransferFunds, MenuTODO, MenuTrailingStopLossAutoRetrySell, MenuTrailingStopLossEntryBuyQuantity, MenuTrailingStopLossPickVsToken, MenuTrailingStopLossSlippagePercent, MenuTrailingStopLossTriggerPercent, MenuTransferFundsTestOrSubmitNow, MenuViewDecryptedWallet, MenuViewOpenPosition, MenuWallet, PositiveDecimalKeypad, PositiveIntegerKeypad, WelcomeScreenPart1, WelcomeScreenPart2 } from "../menus";
@@ -21,7 +21,7 @@ import { CompleteTransferFundsRequest, PartialTransferFundsRequest } from "../rp
 import { isGetQuoteFailure } from "../rpc/rpc_types";
 import { TelegramWebhookInfo, deleteTGMessage, sendMessageToTG, sendRequestToTG, updateTGMessage } from "../telegram";
 import { WEN_ADDRESS, getVsTokenInfo } from "../tokens";
-import { Structural, assertNever, makeFakeFailedRequestResponse, makeSuccessResponse, tryParseFloat } from "../util";
+import { Structural, assertNever, makeFakeFailedRequestResponse, makeSuccessResponse, tryParseFloat, tryParseInt } from "../util";
 import { CallbackHandlerParams } from "./model/callback_handler_params";
 import { TokenAddressExtractor } from "./token_address_extractor";
 
@@ -447,14 +447,40 @@ export class Worker {
                 await sendMessageToTG(chatID, "You can agree at any time by opening the legal agreement in the menu", this.env);
                 await this.handleMenuClose(chatID, messageID, this.env);
                 return;
+            case MenuCode.ImpersonateUser:
+                const replyQuestion = new ReplyQuestion("Enter the user ID to impersonate: ",
+                    ReplyQuestionCode.ImpersonateUser,
+                    this.context, 
+                    {
+                        callback: {
+                            linkedMessageID: messageID,
+                            nextMenuCode: MenuCode.SubmitImpersonateUser
+                        }
+                    });
+                return replyQuestion;
+            case MenuCode.SubmitImpersonateUser:
+                const userIDToImpersonate = tryParseInt(callbackData.menuArg||'');
+                if (!userIDToImpersonate) {
+                    return new MenuContinueMessage(`Sorry, that can't be interpreted as a user ID: '${callbackData.menuArg||''}'`, MenuCode.Main);
+                }
+                await impersonateUser(params.getTelegramUserID('real'), userIDToImpersonate, this.env);
+                params.impersonate(userIDToImpersonate, this.env);
+                return this.createMainMenu(params, this.env);
+            case MenuCode.UnimpersonateUser:
+                await unimpersonateUser(params.getTelegramUserID('real'), this.env);
+                params.unimpersonate(this.env);
+                return this.createMainMenu(params, this.env);
             default:
                 assertNever(callbackData.menuCode);
         }
     }
 
-    private async createMainMenu(telegramWebhookInfo : CallbackHandlerParams, env : Env) : Promise<BaseMenu> {
-        const userData = await getUserData(telegramWebhookInfo.getTelegramUserID(), telegramWebhookInfo.messageID, false, env);
-        return new MenuMain(userData);
+    private async createMainMenu(info : CallbackHandlerParams, env : Env) : Promise<BaseMenu> {
+        const userData = await getUserData(info.getTelegramUserID(), info.messageID, false, env);
+        return new MenuMain({ ...userData, 
+            isAdminOrSuperAdmin: info.isAdminOrSuperAdmin(env), 
+            isImpersonatingUser: info.isImpersonatingAUser() 
+        });
     }
 
     private async handleMenuClose(chatID : number, messageID : number, env : Env) : Promise<Response> {
@@ -572,6 +598,8 @@ export class Worker {
                 break;
             case ReplyQuestionCode.EditPositionChangeToken:
                 break;
+            case ReplyQuestionCode.ImpersonateUser:
+                break;
             default:
                 assertNever(replyQuestionCode);
         }
@@ -613,13 +641,14 @@ export class Worker {
     }
 
     private async handleCommandInternal(command : string, info : TelegramWebhookInfo, messageID : number, env : Env) : Promise<[string,BaseMenu?,{ obj : any, prefix : string }?]> {
+        
         switch(command) {
             case '/start':
                 const userData = await getUserData(info.getTelegramUserID(), info.messageID, false, env);
-                return ["...", new MenuMain(userData)];
+                return ["...", new MenuMain({ ...userData, isAdminOrSuperAdmin: info.isAdminOrSuperAdmin(env), isImpersonatingUser : info.isImpersonatingAUser() })];
             case '/menu':
                 const menuUserData = await getUserData(info.getTelegramUserID(), info.messageID, false, env);
-                return ['...', new MenuMain(menuUserData)];
+                return ['...', new MenuMain({ ...menuUserData, isAdminOrSuperAdmin : info.isAdminOrSuperAdmin(env), isImpersonatingUser: info.isImpersonatingAUser() })];
             case '/welcome_screen':
                 return ['...', new WelcomeScreenPart1(undefined)];
             case '/legal_agreement':

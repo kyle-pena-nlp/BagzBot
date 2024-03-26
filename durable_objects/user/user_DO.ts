@@ -10,7 +10,7 @@ import { ChangeTrackedValue, Structural, assertNever, groupIntoMap, makeFailureR
 import { listUnclaimedBetaInviteCodes } from "../beta_invite_codes/beta_invite_code_interop";
 import { AutomaticallyClosePositionsRequest, AutomaticallyClosePositionsResponse } from "../token_pair_position_tracker/actions/automatically_close_positions";
 import { wakeUpTokenPairPositionTracker } from "../token_pair_position_tracker/token_pair_position_tracker_DO_interop";
-import { BaseUserDORequest } from "./actions/base_user_action";
+import { BaseUserDORequest } from "./actions/base_user_do_request";
 import { DeleteSessionRequest, DeleteSessionResponse } from "./actions/delete_session";
 import { GetAddressBookEntryRequest, GetAddressBookEntryResponse } from "./actions/get_address_book_entry";
 import { GetImpersonatedUserIDRequest, GetImpersonatedUserIDResponse } from "./actions/get_impersonated_user_id";
@@ -19,6 +19,7 @@ import { GetPositionRequest } from "./actions/get_position";
 import { GetSessionValuesRequest, GetSessionValuesWithPrefixRequest, GetSessionValuesWithPrefixResponse } from "./actions/get_session_values";
 import { GetUserDataRequest } from "./actions/get_user_data";
 import { GetWalletDataRequest, GetWalletDataResponse } from "./actions/get_wallet_data";
+import { ImpersonateUserRequest, ImpersonateUserResponse } from "./actions/impersonate_user";
 import { ListAddressBookEntriesRequest, ListAddressBookEntriesResponse } from "./actions/list_address_book_entries";
 import { ListPositionsRequest } from "./actions/list_positions";
 import { ManuallyClosePositionRequest, ManuallyClosePositionResponse } from "./actions/manually_close_position";
@@ -28,6 +29,7 @@ import { DefaultTrailingStopLossRequestRequest, DefaultTrailingStopLossRequestRe
 import { StoreAddressBookEntryRequest, StoreAddressBookEntryResponse } from "./actions/store_address_book_entry";
 import { StoreLegalAgreementStatusRequest, StoreLegalAgreementStatusResponse } from "./actions/store_legal_agreement_status";
 import { StoreSessionValuesRequest, StoreSessionValuesResponse } from "./actions/store_session_values";
+import { UnimpersonateUserRequest, UnimpersonateUserResponse } from "./actions/unimpersonate_user";
 import { UserInitializeRequest, UserInitializeResponse } from "./actions/user_initialize";
 import { UserData } from "./model/user_data";
 import { AddressBookEntryTracker } from "./trackers/address_book_entry_tracker";
@@ -249,11 +251,29 @@ export class UserDO {
             case UserDOFetchMethod.getImpersonatedUserID:
                 response = await this.handleGetImpersonatedUserID(userAction);
                 break;
+            case UserDOFetchMethod.impersonateUser:
+                response = await this.handleImpersonateUser(userAction);
+                break;
+            case UserDOFetchMethod.unimpersonateUser:
+                response = await this.handleUnimpersonateUser(userAction);
+                break;
             default:
                 assertNever(method);
         }
 
         return [method,userAction,response];
+    }
+
+    async handleImpersonateUser(request : ImpersonateUserRequest) : Promise<Response> {
+        this.impersonatedUserID.value = request.userIDToImpersonate;
+        const responseBody : ImpersonateUserResponse = { };
+        return makeJSONResponse(responseBody);
+    }
+
+    async handleUnimpersonateUser(request : UnimpersonateUserRequest) : Promise<Response> {
+        this.impersonatedUserID.value = undefined;
+        const responseBody : UnimpersonateUserResponse = { };
+        return makeJSONResponse(responseBody);
     }
 
     async handleGetImpersonatedUserID(request : GetImpersonatedUserIDRequest) : Promise<Response> {
@@ -528,6 +548,7 @@ export class UserDO {
         const hasWallet = !!(this.wallet.value);
         const address = this.wallet.value?.publicKey;
         const maybeSOLBalance = await this.solBalanceTracker.maybeGetBalance(address, forceRefreshBalance, this.env);
+
         return {
             hasWallet: hasWallet,
             address : address,

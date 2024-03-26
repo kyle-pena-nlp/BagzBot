@@ -1,4 +1,5 @@
 import { Env } from "../env";
+import { logError } from "../logging";
 import { MenuCode } from "../menus";
 import { CallbackData } from "../menus/callback_data";
 import { makeFakeFailedRequestResponse, makeJSONRequest, makeSuccessResponse, sleep } from "../util";
@@ -123,6 +124,7 @@ async function transformToTGMessageSentInfo(response : Promise<Response>) : Prom
         }
         else {
             const responseDescription = (await response.json().catch(r => null));
+            logError("Failed to send TG message: " + responseDescription);
             const failure : FailedTgMessageSentInfo = { success: false };
             return failure;
         }

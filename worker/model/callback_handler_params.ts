@@ -1,3 +1,5 @@
+import { isAnAdminUserID, isTheSuperAdminUserID } from "../../admins";
+import { Env } from "../../env";
 import { CallbackData } from "../../menus/callback_data";
 import { ReplyQuestionWithNextSteps } from "../../reply_question/reply_question_data";
 import { TelegramWebhookInfo } from "../../telegram";
@@ -50,4 +52,28 @@ export class CallbackHandlerParams {
 			return this._telegramUserName;
 		}
 	}
+
+	isAdminOrSuperAdmin(env : Env) {
+		return isAnAdminUserID(this._realUserID, env) || isTheSuperAdminUserID(this._realUserID, env);
+	}
+
+	isImpersonatingAUser() {
+		return this._realUserID !== this._impersonatedUserID;
+	}	
+
+	impersonate(userToImpersonateID : number, env : Env) : 'now-impersonating-user'|'not-permitted' {
+		if (!isAnAdminUserID(this._realUserID, env)) {
+			return 'not-permitted';
+		}
+		const impersonatingAnAdmin = isAnAdminUserID(userToImpersonateID, env);
+		if (impersonatingAnAdmin && !isTheSuperAdminUserID(this._realUserID, env)) {
+			return 'not-permitted';
+		}
+		this._impersonatedUserID = userToImpersonateID;
+		return 'now-impersonating-user';
+	}
+
+	unimpersonate(env : Env) {
+		this._impersonatedUserID = this._realUserID;
+	}	
 }

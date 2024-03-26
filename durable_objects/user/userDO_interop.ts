@@ -11,6 +11,7 @@ import { GetPositionRequest } from "./actions/get_position";
 import { GetSessionValuesRequest, GetSessionValuesWithPrefixRequest, GetSessionValuesWithPrefixResponse, SessionValuesResponse } from "./actions/get_session_values";
 import { GetUserDataRequest } from "./actions/get_user_data";
 import { GetWalletDataRequest, GetWalletDataResponse } from "./actions/get_wallet_data";
+import { ImpersonateUserRequest, ImpersonateUserResponse } from "./actions/impersonate_user";
 import { ListAddressBookEntriesRequest, ListAddressBookEntriesResponse } from "./actions/list_address_book_entries";
 import { ListPositionsRequest } from "./actions/list_positions";
 import { ManuallyClosePositionRequest, ManuallyClosePositionResponse } from "./actions/manually_close_position";
@@ -20,6 +21,7 @@ import { DefaultTrailingStopLossRequestRequest, DefaultTrailingStopLossRequestRe
 import { StoreAddressBookEntryRequest, StoreAddressBookEntryResponse } from "./actions/store_address_book_entry";
 import { StoreLegalAgreementStatusRequest, StoreLegalAgreementStatusResponse } from "./actions/store_legal_agreement_status";
 import { StoreSessionValuesRequest, StoreSessionValuesResponse } from "./actions/store_session_values";
+import { UnimpersonateUserRequest, UnimpersonateUserResponse } from "./actions/unimpersonate_user";
 import { CompletedAddressBookEntry } from "./model/address_book_entry";
 import { SessionKey } from "./model/session";
 import { UserData } from "./model/user_data";
@@ -44,7 +46,9 @@ export enum UserDOFetchMethod {
 	getAddressBookEntry = "getAddressBookEntry",
 	storeLegalAgreementStatus = "storeLegalAgreementStatus",
 	getLegalAgreementStatus = "getLegalAgreementStatus",
-	getImpersonatedUserID = "getImpersonatedUserID"
+	getImpersonatedUserID = "getImpersonatedUserID",
+	impersonateUser = "impersonateUser",
+	unimpersonateUser = "unimpersonateUser"
 }
 
 
@@ -256,4 +260,16 @@ export async function getUserData(telegramUserID : number, messageID : number, f
 export async function requestNewPosition(telegramUserID : number, positionRequestRequest : OpenPositionRequest, env : Env) : Promise<OpenPositionResponse> {
 	const response = await sendJSONRequestToUserDO<OpenPositionRequest,OpenPositionResponse>(telegramUserID, UserDOFetchMethod.openNewPosition, positionRequestRequest, env);
 	return response;
+}
+
+export async function impersonateUser(telegramUserID : number, userIDToImpersonate : number, env : Env) : Promise<void> {
+	const request : ImpersonateUserRequest = { telegramUserID, userIDToImpersonate };
+	await sendJSONRequestToUserDO<ImpersonateUserRequest,ImpersonateUserResponse>(telegramUserID, UserDOFetchMethod.impersonateUser, request, env);
+	return;
+}
+
+export async function unimpersonateUser(telegramUserID : number, env : Env) : Promise<void> {
+	const request : UnimpersonateUserRequest = { telegramUserID };
+	await sendJSONRequestToUserDO<UnimpersonateUserRequest,UnimpersonateUserResponse>(telegramUserID, UserDOFetchMethod.unimpersonateUser, request, env);
+	return;
 }

@@ -4,7 +4,12 @@ import { CallbackButton } from "../telegram";
 import { Menu, MenuCapabilities } from "./menu";
 import { MenuCode } from "./menu_code";
 
-export class MenuMain extends Menu<UserData> implements MenuCapabilities {
+export interface AdminStatus {
+    isAdminOrSuperAdmin : boolean
+    isImpersonatingUser: boolean
+}
+
+export class MenuMain extends Menu<UserData & AdminStatus> implements MenuCapabilities {
     renderText(): string {
         if (this.menuData.maybeSOLBalance != null) {
             return [
@@ -26,7 +31,13 @@ export class MenuMain extends Menu<UserData> implements MenuCapabilities {
             if (this.menuData.hasInviteBetaCodes) {
                 this.insertButtonNextLine(options, "Invite Friends To Beta", this.menuCallback(MenuCode.BetaGateInviteFriends));
             }
-            this.createOptionsFAQHelpMenuLine(options);
+            if (this.menuData.isImpersonatingUser) {
+                this.insertButtonNextLine(options, 'Impersonate', this.menuCallback(MenuCode.ImpersonateUser));
+            }
+            if (this.menuData.isAdminOrSuperAdmin && !this.menuData.isImpersonatingUser) {
+                this.insertButtonNextLine(options, 'Unimpersonate', this.menuCallback(MenuCode.UnimpersonateUser));
+            }
+            this.createHelpMenuLine(options);
         }
         this.insertCloseButtonNextLine(options);
         return options;

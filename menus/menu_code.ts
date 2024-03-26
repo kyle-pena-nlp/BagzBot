@@ -16,12 +16,19 @@ export enum MenuCode {
 	WelcomeScreenPart1 = "WelcomeScreenPart1",
 	WelcomeScreenPart2 = "WelcomeScreenPart2",
 
+	// beta invite
 	BetaGateInviteFriends = "BetaGateInviteFriends",
 
+	// legal
 	LegalAgreement = "LegalAgreement",
 	LegalAgreementAgree = "LegalAgreementAgree",
 	LegalAgreementRefuse = "LegalAgreementRefuse",
 	
+	// user impersonation
+	ImpersonateUser = "ImpersonateUser",
+	UnimpersonateUser = "UnimpersonateUser",
+	SubmitImpersonateUser = "SubmitImpersonateUser",
+
 	// address book stuff
 	SubmitAddressBookEntryName = "Submit.ABE.N",
 	SubmitAddressBookEntryAddress = "Submit.ABE.A",

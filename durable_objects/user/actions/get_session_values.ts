@@ -1,5 +1,5 @@
 import { Structural } from "../../../util";
-import { BaseUserDORequest } from "./base_user_action";
+import { BaseUserDORequest } from "./base_user_do_request";
 
 export interface GetSessionValuesRequest   extends BaseUserDORequest {
 	messageID : number
