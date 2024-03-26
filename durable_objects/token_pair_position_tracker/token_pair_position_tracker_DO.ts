@@ -5,6 +5,7 @@ import { logDebug, logError } from "../../logging";
 import { ChangeTrackedValue, assertNever, makeJSONResponse, makeSuccessResponse } from "../../util";
 import { sendClosePositionOrdersToUserDOs } from "../user/userDO_interop";
 import { AutomaticallyClosePositionsRequest } from "./actions/automatically_close_positions";
+import { GetTokenPriceRequest, GetTokenPriceResponse } from "./actions/get_token_price";
 import { HasPairAddresses } from "./actions/has_pair_addresses";
 import { ImportNewPositionsRequest, ImportNewPositionsResponse } from "./actions/import_new_positions";
 import { MarkPositionAsClosedRequest, MarkPositionAsClosedResponse } from "./actions/mark_position_as_closed";
@@ -167,9 +168,9 @@ export class TokenPairPositionTrackerDO {
         }
     }
 
-    async handleGetTokenPrice(body : {}) : Promise<Response> {
+    async handleGetTokenPrice(body : GetTokenPriceRequest) : Promise<Response> {
         const price = await this.currentPriceTracker.getPrice();
-        return makeJSONResponse<{ price : DecimalizedAmount|undefined }>({ price : price });
+        return makeJSONResponse<GetTokenPriceResponse>({ price : price });
     }
 
     async handleWakeup(body : WakeupRequest) {

@@ -10,7 +10,7 @@ import { getUserHasClaimedBetaInviteCode } from "./durable_objects/beta_invite_c
 import { BetaInviteCodesDO } from "./durable_objects/beta_invite_codes/beta_invite_codes_DO";
 import { PolledTokenPairListDO } from "./durable_objects/polled_token_pair_list/polled_token_pair_list_DO";
 import { TokenPairPositionTrackerDO } from "./durable_objects/token_pair_position_tracker/token_pair_position_tracker_DO";
-import { getImpersonatedUserID, getLegalAgreementStatus, maybeReadSessionObj } from "./durable_objects/user/userDO_interop";
+import { getImpersonatedUserID, getLegalAgreementStatus, maybeReadSessionObj, unimpersonateUser } from "./durable_objects/user/userDO_interop";
 import { UserDO } from "./durable_objects/user/user_DO";
 import { logError } from "./logging";
 import { LegalAgreement, MenuCode } from "./menus";
@@ -73,6 +73,15 @@ export default {
 		// get some important info from the telegram request
 		const telegramWebhookInfo = new TelegramWebhookInfo(telegramRequestBody, env);
 
+		const handler = new Handler(context, env);
+
+		// allow the unimpersonate request
+		if (telegramWebhookInfo.callbackData && telegramWebhookInfo.callbackData.menuCode === MenuCode.UnimpersonateUser) {
+			await unimpersonateUser(telegramWebhookInfo.getTelegramUserID('real'), env);
+			telegramWebhookInfo.unimpersonate(env);
+			return handler.handleCallback(new CallbackHandlerParams(telegramWebhookInfo));
+		}
+
 		// do user impersonation, if an admin or *the* super admin is impersonating another user
 		if (isAnAdminUserID(telegramWebhookInfo.getTelegramUserID('real'), env) || isTheSuperAdminUserID(telegramWebhookInfo.getTelegramUserID('real'), env)) {
 			const impersonatedUserID = (await getImpersonatedUserID(telegramWebhookInfo.getTelegramUserID('real'), env)).impersonatedUserID;
@@ -86,7 +95,6 @@ export default {
 
 		// alias some things
 		const messageType = telegramWebhookInfo.messageType;
-		const handler = new Handler(context, env);
 		
 		// enforce legal agreement gating
 		const legalAgreementGatingAction = await this.enforceLegalAgreementGating(telegramWebhookInfo, handler, env);
@@ -255,7 +263,7 @@ export default {
 				ReplyQuestionCode.EnterBetaInviteCode,
 				handler.context,
 				{
-					timeoutMS: 30000
+					timeoutMS: 10000
 				});
 			await replyQuestion.sendReplyQuestion(info.getTelegramUserID('real'), chatID, env);
 			return 'beta-restricted';

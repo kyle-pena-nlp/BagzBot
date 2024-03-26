@@ -4,10 +4,10 @@ import { logError } from "../../../logging";
 import { ChangeTrackedValue } from "../../../util";
 
 export class CurrentPriceTracker {
-    currentPrice : ChangeTrackedValue<DecimalizedAmount|undefined> = new ChangeTrackedValue<DecimalizedAmount|undefined>("currentPrice", undefined);
+    currentPrice : ChangeTrackedValue<DecimalizedAmount|null> = new ChangeTrackedValue<DecimalizedAmount|null>("currentPrice", null);
     priceLastRefreshed : ChangeTrackedValue<number> = new ChangeTrackedValue<number>("priceLastRefreshed", 0);
-    tokenAddress : ChangeTrackedValue<string|undefined> = new ChangeTrackedValue<string|undefined>("tokenAddress", undefined);
-    vsTokenAddress : ChangeTrackedValue<string|undefined> = new ChangeTrackedValue<string|undefined>("vsTokenAddress",undefined);
+    tokenAddress : ChangeTrackedValue<string|null> = new ChangeTrackedValue<string|null>("tokenAddress", null);
+    vsTokenAddress : ChangeTrackedValue<string|null> = new ChangeTrackedValue<string|null>("vsTokenAddress",null);
     initialize(entries : Map<string,any>) {
         this.currentPrice.initialize(entries);
         this.priceLastRefreshed.initialize(entries);
@@ -20,14 +20,14 @@ export class CurrentPriceTracker {
         // deliberately not flushing tokenAddress or vsTokenAddress.
         return await Promise.allSettled([p1,p2]);
     }
-    async getPrice() : Promise<DecimalizedAmount|undefined> {
+    async getPrice() : Promise<DecimalizedAmount|null> {
         if (this.priceIsStale()) {
             const price = await this.getPriceFromJupiter();
             if (price != null) {
                 this.currentPrice.value = price;
                 this.priceLastRefreshed.value = Date.now();
             }
-            return price;
+            return price||null;
         }
         return this.currentPrice.value;
     }

@@ -5,5 +5,5 @@ export interface GetImpersonatedUserIDRequest  extends BaseUserDORequest {
 }
 
 export interface GetImpersonatedUserIDResponse {
-	impersonatedUserID : number|undefined
+	impersonatedUserID : number|null
 }

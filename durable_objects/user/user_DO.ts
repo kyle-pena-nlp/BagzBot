@@ -58,7 +58,7 @@ export class UserDO {
 
     // if the user is impersonating someone, this is populated.
     // all other properties pertain to the 'real user' per telegramUserID, not the impersonated user
-    impersonatedUserID : ChangeTrackedValue<number|undefined> = new ChangeTrackedValue<number|undefined>("impersonatedUserID", undefined);
+    impersonatedUserID : ChangeTrackedValue<number|null> = new ChangeTrackedValue<number|null>("impersonatedUserID", null);
 
     // the user's wallet
     wallet : ChangeTrackedValue<Wallet|null> = new ChangeTrackedValue<Wallet|null>('wallet', null, true);
@@ -156,7 +156,6 @@ export class UserDO {
         finally {
             this.flushToStorage();
         }
-
     }
 
     async ensureIsInitialized(userAction : BaseUserDORequest) {
@@ -271,13 +270,13 @@ export class UserDO {
     }
 
     async handleUnimpersonateUser(request : UnimpersonateUserRequest) : Promise<Response> {
-        this.impersonatedUserID.value = undefined;
+        this.impersonatedUserID.value = null;
         const responseBody : UnimpersonateUserResponse = { };
         return makeJSONResponse(responseBody);
     }
 
     async handleGetImpersonatedUserID(request : GetImpersonatedUserIDRequest) : Promise<Response> {
-        const responseBody : GetImpersonatedUserIDResponse = { impersonatedUserID : await this.impersonatedUserID.value };
+        const responseBody : GetImpersonatedUserIDResponse = { impersonatedUserID : this.impersonatedUserID.value };
         return makeJSONResponse(responseBody);
     }
 

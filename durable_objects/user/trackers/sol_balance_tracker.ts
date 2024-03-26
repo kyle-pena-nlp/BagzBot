@@ -9,7 +9,7 @@ import { ChangeTrackedValue, strictParseFloat } from "../../../util";
 export class SOLBalanceTracker {
 
     // TODO : to change tracked value
-    maybeSOLBalance : ChangeTrackedValue<DecimalizedAmount|undefined> = new ChangeTrackedValue<DecimalizedAmount|undefined>('maybeSOLBalance', undefined);
+    maybeSOLBalance : ChangeTrackedValue<DecimalizedAmount|null> = new ChangeTrackedValue<DecimalizedAmount|null>('maybeSOLBalance', null);
     lastRefreshedSOLBalance : ChangeTrackedValue<number> = new ChangeTrackedValue<number>('lastRefreshedSOLBalance', 0); // ms since epoch
 
     constructor() {
@@ -26,9 +26,9 @@ export class SOLBalanceTracker {
         return await Promise.allSettled([flushSOLBalance,flushLastRefresh]);
     }
 
-    async maybeGetBalance(address : string|undefined, forceRefresh : boolean, env : Env) : Promise<DecimalizedAmount|undefined> {
+    async maybeGetBalance(address : string|undefined, forceRefresh : boolean, env : Env) : Promise<DecimalizedAmount|null> {
         if (address == null) {
-            return;
+            return null;
         }
         if (this.refreshIntervalExpired(env) || forceRefresh) {
             const refreshedBalance = await this.getBalanceFromRPC(address, env);
@@ -37,7 +37,7 @@ export class SOLBalanceTracker {
                 this.lastRefreshedSOLBalance.value = Date.now();
             }
         }
-        return this.maybeSOLBalance.value;
+        return this.maybeSOLBalance.value||null;
     }
 
     private refreshIntervalExpired(env : Env) {

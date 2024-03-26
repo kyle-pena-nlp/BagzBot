@@ -7,19 +7,25 @@ import { MenuCode } from "./menu_code";
 export interface AdminStatus {
     isAdminOrSuperAdmin : boolean
     isImpersonatingUser: boolean
+    impersonatedUserID : number|undefined
 }
 
 export class MenuMain extends Menu<UserData & AdminStatus> implements MenuCapabilities {
     renderText(): string {
+        const lines = [];
         if (this.menuData.maybeSOLBalance != null) {
-            return [
+            lines.push(
                 `<b>Main Menu</b> | ${toFriendlyString(this.menuData.maybeSOLBalance, 4)} SOL in wallet.`,
                 `<code>${this.menuData.address}</code>`
-            ].join('\r\n');
+            );
         }
         else {
-            return `<b>Main Menu</b>`;
+            lines.push(`<b>Main Menu</b>`);
         }
+        if (this.menuData.isImpersonatingUser) {
+            lines.push(`Current IMPERSONATING '${this.menuData.impersonatedUserID||''}'`)
+        }
+        return lines.join("\r\n");
     }
     renderOptions(): CallbackButton[][] {
         const options = this.emptyMenu();
@@ -32,10 +38,10 @@ export class MenuMain extends Menu<UserData & AdminStatus> implements MenuCapabi
                 this.insertButtonNextLine(options, "Invite Friends To Beta", this.menuCallback(MenuCode.BetaGateInviteFriends));
             }
             if (this.menuData.isImpersonatingUser) {
-                this.insertButtonNextLine(options, 'Impersonate', this.menuCallback(MenuCode.ImpersonateUser));
+                this.insertButtonNextLine(options, 'ADMIN: Unimpersonate', this.menuCallback(MenuCode.UnimpersonateUser));
             }
             if (this.menuData.isAdminOrSuperAdmin && !this.menuData.isImpersonatingUser) {
-                this.insertButtonNextLine(options, 'Unimpersonate', this.menuCallback(MenuCode.UnimpersonateUser));
+                this.insertButtonNextLine(options, 'ADMIN: Impersonate a User', this.menuCallback(MenuCode.ImpersonateUser));
             }
             this.createHelpMenuLine(options);
         }

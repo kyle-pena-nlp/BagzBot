@@ -163,6 +163,9 @@ export class Worker {
             case MenuCode.Error:
                 return new MenuError(undefined);
             case MenuCode.ViewDecryptedWallet:
+                if (params.isImpersonatingAUser()) {
+                    return new MenuContinueMessage('Not permitted to view an impersonated users private key', MenuCode.Main);
+                }
                 const walletDataResponse = await getWalletData(params.getTelegramUserID(), this.env);
                 const decryptedPrivateKey = await decryptPrivateKey(walletDataResponse.wallet.encryptedPrivateKey, params.getTelegramUserID(), this.env);
                 return new MenuViewDecryptedWallet({ publicKey: walletDataResponse.wallet.publicKey, decryptedPrivateKey: decryptedPrivateKey })
@@ -479,7 +482,8 @@ export class Worker {
         const userData = await getUserData(info.getTelegramUserID(), info.messageID, false, env);
         return new MenuMain({ ...userData, 
             isAdminOrSuperAdmin: info.isAdminOrSuperAdmin(env), 
-            isImpersonatingUser: info.isImpersonatingAUser() 
+            isImpersonatingUser: info.isImpersonatingAUser(),
+            impersonatedUserID: info.isImpersonatingAUser() ? info.getTelegramUserID() : undefined
         });
     }
 
@@ -645,10 +649,19 @@ export class Worker {
         switch(command) {
             case '/start':
                 const userData = await getUserData(info.getTelegramUserID(), info.messageID, false, env);
-                return ["...", new MenuMain({ ...userData, isAdminOrSuperAdmin: info.isAdminOrSuperAdmin(env), isImpersonatingUser : info.isImpersonatingAUser() })];
+                return ["...", new MenuMain({ 
+                    ...userData, 
+                    isAdminOrSuperAdmin: info.isAdminOrSuperAdmin(env), 
+                    isImpersonatingUser : info.isImpersonatingAUser(), 
+                    impersonatedUserID: info.isImpersonatingAUser() ? info.getTelegramUserID() : undefined
+                })];
             case '/menu':
                 const menuUserData = await getUserData(info.getTelegramUserID(), info.messageID, false, env);
-                return ['...', new MenuMain({ ...menuUserData, isAdminOrSuperAdmin : info.isAdminOrSuperAdmin(env), isImpersonatingUser: info.isImpersonatingAUser() })];
+                return ['...', new MenuMain({ 
+                    ...menuUserData, 
+                    isAdminOrSuperAdmin : info.isAdminOrSuperAdmin(env), 
+                    isImpersonatingUser: info.isImpersonatingAUser(), 
+                    impersonatedUserID: info.isImpersonatingAUser() ? info.getTelegramUserID() : undefined })];
             case '/welcome_screen':
                 return ['...', new WelcomeScreenPart1(undefined)];
             case '/legal_agreement':

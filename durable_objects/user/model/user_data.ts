@@ -6,5 +6,5 @@ export interface UserData {
 	hasWallet: boolean,
 	address ?: string
 	hasInviteBetaCodes : boolean
-	maybeSOLBalance : DecimalizedAmount|undefined
+	maybeSOLBalance : DecimalizedAmount|null
 };

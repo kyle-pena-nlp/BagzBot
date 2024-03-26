@@ -1,6 +1,6 @@
 import { DurableObjectStorage } from "@cloudflare/workers-types";
 import { Structural, structuralEquals } from "./structural";
-export class ChangeTrackedValue<T extends Structural> {
+export class ChangeTrackedValue<T extends Exclude<Structural,undefined>> {
     storageKey : string;
     _buffer : T;
     value  : T;
