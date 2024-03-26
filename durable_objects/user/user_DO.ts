@@ -478,9 +478,12 @@ export class UserDO {
     async handleOpenNewPosition(openPositionRequest : OpenPositionRequest) : Promise<Response> {
         // fire and forget (async callback will handle success and failure cases for swap)
         const positionRequest = openPositionRequest.positionRequest;       
-        // deliberate fire-and-forget.  callbacks will handle state management.
-        // TODO AM: store buyQuote on request.  Update when appropriate from menu.
-        await buy(positionRequest, this.wallet.value!!, this.userPositionTracker, this.env);
+        /*
+            This is deliberately not awaited.
+            Durable Objects will continue processing requests for up to 30 seconds
+            (Which means the buy has to happen in 30 secs!!!)
+        */
+        buy(positionRequest, this.wallet.value!!, this.userPositionTracker, this.env);
         return makeJSONResponse<OpenPositionResponse>({});
     }
     

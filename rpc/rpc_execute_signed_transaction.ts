@@ -39,16 +39,22 @@ export async function executeAndMaybeConfirmTx(
     let stopSendingTx = false;
     let stopConfirming = false;
 
-    // the blockhash that acts as the nonce for the tx
+    // the blockhash that the tx executes with (assigned by jup swap API)
     const txRecentBlockhash = rawSignedTx.message.recentBlockhash;
 
-    // whether at least 1 tx has been sent.
+    // whether at least 1 tx has been sent (irregardless of if it actually executed)
     let anyTxSent = false;
+
+    // TODO: RPC node heath check, per: https://solana.com/docs/core/transactions/confirmation#use-healthy-rpc-nodes-when-fetching-blockhashes 
+    let latestBlockhash = await connection.getLatestBlockhash('confirmed');    
 
     const resendTxTask = (async () => {
 
-        // Whether or not at least one tx got successfully sent to RPC
+        // Count failures (i.e.; 429 errors)
         let rpcExceptions = 0;
+
+        // TODO: make it a setting
+        const maxRPCSendExceptions = 10;
 
         let returnStatus : TransactionExecutionError|undefined = undefined;
         
@@ -59,8 +65,10 @@ export async function executeAndMaybeConfirmTx(
             logDebug("Attempting to send tx")
             await connection.sendRawTransaction(txBuffer, {
                 skipPreflight : true,
-                maxRetries: 0
-            }).then(_ => {
+                maxRetries: 0, 
+                // per: https://solana.com/docs/core/transactions/confirmation#use-an-appropriate-preflight-commitment-level
+                preflightCommitment: 'confirmed'
+            }).then(async _ => {
                 anyTxSent = true;
                 logDebug("Tx successfully sent.")
             })
@@ -69,31 +77,28 @@ export async function executeAndMaybeConfirmTx(
                 logError("sendRawTransaction threw an exception", e, signature);
             });
 
-            // see if the blockhash the tx was signed with is still valid
-            const blockhashValid = await getIsBlockhashValid(txRecentBlockhash, connection);
+            const blockheight = await connection.getBlockHeight('confirmed').catch(r => {
+                logError("send loop - could not poll blockheight");
+                return null;
+            });
 
-            // if calling the RPC failed (rate-limited?), increment failure count.
-            if (blockhashValid == null) {
-                logDebug("Send loop - could not check blockhash")
+            // if we cannot poll blockheight, immediately terminate send loop (otherwise, 429 -> infinite loop)
+            if (blockheight == null) {
                 rpcExceptions += 1;
             }
 
-            // if there have been too many RPC exceptions, stop re-sending
-            if (rpcExceptions > 10) {
-                // TODO: more appropriate status
-                logDebug("Too many exceptions sending tx");
-                returnStatus = TransactionExecutionError.CouldNotDetermineMaxBlockheight;
-                break;
-            }
-
-            // if the blockhash used to sign the tx is no longer valid, stop re-sending
-            if (blockhashValid === false) {
+            if (blockheight != null && blockheight > latestBlockhash.lastValidBlockHeight) {
                 logDebug("send loop - blockhash expired - stopping send tx");
                 returnStatus = TransactionExecutionError.BlockheightExceeded;
                 break;
             }
 
-            // Sleep to avoid spamming RPC.
+            if (rpcExceptions > maxRPCSendExceptions) {
+                // TODO: better error enum
+                returnStatus = TransactionExecutionError.TransactionFailedOtherReason;
+                break;
+            }
+
             await sleep(REBROADCAST_DELAY_MS);
         }
 
@@ -130,7 +135,6 @@ export async function executeAndMaybeConfirmTx(
             }
             
             // get signature status
-            // note: MAX_RECENT_BLOCKHASHES = 300, which is greater than MAX_VALID_BLOCKHEIGHT = +150
             logDebug("confirm loop - getting signature status");
             const sigStatOpts = { searchTransactionHistory: false }; // TODO: should this change?
             const signatureStatus : SignatureStatus|'tx-does-not-exist'|'get-signature-status-method-failed' = await connection.getSignatureStatus(signature, sigStatOpts)
@@ -166,24 +170,23 @@ export async function executeAndMaybeConfirmTx(
                 }
             }
             else if (signatureStatus === 'tx-does-not-exist') {
-                const isValidBlockhash = await getIsBlockhashValid(txRecentBlockhash, connection);
-                // if tx sig status DNE and blockhash still valid, reattempt confirmation.
-                if (isValidBlockhash === true) {
-                    logDebug("Tx DNE yet blockhash still valid - reattempting confirmation");
+
+                const blockheight = await connection.getBlockHeight('confirmed').catch(r => {
+                    logError("send loop - could not poll blockheight");
+                    return null;
+                });
+
+                if (blockheight == null) {
+                    logError("confirm loop - could not determine blockheight");
+                    rpcExceptions += 1;
                 }
-                // if tx sig status DNE and blockhash expired, tx was dropped.
-                else if (isValidBlockhash === false) {
-                    logError("Tx dropped", signature);
+                else if (blockheight != null && blockheight <= latestBlockhash.lastValidBlockHeight) {
+                    logDebug("tx not found yet blockhash still valid");
+                }
+                else if (blockheight != null && blockheight > latestBlockhash.lastValidBlockHeight) {
+                    logError("tx not found and blockhash expired - considered dropped", signature);
                     returnStatus = TransactionExecutionError.TransactionDropped;
                     break;
-                }
-                // if failed to get blockhash status, increment exception count
-                else if (isValidBlockhash == null) {
-                    logError("Error occurred determining if blockhash is valid")
-                    rpcExceptions +=1;
-                }
-                else {
-                    assertNever(isValidBlockhash);
                 }
             }
             // if could not get sig status due to RPC error, increment exception count
@@ -256,6 +259,8 @@ function determineTxConfirmationFinalStatus(
     }
 }
 
+/*
+// this method is unreliable - would say 'false' sometimes even when blockhash just produced.
 async function getIsBlockhashValid(txRecentBlockhash : string, connection : Connection) {
     return await connection.isBlockhashValid(txRecentBlockhash, { commitment: 'processed' })
         .then(result => {
@@ -266,6 +271,7 @@ async function getIsBlockhashValid(txRecentBlockhash : string, connection : Conn
             return null;
         });
 }
+*/
 
 function interpretTxSignatureStatus(status : SignatureStatus) : 'failed'|'unconfirmed'|'succeeded' {
                 

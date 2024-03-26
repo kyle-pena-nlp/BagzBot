@@ -7,6 +7,7 @@ import { waitUntilCurrentBlockFinalized } from "../../rpc/rpc_blocks";
 import { parseSwapTransaction } from "../../rpc/rpc_parse";
 import { ParsedSuccessfulSwapSummary, isSuccessfullyParsedSwapSummary, isSwapExecutionErrorParseSummary, isSwapExecutionErrorParseSwapSummary, isUnknownTransactionParseSummary } from "../../rpc/rpc_types";
 import { TGStatusMessage } from "../../telegram";
+import { assertNever } from "../../util";
 import { MarkPositionAsClosedRequest } from "../token_pair_position_tracker/actions/mark_position_as_closed";
 import { markPositionAsClosedInTokenPairPositionTracker as removePositionFromPriceTracking } from "../token_pair_position_tracker/token_pair_position_tracker_DO_interop";
 import { UserPositionTracker } from "./trackers/user_position_tracker";
@@ -16,6 +17,9 @@ export async function sell(positionID: string,
     wallet : Wallet, 
     userPositionTracker : UserPositionTracker,
     env : Env) {
+
+    const startTimeMS = Date.now();
+    const maxTimeMS = startTimeMS + (25 * 1000);
 
     // get the corresponding tracked position from the user-side position tracker
     const position = userPositionTracker.getPosition(positionID);
@@ -76,25 +80,39 @@ export async function sell(positionID: string,
     // TODO: how can I prevent an extra sell attempt from sneaking between these lines of code? is there a way to block?
 
     // do the swap
-    const parsedSwapSummary = await executeAndConfirmSignedTx(position, signedTx, wallet, env, notificationChannel, connection);
+    const parsedSwapSummary = await executeAndConfirmSignedTx(position, signedTx, wallet, env, notificationChannel, connection, maxTimeMS);
 
-    // if the sell swap failed, set the position as open again (todo: don't retry if not desired.)
-    if (parsedSwapSummary == null) {
+    if (parsedSwapSummary === 'could-not-retrieve-tx') {
+        //TODO: mark as unconfirmed.
+        //logError("Could not execute sell tx, marking position as open again", position);
+        //userPositionTracker.setAsOpen(position.positionID);
+        return;
+    }
+    else if (parsedSwapSummary === 'swap-failed') {
         logError("Could not execute sell tx, marking position as open again", position);
         userPositionTracker.setAsOpen(position.positionID);
         return;
     }
+    else if (parsedSwapSummary === 'tx-failed') {
+        logError("Could not execute sell swap, marking position as open again", position);
+        userPositionTracker.setAsOpen(position.positionID);
+        return;
+    }
+    else if (isSuccessfullyParsedSwapSummary(parsedSwapSummary)) {
+        // otherwise, mark position as closed.
+        userPositionTracker.closePosition(position.positionID);
 
-    // otherwise, mark position as closed.
-    userPositionTracker.closePosition(position.positionID);
-
-    // send a request to the price tracker to stop tracking the position
-    const removeFromPriceTrackingRequest : MarkPositionAsClosedRequest = { 
-        positionID : position.positionID, 
-        tokenAddress: position.token.address, 
-        vsTokenAddress : position.vsToken.address 
-    };
-    await removePositionFromPriceTracking(removeFromPriceTrackingRequest, env);
+        // send a request to the price tracker to stop tracking the position
+        const removeFromPriceTrackingRequest : MarkPositionAsClosedRequest = { 
+            positionID : position.positionID, 
+            tokenAddress: position.token.address, 
+            vsTokenAddress : position.vsToken.address 
+        };
+        await removePositionFromPriceTracking(removeFromPriceTrackingRequest, env);
+    }
+    else {
+        assertNever(parsedSwapSummary);
+    }
 
     // force all queued message to fire
     await TGStatusMessage.finalize(notificationChannel);

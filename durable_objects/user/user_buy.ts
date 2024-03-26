@@ -4,11 +4,12 @@ import * as bs58 from "bs58";
 import { Wallet } from "../../crypto";
 import { Env } from "../../env";
 import { Position, PositionRequest, PositionStatus, Quote, getSwapOfXDescription } from "../../positions";
-import { SwapSummary } from "../../rpc/rpc_types";
+import { SwapSummary, isSuccessfulSwapSummary } from "../../rpc/rpc_types";
 import { TGStatusMessage } from "../../telegram";
 import { importNewPosition as importNewPositionIntoPriceTracker } from "../token_pair_position_tracker/token_pair_position_tracker_DO_interop";
 import { UserPositionTracker } from "./trackers/user_position_tracker";
 import { createAndSignTx, executeAndConfirmSignedTx } from "./user_swap";
+import { assertNever } from "../../util";
 /* markPositionAsOpen, renegeOpenPosition */
 
 
@@ -19,10 +20,16 @@ export async function buy(positionRequest: PositionRequest,
     userPositionTracker: UserPositionTracker, 
     env : Env) {
 
-    const connection = new Connection(env.RPC_ENDPOINT_URL);
-    const quote = positionRequest.quote;
+    // durable objects only continue to process requests for up to 30s.
+    const startTimeMS = Date.now();
+    const maxTimeMS = startTimeMS + (25 * 1000); // actual limit is 30s. Give some breathing room.
+
+    // non-blocking notification channel to push update messages to TG
     const notificationChannel = TGStatusMessage.replaceWithNotification(positionRequest.messageID, `Initiating.`, false, positionRequest.chatID, env);
     
+    // RPC connection
+    const connection = new Connection(env.RPC_ENDPOINT_URL);
+
     // create a signed tx (which involves generating a quote & etc.)
     const signedTx = await createAndSignTx(positionRequest, wallet, env, notificationChannel);
     
@@ -37,29 +44,39 @@ export async function buy(positionRequest: PositionRequest,
     const signature = bs58.encode(signedTx.signatures[0]);
 
     // optimistically store the position in the user-side tracker
-    // by optimistic, "assume" the tx and swap executed successfully
+    // by optimistic, "assume" the tx and swap will execute successfully
     // If unconfirmed, we will attempt to confirm at sell time
     // TODO: periodically scan for unconfirmed and attempt confirmation.
+    const quote = positionRequest.quote;
     userPositionTracker.storePositions([convertToUnconfirmedPosition(positionRequest, quote, signature)]);
     
-    const parsedSwapSummary = await executeAndConfirmSignedTx(positionRequest, signedTx, wallet, env, notificationChannel, connection);
+    // attempt to execute tx.  all sorts of things can go wrong.
+    const parsedSwapSummary = await executeAndConfirmSignedTx(positionRequest, signedTx, wallet, env, notificationChannel, connection, maxTimeMS);
+
+    // if we sent the tx at least once, but couldn't retrieve it (i.e.; couldn't confirm it)
     if (parsedSwapSummary === 'could-not-retrieve-tx') {
         const unconfirmedPosition = convertToUnconfirmedPosition(positionRequest, quote, signature);
         userPositionTracker.storePositions([unconfirmedPosition]);
         // TODO: link to view position menu
     }
+    // if we sent the tx and it executed, but the swap failed
     else if (parsedSwapSummary === 'swap-failed') {
         userPositionTracker.removePositions([positionRequest.positionID]);
     }
+    // if the act of sending the tx itself failed
     else if (parsedSwapSummary === 'tx-failed') {
         userPositionTracker.removePositions([positionRequest.positionID]);
     }
-    else {
+    // but if it's successful, convert it to a confirmed position and celebrate!
+    else if (isSuccessfulSwapSummary(parsedSwapSummary)) {
         const newPosition = convertConfirmedRequestToPosition(positionRequest, parsedSwapSummary.swapSummary);
         userPositionTracker.storePositions([newPosition]);
         await importNewPositionIntoPriceTracker(newPosition, env);
         TGStatusMessage.queue(notificationChannel, `Peak Price is now being tracked. Position will be unwound when price dips below ${positionRequest.triggerPercent}% of peak.`, true);    
         // TODO: link to view position menu
+    }
+    else {
+        assertNever(parsedSwapSummary);
     }
     await TGStatusMessage.finalize(notificationChannel);
 }

@@ -19,7 +19,7 @@ import { assertNever } from "../../util";
 export async function createAndSignTx(s : Swappable, 
     wallet: Wallet,
     env: Env,
-    notificationChannel : UpdateableNotification) : Promise<VersionedTransaction|void> {
+    notificationChannel : UpdateableNotification) : Promise<VersionedTransaction|undefined> {
 
 
     // get swap route / quote
@@ -66,7 +66,8 @@ export async function executeAndConfirmSignedTx(s: Swappable,
     wallet : Wallet, 
     env : Env,
     notificationChannel : UpdateableNotification,
-    connection : Connection) : Promise<ParsedSuccessfulSwapSummary|'could-not-retrieve-tx'|'tx-failed'|'swap-failed'> {
+    connection : Connection,
+    maxTimeMS : number) : Promise<ParsedSuccessfulSwapSummary|'could-not-retrieve-tx'|'tx-failed'|'swap-failed'> {
 
     const swapOfX = getSwapOfXDescription(s);
     const SwapOfX = getSwapOfXDescription(s, true);
