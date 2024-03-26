@@ -58,6 +58,7 @@ interface BasePositionRequest {
 
 // Pre-request before full info is retrieved (like TokenInfo and BuyQuote)
 export interface PositionPreRequest extends BasePositionRequest {
+	readonly [ key : string ] : Structural
 	tokenAddress : string
 	vsToken : TokenInfo
 }

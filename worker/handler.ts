@@ -19,6 +19,7 @@ import { ReplyQuestionData, replyQuestionHasNextSteps } from "../reply_question/
 import { quoteBuy } from "../rpc/jupiter_quotes";
 import { CompleteTransferFundsRequest, PartialTransferFundsRequest } from "../rpc/rpc_transfer_funds";
 import { isGetQuoteFailure } from "../rpc/rpc_types";
+import { POSITION_REQUEST_STORAGE_KEY } from "../storage_keys";
 import { TelegramWebhookInfo, deleteTGMessage, sendMessageToTG, sendRequestToTG, updateTGMessage } from "../telegram";
 import { WEN_ADDRESS, getVsTokenInfo } from "../tokens";
 import { Structural, assertNever, makeFakeFailedRequestResponse, makeSuccessResponse, tryParseFloat, tryParseInt } from "../util";
@@ -26,8 +27,6 @@ import { CallbackHandlerParams } from "./model/callback_handler_params";
 import { TokenAddressExtractor } from "./token_address_extractor";
 
 
-
-const POSITION_REQUEST_STORAGE_KEY = "PositionRequest";
 const QUESTION_TIMEOUT_MS = 10000
 
 export class Worker {

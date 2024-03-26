@@ -1,0 +1,1 @@
+export const POSITION_REQUEST_STORAGE_KEY = "PositionRequest"

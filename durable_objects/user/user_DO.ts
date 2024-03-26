@@ -5,6 +5,7 @@ import { Env } from "../../env";
 import { logError } from "../../logging";
 import { PositionPreRequest, PositionStatus, PositionType } from "../../positions";
 import { getSOLBalance } from "../../rpc/rpc_wallet";
+import { POSITION_REQUEST_STORAGE_KEY } from "../../storage_keys";
 import { WEN_ADDRESS, getVsTokenInfo } from "../../tokens";
 import { ChangeTrackedValue, Structural, assertNever, groupIntoMap, makeFailureResponse, makeJSONResponse, makeSuccessResponse, maybeGetJson, strictParseBoolean } from "../../util";
 import { listUnclaimedBetaInviteCodes } from "../beta_invite_codes/beta_invite_code_interop";
@@ -43,7 +44,19 @@ import { sell } from "./user_sell";
 // TODO: all requests to UserDo include telegramUserID and telegramUserName
 // and ensure initialization.  That way, no purpose-specific initialization call is required
 
-
+const DEFAULT_POSITION_PREREQUEST : PositionPreRequest = {
+    userID: -1,
+    chatID: -1,
+    messageID: -1,
+    positionID : "",
+    positionType : PositionType.LongTrailingStopLoss,
+    tokenAddress : WEN_ADDRESS, // to be subbed in
+    vsToken : getVsTokenInfo('SOL'),
+    vsTokenAmt : 1.0,
+    slippagePercent : 5.0,
+    triggerPercent : 5,
+    retrySellIfSlippageExceeded : true            
+};
 
 /* Durable Object storing state of user */
 export class UserDO {
@@ -67,7 +80,7 @@ export class UserDO {
     solBalanceTracker : SOLBalanceTracker = new SOLBalanceTracker();
 
     // the default values for a trailing sotp loss
-    defaultTrailingStopLossRequest : PositionPreRequest;
+    defaultTrailingStopLossRequest : ChangeTrackedValue<PositionPreRequest> = new ChangeTrackedValue<PositionPreRequest>("defaultTrailingStopLossRequest", structuredClone(DEFAULT_POSITION_PREREQUEST));
 
     // tracks variable values associated with the current messageID
     sessionTracker : SessionTracker = new SessionTracker();
@@ -86,19 +99,7 @@ export class UserDO {
         this.env                = env;
         this.state              = state;
         // TODO: allow user to update defaults in 'Options' menu
-        this.defaultTrailingStopLossRequest = {
-            userID: -1,
-            chatID: -1,
-            messageID: -1,
-            positionID : "",
-            positionType : PositionType.LongTrailingStopLoss,
-            tokenAddress : WEN_ADDRESS, // to be subbed in
-            vsToken : getVsTokenInfo('SOL'),
-            vsTokenAmt : parseFloat(env.DEFAULT_TLS_VS_TOKEN_FRACTION),
-            slippagePercent : 5.0,
-            triggerPercent : 5,
-            retrySellIfSlippageExceeded : true            
-        };
+        
         this.state.blockConcurrencyWhile(async () => {
             await this.loadStateFromStorage();
         });
@@ -125,6 +126,7 @@ export class UserDO {
         this.addressBookEntryTracker.initialize(storage);
         this.solBalanceTracker.initialize(storage); // rate limits RPC calls. will refresh on access.
         this.legalAgreementStatus.initialize(storage);
+        this.defaultTrailingStopLossRequest.initialize(storage);
     }
 
     async flushToStorage() {
@@ -136,7 +138,8 @@ export class UserDO {
             this.userPositionTracker.flushToStorage(this.state.storage),
             this.addressBookEntryTracker.flushToStorage(this.state.storage),
             this.solBalanceTracker.flushToStorage(this.state.storage),
-            this.legalAgreementStatus.flushToStorage(this.state.storage)
+            this.legalAgreementStatus.flushToStorage(this.state.storage),
+            this.defaultTrailingStopLossRequest.flushToStorage(this.state.storage)
         ]);
     }
 
@@ -360,7 +363,7 @@ export class UserDO {
     }
 
     handleGetDefaultTrailingStopLossRequest(defaultTrailingStopLossRequestRequest : DefaultTrailingStopLossRequestRequest) : Response {
-        const defaultPrerequest = structuredClone(this.defaultTrailingStopLossRequest);
+        const defaultPrerequest = structuredClone(this.defaultTrailingStopLossRequest.value);
         defaultPrerequest.userID = defaultTrailingStopLossRequestRequest.telegramUserID;
         defaultPrerequest.chatID = defaultTrailingStopLossRequestRequest.chatID;
         defaultPrerequest.messageID = defaultTrailingStopLossRequestRequest.messageID;
@@ -408,10 +411,32 @@ export class UserDO {
         for (const sessionKey of Object.keys(jsonRequestBody.sessionValues)) {
             const value = jsonRequestBody.sessionValues[sessionKey];
             this.sessionTracker.storeSessionValue(messageID, sessionKey, value);
+            this.maybeWriteToDefaultPositionPrerequest(sessionKey, value); // hack
         }
         return await this.sessionTracker.flushToStorage(this.state.storage).then(() => {
             return makeJSONResponse<StoreSessionValuesResponse>({});
         });
+    }
+
+    // TODO: a less hacky/dangerous way to do this.
+    maybeWriteToDefaultPositionPrerequest(sessionKey : string, value : any) {
+        // MAJOR hack to avoid large code change
+        if (sessionKey.startsWith(POSITION_REQUEST_STORAGE_KEY)) {
+            const sessionProperty = sessionKey.split("/")[1];
+            const dont_store_these : (keyof PositionPreRequest)[] = [ 'userID', 'chatID', 'positionID', 'messageID', 'positionID' ];
+            if (dont_store_these.includes(sessionProperty)) {
+                return;
+            }
+            if (sessionProperty != null && sessionProperty in this.defaultTrailingStopLossRequest.value) {
+                (this.defaultTrailingStopLossRequest.value as any)[sessionProperty] = value;
+            }
+            if (sessionProperty != null && sessionProperty === 'token') {
+                const tokenAddress = (value as any)?.address;
+                if (tokenAddress != null) {
+                    (this.defaultTrailingStopLossRequest.value as any)['tokenAddress'] = tokenAddress;
+                }      
+            }
+        }        
     }
 
     async handleGetSessionValues(jsonRequestBody : GetSessionValuesRequest) : Promise<Response> {
@@ -479,6 +504,7 @@ export class UserDO {
     async handleAutomaticallyClosePositionsRequest(closePositionsRequest : AutomaticallyClosePositionsRequest) : Promise<Response> {
         const positions = closePositionsRequest.positions;
         for (const position of positions) {
+
             // before we sell, we verify the position is still active
             const userTrackedPosition = this.userPositionTracker.getPosition(position.positionID);
             
@@ -540,7 +566,7 @@ export class UserDO {
         if (!this.wallet.value) {
             throw new Error("User has no wallet");
         }
-    }    
+    }
 
     async makeUserData(forceRefreshBalance : boolean) : Promise<UserData> {
         const hasInviteBetaCodes = await this.getHasBetaCodes();
