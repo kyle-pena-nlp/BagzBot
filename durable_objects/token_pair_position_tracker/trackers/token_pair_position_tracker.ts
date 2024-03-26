@@ -1,6 +1,6 @@
 import { DecimalizedAmount } from "../../../decimalized";
 import { logError } from "../../../logging";
-import { Position, PositionRequest, PositionStatus } from "../../../positions";
+import { Position, PositionStatus } from "../../../positions";
 import { MapWithStorage } from "../../../util";
 import { PeakPricePositionTracker } from "./peak_price_tracker";
 
@@ -10,12 +10,8 @@ export interface PositionsToClose {
 
 export class TokenPairPositionTracker {
 
-    // TODO: unused, remove.
-    // positions sent to DEX yet not filled/confirmed
-    sentPositionRequests : MapWithStorage<PositionRequest> = new MapWithStorage<PositionRequest>("sentPositionRequests");
-
     // new open positions collected by the callback from the dex
-    newOpenPositions : MapWithStorage<Position> = new MapWithStorage<Position>("newOpenPositions");
+    //newOpenPositions : MapWithStorage<Position> = new MapWithStorage<Position>("newOpenPositions");
     
     // all open positions
     openPositions : MapWithStorage<Position> = new MapWithStorage<Position>("openPositions");
@@ -34,40 +30,22 @@ export class TokenPairPositionTracker {
     }
 
     any() : boolean {
-        return  this.newOpenPositions.size > 0 ||
-                this.openPositions.size > 0 ||
+        return  this.openPositions.size > 0 ||
                 this.closingPositions.size > 0;
+    }
+
+    listByUser(userID : number) : Position[] {
+        return this.pricePeaks.listByUser(userID);
     }
 
     importNewOpenPositions(positions : Position[]) {
         for (const position of positions) {
-            this.newOpenPositions.set(position.positionID, position);
+            // this is a staging area for positions
+            this.pricePeaks.add(position.fillPrice, position);
         }
-    }
-
-    addPositionRequest(positionRequest : PositionRequest) {
-        this.sentPositionRequests.set(positionRequest.positionID, positionRequest);
-    }
-
-    callbackSuccessFilledPosition(position : Position) {
-        this.sentPositionRequests.delete(position.positionID);
-        this.newOpenPositions.set(position.positionID, position);
-    }
-
-    callbackFailureFilledPosition(position : Position) {
-        this.sentPositionRequests.delete(position.positionID);
     }
 
     updatePrice(newPrice : DecimalizedAmount) : PositionsToClose {
-
-        // take new open positions out of staging and into the data structure(s)
-        for (const [positionID,newOpenPosition] of this.newOpenPositions) {
-            // add it to set of all open positions
-            this.openPositions.set(newOpenPosition.positionID, newOpenPosition);            
-            // add it to peak price tracking
-            this.pricePeaks.push(newOpenPosition.fillPrice, newOpenPosition);
-        }
-        this.newOpenPositions.clear();
 
         // update the peak prices
         const positionsToClose = this.pricePeaks.update(newPrice);
@@ -91,14 +69,6 @@ export class TokenPairPositionTracker {
     }
 
     markPositionAsClosing(positionID : string) {
-
-        // if it is new, move it to closing
-        const newOpenPosition = this.newOpenPositions.get(positionID);
-        if (newOpenPosition) {
-            this.newOpenPositions.delete(positionID);
-            newOpenPosition.status = PositionStatus.Closing;
-            this.closingPositions.set(positionID, newOpenPosition);
-        }
 
         // if it is in open, move it to closing
         const openPosition = this.openPositions.get(positionID);
@@ -127,14 +97,6 @@ export class TokenPairPositionTracker {
         // if the position has been sent to the dex and hasn't been filled/confirmed,
         // nothing can be done yet.
 
-        // if new, move to closing
-        const newOpenPosition = this.newOpenPositions.get(positionID);
-        if (newOpenPosition) {
-            this.newOpenPositions.delete(positionID);
-            newOpenPosition.status = PositionStatus.Closed;
-            this.closedPositions.set(positionID, newOpenPosition);
-        }
-
         // if open, move to closing
         const openPosition = this.openPositions.get(positionID);
         if (openPosition) {
@@ -144,7 +106,7 @@ export class TokenPairPositionTracker {
         }
 
         // also, remove it from peak prices data structure
-        this.pricePeaks.removePosition(positionID);
+        this.pricePeaks.remove(positionID);
 
         // if closing, move to closed
         const closingPosition = this.closingPositions.get(positionID);
@@ -157,7 +119,6 @@ export class TokenPairPositionTracker {
 
 
     initialize(entries : Map<string,any>) {
-        this.sentPositionRequests.initialize(entries);
         this.openPositions.initialize(entries);
         this.pricePeaks.initialize(entries);
         this.closingPositions.initialize(entries);
@@ -166,7 +127,6 @@ export class TokenPairPositionTracker {
 
     async flushToStorage(storage : DurableObjectStorage) : Promise<void> {
         return Promise.all([
-            this.sentPositionRequests.flushToStorage(storage),
             this.openPositions.flushToStorage(storage),
             this.pricePeaks.flushToStorage(storage),
             this.closingPositions.flushToStorage(storage),

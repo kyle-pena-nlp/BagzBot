@@ -6,10 +6,9 @@ import { Env } from "../../env";
 import { Position, PositionRequest, PositionStatus, Quote, getSwapOfXDescription } from "../../positions";
 import { SwapSummary, isSuccessfulSwapSummary } from "../../rpc/rpc_types";
 import { TGStatusMessage } from "../../telegram";
-import { importNewPosition as importNewPositionIntoPriceTracker } from "../token_pair_position_tracker/token_pair_position_tracker_DO_interop";
-import { UserPositionTracker } from "./trackers/user_position_tracker";
-import { createAndSignTx, executeAndConfirmSignedTx } from "./user_swap";
 import { assertNever } from "../../util";
+import { importNewPosition as importNewPositionIntoPriceTracker } from "../token_pair_position_tracker/token_pair_position_tracker_DO_interop";
+import { createAndSignTx, executeAndConfirmSignedTx } from "./user_swap";
 /* markPositionAsOpen, renegeOpenPosition */
 
 
@@ -17,7 +16,6 @@ import { assertNever } from "../../util";
 
 export async function buy(positionRequest: PositionRequest,
     wallet : Wallet, 
-    userPositionTracker: UserPositionTracker, 
     env : Env) {
 
     // durable objects only continue to process requests for up to 30s.
@@ -48,7 +46,7 @@ export async function buy(positionRequest: PositionRequest,
     // If unconfirmed, we will attempt to confirm at sell time
     // TODO: periodically scan for unconfirmed and attempt confirmation.
     const quote = positionRequest.quote;
-    userPositionTracker.storePositions([convertToUnconfirmedPosition(positionRequest, quote, signature)]);
+    await storePosition(convertToUnconfirmedPosition(positionRequest, quote, signature), env);
     
     // attempt to execute tx.  all sorts of things can go wrong.
     const parsedSwapSummary = await executeAndConfirmSignedTx(positionRequest, signedTx, wallet, env, notificationChannel, connection, maxTimeMS);
@@ -56,21 +54,21 @@ export async function buy(positionRequest: PositionRequest,
     // if we sent the tx at least once, but couldn't retrieve it (i.e.; couldn't confirm it)
     if (parsedSwapSummary === 'could-not-retrieve-tx') {
         const unconfirmedPosition = convertToUnconfirmedPosition(positionRequest, quote, signature);
-        userPositionTracker.storePositions([unconfirmedPosition]);
+        await storePosition(unconfirmedPosition, env);
         // TODO: link to view position menu
     }
     // if we sent the tx and it executed, but the swap failed
     else if (parsedSwapSummary === 'swap-failed') {
-        userPositionTracker.removePositions([positionRequest.positionID]);
+        await removePosition(positionRequest.positionID, env);
     }
     // if the act of sending the tx itself failed
     else if (parsedSwapSummary === 'tx-failed') {
-        userPositionTracker.removePositions([positionRequest.positionID]);
+        await removePosition(positionRequest.positionID, env);
     }
     // but if it's successful, convert it to a confirmed position and celebrate!
     else if (isSuccessfulSwapSummary(parsedSwapSummary)) {
         const newPosition = convertConfirmedRequestToPosition(positionRequest, parsedSwapSummary.swapSummary);
-        userPositionTracker.storePositions([newPosition]);
+        await storePosition(newPosition, env);
         await importNewPositionIntoPriceTracker(newPosition, env);
         TGStatusMessage.queue(notificationChannel, `Peak Price is now being tracked. Position will be unwound when price dips below ${positionRequest.triggerPercent}% of peak.`, true);    
         // TODO: link to view position menu

@@ -8,6 +8,7 @@ import { AutomaticallyClosePositionsRequest } from "./actions/automatically_clos
 import { GetTokenPriceRequest, GetTokenPriceResponse } from "./actions/get_token_price";
 import { HasPairAddresses } from "./actions/has_pair_addresses";
 import { ImportNewPositionsRequest, ImportNewPositionsResponse } from "./actions/import_new_positions";
+import { ListPositionsByUserRequest, ListPositionsByUserResponse } from "./actions/list_positions_by_user";
 import { MarkPositionAsClosedRequest, MarkPositionAsClosedResponse } from "./actions/mark_position_as_closed";
 import { MarkPositionAsClosingRequest, MarkPositionAsClosingResponse } from "./actions/mark_position_as_closing";
 import { UpdatePriceRequest, UpdatePriceResponse } from "./actions/update_price";
@@ -163,9 +164,20 @@ export class TokenPairPositionTrackerDO {
                 return await this.handleWakeup(body);
             case TokenPairPositionTrackerDOFetchMethod.getTokenPrice:
                 return await this.handleGetTokenPrice(body);
+            case TokenPairPositionTrackerDOFetchMethod.listPositionsByUser:
+                return await this.handleListPositionsByUser(body);
             default:
                 assertNever(method);
         }
+    }
+
+    async handleListPositionsByUser(body: ListPositionsByUserRequest) : Promise<Response> {
+        const userID = body.telegramUserID;
+        const positions = this.tokenPairPositionTracker.listByUser(userID);
+        const response : ListPositionsByUserResponse = {
+            positions: positions
+        }
+        return makeJSONResponse<ListPositionsByUserResponse>(response);
     }
 
     async handleGetTokenPrice(body : GetTokenPriceRequest) : Promise<Response> {

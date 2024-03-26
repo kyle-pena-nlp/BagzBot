@@ -7,22 +7,19 @@ import { PositionPreRequest, PositionStatus, PositionType } from "../../position
 import { getSOLBalance } from "../../rpc/rpc_wallet";
 import { POSITION_REQUEST_STORAGE_KEY } from "../../storage_keys";
 import { WEN_ADDRESS, getVsTokenInfo } from "../../tokens";
-import { ChangeTrackedValue, Structural, assertNever, groupIntoMap, makeFailureResponse, makeJSONResponse, makeSuccessResponse, maybeGetJson, strictParseBoolean } from "../../util";
+import { ChangeTrackedValue, Structural, assertNever, makeFailureResponse, makeJSONResponse, makeSuccessResponse, maybeGetJson, strictParseBoolean } from "../../util";
 import { listUnclaimedBetaInviteCodes } from "../beta_invite_codes/beta_invite_code_interop";
 import { AutomaticallyClosePositionsRequest, AutomaticallyClosePositionsResponse } from "../token_pair_position_tracker/actions/automatically_close_positions";
-import { wakeUpTokenPairPositionTracker } from "../token_pair_position_tracker/token_pair_position_tracker_DO_interop";
 import { BaseUserDORequest } from "./actions/base_user_do_request";
 import { DeleteSessionRequest, DeleteSessionResponse } from "./actions/delete_session";
 import { GetAddressBookEntryRequest, GetAddressBookEntryResponse } from "./actions/get_address_book_entry";
 import { GetImpersonatedUserIDRequest, GetImpersonatedUserIDResponse } from "./actions/get_impersonated_user_id";
 import { GetLegalAgreementStatusRequest, GetLegalAgreementStatusResponse } from "./actions/get_legal_agreement_status";
-import { GetPositionRequest } from "./actions/get_position";
 import { GetSessionValuesRequest, GetSessionValuesWithPrefixRequest, GetSessionValuesWithPrefixResponse } from "./actions/get_session_values";
 import { GetUserDataRequest } from "./actions/get_user_data";
 import { GetWalletDataRequest, GetWalletDataResponse } from "./actions/get_wallet_data";
 import { ImpersonateUserRequest, ImpersonateUserResponse } from "./actions/impersonate_user";
 import { ListAddressBookEntriesRequest, ListAddressBookEntriesResponse } from "./actions/list_address_book_entries";
-import { ListPositionsRequest } from "./actions/list_positions";
 import { ManuallyClosePositionRequest, ManuallyClosePositionResponse } from "./actions/manually_close_position";
 import { OpenPositionRequest, OpenPositionResponse } from "./actions/open_new_position";
 import { RemoveAddressBookEntryRequest, RemoveAddressBookEntryResponse } from "./actions/remove_address_book_entry";
@@ -36,7 +33,6 @@ import { UserData } from "./model/user_data";
 import { AddressBookEntryTracker } from "./trackers/address_book_entry_tracker";
 import { SessionTracker } from "./trackers/session_tracker";
 import { SOLBalanceTracker } from "./trackers/sol_balance_tracker";
-import { UserPositionTracker } from "./trackers/user_position_tracker";
 import { UserDOFetchMethod, parseUserDOFetchMethod } from "./userDO_interop";
 import { buy } from "./user_buy";
 import { sell } from "./user_sell";
@@ -86,7 +82,7 @@ export class UserDO {
     sessionTracker : SessionTracker = new SessionTracker();
 
     // tracks the positions currently open (or closing but not confirmed closed) for this user
-    userPositionTracker : UserPositionTracker = new UserPositionTracker();
+    //userPositionTracker : UserPositionTracker = new UserPositionTracker();
 
     // tracks the address book entries to which the user can send funds
     addressBookEntryTracker : AddressBookEntryTracker = new AddressBookEntryTracker();
@@ -103,17 +99,6 @@ export class UserDO {
         this.state.blockConcurrencyWhile(async () => {
             await this.loadStateFromStorage();
         });
-        this.wakeUpPositionTrackers();
-    }
-
-    async wakeUpPositionTrackers() {
-        const positions = this.userPositionTracker.listPositions();
-        const map = groupIntoMap(positions, p => `${p.token.address}~${p.vsToken.address}`);
-        for (const [key,positions] of map) {
-            const tokenAddress = positions[0].token.address;
-            const vsTokenAddress = positions[0].vsToken.address;
-            wakeUpTokenPairPositionTracker(tokenAddress, vsTokenAddress, this.env);
-        }
     }
 
     async loadStateFromStorage() {
@@ -122,7 +107,6 @@ export class UserDO {
         this.telegramUserID.initialize(storage);
         this.impersonatedUserID.initialize(storage);
         this.sessionTracker.initialize(storage);
-        this.userPositionTracker.initialize(storage);
         this.addressBookEntryTracker.initialize(storage);
         this.solBalanceTracker.initialize(storage); // rate limits RPC calls. will refresh on access.
         this.legalAgreementStatus.initialize(storage);
@@ -135,7 +119,6 @@ export class UserDO {
             this.impersonatedUserID.flushToStorage(this.state.storage),
             this.wallet.flushToStorage(this.state.storage),
             this.sessionTracker.flushToStorage(this.state.storage),
-            this.userPositionTracker.flushToStorage(this.state.storage),
             this.addressBookEntryTracker.flushToStorage(this.state.storage),
             this.solBalanceTracker.flushToStorage(this.state.storage),
             this.legalAgreementStatus.flushToStorage(this.state.storage),
@@ -215,14 +198,6 @@ export class UserDO {
             case UserDOFetchMethod.openNewPosition:
                 this.assertUserHasWallet();
                 response = await this.handleOpenNewPosition(userAction);
-                break;
-            case UserDOFetchMethod.getPosition:
-                this.assertUserHasWallet();
-                response = await this.handleGetPosition(userAction);
-                break;
-            case UserDOFetchMethod.listPositions:
-                this.assertUserHasWallet();
-                response = await this.handleListPositions(userAction);
                 break;
             case UserDOFetchMethod.manuallyClosePosition:
                 this.assertUserHasWallet();
@@ -375,21 +350,11 @@ export class UserDO {
         return makeJSONResponse(responseBody);
     }
 
-    async handleListPositions(request : ListPositionsRequest) : Promise<Response> {
-        const positions = this.userPositionTracker.listPositions();
-        return makeJSONResponse(positions);
-    }
-
     /* Handles any exceptions and turns them into failure responses - fine because UserDO doesn't talk directly to TG */
     async catchResponse(promise : Promise<Response>) : Promise<Response> {
         return promise.catch((reason) => {
             return makeFailureResponse(reason.toString());
         });
-    }
-
-    async handleGetPosition(getPositionRequest: GetPositionRequest) {
-        const position = this.userPositionTracker.getPosition(getPositionRequest.positionID);
-        return makeJSONResponse(position);
     }
 
     async handleGet(jsonRequestBody : GetUserDataRequest) : Promise<Response> {
@@ -483,14 +448,14 @@ export class UserDO {
             Durable Objects will continue processing requests for up to 30 seconds
             (Which means the buy has to happen in 30 secs!!!)
         */
-        buy(positionRequest, this.wallet.value!!, this.userPositionTracker, this.env);
+        buy(positionRequest, this.wallet.value!!, this.env);
         return makeJSONResponse<OpenPositionResponse>({});
     }
     
     async handleManuallyClosePositionRequest(manuallyClosePositionRequest : ManuallyClosePositionRequest) : Promise<Response> {
         
         const positionID = manuallyClosePositionRequest.positionID;
-        const position = this.userPositionTracker.getPosition(positionID);
+        const position = await getPosition(positionID);
         if (position == null) {
             return makeJSONResponse<ManuallyClosePositionResponse>({ message: 'Position does not exist.' });
         }
@@ -500,7 +465,7 @@ export class UserDO {
         else if (position.status === PositionStatus.Closed) {
             return makeJSONResponse<ManuallyClosePositionResponse>({ message: 'Position already closed.' });
         }
-        sell(position.positionID, this.wallet.value!!, this.userPositionTracker, this.env);
+        sell(position.positionID, this.wallet.value!!, this.env);
         return makeJSONResponse<ManuallyClosePositionResponse>({ message: 'Position will now be closed. '});
     }
 
@@ -509,7 +474,7 @@ export class UserDO {
         for (const position of positions) {
 
             // before we sell, we verify the position is still active
-            const userTrackedPosition = this.userPositionTracker.getPosition(position.positionID);
+            const userTrackedPosition = await getPosition(position.positionID);
             
             // if it's already gone, don't try to re-sell it
             if (userTrackedPosition == null) {
@@ -529,7 +494,7 @@ export class UserDO {
             // TODO: handle unconfirmed status.
 
             // otherwise, try to sell it.
-            sell(position.positionID, this.wallet.value!!, this.userPositionTracker, this.env);
+            sell(position.positionID, this.wallet.value!!, this.env);
         }
         return makeJSONResponse<AutomaticallyClosePositionsResponse>({});
     }

@@ -15,14 +15,13 @@ import { createAndSignTx, executeAndConfirmSignedTx } from "./user_swap";
 
 export async function sell(positionID: string, 
     wallet : Wallet, 
-    userPositionTracker : UserPositionTracker,
     env : Env) {
 
     const startTimeMS = Date.now();
     const maxTimeMS = startTimeMS + (25 * 1000);
 
     // get the corresponding tracked position from the user-side position tracker
-    const position = userPositionTracker.getPosition(positionID);
+    const position = await getPosition(positionID);
     
     // if it doesn't exist, either:
     //  it's already been sold or... 
@@ -68,14 +67,14 @@ export async function sell(positionID: string,
     }
 
     // check one last time position isn't gone, closed, or closing (awaits can happen, dude)
-    const recheckPosition = userPositionTracker.getPosition(position.positionID);
+    const recheckPosition = await getPosition(position.positionID);
     if (recheckPosition == null || recheckPosition.status == PositionStatus.Closing || recheckPosition.status === PositionStatus.Closed) {
         logInfo("Final check on position status showed position was closed/closing/removed");
         return;
     }
 
     // marking as closing will prevent double-sells until the sell is confirmed
-    userPositionTracker.markAsClosing(position.positionID);
+    await markAsClosing(position.positionID);
 
     // TODO: how can I prevent an extra sell attempt from sneaking between these lines of code? is there a way to block?
 
@@ -90,17 +89,17 @@ export async function sell(positionID: string,
     }
     else if (parsedSwapSummary === 'swap-failed') {
         logError("Could not execute sell tx, marking position as open again", position);
-        userPositionTracker.setAsOpen(position.positionID);
+        await setAsOpen(position.positionID);
         return;
     }
     else if (parsedSwapSummary === 'tx-failed') {
         logError("Could not execute sell swap, marking position as open again", position);
-        userPositionTracker.setAsOpen(position.positionID);
+        await setAsOpen(position.positionID);
         return;
     }
     else if (isSuccessfullyParsedSwapSummary(parsedSwapSummary)) {
         // otherwise, mark position as closed.
-        userPositionTracker.closePosition(position.positionID);
+        await closePosition(position.positionID);
 
         // send a request to the price tracker to stop tracking the position
         const removeFromPriceTrackingRequest : MarkPositionAsClosedRequest = { 

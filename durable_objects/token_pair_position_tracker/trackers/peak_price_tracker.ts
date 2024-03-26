@@ -7,8 +7,8 @@ import { PositionsAssociatedWithPeakPrices } from "./positions_associated_with_p
 /* 
     This class maintains lists of positions grouped by peak price thus far
         (Which is a function of when the position was opened)
-    Flushing to storage is achived by diffing from a buffer of internal state 
-        and writing changes.
+    Flushing to storage is achieved by diffing from a buffer of internal state 
+        and writing deltas.
     The update method determines which TLS positions should be closed based on the latest prices.
     Positions can also be marked as closing (which excludes them from being sent to be sold off)
     And positions can be removed from tracking
@@ -29,13 +29,16 @@ export class PeakPricePositionTracker {
     constructor(pricePeakSessionKeyPrefix : string) {
         this.pricePeakSessionKeyPrefix = pricePeakSessionKeyPrefix;
     }
-    push(price : DecimalizedAmount, position : Position) {
-        this.itemsByPeakPrice.push(price, position);
+    add(price : DecimalizedAmount, position : Position) {
+        this.itemsByPeakPrice.add(price, position);
+    }
+    listByUser(userID : number) : Position[] {
+        return this.itemsByPeakPrice.listByUser(userID);
     }
     markAsClosing(positionID : string) {
         this.itemsByPeakPrice.markAsClosing(positionID);
     }
-    removePosition(positionID : string) {
+    remove(positionID : string) {
         this.itemsByPeakPrice.removePosition(positionID);
     }
     update(newPrice : DecimalizedAmount) : Position[] {
@@ -137,18 +140,8 @@ export class PeakPricePositionTracker {
                 if (!this.itemsByPeakPrice.has(price)) {
                     this.itemsByPeakPrice.set(price,[]);
                 }
-                this.itemsByPeakPrice.setAtIndex(price, index, value);
+                this.itemsByPeakPrice._setAtIndex(price, index, value);
             }
-        }
-        // denseify the arrays (out-of-order initialization causes arrays to be sparse arrays behind the scene)
-        for (const key of this.itemsByPeakPrice.keys()) {
-            const sparseArray = this.itemsByPeakPrice.get(key);
-            if (sparseArray) {
-                // this operation converts sparse to dense
-                // (it replaces deleted slots with undefined values at the appropriate index)
-                this.itemsByPeakPrice.set(key, sparseArray as Position[]);
-            }
-
         }
         // when done initializing, copy state to _buffer to avoid writing back fresh state to storage
         this.overwriteBufferWithCurrentState();
@@ -255,16 +248,11 @@ export class PeakPricePositionTracker {
                     return;
                 }
                 const clonedPositionObject = structuredClone(position);
-                this._buffer.push(key, clonedPositionObject);
+                this._buffer.add(key, clonedPositionObject);
             })
         }
     }
     private positionsEqualByValue(a : Position, b : Position) : boolean {
-        for (const key of Object.keys(a)) {
-            if (!structuralEquals(a[key], b[key])) {
-                return false;
-            }
-        }
-        return true;
+        return structuralEquals(a,b);
     }
 }

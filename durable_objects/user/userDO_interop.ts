@@ -35,8 +35,6 @@ export enum UserDOFetchMethod {
 	deleteSession = "deleteSession",
 	getWalletData = "getWalletData",
 	openNewPosition = "openNewPosition",
-	getPosition = "getPosition",
-	listPositions = "listPositions",
 	manuallyClosePosition = "manuallyClosePosition", // user initiated close position
 	automaticallyClosePositions = "automaticallyClosePositions", // system-initiated close position
 	getDefaultTrailingStopLossRequest = "getDefaultTrailingStopLossRequest",
@@ -136,18 +134,6 @@ export function getUserDO(telegramUserID : number, env : Env) : any {
 	const userDODurableObjectID = userDONamespace.idFromName(telegramUserID.toString());
 	const userDO = userDONamespace.get(userDODurableObjectID);
 	return userDO;
-}
-
-export async function listOpenTrailingStopLossPositions(telegramUserID : number, env : Env) : Promise<Position[]> {
-	const body  : ListPositionsRequest = { telegramUserID };
-	const positions = await sendJSONRequestToUserDO<ListPositionsRequest,Position[]>(telegramUserID, UserDOFetchMethod.listPositions, body, env);
-	return positions;
-}
-
-export async function getPosition(telegramUserID : number, positionID : string, env : Env) : Promise<Position> {
-	const body : GetPositionRequest = { telegramUserID, positionID };
-	const position = await sendJSONRequestToUserDO<GetPositionRequest,Position>(telegramUserID, UserDOFetchMethod.getPosition, body, env);
-	return position;
 }
 
 export async function getDefaultTrailingStopLoss(telegramUserID : number, 

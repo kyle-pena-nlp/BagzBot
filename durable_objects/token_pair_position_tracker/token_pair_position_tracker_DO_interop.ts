@@ -3,6 +3,7 @@ import { Env } from "../../env";
 import { Position } from "../../positions";
 import { makeJSONRequest, makeRequest } from "../../util";
 import { ImportNewPositionsRequest, ImportNewPositionsResponse } from "./actions/import_new_positions";
+import { ListPositionsByUserRequest, ListPositionsByUserResponse } from "./actions/list_positions_by_user";
 import { MarkPositionAsClosedRequest, MarkPositionAsClosedResponse } from "./actions/mark_position_as_closed";
 import { MarkPositionAsClosingRequest, MarkPositionAsClosingResponse } from "./actions/mark_position_as_closing";
 import { WakeupRequest, WakeupResponse } from "./actions/wake_up";
@@ -13,7 +14,24 @@ export enum TokenPairPositionTrackerDOFetchMethod {
 	importNewOpenPositions = "importNewOpenPositions",
 	markPositionAsClosing = "markPositionAsClosing",
 	markPositionAsClosed = "markPositionAsClosed",
-	getTokenPrice = "getTokenPrice"
+	getTokenPrice = "getTokenPrice",
+
+	listPositionsByUser = "listPositionsByUser"
+}
+
+export function parseTokenPairPositionTrackerDOFetchMethod(value : string) : TokenPairPositionTrackerDOFetchMethod|null {
+	return Object.values(TokenPairPositionTrackerDOFetchMethod).find(x => x === value)||null;
+}
+
+export async function listPositionsByUser(telegramUserID : number, tokenAddress : string, vsTokenAddress : string, env : Env) : Promise<Position[]> {
+	const request : ListPositionsByUserRequest = {
+		telegramUserID,
+		tokenAddress,
+		vsTokenAddress
+	};
+	const method = TokenPairPositionTrackerDOFetchMethod.listPositionsByUser;
+	const response = await sendJSONRequestToTokenPairPositionTracker<ListPositionsByUserRequest,ListPositionsByUserResponse>(method, request, tokenAddress, vsTokenAddress, env);
+	return response.positions;
 }
 
 /* This should be called on cold-start */
@@ -31,19 +49,7 @@ export async function wakeUpTokenPairPositionTracker(tokenAddress : string, vsTo
 	return response;
 }
 
-export function parseTokenPairPositionTrackerDOFetchMethod(value : string) : TokenPairPositionTrackerDOFetchMethod|null {
-	return Object.values(TokenPairPositionTrackerDOFetchMethod).find(x => x === value)||null;
-}
 
-export function makeTokenPairPositionTrackerDOFetchRequest<T>(method : TokenPairPositionTrackerDOFetchMethod, body?: T, httpMethod? : 'GET'|'POST') : Request {
-	const url = `http://tokenPairPositionTrackerDO/${method.toString()}`;
-	if (body != null) {
-		return makeJSONRequest(url, body);
-	}
-	else {
-		return makeRequest(url, httpMethod);
-	}
-}
 
 export async function markPositionAsClosedInTokenPairPositionTracker(request : MarkPositionAsClosedRequest, env : Env) : Promise<MarkPositionAsClosedResponse> {
 	const method = TokenPairPositionTrackerDOFetchMethod.markPositionAsClosed;
@@ -98,4 +104,15 @@ function getTokenPairPositionTrackerDO(tokenAddress : string, vsTokenAddress : s
 	const id = namespace.idFromName(`${tokenAddress}:${vsTokenAddress}`);
 	const stub = namespace.get(id);
 	return stub;
+}
+
+
+export function makeTokenPairPositionTrackerDOFetchRequest<T>(method : TokenPairPositionTrackerDOFetchMethod, body?: T, httpMethod? : 'GET'|'POST') : Request {
+	const url = `http://tokenPairPositionTrackerDO/${method.toString()}`;
+	if (body != null) {
+		return makeJSONRequest(url, body);
+	}
+	else {
+		return makeRequest(url, httpMethod);
+	}
 }
