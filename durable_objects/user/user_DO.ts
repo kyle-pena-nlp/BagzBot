@@ -500,7 +500,7 @@ export class UserDO {
         else if (position.status === PositionStatus.Closed) {
             return makeJSONResponse<ManuallyClosePositionResponse>({ message: 'Position already closed.' });
         }
-        await sell(position.positionID, this.wallet.value!!, this.userPositionTracker, this.env);
+        sell(position.positionID, this.wallet.value!!, this.userPositionTracker, this.env);
         return makeJSONResponse<ManuallyClosePositionResponse>({ message: 'Position will now be closed. '});
     }
 
