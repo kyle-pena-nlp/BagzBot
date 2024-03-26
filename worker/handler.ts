@@ -39,6 +39,16 @@ export class Worker {
         this.context = context;
     }
 
+    async handleMinuteCRONJob(env : Env) : Promise<void> {
+        const namespace = env.TokenPairPositionTrackerDO as DurableObjectNamespace;
+        //const objectList = await listObjectsInNamespace('TokenPairPositionTrackerDO', namespace);
+    }
+
+    async listDurableObjectIDsInNamespace(namespace : DurableObjectNamespace) : Promise<string[]> {
+        //const namespaceID = namespace
+        return [];
+    } 
+
     // I am interpreting any message sent to handleMessage as a token address
     async handleMessage(info : TelegramWebhookInfo) : Promise<Response> {
         

@@ -17,3 +17,7 @@ bindings = [
     {name = "PolledTokenPairListDO", class_name = "PolledTokenPairListDO" },
     {name = "BetaInviteCodesDO", class_name = "BetaInviteCodesDO" }
 ]
+
+# The 'wake up!' cron trigger
+[triggers]
+crons = [ "* * * * *" ]

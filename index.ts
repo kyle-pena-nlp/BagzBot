@@ -36,6 +36,14 @@ enum ERRORS {
  */
 export default {
 
+	async scheduled(event : ScheduledEvent, env : Env, context : FetchEvent) {
+		const handler = new Handler(context, env);
+		if (event.cron === "* * * * *") {
+			// we use the per-minute CRON job to handle cold-start / making sure token pairs are polling
+			context.waitUntil(handler.handleMinuteCRONJob(env));
+		}
+	},
+
 	async fetch(req : Request, env : Env, context : FetchEvent) {
 		try {
 			const response = await this._fetch(req, context, env);

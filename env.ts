@@ -9,7 +9,6 @@ export interface Env {
 	TELEGRAM_API_ID : string
 	TELEGRAM_API_HASH : string
 	RPC_ENDPOINT_URL : string
-	V0_HELIUS_RPC_TRANSACTION_PARSING_URL: string
 	HELIUS_API_KEY : string
 	JUPITER_PRICE_API_URL : string
 	JUPITER_QUOTE_API_URL : string
@@ -33,6 +32,7 @@ export interface Env {
 	WALLET_BALANCE_REFRESH_INTERVAL_MS : string
 	ADMIN_TELEGRAM_USER_IDS: string
 	SUPER_ADMIN_USER_ID : string
+	START_POLLING_ON_START : string
 
 	UserDO : any // i'd like to strongly type this as DurableObjectNamespace, but can't for technical reasons
 	TokenPairPositionTrackerDO : any // ditto
