@@ -1,9 +1,9 @@
 import { Position } from "../../../positions";
 import { HasPairAddresses } from "./has_pair_addresses";
 
-export interface ImportNewPositionsRequest extends HasPairAddresses {
+export interface UpsertPositionsRequest extends HasPairAddresses {
     positions : Position[]
 };
 
-export interface ImportNewPositionsResponse {
+export interface UpsertPositionsResponse {
 }

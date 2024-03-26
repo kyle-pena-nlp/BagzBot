@@ -21,6 +21,11 @@ export class PositionsAssociatedWithPeakPrices extends DecimalizedAmountMap<Read
         super();
     }
 
+    any() : boolean {
+        // overriding DecimalizedAmountMap implementation
+        return this.positionIDMap.size > 0;
+    }
+
     // get positions associated with this peak price
     get(price : DecimalizedAmount) : ReadonlySparseArray<Position>|undefined {
         return super.get(price);
@@ -30,12 +35,18 @@ export class PositionsAssociatedWithPeakPrices extends DecimalizedAmountMap<Read
     getPosition(positionID : string) : Position|undefined {
         const location = this.positionIDMap.get(positionID);
         if (location == null) {
+            // no location for position - indicated position DNE (which can be fine)
             return undefined;
         }
         const [price,index] = location;
         const position = (this.get(price)||[])[index];
         if (position == null) {
             logError(`positionIDMap pointed to non-existent position for '${positionID}': ${toObjectLocationString(location)}`)
+            return;
+        }
+        if (position.positionID !== positionID) {
+            logError(`positionIDMap pointed to position with unexpected positionID for ${toObjectLocationString(location)} Expected: ${positionID} Was: ${position.positionID}`)
+            return;
         }
         return position;
     }
@@ -147,27 +158,22 @@ export class PositionsAssociatedWithPeakPrices extends DecimalizedAmountMap<Read
         });
         return super.delete(price);
     }
+    // idempotentally mark as open
+    markAsOpen(positionID : string) {
+        const position = this.getPosition(positionID);
+        if (position != null) {
+            position.status = PositionStatus.Open;
+        }
+    }
+    // idempotentally mark as closing
     markAsClosing(positionID : string) {
-        const location = this.positionIDMap.get(positionID);
-        if (location) {
-            const [price,index] = location;
-            const positionArray = super.get(price);
-            if (positionArray) {
-                const position = positionArray[index];
-                if (position == null) {
-                    logError(`Did not find position at ${toObjectLocationString(location)}`)
-                    return;
-                }
-                if (position.positionID !== positionID) {
-                    logError(`Position at location did not match expected id.  ${toObjectLocationString(location)}. Expected: ${positionID}, was: ${position.positionID}`);
-                    return;
-                }
-                position.status = PositionStatus.Closing;
-            }
+        const position = this.getPosition(positionID);
+        if (position != null) {
+            position.status = PositionStatus.Closing;
         }
     }
     // *idempotentally* remove a position
-    removePosition(positionID : string) {
+    removePosition(positionID : string) : Position|undefined {
         const location = this.positionIDMap.get(positionID);
         let positionFound = false;
         if (location) {
@@ -190,6 +196,7 @@ export class PositionsAssociatedWithPeakPrices extends DecimalizedAmountMap<Read
                     delete (positionArray as Position[])[index];
                     this.removeFromLookupCaches(position, location);
                 }
+                return position;
             }
         }
         // If for whatever reason the position is lingering in the lookup cache
@@ -201,6 +208,7 @@ export class PositionsAssociatedWithPeakPrices extends DecimalizedAmountMap<Read
             this.positionIDMap.delete(positionID);  
             this.userIDMap._removeFromAnyUser(positionID, this);
         }
+        return;
     }
     getPeakPrice(positionID : string) : DecimalizedAmount|undefined {
         const location = this.positionIDMap.get(positionID);

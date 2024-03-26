@@ -1,22 +1,24 @@
 import { DurableObjectState } from "@cloudflare/workers-types";
 import { DecimalizedAmount } from "../../decimalized";
 import { Env } from "../../env";
-import { logDebug, logError } from "../../logging";
+import { logDebug, logError, logInfo } from "../../logging";
 import { ChangeTrackedValue, assertNever, makeJSONResponse, makeSuccessResponse } from "../../util";
 import { sendClosePositionOrdersToUserDOs } from "../user/userDO_interop";
 import { AutomaticallyClosePositionsRequest } from "./actions/automatically_close_positions";
+import { GetPositionFromPriceTrackerRequest, GetPositionFromPriceTrackerResponse } from "./actions/get_position";
 import { GetTokenPriceRequest, GetTokenPriceResponse } from "./actions/get_token_price";
 import { HasPairAddresses } from "./actions/has_pair_addresses";
-import { ImportNewPositionsRequest, ImportNewPositionsResponse } from "./actions/import_new_positions";
 import { ListPositionsByUserRequest, ListPositionsByUserResponse } from "./actions/list_positions_by_user";
 import { MarkPositionAsClosedRequest, MarkPositionAsClosedResponse } from "./actions/mark_position_as_closed";
 import { MarkPositionAsClosingRequest, MarkPositionAsClosingResponse } from "./actions/mark_position_as_closing";
+import { MarkPositionAsOpenRequest, MarkPositionAsOpenResponse } from "./actions/mark_position_as_open";
+import { RemovePositionRequest, RemovePositionResponse } from "./actions/remove_position";
 import { UpdatePriceRequest, UpdatePriceResponse } from "./actions/update_price";
+import { UpsertPositionsRequest, UpsertPositionsResponse } from "./actions/upsert_positions";
 import { WakeupRequest, WakeupResponse } from "./actions/wake_up";
 import { TokenPairPositionTrackerDOFetchMethod, parseTokenPairPositionTrackerDOFetchMethod } from "./token_pair_position_tracker_DO_interop";
 import { CurrentPriceTracker } from "./trackers/current_price_tracker";
 import { TokenPairPositionTracker } from "./trackers/token_pair_position_tracker";
-
 /*
     Big TODO: How do we limit concurrent outgoing requests when a dip happens?
     This is a big burst and may trip limits.
@@ -45,6 +47,7 @@ export class TokenPairPositionTrackerDO {
     // this performs all the book keeping and determines what RPC actions to take
     tokenPairPositionTracker : TokenPairPositionTracker = new TokenPairPositionTracker();
     
+    // this contains (and queries for) the current price of the pair in $token/$vsToken
     currentPriceTracker : CurrentPriceTracker = new CurrentPriceTracker();
 
     env : Env;
@@ -81,7 +84,8 @@ export class TokenPairPositionTrackerDO {
     }
 
     initialized() : boolean {
-        return this.vsTokenAddress.value != null && this.tokenAddress.value != null;
+        return  this.vsTokenAddress.value != null && 
+                this.tokenAddress.value != null;
     }
 
     async alarm() {
@@ -109,7 +113,7 @@ export class TokenPairPositionTrackerDO {
             }
         }
         catch(e) {
-            console.log("Price polling failed.");
+            logError("Price polling failed.", e, this.tokenAddress, this.vsTokenAddress);
         }
         if (!this.shouldBePolling()) {
             this.isPolling = false;
@@ -125,7 +129,7 @@ export class TokenPairPositionTrackerDO {
         const end = Date.now();
         const elapsed = end - begin;
         if (elapsed > 1000) {
-            console.log("Tracker ran longer than 1s");
+            logInfo("Tracker ran longer than 1s", this.tokenAddress, this.vsTokenAddress);
         }
         const remainder = elapsed % 1000;
         const nextAlarm = 1000 - remainder;
@@ -143,6 +147,7 @@ export class TokenPairPositionTrackerDO {
             return response;
         }
         catch(e : any) {
+            logError("Error in fetch for tokenPairPositionTracker", e, this.tokenAddress, this.vsTokenAddress);
         }
         finally {
             await this.flushToStorage();
@@ -154,21 +159,41 @@ export class TokenPairPositionTrackerDO {
         switch(method) {
             case TokenPairPositionTrackerDOFetchMethod.updatePrice:
                 return await this.handleUpdatePrice(body);
-            case TokenPairPositionTrackerDOFetchMethod.importNewOpenPositions:
-                return await this.handleImportNewOpenPositions(body);
+            case TokenPairPositionTrackerDOFetchMethod.upsertPositions:
+                return await this.handleUpsertPositions(body);
             case TokenPairPositionTrackerDOFetchMethod.markPositionAsClosing:
                 return await this.handleMarkPositionAsClosing(body);
             case TokenPairPositionTrackerDOFetchMethod.markPositionAsClosed:
                 return await this.handleMarkPositionAsClosed(body);
+            case TokenPairPositionTrackerDOFetchMethod.markPositionAsOpen:
+                return await this.handleMarkPositionAsOpen(body);                
             case TokenPairPositionTrackerDOFetchMethod.wakeUp:
                 return await this.handleWakeup(body);
             case TokenPairPositionTrackerDOFetchMethod.getTokenPrice:
                 return await this.handleGetTokenPrice(body);
             case TokenPairPositionTrackerDOFetchMethod.listPositionsByUser:
                 return await this.handleListPositionsByUser(body);
+            case TokenPairPositionTrackerDOFetchMethod.removePosition:
+                return await this.handleRemovePosition(body);
+            case TokenPairPositionTrackerDOFetchMethod.getPosition:
+                return await this.handleGetPosition(body);
             default:
                 assertNever(method);
         }
+    }
+
+    async handleGetPosition(body : GetPositionFromPriceTrackerRequest) : Promise<Response> {
+        const positionID = body.positionID;
+        const maybePosition = this.tokenPairPositionTracker.getPosition(positionID);
+        const response : GetPositionFromPriceTrackerResponse = { maybePosition : maybePosition };
+        return makeJSONResponse(response);
+    }
+
+    async handleRemovePosition(body: RemovePositionRequest) : Promise<Response> {
+        const positionID = body.positionID;
+        this.tokenPairPositionTracker.removePosition(positionID);
+        const response : RemovePositionResponse = {};
+        return makeJSONResponse(response);
     }
 
     async handleListPositionsByUser(body: ListPositionsByUserRequest) : Promise<Response> {
@@ -191,10 +216,10 @@ export class TokenPairPositionTrackerDO {
         return makeJSONResponse(responseBody);
     }
 
-    async handleImportNewOpenPositions(body : ImportNewPositionsRequest) {
+    async handleUpsertPositions(body : UpsertPositionsRequest) {
         this.ensureIsInitialized(body);
-        const responseBody : ImportNewPositionsResponse = {};
-        this.tokenPairPositionTracker.importNewOpenPositions(body.positions);
+        const responseBody : UpsertPositionsResponse = {};
+        this.tokenPairPositionTracker.upsertPositions(body.positions);
         return makeJSONResponse(responseBody);
     }
 
@@ -209,6 +234,13 @@ export class TokenPairPositionTrackerDO {
         this.ensureIsInitialized(body);
         this.tokenPairPositionTracker.markPositionAsClosing(body.positionID);
         const responseBody : MarkPositionAsClosingResponse = {};
+        return makeJSONResponse(responseBody);
+    }
+
+    async handleMarkPositionAsOpen(body: MarkPositionAsOpenRequest) : Promise<Response> {
+        this.ensureIsInitialized(body);
+        this.tokenPairPositionTracker.markPositionAsOpen(body.positionID);
+        const responseBody : MarkPositionAsOpenResponse = {};
         return makeJSONResponse(responseBody);
     }
 

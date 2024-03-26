@@ -5,6 +5,7 @@ import { setDifference, setIntersection, setUnion, structuralEquals } from "../.
 import { PositionsAssociatedWithPeakPrices } from "./positions_associated_with_peak_prices";
 
 /* 
+    CONTAINS POSITION LIST FOR THE ENTIRE APP FOR THIS TOKEN PAIR!
     This class maintains lists of positions grouped by peak price thus far
         (Which is a function of when the position was opened)
     Flushing to storage is achieved by diffing from a buffer of internal state 
@@ -29,6 +30,9 @@ export class PeakPricePositionTracker {
     constructor(pricePeakSessionKeyPrefix : string) {
         this.pricePeakSessionKeyPrefix = pricePeakSessionKeyPrefix;
     }
+    any() : boolean {
+        return this.itemsByPeakPrice.any();
+    }
     add(price : DecimalizedAmount, position : Position) {
         this.itemsByPeakPrice.add(price, position);
     }
@@ -38,8 +42,11 @@ export class PeakPricePositionTracker {
     markAsClosing(positionID : string) {
         this.itemsByPeakPrice.markAsClosing(positionID);
     }
-    remove(positionID : string) {
-        this.itemsByPeakPrice.removePosition(positionID);
+    markAsOpen(positionID : string) {
+        this.itemsByPeakPrice.markAsOpen(positionID);
+    }
+    remove(positionID : string) : Position|undefined {
+        return this.itemsByPeakPrice.removePosition(positionID);
     }
     update(newPrice : DecimalizedAmount) : Position[] {
         const peaks = [...this.itemsByPeakPrice.keys()];
@@ -103,6 +110,7 @@ export class PeakPricePositionTracker {
                 }
 
                 // If it is not an open position, skip.
+                // (if the sell fails, we mark it as open again, but keep tracking anyway)
                 if (position.status !== PositionStatus.Open) {
                     return;
                 }

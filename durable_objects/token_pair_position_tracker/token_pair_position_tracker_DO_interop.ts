@@ -2,25 +2,53 @@ import { DecimalizedAmount } from "../../decimalized";
 import { Env } from "../../env";
 import { Position } from "../../positions";
 import { makeJSONRequest, makeRequest } from "../../util";
-import { ImportNewPositionsRequest, ImportNewPositionsResponse } from "./actions/import_new_positions";
+import { GetPositionFromPriceTrackerRequest, GetPositionFromPriceTrackerResponse } from "./actions/get_position";
 import { ListPositionsByUserRequest, ListPositionsByUserResponse } from "./actions/list_positions_by_user";
 import { MarkPositionAsClosedRequest, MarkPositionAsClosedResponse } from "./actions/mark_position_as_closed";
 import { MarkPositionAsClosingRequest, MarkPositionAsClosingResponse } from "./actions/mark_position_as_closing";
+import { RemovePositionRequest, RemovePositionResponse } from "./actions/remove_position";
+import { UpsertPositionsRequest, UpsertPositionsResponse } from "./actions/upsert_positions";
 import { WakeupRequest, WakeupResponse } from "./actions/wake_up";
 
 export enum TokenPairPositionTrackerDOFetchMethod {
 	wakeUp = "wakeUp",
 	updatePrice = "updatePrice",
-	importNewOpenPositions = "importNewOpenPositions",
+	upsertPositions = "upsertPositions",
 	markPositionAsClosing = "markPositionAsClosing",
 	markPositionAsClosed = "markPositionAsClosed",
+	removePosition = "removePosition",
+	markPositionAsOpen = "markPositionAsOpen",
 	getTokenPrice = "getTokenPrice",
-
+	getPosition = "getPosition",
 	listPositionsByUser = "listPositionsByUser"
 }
 
+
+
 export function parseTokenPairPositionTrackerDOFetchMethod(value : string) : TokenPairPositionTrackerDOFetchMethod|null {
 	return Object.values(TokenPairPositionTrackerDOFetchMethod).find(x => x === value)||null;
+}
+
+export async function getPosition(positionID : string, tokenAddress : string, vsTokenAddress : string, env : Env) : Promise<Position|undefined> {
+	const method = TokenPairPositionTrackerDOFetchMethod.getPosition;
+	const request : GetPositionFromPriceTrackerRequest = { positionID, tokenAddress, vsTokenAddress };
+	const response = await sendJSONRequestToTokenPairPositionTracker<GetPositionFromPriceTrackerRequest,GetPositionFromPriceTrackerResponse>(method, request, tokenAddress, vsTokenAddress, env);
+	return response.maybePosition;
+}
+
+export async function storePosition(position : Position, env : Env) : Promise<UpsertPositionsResponse> {
+	const method = TokenPairPositionTrackerDOFetchMethod.upsertPositions;
+	const request : UpsertPositionsRequest = { positions: [position], tokenAddress: position.token.address, vsTokenAddress: position.vsToken.address };
+	const response = await sendJSONRequestToTokenPairPositionTracker<UpsertPositionsRequest,UpsertPositionsResponse>(method, request, request.tokenAddress, request.vsTokenAddress, env);
+	return response;
+}
+
+// this straight-up deletes the position, doesn't just mark it as closed.
+export async function removePosition(positionID : string, tokenAddress : string, vsTokenAddress : string, env : Env) : Promise<RemovePositionResponse> {
+	const method = TokenPairPositionTrackerDOFetchMethod.removePosition;
+	const request : RemovePositionRequest = { positionID, tokenAddress, vsTokenAddress };
+	const response = await sendJSONRequestToTokenPairPositionTracker<RemovePositionRequest,RemovePositionResponse>(method, request, tokenAddress, vsTokenAddress, env);
+	return response;
 }
 
 export async function listPositionsByUser(telegramUserID : number, tokenAddress : string, vsTokenAddress : string, env : Env) : Promise<Position[]> {
@@ -71,16 +99,16 @@ export async function markPositionAsClosingInTokenPairPositionTracker(request : 
 		env);
 }
 
-export async function importNewPosition(position : Position, env : Env) : Promise<ImportNewPositionsResponse> {
-	const requestBody : ImportNewPositionsRequest = { 
+export async function importNewPosition(position : Position, env : Env) : Promise<UpsertPositionsResponse> {
+	const requestBody : UpsertPositionsRequest = { 
 		positions : [position], 
 		tokenAddress: position.token.address, 
 		vsTokenAddress: position.vsToken.address
 	};
-	const method = TokenPairPositionTrackerDOFetchMethod.importNewOpenPositions;
+	const method = TokenPairPositionTrackerDOFetchMethod.upsertPositions;
 	const tokenAddress = position.token.address;
 	const vsTokenAddress = position.vsToken.address;
-	return await sendJSONRequestToTokenPairPositionTracker<ImportNewPositionsRequest,ImportNewPositionsResponse>(method, requestBody, tokenAddress, vsTokenAddress, env);
+	return await sendJSONRequestToTokenPairPositionTracker<UpsertPositionsRequest,UpsertPositionsResponse>(method, requestBody, tokenAddress, vsTokenAddress, env);
 }
 
 async function sendJSONRequestToTokenPairPositionTracker<TRequestBody,TResponseBody>(method : TokenPairPositionTrackerDOFetchMethod, requestBody : TRequestBody, tokenAddress : string, vsTokenAddress : string, env : Env) {
