@@ -5,7 +5,7 @@ import { Wallet } from "../../crypto";
 import { dMult } from "../../decimalized";
 import { Env } from "../../env";
 import { logError, logInfo } from "../../logging";
-import { MenuViewOpenPosition } from "../../menus";
+import { MenuRetryBuy, MenuViewOpenPosition } from "../../menus";
 import { Position, PositionRequest, PositionStatus, Quote, getSwapOfXDescription } from "../../positions";
 import { SwapSummary, isSuccessfulSwapSummary } from "../../rpc/rpc_types";
 import { TGStatusMessage, UpdateableNotification } from "../../telegram";
@@ -26,18 +26,18 @@ export async function buy(positionRequest : PositionRequest,
 
     if (result === 'can-retry') {
         // give user option to retry
-        const retryBuyMenuRequest = new MenuRetryBuy(undefined).getUpdateExistingMenuRequest(positionRequest.chatID, positionRequest.messageID, env);
+        const retryBuyMenuRequest = new MenuRetryBuy(positionRequest).getUpdateExistingMenuRequest(positionRequest.chatID, positionRequest.messageID, env);
         await fetch(retryBuyMenuRequest);
     }
     else {
         // take straight to position view
         const newPosition = result.newPosition;
         const currentValue = dMult(newPosition.tokenAmt, newPosition.fillPrice);
-        const viewOpenPositionRequest = new MenuViewOpenPosition({
+        const viewOpenPositionMenuRequest = new MenuViewOpenPosition({
             position: newPosition,
             currentValue
         }).getUpdateExistingMenuRequest(positionRequest.chatID, positionRequest.messageID, env);
-        await fetch(viewOpenPositionRequest); 
+        await fetch(viewOpenPositionMenuRequest); 
     }
 }
 

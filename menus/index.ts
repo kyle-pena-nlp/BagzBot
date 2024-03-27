@@ -14,6 +14,7 @@ import { MenuMain } from "./menu_main";
 import { MenuPickTransferFundsRecipient } from "./menu_pick_transfer_funds_recipient";
 import { MenuPleaseEnterToken } from "./menu_please_enter_token";
 import { MenuPleaseWait } from "./menu_please_wait";
+import { MenuRetryBuy } from "./menu_retry_buy";
 import { MenuTrailingStopLossAutoRetrySell } from "./menu_trailing_stop_loss_auto_retry_sell";
 import { MenuTrailingStopLossEntryBuyQuantity } from "./menu_trailing_stop_loss_entry_buy_quantity";
 import { MenuTrailingStopLossPickVsToken } from "./menu_trailing_stop_loss_pick_vs_token";
@@ -32,7 +33,7 @@ import { WelcomeScreenPart2 } from "./welcome_screen_part_2";
 
 export {
     BaseMenu, LegalAgreement, MenuBetaInviteFriends, MenuCode, MenuConfirmAddressBookEntry, MenuConfirmTrailingStopLossPositionRequest, MenuContinueMessage, MenuEditTrailingStopLossPositionRequest, MenuError, MenuFAQ, MenuHelp,
-    MenuListPositions, MenuMain, MenuPickTransferFundsRecipient, MenuPleaseEnterToken, MenuPleaseWait, MenuTransferFundsMainMenu as MenuStartTransferFunds, MenuTODO, MenuTrailingStopLossAutoRetrySell,
+    MenuListPositions, MenuMain, MenuPickTransferFundsRecipient, MenuPleaseEnterToken, MenuPleaseWait, MenuRetryBuy, MenuTransferFundsMainMenu as MenuStartTransferFunds, MenuTODO, MenuTrailingStopLossAutoRetrySell,
     MenuTrailingStopLossEntryBuyQuantity,
     MenuTrailingStopLossPickVsToken,
     MenuTrailingStopLossSlippagePercent,

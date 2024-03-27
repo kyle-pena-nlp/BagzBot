@@ -29,7 +29,7 @@ export async function createAndSignTx(s : Swappable,
     const swapRoute = await getSwapRoute(s, env).catch(r => null);
     if (swapRoute == null || isGetQuoteFailure(swapRoute)) {
         logError("Failed getting swap route", s, swapRoute);
-        TGStatusMessage.queue(notificationChannel, `Could not get a quote for ${swapOfX} - purchase failed. Try again soon.`, true);
+        TGStatusMessage.queue(notificationChannel, `Could not get a quote for ${swapOfX} - purchase failed. Try again soon.`, false);
         return;
     }
     else{
@@ -40,7 +40,7 @@ export async function createAndSignTx(s : Swappable,
     const txBuffer = await serializeSwapRouteTransaction(swapRoute, wallet.publicKey, shouldIncludeReferralPlatformFee(s), env).catch(r => null);
     if (txBuffer == null || isTransactionPreparationFailure(txBuffer)) {
         logError("Failed serializing transaction", s, txBuffer);
-        TGStatusMessage.queue(notificationChannel, `Could not prepare transaction - ${swapOfX} failed.`, true);
+        TGStatusMessage.queue(notificationChannel, `Could not prepare transaction - ${swapOfX} failed.`, false);
         return;
     }
     else {
@@ -51,7 +51,7 @@ export async function createAndSignTx(s : Swappable,
     const signedTx = await signTransaction(txBuffer, wallet, s.userID, env).catch(r => null);
     if (signedTx == null || isTransactionPreparationFailure(signedTx)) {
         logError("Failed signing transaction", s, signedTx);
-        TGStatusMessage.queue(notificationChannel, `Could not sign transaction - ${swapOfX} failed.`, true);
+        TGStatusMessage.queue(notificationChannel, `Could not sign transaction - ${swapOfX} failed.`, false);
         return;
     }
     else {
@@ -83,7 +83,7 @@ export async function executeAndConfirmSignedTx(s: Swappable,
     if (isFailedTxExecution(maybeExecutedTx)) {
         logError('Transaction execution failed', s, maybeExecutedTx);
         const msg = makeTransactionFailedErrorMessage(s, maybeExecutedTx.status);
-        TGStatusMessage.queue(notificationChannel, msg, true);
+        TGStatusMessage.queue(notificationChannel, msg, false);
         return 'tx-failed';        
     }
 
@@ -91,7 +91,7 @@ export async function executeAndConfirmSignedTx(s: Swappable,
     if (isFailedSwapTxExecution(maybeExecutedTx)) {
         logError('Swap failed', s, maybeExecutedTx);
         const msg = makeSwapSummaryFailedMessage(maybeExecutedTx.status, s);
-        TGStatusMessage.queue(notificationChannel, msg, true);
+        TGStatusMessage.queue(notificationChannel, msg, false);
         return 'swap-failed';
     }    
 
@@ -110,7 +110,7 @@ export async function executeAndConfirmSignedTx(s: Swappable,
     if (parsedSwapSummary == null) {
         logError('Unexpected error retrieving transaction', s, { signature : signature });
         const msg = `There was a problem retrieving information about your transaction.`;
-        TGStatusMessage.queue(notificationChannel, msg, true);
+        TGStatusMessage.queue(notificationChannel, msg, false);
         return 'could-not-retrieve-tx';
     }
 
@@ -118,7 +118,7 @@ export async function executeAndConfirmSignedTx(s: Swappable,
     if (isSwapExecutionErrorParseSwapSummary(parsedSwapSummary)) {
         logError('Swap execution error', s, parsedSwapSummary);
         const failedMsg = makeSwapSummaryFailedMessage(parsedSwapSummary.status, s);
-        TGStatusMessage.queue(notificationChannel, failedMsg, true);
+        TGStatusMessage.queue(notificationChannel, failedMsg, false);
         return 'swap-failed';
     }
 
