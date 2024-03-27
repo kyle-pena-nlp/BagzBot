@@ -17,7 +17,7 @@ export function renderTrailingStopLossRequestMarkdown(positionRequest : Position
             `<a href="https://birdeye.so/token/${positionRequest.token.address}?chain=solana&v=${nonce}">$${positionRequest.token.symbol}</a> | ${positionRequest.token.name}`,
             //`Preview is ${staleSeconds} seconds old`,
             `<code>${positionRequest.token.address}</code>`,
-            `Purchasing ${toFriendlyString(positionRequest.quote.outTokenAmt,4)} $${positionRequest.token.symbol} @ ${toFriendlyString(positionRequest.quote.fillPrice,4)} $${positionRequest.token.symbol}/SOL`,
+            `Purchasing ${toFriendlyString(positionRequest.quote.outTokenAmt,4)} $${positionRequest.token.symbol} @ ${toFriendlyString(positionRequest.quote.fillPrice,4)} SOL/$${positionRequest.token.symbol}`,
             `<b>Price Impact</b>: ${positionRequest.quote.priceImpactPct.toFixed(2)}%`
         ];
         return lines.join("\r\n");

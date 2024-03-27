@@ -2,14 +2,16 @@
 import { Connection } from "@solana/web3.js";
 import * as bs58 from "bs58";
 import { Wallet } from "../../crypto";
+import { dMult } from "../../decimalized";
 import { Env } from "../../env";
+import { logError, logInfo } from "../../logging";
+import { MenuViewOpenPosition } from "../../menus";
 import { Position, PositionRequest, PositionStatus, Quote, getSwapOfXDescription } from "../../positions";
 import { SwapSummary, isSuccessfulSwapSummary } from "../../rpc/rpc_types";
 import { TGStatusMessage } from "../../telegram";
 import { assertNever } from "../../util";
 import { upsertPosition } from "../token_pair_position_tracker/token_pair_position_tracker_DO_interop";
 import { createAndSignTx, executeAndConfirmSignedTx } from "./user_swap";
-import { logInfo } from "../../logging";
 
 export async function buy(positionRequest: PositionRequest,
     wallet : Wallet, 
@@ -33,41 +35,49 @@ export async function buy(positionRequest: PositionRequest,
 
     // programatically generate bs58 signature of tx
     const signature = bs58.encode(signedTx.signatures[0]);
-
-    // optimistically store the position in the user-side tracker
-    // by optimistic, "assume" the tx and swap will execute successfully
-    // If unconfirmed, we will attempt to confirm at sell time
-    // TODO: periodically scan for unconfirmed and attempt confirmation.
-    //
-    //await upsertPosition(convertToUnconfirmedPosition(positionRequest, quote, signature), env);
     
     // attempt to execute tx.  all sorts of things can go wrong.
     const parsedSwapSummary = await executeAndConfirmSignedTx(positionRequest, signedTx, wallet, env, notificationChannel, connection);
 
-    // if we couldn't confirm, send the position for tracking, but marked as unconfirmed.
-    if (parsedSwapSummary === 'could-not-retrieve-tx') {
-        const quote = positionRequest.quote;
-        const unconfirmedPosition = convertToUnconfirmedPosition(positionRequest, quote, signature);
-        await upsertPosition(unconfirmedPosition, env);
-    }
-    // if we sent the tx and it executed, but the swap failed
-    else if (parsedSwapSummary === 'swap-failed') {
+    let newPosition : Position|undefined = undefined;
+
+    // if the tx was executed but the swap failed
+    if (parsedSwapSummary === 'swap-failed') {
         logInfo("Swap failed", positionRequest);
+        TGStatusMessage.queue(notificationChannel, '', false);
     }
     // if the act of sending the tx itself failed
     else if (parsedSwapSummary === 'tx-failed') {
         logInfo("Tx failed", positionRequest);
+        TGStatusMessage.queue(notificationChannel, '', false);
     }
-    // but if it's successful, convert it to a confirmed position and send it to the tracker!
-    else if (isSuccessfulSwapSummary(parsedSwapSummary)) {
-        const newPosition = convertConfirmedRequestToPosition(positionRequest, parsedSwapSummary.swapSummary);
+    // if we couldn't retrieve (and therefore confirm) the tx
+    else if (parsedSwapSummary === 'could-not-retrieve-tx') {
+        logError("Could not retrieve tx - converting to unconfirmed position", positionRequest);
+        const quote = positionRequest.quote;
+        newPosition = convertToUnconfirmedPosition(positionRequest, quote, signature);
         await upsertPosition(newPosition, env);
-        TGStatusMessage.queue(notificationChannel, `Peak Price is now being tracked. Position will be unwound when price dips below ${positionRequest.triggerPercent}% of peak.`, true);    
+        TGStatusMessage.queue(notificationChannel, '', false);
+    }
+    else if (isSuccessfulSwapSummary(parsedSwapSummary)) {
+        newPosition = convertConfirmedRequestToPosition(positionRequest, parsedSwapSummary.swapSummary);
+        await upsertPosition(newPosition, env);
+        TGStatusMessage.queue(notificationChannel, `Peak Price is now being tracked. Position will be unwound when price dips below ${positionRequest.triggerPercent}% of peak.`, true);
     }
     else {
         assertNever(parsedSwapSummary);
     }
+
     await TGStatusMessage.finalize(notificationChannel);
+
+    if (newPosition != null) {
+        const currentValue = dMult(newPosition.tokenAmt, newPosition.fillPrice);
+        const viewOpenPositionRequest = new MenuViewOpenPosition({
+            position: newPosition,
+            currentValue
+        }).getUpdateExistingMenuRequest(positionRequest.chatID, positionRequest.messageID, env);
+        await fetch(viewOpenPositionRequest); 
+    } 
 }
 
 function convertToUnconfirmedPosition(positionRequest : PositionRequest, quote : Quote, txSignature : string) {

@@ -39,7 +39,9 @@ async function makeQuote(swapRoute : GetQuoteFailure|SwapRoute, inTokenInfo : To
     };
     const inTokenAmt = { tokenAmount : inTokenAmount, decimals : inTokenInfo.decimals };
     const outTokenAmt = { tokenAmount : outTokenAmount, decimals : outTokenInfo.decimals };
-    const fillPrice = dDiv(outTokenAmt, inTokenAmt, MATH_DECIMAL_PLACES);
+    // For the buy:
+    // in / out <-> SOL / chonky <-> $$ / taco <-> a taco cost $1.50
+    const fillPrice = dDiv(inTokenAmt, outTokenAmt, MATH_DECIMAL_PLACES);
     const quote : Quote = {
         inToken: inTokenInfo,
         inTokenAmt: inTokenAmt,

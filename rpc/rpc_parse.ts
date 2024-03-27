@@ -79,6 +79,7 @@ export async function parseSwapTransaction(
         throw new Error("Programmer error.");
     }
 
+    // in / out <-> SOL / CHONKY <-> $$ / taco <-> taco costs $1.50
     const fillPrice = dDiv(swapInTokenDiff, swapOutTokenDiff, MATH_DECIMAL_PLACES);
 
     const fees = parsedTransaction.meta?.fee || 0;

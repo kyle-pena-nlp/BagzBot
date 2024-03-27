@@ -98,11 +98,8 @@ export class UserDO {
     tokenPairsForPositionIDsTracker : TokenPairsForPositionIDsTracker = new TokenPairsForPositionIDsTracker();
 
     constructor(state : DurableObjectState, env : any) {
-        // persistent state object which reaches eventual consistency
         this.env                = env;
         this.state              = state;
-        // TODO: allow user to update defaults in 'Options' menu
-        
         this.state.blockConcurrencyWhile(async () => {
             await this.loadStateFromStorage();
         });
