@@ -2,7 +2,7 @@ import { DurableObjectState } from "@cloudflare/workers-types";
 import { DecimalizedAmount } from "../../decimalized";
 import { Env } from "../../env";
 import { logDebug, logError, logInfo } from "../../logging";
-import { ChangeTrackedValue, assertNever, makeJSONResponse, makeSuccessResponse } from "../../util";
+import { ChangeTrackedValue, assertNever, makeJSONResponse, makeSuccessResponse, strictParseBoolean } from "../../util";
 import { sendClosePositionOrdersToUserDOs } from "../user/userDO_interop";
 import { AutomaticallyClosePositionsRequest } from "./actions/automatically_close_positions";
 import { GetPositionFromPriceTrackerRequest, GetPositionFromPriceTrackerResponse } from "./actions/get_position";
@@ -80,7 +80,7 @@ export class TokenPairPositionTrackerDO {
     }
 
     shouldBePolling() : boolean {
-        return this.tokenPairPositionTracker.any() && this.initialized();
+        return this.tokenPairPositionTracker.any() && this.initialized() && strictParseBoolean(this.env.POLLING_ON);
     }
 
     initialized() : boolean {

@@ -276,6 +276,14 @@ export class UserDO {
             const positionsForTokenPair = await listPositionsByUser(request.telegramUserID, tokenPair.tokenAddress, tokenPair.vsTokenAddress, this.env);
             positions.push(...positionsForTokenPair);
         }
+        // if for whatever reason the pair for this position is missing, this would rectify it
+        for (const position of positions) {
+            this.tokenPairsForPositionIDsTracker.storePosition({
+                positionID: position.positionID,
+                token : { address : position.token.address },
+                vsToken : { address : position.vsToken.address }
+            });
+        }
         const response : ListPositionsFromUserDOResponse = { positions: positions };
         return makeJSONResponse(response);
     }

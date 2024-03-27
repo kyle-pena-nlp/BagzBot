@@ -33,6 +33,7 @@ export interface Env {
 	ADMIN_TELEGRAM_USER_IDS: string
 	SUPER_ADMIN_USER_ID : string
 	START_POLLING_ON_START : string
+	POLLING_ON : string
 
 	UserDO : any // i'd like to strongly type this as DurableObjectNamespace, but can't for technical reasons
 	TokenPairPositionTrackerDO : any // ditto
