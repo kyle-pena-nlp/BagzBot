@@ -8,7 +8,7 @@ export class MenuBetaInviteFriends extends Menu<{ betaInviteCodes: string[], bot
         const lines : string[] = [
             'Send these one-time-use links to your friends. Click or long-press to copy.',
         ];
-        lines.push(...inviteBetaCodes.map(code => `<code>https://t.me/${botUsername}?start=${code}</code>`));
+        lines.push(...inviteBetaCodes.map(code => `:ticket: <code>https://t.me/${botUsername}?start=${code}</code>`));
         return lines.join("\r\n");
     }
     renderOptions(): CallbackButton[][] {
@@ -19,7 +19,7 @@ export class MenuBetaInviteFriends extends Menu<{ betaInviteCodes: string[], bot
     parseMode(): "MarkdownV2" | "HTML" {
         return 'HTML';
     }
-    forceResponse(): boolean {
+    renderURLPreviewNormally(): boolean {
         return true;
     }
 

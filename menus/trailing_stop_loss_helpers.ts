@@ -14,7 +14,7 @@ export function renderTrailingStopLossRequestMarkdown(positionRequest : Position
         const staleness = Date.now() - nonce;
         const staleSeconds = Math.round(staleness/1000);
         const lines : string[] = [
-            `<a href="https://birdeye.so/token/${positionRequest.token.address}?chain=solana&v=${nonce}">$${positionRequest.token.symbol}</a> | ${positionRequest.token.name}`,
+            `<image href="${positionRequest.token.logoURI}">.</image> <a href="https://birdeye.so/token/${positionRequest.token.address}?chain=solana&v=${nonce}">$${positionRequest.token.symbol}</a> | ${positionRequest.token.name}`,
             //`Preview is ${staleSeconds} seconds old`,
             `<code>${positionRequest.token.address}</code>`,
             `Purchasing ${toFriendlyString(positionRequest.quote.outTokenAmt,4)} $${positionRequest.token.symbol} @ ${toFriendlyString(positionRequest.quote.fillPrice,4)} SOL/$${positionRequest.token.symbol}`,

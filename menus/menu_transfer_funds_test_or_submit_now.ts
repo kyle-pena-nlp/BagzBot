@@ -17,7 +17,7 @@ export class MenuTransferFundsTestOrSubmitNow extends Menu<CompleteTransferFunds
     parseMode(): "MarkdownV2" | "HTML" {
         return "HTML";
     }
-    forceResponse(): boolean {
+    renderURLPreviewNormally(): boolean {
         return true;
     }
 }

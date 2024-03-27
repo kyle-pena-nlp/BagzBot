@@ -13,7 +13,7 @@ export class MenuPleaseEnterToken extends Menu<undefined> implements MenuCapabil
     parseMode(): "HTML" | "MarkdownV2" {
         return 'HTML';
     }
-    forceResponse(): boolean {
+    renderURLPreviewNormally(): boolean {
         return true;
     }
 }

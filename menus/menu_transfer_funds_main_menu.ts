@@ -16,7 +16,7 @@ export class MenuTransferFundsMainMenu extends Menu<undefined> implements MenuCa
     parseMode(): "MarkdownV2" | "HTML" {
         return 'HTML';
     }
-    forceResponse(): boolean {
+    renderURLPreviewNormally(): boolean {
         return true;
     }
 

@@ -20,8 +20,8 @@ export class MenuMain extends Menu<UserData & AdminStatus & BotName> implements 
         if (this.menuData.maybeSOLBalance != null) {
             lines.push(
                 `<b>:bot: ${this.menuData.botName} Main Menu</b>`,
-                `<b>Wallet</b>: <code>${this.menuData.address}</code>`,
-                `<b>Purchasing Power</b>: :money_bag: ${toFriendlyString(this.menuData.maybeSOLBalance, 4)} SOL :money_bag:`,
+                `:bank: <b>Wallet</b>: <code>${this.menuData.address}</code>`,
+                `<b>Balance</b>: ${toFriendlyString(this.menuData.maybeSOLBalance, 4)} SOL :money_bag:`,
             );
         }
         else {
@@ -36,11 +36,11 @@ export class MenuMain extends Menu<UserData & AdminStatus & BotName> implements 
         const options = this.emptyMenu();
         const hasWallet = this.menuData.hasWallet;
         if (hasWallet) {
-            this.insertButtonNextLine(options, 'New Position', this.menuCallback(MenuCode.NewPosition));
-            this.insertButtonNextLine(options, 'Wallet', this.menuCallback(MenuCode.Wallet));
-            this.insertButtonSameLine(options, 'Positions', this.menuCallback(MenuCode.ListPositions));
+            this.insertButtonNextLine(options, ':sparkle: New Position :sparkle:', this.menuCallback(MenuCode.NewPosition));
+            this.insertButtonNextLine(options, ':briefcase: Wallet', this.menuCallback(MenuCode.Wallet));
+            this.insertButtonSameLine(options, ':chart_up: Positions', this.menuCallback(MenuCode.ListPositions));
             if (this.menuData.hasInviteBetaCodes) {
-                this.insertButtonNextLine(options, "Invite Friends To Beta", this.menuCallback(MenuCode.BetaGateInviteFriends));
+                this.insertButtonNextLine(options, ":envelope: Invite Friends To Beta", this.menuCallback(MenuCode.BetaGateInviteFriends));
             }
             if (this.menuData.isImpersonatingUser) {
                 this.insertButtonNextLine(options, 'ADMIN: Unimpersonate', this.menuCallback(MenuCode.UnimpersonateUser));
@@ -56,7 +56,7 @@ export class MenuMain extends Menu<UserData & AdminStatus & BotName> implements 
     parseMode(): "MarkdownV2" | "HTML" {
         return 'HTML';
     }    
-    forceResponse() : boolean {
+    renderURLPreviewNormally() : boolean {
         return true;
     }
 }

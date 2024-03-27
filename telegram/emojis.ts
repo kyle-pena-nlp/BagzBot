@@ -31,15 +31,17 @@ const emojis = {
 
     ':key:': '🔑',
 
-    ':sparkles:' : '✨',
+    ':sparkle:' : '✨',
     ':ledger:': '📒',
     ':money_bag:': '💰',
     ':credit_card:': '💳',
-    ':currency_exchange:': '💱',
     ':gem:': '💎',
     ':bank:': '🏦',
     ':briefcase:': '💼',
     ':dead:': '💀',
+    ':envelope:': '✉️',
+    ':ticket:': '🎟️',
+    ':love_letter:': '💌',
 
     ':rage:': '🤬',
     ':anger:': '😠',
@@ -50,7 +52,10 @@ const emojis = {
     ':money_face:': '🤑',
     ':thumbs_up:': '👍', 
     ':thumbs_down:': '👎',
+
+
     ':sign:': '✍',
+    ':thinking:': '🤔',
 
     ':bread:': '🍞',
     ':office:': '🏢',

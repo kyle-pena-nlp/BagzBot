@@ -16,7 +16,7 @@ export class MenuRetryBuy extends Menu<PositionRequest> implements MenuCapabilit
     parseMode(): "MarkdownV2" | "HTML" {
         return 'HTML';
     }
-    forceResponse(): boolean {
+    renderURLPreviewNormally(): boolean {
         return true;
     }
 

@@ -21,7 +21,7 @@ export class MenuTrailingStopLossPickVsToken extends Menu<TokenSymbolAndAddress>
     parseMode(): "HTML" | "MarkdownV2" {
         return 'HTML';
     }
-    forceResponse(): boolean {
+    renderURLPreviewNormally(): boolean {
         return true;
     }
 }

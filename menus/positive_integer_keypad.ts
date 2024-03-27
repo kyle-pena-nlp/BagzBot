@@ -86,7 +86,7 @@ export class PositiveIntegerKeypad extends Menu<string> implements MenuCapabilit
         return 'HTML';
     }
 
-    forceResponse() {
+    renderURLPreviewNormally() {
         return true;
     }
     
@@ -96,7 +96,7 @@ export class PositiveIntegerKeypad extends Menu<string> implements MenuCapabilit
             options : this.renderOptions(),
             parseMode : this.parseMode(),
             mode : mode,
-            forceReply : true            
+            renderLinkPreviewAsIcon : true            
         };
         return menuSpec;
     }

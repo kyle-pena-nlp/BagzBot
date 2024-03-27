@@ -21,7 +21,7 @@ export class MenuTrailingStopLossSlippagePercent extends Menu<number> implements
     parseMode(): "HTML" | "MarkdownV2" {
         return "HTML";
     }
-    forceResponse(): boolean {
+    renderURLPreviewNormally(): boolean {
         return true;
     }
     

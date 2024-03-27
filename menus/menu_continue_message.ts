@@ -22,7 +22,7 @@ export class MenuContinueMessage extends Menu<string> implements MenuCapabilitie
     parseMode(): "MarkdownV2" | "HTML" {
         return this.messageParseMode;
     }
-    forceResponse(): boolean {
+    renderURLPreviewNormally(): boolean {
         return true;
     }
     

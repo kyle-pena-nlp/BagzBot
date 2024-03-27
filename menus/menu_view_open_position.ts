@@ -36,7 +36,7 @@ export class MenuViewOpenPosition extends Menu<PositionAndMaybeCurrentValue> imp
     parseMode(): "HTML" | "MarkdownV2" {
         return 'HTML';
     }
-    forceResponse(): boolean {
+    renderURLPreviewNormally(): boolean {
         return true;
     }
     

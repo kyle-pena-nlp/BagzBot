@@ -30,7 +30,7 @@ export class MenuEditTrailingStopLossPositionRequest extends Menu<PositionReques
     parseMode(): "HTML" | "MarkdownV2" {
         return 'HTML';
     }
-    forceResponse(): boolean {
-        return true;
+    renderURLPreviewNormally(): boolean {
+        return false;
     }
 }

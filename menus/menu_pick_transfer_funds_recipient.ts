@@ -20,7 +20,7 @@ export class MenuPickTransferFundsRecipient extends Menu<CompletedAddressBookEnt
     parseMode(): "MarkdownV2" | "HTML" {
         throw new Error("Method not implemented.");
     }
-    forceResponse(): boolean {
+    renderURLPreviewNormally(): boolean {
         throw new Error("Method not implemented.");
     }
 

@@ -18,7 +18,7 @@ export class MenuConfirmAddressBookEntry extends Menu<CompletedAddressBookEntry>
     parseMode(): "MarkdownV2" | "HTML" {
         return 'HTML';
     }
-    forceResponse(): boolean {
+    renderURLPreviewNormally(): boolean {
         return true;
     }
 

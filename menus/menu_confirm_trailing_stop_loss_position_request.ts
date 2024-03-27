@@ -1,4 +1,4 @@
-import { PositionRequest, PositionRequestAndMaybeQuote } from "../positions";
+import { PositionRequest } from "../positions";
 import { CallbackButton } from "../telegram";
 import { CallbackData } from "./callback_data";
 import { Menu, MenuCapabilities } from "./menu";
@@ -21,7 +21,7 @@ export class MenuConfirmTrailingStopLossPositionRequest extends Menu<PositionReq
     parseMode(): "HTML" | "MarkdownV2" {
         return 'HTML';
     }
-    forceResponse(): boolean {
+    renderURLPreviewNormally(): boolean {
         return true;
     }
 }

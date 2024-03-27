@@ -15,14 +15,14 @@ export interface MenuSpec {
 	options : Array<Array<CallbackButton>>
 	parseMode : 'HTML'|'MarkdownV2'
 	mode : MenuDisplayMode
-	forceReply : boolean
+	renderLinkPreviewAsIcon : boolean
 }
 
 export interface MenuCapabilities {
     renderText() : string;
     renderOptions() : CallbackButton[][];
     parseMode() : 'MarkdownV2'|'HTML'
-    forceResponse() : boolean
+    renderURLPreviewNormally() : boolean
 }
 
 export abstract class BaseMenu {
@@ -57,6 +57,12 @@ export abstract class BaseMenu {
             parse_mode: menuSpec.parseMode,
             message_id: messageID
         };
+        if (menuSpec.renderLinkPreviewAsIcon) {
+            body.link_preview_options = {
+                prefer_small_media: true,
+                show_above_text : true
+            }
+        }
         if (menuSpec.options.length > 0 && menuSpec.options[0].length > 0) {
             body.reply_markup = {
                 "inline_keyboard": menuSpec.options
@@ -74,7 +80,7 @@ export abstract class BaseMenu {
             options : subInEmojisOnButtons(menu.renderOptions()),
             parseMode : menu.parseMode(),
             mode : mode,
-            forceReply : menu.forceResponse()
+            renderLinkPreviewAsIcon : !menu.renderURLPreviewNormally()
         };
         return menuSpec;
     }
@@ -118,7 +124,7 @@ export abstract class Menu<T> extends BaseMenu {
 
     protected createHelpMenuLine(options : CallbackButton[][]) {
         const lineNumber = options.length + 1;
-        this.insertButton(options, 'Help', new CallbackData(MenuCode.Help, undefined), lineNumber);
+        this.insertButton(options, ':thinking: Help', new CallbackData(MenuCode.Help, undefined), lineNumber);
     }
 
     protected insertCloseButtonNextLine(options : CallbackButton[][]) {

@@ -15,7 +15,7 @@ export class WelcomeScreenPart1 extends Menu<undefined> implements MenuCapabilit
     parseMode(): "MarkdownV2" | "HTML" {
         return 'HTML';
     }
-    forceResponse(): boolean {
+    renderURLPreviewNormally(): boolean {
         return true;
     }
 

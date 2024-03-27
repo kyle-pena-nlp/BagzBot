@@ -13,7 +13,7 @@ export class MenuTODO extends Menu<undefined> implements MenuCapabilities {
     parseMode(): "HTML" | "MarkdownV2" {
         return 'HTML';
     }
-    forceResponse(): boolean {
+    renderURLPreviewNormally(): boolean {
         return true;
     }
 }

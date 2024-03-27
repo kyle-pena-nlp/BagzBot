@@ -5,7 +5,7 @@ import { MenuCode } from "./menu_code";
 import { MenuConfirmAddressBookEntry } from "./menu_confirm_address_book_entry";
 import { MenuConfirmTrailingStopLossPositionRequest } from "./menu_confirm_trailing_stop_loss_position_request";
 import { MenuContinueMessage } from "./menu_continue_message";
-import { MenuEditTrailingStopLossPositionRequest } from "./menu_edit_trailing_stop_loss_position_request";
+import { MenuEditTrailingStopLossPositionRequest } from "./menu_edit_position_request";
 import { MenuError } from "./menu_error";
 import { MenuFAQ } from "./menu_faq";
 import { MenuHelp } from "./menu_help";

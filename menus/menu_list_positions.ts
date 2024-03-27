@@ -39,7 +39,7 @@ export class MenuListPositions extends Menu<PositionAndMaybePNL[]> implements Me
     parseMode(): "HTML" | "MarkdownV2" {
         return 'HTML';
     }
-    forceResponse(): boolean {
+    renderURLPreviewNormally(): boolean {
         return true;
     }
     maybeCalcTotalPNL() : DecimalizedAmount|undefined {

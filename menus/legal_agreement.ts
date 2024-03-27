@@ -16,7 +16,7 @@ export class LegalAgreement extends Menu<undefined> implements MenuCapabilities 
     parseMode(): "MarkdownV2" | "HTML" {
         return 'HTML';
     }
-    forceResponse(): boolean {
+    renderURLPreviewNormally(): boolean {
         return true;
     }
 }

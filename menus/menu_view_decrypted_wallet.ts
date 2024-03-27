@@ -22,7 +22,7 @@ export class MenuViewDecryptedWallet extends Menu<DecryptedWalletData> implement
     parseMode(): "MarkdownV2" | "HTML" {
         return 'HTML';
     }
-    forceResponse(): boolean {
+    renderURLPreviewNormally(): boolean {
         return true;
     }
 }
