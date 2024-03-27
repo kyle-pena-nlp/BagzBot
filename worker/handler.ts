@@ -495,8 +495,13 @@ export class Worker {
         return new MenuMain({ ...userData, 
             isAdminOrSuperAdmin: info.isAdminOrSuperAdmin(env), 
             isImpersonatingUser: info.isImpersonatingAUser(),
-            impersonatedUserID: info.isImpersonatingAUser() ? info.getTelegramUserID() : undefined
+            impersonatedUserID: info.isImpersonatingAUser() ? info.getTelegramUserID() : undefined,
+            botName : this.getBotName(env)
         });
+    }
+
+    private getBotName(env : Env) {
+        return `${env.TELEGRAM_BOT_NAME} (${env.TELEGRAM_BOT_INSTANCE})`;
     }
 
     private async handleMenuClose(chatID : number, messageID : number, env : Env) : Promise<Response> {
@@ -665,7 +670,8 @@ export class Worker {
                     ...userData, 
                     isAdminOrSuperAdmin: info.isAdminOrSuperAdmin(env), 
                     isImpersonatingUser : info.isImpersonatingAUser(), 
-                    impersonatedUserID: info.isImpersonatingAUser() ? info.getTelegramUserID() : undefined
+                    impersonatedUserID: info.isImpersonatingAUser() ? info.getTelegramUserID() : undefined,
+                    botName : this.getBotName(env)
                 })];
             case '/menu':
                 const menuUserData = await getUserData(info.getTelegramUserID(), info.messageID, false, env);
@@ -673,7 +679,8 @@ export class Worker {
                     ...menuUserData, 
                     isAdminOrSuperAdmin : info.isAdminOrSuperAdmin(env), 
                     isImpersonatingUser: info.isImpersonatingAUser(), 
-                    impersonatedUserID: info.isImpersonatingAUser() ? info.getTelegramUserID() : undefined })];
+                    impersonatedUserID: info.isImpersonatingAUser() ? info.getTelegramUserID() : undefined,
+                    botName : this.getBotName(env) })];
             case '/welcome_screen':
                 return ['...', new WelcomeScreenPart1(undefined)];
             case '/legal_agreement':

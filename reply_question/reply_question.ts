@@ -1,6 +1,7 @@
 import { storeSessionObj } from "../durable_objects/user/userDO_interop";
 import { Env } from "../env";
 import { MenuCode } from "../menus";
+import { subInEmojis } from "../telegram";
 import { sendQuestionToTG } from "../telegram/telegram_helpers";
 import { ReplyQuestionCode } from "./reply_question_code";
 import { ReplyQuestionData } from "./reply_question_data";
@@ -29,7 +30,7 @@ export class ReplyQuestion {
         replyQuestionCode: ReplyQuestionCode, 
         context : FetchEvent,
         opts ?: ReplyQuestionOptions) {
-        this.question = question;
+        this.question = subInEmojis(question);
         this.replyQuestionCode = replyQuestionCode;
         this.context = context;
         opts = opts || {};

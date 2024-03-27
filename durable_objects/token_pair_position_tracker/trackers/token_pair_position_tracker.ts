@@ -2,6 +2,7 @@ import { DecimalizedAmount } from "../../../decimalized";
 import { logError } from "../../../logging";
 import { Position, PositionStatus } from "../../../positions";
 import { MapWithStorage } from "../../../util";
+import { PositionAndMaybePNL } from "../model/position_and_PNL";
 import { PeakPricePositionTracker } from "./peak_price_tracker";
 
 export interface PositionsToClose {
@@ -27,7 +28,7 @@ export class TokenPairPositionTracker {
         return this.pricePeaks.getPosition(positionID);
     }
 
-    listByUser(userID : number) : Position[] {
+    listByUser(userID : number) : PositionAndMaybePNL[] {
         return this.pricePeaks.listByUser(userID);
     }
 

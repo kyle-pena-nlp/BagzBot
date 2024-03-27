@@ -1,4 +1,4 @@
-import { Position } from "../../../positions";
+import { PositionAndMaybePNL } from "../model/position_and_PNL";
 import { HasPairAddresses } from "./has_pair_addresses";
 
 export interface ListPositionsByUserRequest extends HasPairAddresses {
@@ -6,5 +6,5 @@ export interface ListPositionsByUserRequest extends HasPairAddresses {
 }
 
 export interface ListPositionsByUserResponse {
-    positions : Position[]
+    positions : PositionAndMaybePNL[]
 }

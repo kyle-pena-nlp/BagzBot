@@ -1,6 +1,8 @@
 
 export interface Env {
 	ENVIRONMENT : string
+	TELEGRAM_BOT_NAME : string
+	TELEGRAM_BOT_INSTANCE : string
 	TELEGRAM_BOT_USERNAME : string
 	TELEGRAM_BOT_SERVER_URL : string
 	TELEGRAM_BOT_ID : string

@@ -3,6 +3,7 @@ import { Position } from "../../positions";
 import { TokenInfo } from "../../tokens";
 import { Structural, groupIntoMap, makeJSONRequest, makeRequest } from "../../util";
 import { AutomaticallyClosePositionsRequest, AutomaticallyClosePositionsResponse } from "../token_pair_position_tracker/actions/automatically_close_positions";
+import { PositionAndMaybePNL } from "../token_pair_position_tracker/model/position_and_PNL";
 import { DeleteSessionRequest } from "./actions/delete_session";
 import { GetAddressBookEntryRequest, GetAddressBookEntryResponse } from "./actions/get_address_book_entry";
 import { GetImpersonatedUserIDRequest, GetImpersonatedUserIDResponse } from "./actions/get_impersonated_user_id";
@@ -51,7 +52,7 @@ export enum UserDOFetchMethod {
 	getPositionFromUserDO = "getPositionFromUserDO"
 }
 
-export async function listPositionsFromUserDO(telegramUserID : number, env : Env) : Promise<Position[]> {
+export async function listPositionsFromUserDO(telegramUserID : number, env : Env) : Promise<PositionAndMaybePNL[]> {
 	const request : ListPositionsFromUserDORequest = { telegramUserID };
 	const method = UserDOFetchMethod.listPositionsFromUserDO;
 	const response = await sendJSONRequestToUserDO<ListPositionsFromUserDORequest,ListPositionsFromUserDOResponse>(telegramUserID, method, request, env);

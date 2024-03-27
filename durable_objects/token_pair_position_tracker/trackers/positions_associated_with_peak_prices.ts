@@ -52,15 +52,15 @@ export class PositionsAssociatedWithPeakPrices extends DecimalizedAmountMap<Read
     }
 
     // list all the positions by user
-    listByUser(userID : number) : Position[] {
+    listByUser(userID : number) : { position: Position, peakPrice: DecimalizedAmount }[] {
         const locations = this.userIDMap.list(userID);
         if (locations == null) {
             return [];
         }
-        const result : Position[] = [];
+        const result : { position: Position, peakPrice: DecimalizedAmount }[] = [];
         for (const location of locations) {
-            const [price,index] = location;
-            const position = (this.get(price)||[])[index];
+            const [peakPrice,index] = location;
+            const position = (this.get(peakPrice)||[])[index];
             if (position == null) {
                 logError(`userIDMap pointed to non-existent Position for [${toObjectLocationString(location)}]`);
                 continue;
@@ -69,7 +69,7 @@ export class PositionsAssociatedWithPeakPrices extends DecimalizedAmountMap<Read
                 logError(`userIDMap pointed to position with wrong user ID for [${toObjectLocationString(location)}]. Expected ${userID}, was ${position.userID}`);
                 continue;
             }
-            result.push(position);
+            result.push({ position: position, peakPrice: peakPrice });
         }
         return result;
     }

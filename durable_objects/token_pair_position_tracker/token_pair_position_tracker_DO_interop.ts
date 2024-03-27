@@ -10,6 +10,7 @@ import { MarkPositionAsOpenRequest, MarkPositionAsOpenResponse } from "./actions
 import { RemovePositionRequest, RemovePositionResponse } from "./actions/remove_position";
 import { UpsertPositionsRequest, UpsertPositionsResponse } from "./actions/upsert_positions";
 import { WakeupRequest, WakeupResponse } from "./actions/wake_up";
+import { PositionAndMaybePNL } from "./model/position_and_PNL";
 
 export enum TokenPairPositionTrackerDOFetchMethod {
 	wakeUp = "wakeUp",
@@ -52,7 +53,7 @@ export async function removePosition(positionID : string, tokenAddress : string,
 	return response;
 }
 
-export async function listPositionsByUser(telegramUserID : number, tokenAddress : string, vsTokenAddress : string, env : Env) : Promise<Position[]> {
+export async function listPositionsByUser(telegramUserID : number, tokenAddress : string, vsTokenAddress : string, env : Env) : Promise<PositionAndMaybePNL[]> {
 	const request : ListPositionsByUserRequest = {
 		telegramUserID,
 		tokenAddress,

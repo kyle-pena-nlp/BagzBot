@@ -1,6 +1,7 @@
 import { Env } from "../env";
 import { logError } from "../logging";
 import { pause } from "../util";
+import { subInEmojis } from "./emojis";
 import { deleteTGMessage, sendMessageToTG, updateTGMessage } from "./telegram_helpers";
 
 export interface UpdateableNotification { 
@@ -19,7 +20,7 @@ export class TGStatusMessage {
     private constructor(message : string, parseMode : 'HTML'|'MarkdownV2', dismissable : boolean, messageID : number, chatID : number, env : Env) {
         this.messageID = messageID;
         this.chatID = chatID;
-        this.message = message;        
+        this.message = subInEmojis(message);        
         this.parseMode = parseMode;        
         this.dismissable = dismissable;
         this.lastSendSuccessful = true;

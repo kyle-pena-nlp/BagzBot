@@ -68,6 +68,11 @@ export class TokenPairPositionTrackerDO {
         this.vsTokenAddress.initialize(entries);
         this.tokenPairPositionTracker.initialize(entries);
         this.currentPriceTracker.initialize(entries);
+
+        // these should be in-sync but just in case.
+        if (this.tokenPairPositionTracker.pricePeaks.currentPrice.value == null) {
+            this.tokenPairPositionTracker.pricePeaks.currentPrice.value = this.currentPriceTracker.currentPrice.value;
+        }
     }
 
     async flushToStorage() {

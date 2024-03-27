@@ -2,7 +2,7 @@ import { Env } from "../env";
 import { CallbackData } from "./callback_data";
 import { MenuCode } from "./menu_code";
 
-import { CallbackButton, escapeTGText, makeTelegramBotUrl } from "../telegram";
+import { CallbackButton, escapeTGText, makeTelegramBotUrl, subInEmojis, subInEmojisOnButtons } from "../telegram";
 import { makeJSONRequest } from "../util";
 
 export enum MenuDisplayMode {
@@ -70,8 +70,8 @@ export abstract class BaseMenu {
 
     private static renderMenuSpec(menu : MenuCapabilities, mode: MenuDisplayMode): MenuSpec {
         const menuSpec : MenuSpec = {
-            text : escapeTGText(menu.renderText(), menu.parseMode()),
-            options : menu.renderOptions(),
+            text : subInEmojis(escapeTGText(menu.renderText(), menu.parseMode())),
+            options : subInEmojisOnButtons(menu.renderOptions()),
             parseMode : menu.parseMode(),
             mode : mode,
             forceReply : menu.forceResponse()

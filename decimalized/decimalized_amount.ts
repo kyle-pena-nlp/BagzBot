@@ -8,6 +8,13 @@ import { Structural } from "../util";
 
 export const MATH_DECIMAL_PLACES = 15;
 
+export function dZero() : DecimalizedAmount {
+    return {
+        tokenAmount: "0",
+        decimals: 0
+    };
+}
+
 /* See decimalized_math.ts for operations on this type */
 export interface DecimalizedAmount {
     readonly [ key : string ] : Structural
@@ -23,7 +30,8 @@ const subscriptDigits = ['₀', '₁', '₂', '₃', '₄', '₅', '₆', '₇',
 
 export function toFriendlyString(x : DecimalizedAmount, maxSigFigs : number, 
     useSubscripts : boolean = true, 
-    addCommas : boolean = true) : string {
+    addCommas : boolean = true,
+    includePlusSign : boolean = false) : string {
     const longDecimalRepr = moveDecimalInString(x.tokenAmount, -x.decimals);
     const numberParts = longDecimalRepr.split(".");
     if (numberParts.length == 1) {
@@ -62,6 +70,9 @@ export function toFriendlyString(x : DecimalizedAmount, maxSigFigs : number,
         const localizedWholePart = addCommas ? 
             parseFloat(wholePart).toLocaleString() : 
             parseFloat(wholePart).toString();
+        if (includePlusSign && sign === '') {
+            sign = '+';
+        }
         return sign + localizedWholePart + "." + zeros + rest;
     }
 }

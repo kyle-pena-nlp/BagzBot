@@ -10,6 +10,7 @@ import { WEN_ADDRESS, getVsTokenInfo } from "../../tokens";
 import { ChangeTrackedValue, Structural, assertNever, makeFailureResponse, makeJSONResponse, makeSuccessResponse, maybeGetJson, strictParseBoolean } from "../../util";
 import { listUnclaimedBetaInviteCodes } from "../beta_invite_codes/beta_invite_code_interop";
 import { AutomaticallyClosePositionsRequest, AutomaticallyClosePositionsResponse } from "../token_pair_position_tracker/actions/automatically_close_positions";
+import { PositionAndMaybePNL } from "../token_pair_position_tracker/model/position_and_PNL";
 import { getPosition, listPositionsByUser } from "../token_pair_position_tracker/token_pair_position_tracker_DO_interop";
 import { BaseUserDORequest } from "./actions/base_user_do_request";
 import { DeleteSessionRequest, DeleteSessionResponse } from "./actions/delete_session";
@@ -268,7 +269,7 @@ export class UserDO {
 
     async handleListPositionsFromUserDO(request : ListPositionsFromUserDORequest) : Promise<Response> {
         const uniqueTokenPairs : TokenPair[] = this.tokenPairsForPositionIDsTracker.listUniqueTokenPairs();
-        const positions : Position[]  = [];
+        const positions : PositionAndMaybePNL[]  = [];
         for (const tokenPair of uniqueTokenPairs) {
             const positionsForTokenPair = await listPositionsByUser(request.telegramUserID, tokenPair.tokenAddress, tokenPair.vsTokenAddress, this.env);
             positions.push(...positionsForTokenPair);
@@ -276,9 +277,9 @@ export class UserDO {
         // if for whatever reason the pair for this position is missing, this would rectify it
         for (const position of positions) {
             this.tokenPairsForPositionIDsTracker.storePosition({
-                positionID: position.positionID,
-                token : { address : position.token.address },
-                vsToken : { address : position.vsToken.address }
+                positionID: position.position.positionID,
+                token : { address : position.position.token.address },
+                vsToken : { address : position.position.vsToken.address }
             });
         }
         const response : ListPositionsFromUserDOResponse = { positions: positions };

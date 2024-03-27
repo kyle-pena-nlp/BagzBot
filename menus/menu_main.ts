@@ -10,13 +10,18 @@ export interface AdminStatus {
     impersonatedUserID : number|undefined
 }
 
-export class MenuMain extends Menu<UserData & AdminStatus> implements MenuCapabilities {
+export interface BotName {
+    botName : string
+}
+
+export class MenuMain extends Menu<UserData & AdminStatus & BotName> implements MenuCapabilities {
     renderText(): string {
         const lines = [];
         if (this.menuData.maybeSOLBalance != null) {
             lines.push(
-                `<b>Main Menu</b> | ${toFriendlyString(this.menuData.maybeSOLBalance, 4)} SOL in wallet.`,
-                `<code>${this.menuData.address}</code>`
+                `<b>:bot: ${this.menuData.botName} Main Menu</b>`,
+                `<b>Wallet</b>: <code>${this.menuData.address}</code>`,
+                `<b>Purchasing Power</b>: :money_bag: ${toFriendlyString(this.menuData.maybeSOLBalance, 4)} SOL :money_bag:`,
             );
         }
         else {

@@ -1,7 +1,10 @@
 import * as dMath from "../../../decimalized";
-import { DecimalizedAmount, DecimalizedAmountSet, MATH_DECIMAL_PLACES, fromKey, fromNumber, toKey } from "../../../decimalized";
+import { DecimalizedAmount, DecimalizedAmountSet, MATH_DECIMAL_PLACES, dAdd, dDiv, dMult, dSub, fromKey, fromNumber, toKey } from "../../../decimalized";
+import { dZero } from "../../../decimalized/decimalized_amount";
+import { logError, logInfo } from "../../../logging";
 import { Position, PositionStatus, PositionType } from "../../../positions";
-import { setDifference, setIntersection, setUnion, structuralEquals } from "../../../util";
+import { ChangeTrackedValue, setDifference, setIntersection, setUnion, structuralEquals } from "../../../util";
+import { PositionAndMaybePNL } from "../model/position_and_PNL";
 import { PositionsAssociatedWithPeakPrices } from "./positions_associated_with_peak_prices";
 
 /* 
@@ -26,6 +29,7 @@ export class PeakPricePositionTracker {
     _buffer : PositionsAssociatedWithPeakPrices = new PositionsAssociatedWithPeakPrices();
     itemsByPeakPrice : PositionsAssociatedWithPeakPrices = new PositionsAssociatedWithPeakPrices();
     pricePeakSessionKeyPrefix : string;
+    currentPrice : ChangeTrackedValue<DecimalizedAmount|null> = new ChangeTrackedValue<DecimalizedAmount|null>("peakPriceTrackerCurrentPrice", null);
 
     constructor(pricePeakSessionKeyPrefix : string) {
         this.pricePeakSessionKeyPrefix = pricePeakSessionKeyPrefix;
@@ -36,8 +40,50 @@ export class PeakPricePositionTracker {
     add(price : DecimalizedAmount, position : Position) {
         this.itemsByPeakPrice.add(price, position);
     }
-    listByUser(userID : number) : Position[] {
-        return this.itemsByPeakPrice.listByUser(userID);
+    listByUser(userID : number) : PositionAndMaybePNL[] {
+        const result : PositionAndMaybePNL[] = [];
+        const positionsWithPeakPrices = this.itemsByPeakPrice.listByUser(userID);
+        for (const positionWithPeakPrice of positionsWithPeakPrices) {
+            // TODO: make sure currentPrice is updated.
+            const currentPrice = this.currentPrice.value;
+            if (currentPrice == null) {
+                result.push(positionWithPeakPrice);
+            }
+            else {
+                const originalValue = positionWithPeakPrice.position.vsTokenAmt;
+                const currentValue = dMult(currentPrice, positionWithPeakPrice.position.tokenAmt);
+                const peak = positionWithPeakPrice.peakPrice;
+                const fracBelowPeak = dDiv(dSub(peak, currentPrice), peak, MATH_DECIMAL_PLACES);
+                const PNL = dSub(currentValue, originalValue);
+                const PNLfrac = dDiv(PNL, originalValue, MATH_DECIMAL_PLACES);
+                result.push({
+                    ...positionWithPeakPrice,
+                    PNL: {
+                        currentPrice: currentPrice,
+                        fracBelowPeak: fracBelowPeak,
+                        PNL: PNL,
+                        PNLfrac: PNLfrac                       
+                    }
+                })
+            }
+        }
+        return result;
+    }
+    measurePNLForUser(userID : number) : DecimalizedAmount|undefined {
+        if (this.currentPrice.value == null) {
+            logInfo(`Couldn't calculate total PNL because currentPrice is null: ${userID}`);
+            return;
+        }
+        const positionsWithMaybePNL = this.listByUser(userID);
+        let totalPNL = dZero();
+        for (const pos of positionsWithMaybePNL) {
+            if (pos.PNL == null) {
+                logError(`Couldn't calculate total PNL b/c didn't have measured PNL: ${userID}, ${pos.position.positionID}`);
+                return;
+            }
+            totalPNL = dAdd(totalPNL, pos.PNL.PNL);
+        }
+        return totalPNL;
     }
     markAsClosing(positionID : string) {
         this.itemsByPeakPrice.markAsClosing(positionID);
@@ -49,6 +95,7 @@ export class PeakPricePositionTracker {
         return this.itemsByPeakPrice.removePosition(positionID);
     }
     update(newPrice : DecimalizedAmount) : Position[] {
+        this.currentPrice.value = newPrice;
         const peaks = [...this.itemsByPeakPrice.keys()];
         const mergedPeaks : DecimalizedAmount[] = [];
         const mergedPositions : (Position|undefined)[] = [];
