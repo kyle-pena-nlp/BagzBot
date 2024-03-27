@@ -8,18 +8,45 @@ import { logError, logInfo } from "../../logging";
 import { MenuViewOpenPosition } from "../../menus";
 import { Position, PositionRequest, PositionStatus, Quote, getSwapOfXDescription } from "../../positions";
 import { SwapSummary, isSuccessfulSwapSummary } from "../../rpc/rpc_types";
-import { TGStatusMessage } from "../../telegram";
+import { TGStatusMessage, UpdateableNotification } from "../../telegram";
 import { assertNever } from "../../util";
 import { upsertPosition } from "../token_pair_position_tracker/token_pair_position_tracker_DO_interop";
 import { createAndSignTx, executeAndConfirmSignedTx } from "./user_swap";
 
-export async function buy(positionRequest: PositionRequest,
-    wallet : Wallet, 
-    env : Env) {
-    
+export async function buy(positionRequest : PositionRequest,
+    wallet : Wallet,
+    env : Env) : Promise<void> {
+
     // non-blocking notification channel to push update messages to TG
     const notificationChannel = TGStatusMessage.replaceWithNotification(positionRequest.messageID, `Initiating.`, false, positionRequest.chatID, env);
+            
+    const result = await _buy(positionRequest, wallet, notificationChannel, env);
     
+    await TGStatusMessage.finalize(notificationChannel);
+
+    if (result === 'can-retry') {
+        // give user option to retry
+        const retryBuyMenuRequest = new MenuRetryBuy(undefined).getUpdateExistingMenuRequest(positionRequest.chatID, positionRequest.messageID, env);
+        await fetch(retryBuyMenuRequest);
+    }
+    else {
+        // take straight to position view
+        const newPosition = result.newPosition;
+        const currentValue = dMult(newPosition.tokenAmt, newPosition.fillPrice);
+        const viewOpenPositionRequest = new MenuViewOpenPosition({
+            position: newPosition,
+            currentValue
+        }).getUpdateExistingMenuRequest(positionRequest.chatID, positionRequest.messageID, env);
+        await fetch(viewOpenPositionRequest); 
+    }
+}
+
+async function _buy(positionRequest: PositionRequest,
+    wallet : Wallet, 
+    notificationChannel : UpdateableNotification,
+    env : Env) : Promise<'can-retry'|{ newPosition: Position }> {
+    
+
     // RPC connection
     const connection = new Connection(env.RPC_ENDPOINT_URL);
 
@@ -30,7 +57,7 @@ export async function buy(positionRequest: PositionRequest,
     if (signedTx == null) {
         const swapOfX = getSwapOfXDescription(positionRequest);
         TGStatusMessage.queue(notificationChannel, `Unable to sign transaction for ${swapOfX}`, true);
-        return;
+        return 'can-retry';
     }
 
     // programatically generate bs58 signature of tx
@@ -44,12 +71,10 @@ export async function buy(positionRequest: PositionRequest,
     // if the tx was executed but the swap failed
     if (parsedSwapSummary === 'swap-failed') {
         logInfo("Swap failed", positionRequest);
-        TGStatusMessage.queue(notificationChannel, '', false);
     }
     // if the act of sending the tx itself failed
     else if (parsedSwapSummary === 'tx-failed') {
         logInfo("Tx failed", positionRequest);
-        TGStatusMessage.queue(notificationChannel, '', false);
     }
     // if we couldn't retrieve (and therefore confirm) the tx
     else if (parsedSwapSummary === 'could-not-retrieve-tx') {
@@ -62,22 +87,22 @@ export async function buy(positionRequest: PositionRequest,
     else if (isSuccessfulSwapSummary(parsedSwapSummary)) {
         newPosition = convertConfirmedRequestToPosition(positionRequest, parsedSwapSummary.swapSummary);
         await upsertPosition(newPosition, env);
-        TGStatusMessage.queue(notificationChannel, `Peak Price is now being tracked. Position will be unwound when price dips below ${positionRequest.triggerPercent}% of peak.`, true);
+        TGStatusMessage.queue(notificationChannel, `Peak Price is now being tracked. Position will be unwound when price dips below ${positionRequest.triggerPercent}% of peak.`, false);
     }
     else {
         assertNever(parsedSwapSummary);
     }
 
-    await TGStatusMessage.finalize(notificationChannel);
 
-    if (newPosition != null) {
-        const currentValue = dMult(newPosition.tokenAmt, newPosition.fillPrice);
-        const viewOpenPositionRequest = new MenuViewOpenPosition({
-            position: newPosition,
-            currentValue
-        }).getUpdateExistingMenuRequest(positionRequest.chatID, positionRequest.messageID, env);
-        await fetch(viewOpenPositionRequest); 
-    } 
+    if (newPosition == null) {
+        return 'can-retry';
+    }
+    else if (newPosition != null) {
+        return  { newPosition };
+    }
+    else {
+        assertNever(newPosition);
+    }
 }
 
 function convertToUnconfirmedPosition(positionRequest : PositionRequest, quote : Quote, txSignature : string) {
