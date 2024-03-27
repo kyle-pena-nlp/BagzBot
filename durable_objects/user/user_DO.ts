@@ -3,23 +3,26 @@ import { Wallet, encryptPrivateKey, generateEd25519Keypair } from "../../crypto"
 import { DecimalizedAmount } from "../../decimalized";
 import { Env } from "../../env";
 import { logError } from "../../logging";
-import { PositionPreRequest, PositionType } from "../../positions";
+import { Position, PositionPreRequest, PositionType } from "../../positions";
 import { getSOLBalance } from "../../rpc/rpc_wallet";
 import { POSITION_REQUEST_STORAGE_KEY } from "../../storage_keys";
 import { WEN_ADDRESS, getVsTokenInfo } from "../../tokens";
 import { ChangeTrackedValue, Structural, assertNever, makeFailureResponse, makeJSONResponse, makeSuccessResponse, maybeGetJson, strictParseBoolean } from "../../util";
 import { listUnclaimedBetaInviteCodes } from "../beta_invite_codes/beta_invite_code_interop";
 import { AutomaticallyClosePositionsRequest, AutomaticallyClosePositionsResponse } from "../token_pair_position_tracker/actions/automatically_close_positions";
+import { getPosition, listPositionsByUser } from "../token_pair_position_tracker/token_pair_position_tracker_DO_interop";
 import { BaseUserDORequest } from "./actions/base_user_do_request";
 import { DeleteSessionRequest, DeleteSessionResponse } from "./actions/delete_session";
 import { GetAddressBookEntryRequest, GetAddressBookEntryResponse } from "./actions/get_address_book_entry";
 import { GetImpersonatedUserIDRequest, GetImpersonatedUserIDResponse } from "./actions/get_impersonated_user_id";
 import { GetLegalAgreementStatusRequest, GetLegalAgreementStatusResponse } from "./actions/get_legal_agreement_status";
+import { GetPositionFromUserDORequest, GetPositionFromUserDOResponse } from "./actions/get_position_from_user_do";
 import { GetSessionValuesRequest, GetSessionValuesWithPrefixRequest, GetSessionValuesWithPrefixResponse } from "./actions/get_session_values";
 import { GetUserDataRequest } from "./actions/get_user_data";
 import { GetWalletDataRequest, GetWalletDataResponse } from "./actions/get_wallet_data";
 import { ImpersonateUserRequest, ImpersonateUserResponse } from "./actions/impersonate_user";
 import { ListAddressBookEntriesRequest, ListAddressBookEntriesResponse } from "./actions/list_address_book_entries";
+import { ListPositionsFromUserDORequest, ListPositionsFromUserDOResponse } from "./actions/list_positions_from_user_do";
 import { ManuallyClosePositionRequest, ManuallyClosePositionResponse } from "./actions/manually_close_position";
 import { OpenPositionRequest, OpenPositionResponse } from "./actions/open_new_position";
 import { RemoveAddressBookEntryRequest, RemoveAddressBookEntryResponse } from "./actions/remove_address_book_entry";
@@ -33,7 +36,7 @@ import { UserData } from "./model/user_data";
 import { AddressBookEntryTracker } from "./trackers/address_book_entry_tracker";
 import { SessionTracker } from "./trackers/session_tracker";
 import { SOLBalanceTracker } from "./trackers/sol_balance_tracker";
-import { TokenPairsForPositionIDsTracker } from "./trackers/token_pairs_for_position_ids_tracker";
+import { TokenPair, TokenPairsForPositionIDsTracker } from "./trackers/token_pairs_for_position_ids_tracker";
 import { UserDOFetchMethod, parseUserDOFetchMethod } from "./userDO_interop";
 import { buy } from "./user_buy";
 import { sell, sellPosition } from "./user_sell";
@@ -240,11 +243,41 @@ export class UserDO {
             case UserDOFetchMethod.unimpersonateUser:
                 response = await this.handleUnimpersonateUser(userAction);
                 break;
+            case UserDOFetchMethod.getPositionFromUserDO:
+                response = await this.handleGetPositionFromUserDO(userAction);
+                break;
+            case UserDOFetchMethod.listPositionsFromUserDO:
+                response = await this.handleListPositionsFromUserDO(userAction);
+                break;
             default:
                 assertNever(method);
         }
 
         return [method,userAction,response];
+    }
+
+    async handleGetPositionFromUserDO(request : GetPositionFromUserDORequest) : Promise<Response> {
+        const positionID = request.positionID;
+        const tokenPair = this.tokenPairsForPositionIDsTracker.getPosition(positionID);
+        let position : Position|undefined = undefined;
+        if (tokenPair != null) {
+            const tokenAddress = tokenPair.token.address;
+            const vsTokenAddress = tokenPair.vsToken.address;
+            position = await getPosition(positionID, tokenAddress, vsTokenAddress, this.env);
+        }
+        const response : GetPositionFromUserDOResponse = { position : position };
+        return makeJSONResponse(response);
+    }
+
+    async handleListPositionsFromUserDO(request : ListPositionsFromUserDORequest) : Promise<Response> {
+        const uniqueTokenPairs : TokenPair[] = this.tokenPairsForPositionIDsTracker.listUniqueTokenPairs();
+        const positions : Position[]  = [];
+        for (const tokenPair of uniqueTokenPairs) {
+            const positionsForTokenPair = await listPositionsByUser(request.telegramUserID, tokenPair.tokenAddress, tokenPair.vsTokenAddress, this.env);
+            positions.push(...positionsForTokenPair);
+        }
+        const response : ListPositionsFromUserDOResponse = { positions: positions };
+        return makeJSONResponse(response);
     }
 
     async handleImpersonateUser(request : ImpersonateUserRequest) : Promise<Response> {

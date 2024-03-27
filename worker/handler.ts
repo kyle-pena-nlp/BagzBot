@@ -9,7 +9,7 @@ import { OpenPositionRequest } from "../durable_objects/user/actions/open_new_po
 import { CompletedAddressBookEntry, JustAddressBookEntryID, JustAddressBookEntryName } from "../durable_objects/user/model/address_book_entry";
 import { QuantityAndToken } from "../durable_objects/user/model/quantity_and_token";
 import { TokenSymbolAndAddress } from "../durable_objects/user/model/token_name_and_address";
-import { getAddressBookEntry, getDefaultTrailingStopLoss, getUserData, getWalletData, impersonateUser, listAddressBookEntries, manuallyClosePosition, maybeReadSessionObj, readSessionObj, requestNewPosition, storeAddressBookEntry, storeLegalAgreementStatus, storeSessionObj, storeSessionObjProperty, storeSessionValues, unimpersonateUser } from "../durable_objects/user/userDO_interop";
+import { getAddressBookEntry, getDefaultTrailingStopLoss, getPositionFromUserDO, getUserData, getWalletData, impersonateUser, listAddressBookEntries, listPositionsFromUserDO, manuallyClosePosition, maybeReadSessionObj, readSessionObj, requestNewPosition, storeAddressBookEntry, storeLegalAgreementStatus, storeSessionObj, storeSessionObjProperty, storeSessionValues, unimpersonateUser } from "../durable_objects/user/userDO_interop";
 import { Env } from "../env";
 import { logError } from "../logging";
 import { BaseMenu, LegalAgreement, MenuBetaInviteFriends, MenuCode, MenuConfirmAddressBookEntry, MenuConfirmTrailingStopLossPositionRequest, MenuContinueMessage, MenuEditTrailingStopLossPositionRequest, MenuError, MenuFAQ, MenuHelp, MenuListPositions, MenuMain, MenuPickTransferFundsRecipient, MenuPleaseEnterToken, MenuStartTransferFunds, MenuTODO, MenuTrailingStopLossAutoRetrySell, MenuTrailingStopLossEntryBuyQuantity, MenuTrailingStopLossPickVsToken, MenuTrailingStopLossSlippagePercent, MenuTrailingStopLossTriggerPercent, MenuTransferFundsTestOrSubmitNow, MenuViewDecryptedWallet, MenuViewOpenPosition, MenuWallet, PositiveDecimalKeypad, PositiveIntegerKeypad, WelcomeScreenPart1, WelcomeScreenPart2 } from "../menus";
@@ -192,6 +192,9 @@ export class Worker {
             case MenuCode.ViewOpenPosition:
                 const viewPositionID = callbackData.menuArg!!;
                 const position = await getPositionFromUserDO(params.getTelegramUserID(), viewPositionID, this.env);
+                if (position == null) {
+                    return new MenuContinueMessage('Sorry - this position was not found.', MenuCode.Main);
+                }
                 const price : DecimalizedAmount|undefined = await getTokenPrice(position.token.address, position.vsToken.address, this.env);
                 if (price != null) {
                     const currentValue = dMult(price, position.tokenAmt);

@@ -7,13 +7,13 @@ import { DeleteSessionRequest } from "./actions/delete_session";
 import { GetAddressBookEntryRequest, GetAddressBookEntryResponse } from "./actions/get_address_book_entry";
 import { GetImpersonatedUserIDRequest, GetImpersonatedUserIDResponse } from "./actions/get_impersonated_user_id";
 import { GetLegalAgreementStatusRequest, GetLegalAgreementStatusResponse } from "./actions/get_legal_agreement_status";
-import { GetPositionRequest } from "./actions/get_position";
+import { GetPositionFromUserDORequest, GetPositionFromUserDOResponse } from "./actions/get_position_from_user_do";
 import { GetSessionValuesRequest, GetSessionValuesWithPrefixRequest, GetSessionValuesWithPrefixResponse, SessionValuesResponse } from "./actions/get_session_values";
 import { GetUserDataRequest } from "./actions/get_user_data";
 import { GetWalletDataRequest, GetWalletDataResponse } from "./actions/get_wallet_data";
 import { ImpersonateUserRequest, ImpersonateUserResponse } from "./actions/impersonate_user";
 import { ListAddressBookEntriesRequest, ListAddressBookEntriesResponse } from "./actions/list_address_book_entries";
-import { ListPositionsRequest } from "./actions/list_positions";
+import { ListPositionsFromUserDORequest, ListPositionsFromUserDOResponse } from "./actions/list_positions_from_user_do";
 import { ManuallyClosePositionRequest, ManuallyClosePositionResponse } from "./actions/manually_close_position";
 import { OpenPositionRequest, OpenPositionResponse } from "./actions/open_new_position";
 import { RemoveAddressBookEntryRequest, RemoveAddressBookEntryResponse } from "./actions/remove_address_book_entry";
@@ -46,9 +46,24 @@ export enum UserDOFetchMethod {
 	getLegalAgreementStatus = "getLegalAgreementStatus",
 	getImpersonatedUserID = "getImpersonatedUserID",
 	impersonateUser = "impersonateUser",
-	unimpersonateUser = "unimpersonateUser"
+	unimpersonateUser = "unimpersonateUser",
+	listPositionsFromUserDO = "listPositionsFromUserDO",
+	getPositionFromUserDO = "getPositionFromUserDO"
 }
 
+export async function listPositionsFromUserDO(telegramUserID : number, env : Env) : Promise<Position[]> {
+	const request : ListPositionsFromUserDORequest = { telegramUserID };
+	const method = UserDOFetchMethod.listPositionsFromUserDO;
+	const response = await sendJSONRequestToUserDO<ListPositionsFromUserDORequest,ListPositionsFromUserDOResponse>(telegramUserID, method, request, env);
+	return response.positions;
+}
+
+export async function getPositionFromUserDO(telegramUserID : number, positionID : string, env : Env) : Promise<Position|undefined> {
+	const request : GetPositionFromUserDORequest = { telegramUserID, positionID };
+	const method = UserDOFetchMethod.getPositionFromUserDO;
+	const response = await sendJSONRequestToUserDO<GetPositionFromUserDORequest,GetPositionFromUserDOResponse>(telegramUserID, method, request, env);
+	return response.position;
+}
 
 export async function getImpersonatedUserID(telegramUserID : number, env : Env) : Promise<GetImpersonatedUserIDResponse> {
 	const request : GetImpersonatedUserIDRequest = { telegramUserID };

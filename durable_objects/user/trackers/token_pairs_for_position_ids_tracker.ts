@@ -6,6 +6,11 @@ export interface TokenPairForAPosition {
     vsToken : { address : string }
 }
 
+export interface TokenPair {
+    tokenAddress : string
+    vsTokenAddress : string
+}
+
 export class TokenPairsForPositionIDsTracker {
     tokenPairsForPositionIDs : Record<string,TokenPairForAPosition> = {};
     dirtyTracking : Set<string> = new Set<string>();
@@ -21,6 +26,22 @@ export class TokenPairsForPositionIDsTracker {
                 this.tokenPairsForPositionIDs[positionIDKey.toString()] = position;
             }
         }
+    }
+    listUniqueTokenPairs() : TokenPair[] {
+        const uniqueKeys : Set<string> = new Set<string>();
+        const tokenPairs : TokenPair[] = [];
+        for (const positionID of Object.keys(this.tokenPairsForPositionIDs)) {
+            const tokenPairForPosition = this.tokenPairsForPositionIDs[positionID];
+            const key = `${tokenPairForPosition.token.address}:${tokenPairForPosition.vsToken.address}`;
+            if (!uniqueKeys.has(key)) {
+                uniqueKeys.add(key);
+                tokenPairs.push({
+                    tokenAddress : tokenPairForPosition.token.address,
+                    vsTokenAddress: tokenPairForPosition.vsToken.address
+                });
+            }
+        }
+        return tokenPairs;
     }
     async flushToStorage(storage : DurableObjectStorage) {
         if (this.dirtyTracking.size == 0 && this.deletedKeys.size == 0) {
