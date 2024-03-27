@@ -20,7 +20,7 @@ export class MenuMain extends Menu<UserData & AdminStatus & BotName> implements 
         if (this.menuData.maybeSOLBalance != null) {
             lines.push(
                 `<b>:bot: ${this.menuData.botName} Main Menu</b>`,
-                `:bank: <b>Wallet</b>: <code>${this.menuData.address}</code>`,
+                `:wallet: <b>Wallet</b>: <code>${this.menuData.address}</code>`,
                 `<b>Balance</b>: ${toFriendlyString(this.menuData.maybeSOLBalance, 4)} SOL :money_bag:`,
             );
         }

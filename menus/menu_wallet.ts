@@ -11,11 +11,12 @@ export interface ViewWalletData {
 export class MenuWallet extends Menu<UserData> implements MenuCapabilities {
     renderText(): string {
         const lines : string[] = [];
+        lines.push(":wallet: <b>Your Wallet</b>");
         if (this.menuData.address != null) {
-            lines.push(`Address: <code>${this.menuData.address||''}</code>`);
+            lines.push(`<b>Address</b>: <code>${this.menuData.address||''}</code>`);
         }
         if (this.menuData.maybeSOLBalance != null) {
-            lines.push(`Balance: ${toFriendlyString(this.menuData.maybeSOLBalance, 4)} SOL`);
+            lines.push(`<b>Balance</b>: ${toFriendlyString(this.menuData.maybeSOLBalance, 4)} SOL`);
         }
         if (this.menuData.address != null) {
             lines.push(`<a href='https://solscan.io/account/${this.menuData.address}'>View Wallet</a>`);
@@ -24,8 +25,8 @@ export class MenuWallet extends Menu<UserData> implements MenuCapabilities {
     }
     renderOptions(): CallbackButton[][] {
         const options = this.emptyMenu();
-        this.insertButton(options, "Transfer Funds", this.menuCallback(MenuCode.TransferFunds), 1);
-        this.insertButton(options, "View Private Key",  this.menuCallback(MenuCode.ViewDecryptedWallet),  3);
+        this.insertButton(options, ":dollars: Transfer Funds :dollars:", this.menuCallback(MenuCode.TransferFunds), 1);
+        this.insertButton(options, ":key: View Private Key :key:",  this.menuCallback(MenuCode.ViewDecryptedWallet),  3);
         this.insertBackToMainButtonOnNewLine(options);
         return options;
     }

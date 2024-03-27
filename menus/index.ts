@@ -5,6 +5,7 @@ import { MenuCode } from "./menu_code";
 import { MenuConfirmAddressBookEntry } from "./menu_confirm_address_book_entry";
 import { MenuConfirmTrailingStopLossPositionRequest } from "./menu_confirm_trailing_stop_loss_position_request";
 import { MenuContinueMessage } from "./menu_continue_message";
+import { MenuEditPositionHelp } from "./menu_edit_position_help";
 import { MenuEditTrailingStopLossPositionRequest } from "./menu_edit_position_request";
 import { MenuError } from "./menu_error";
 import { MenuFAQ } from "./menu_faq";
@@ -32,7 +33,7 @@ import { WelcomeScreenPart1 } from "./welcome_screen_part_1";
 import { WelcomeScreenPart2 } from "./welcome_screen_part_2";
 
 export {
-    BaseMenu, LegalAgreement, MenuBetaInviteFriends, MenuCode, MenuConfirmAddressBookEntry, MenuConfirmTrailingStopLossPositionRequest, MenuContinueMessage, MenuEditTrailingStopLossPositionRequest, MenuError, MenuFAQ, MenuHelp,
+    BaseMenu, LegalAgreement, MenuBetaInviteFriends, MenuCode, MenuConfirmAddressBookEntry, MenuConfirmTrailingStopLossPositionRequest, MenuContinueMessage, MenuEditPositionHelp, MenuEditTrailingStopLossPositionRequest, MenuError, MenuFAQ, MenuHelp,
     MenuListPositions, MenuMain, MenuPickTransferFundsRecipient, MenuPleaseEnterToken, MenuPleaseWait, MenuRetryBuy, MenuTransferFundsMainMenu as MenuStartTransferFunds, MenuTODO, MenuTrailingStopLossAutoRetrySell,
     MenuTrailingStopLossEntryBuyQuantity,
     MenuTrailingStopLossPickVsToken,

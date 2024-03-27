@@ -11,6 +11,7 @@ export enum MenuCode {
 	Help = "Help",
 	Error = "Error",
 	NewPosition = "NewPosition",
+	EditPositionHelp = "EditPositionHelp",
 
 	// welcome screen
 	WelcomeScreenPart1 = "WelcomeScreenPart1",

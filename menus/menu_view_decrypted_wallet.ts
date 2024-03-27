@@ -8,7 +8,6 @@ import { MenuCode } from "./menu_code";
 export class MenuViewDecryptedWallet extends Menu<DecryptedWalletData> implements MenuCapabilities {
     renderText(): string {
         const lines = [
-            `<b>Address:</b> <code>${this.menuData.publicKey}</code>`,
             `<b>Private Key:</b> <span class="tg-spoiler">${this.menuData.decryptedPrivateKey}</span>`,
             `<i>We do not store keys in plaintext.  This private key was decrypted and sent to you via secure channels over telegram.</i>`
         ];

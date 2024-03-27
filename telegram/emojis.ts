@@ -5,13 +5,19 @@ const emojis = {
     ':bot:': '🤖',
 
     ':winged_money:': '💸',
-    ':dollar:': '💵',
+    ':dollars:': '💵',
+    ':wallet:': '💰',
 
     ':notify:': '🔔',
 
     ':black-square:': '◾',
     ':big-black-square:': '⬛',
     ':down-red:': '🔻',
+    ':bullet:': '•',
+    ':pencil:': '✏️',
+    ':refresh:': '🔄',
+    ':twisted_arrows:': '🔀',
+    ':cancel:': '🥜',
 
     ':chart_up:': '📈',
     ':chart_down:': '📉',
@@ -47,6 +53,7 @@ const emojis = {
     ':anger:': '😠',
     ':disappointed:': '😞',
     ':indifference:': '😑',
+    ':peanuts:': '🥜',
     ':happy:': '😊',
     ':beaming:': '😁',
     ':money_face:': '🤑',
@@ -55,7 +62,7 @@ const emojis = {
 
 
     ':sign:': '✍',
-    ':thinking:': '🤔',
+    ':help:': '🤔',
 
     ':bread:': '🍞',
     ':office:': '🏢',
@@ -89,16 +96,19 @@ export function interpretPNL(pnl : number) : emojiTag {
     if (pnl < -10) {
         return ':rage:';
     }
-    else if (pnl < -1) {
+    else if (pnl < -5) {
         return ':anger:';
     }
-    else if (pnl <= -0.1) {
+    else if (pnl <= -0.5) {
         return ':disappointed:'
     }
-    else if (pnl < 0.1) {
+    else if (pnl < 0.0) {
         return ':meh:';
     }
-    else if (pnl < 1) {
+    else if (pnl < 0.5) {
+        return ':peanuts:';
+    }
+    else if (pnl < 5) {
         return ':happy:';
     }
     else if (pnl < 10) {
