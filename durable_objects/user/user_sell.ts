@@ -8,21 +8,18 @@ import { parseSwapTransaction } from "../../rpc/rpc_parse";
 import { ParsedSuccessfulSwapSummary, isSuccessfullyParsedSwapSummary, isSwapExecutionErrorParseSummary, isSwapExecutionErrorParseSwapSummary, isUnknownTransactionParseSummary } from "../../rpc/rpc_types";
 import { TGStatusMessage } from "../../telegram";
 import { assertNever } from "../../util";
-import { MarkPositionAsClosedRequest } from "../token_pair_position_tracker/actions/mark_position_as_closed";
-import { markPositionAsClosedInTokenPairPositionTracker as removePositionFromPriceTracking } from "../token_pair_position_tracker/token_pair_position_tracker_DO_interop";
-import { UserPositionTracker } from "./trackers/user_position_tracker";
+import { getPosition, markAsClosed, markAsClosing, markAsOpen, upsertPosition } from "../token_pair_position_tracker/token_pair_position_tracker_DO_interop";
 import { createAndSignTx, executeAndConfirmSignedTx } from "./user_swap";
 
 export async function sell(positionID: string, 
+    tokenAddress : string,
+    vsTokenAddress : string,
     wallet : Wallet, 
-    env : Env) {
-
-    const startTimeMS = Date.now();
-    const maxTimeMS = startTimeMS + (25 * 1000);
+    env : Env) : Promise<void> {
 
     // get the corresponding tracked position from the user-side position tracker
-    const position = await getPosition(positionID);
-    
+    const position = await getPosition(positionID, tokenAddress, vsTokenAddress, env);
+
     // if it doesn't exist, either:
     //  it's already been sold or... 
     //  the system determined that the tx certainly never executed.
@@ -31,6 +28,15 @@ export async function sell(positionID: string,
         logInfo("Sell attempted on position that doesn't exist", position);
         return;
     }
+
+    return await sellPosition(position, wallet, env);
+
+}
+export async function sellPosition(position : Position,
+    wallet : Wallet,
+    env : Env) : Promise<void> {
+
+
 
     // if the position is already being sold (Closing), don't pile it on.
     if (position.status === PositionStatus.Closing) {
@@ -49,7 +55,7 @@ export async function sell(positionID: string,
     // if the position was never successfully confirmed, try now.
     if (!position.confirmed) {
         logInfo("Position unconfirmed when attempting to sell - attempting to confirm now.", position);
-        await tryToConfirmPriorBuyInOrderToSell(position, wallet, connection, userPositionTracker, env);
+        await tryToConfirmPriorBuyInOrderToSell(position, wallet, connection, env);
         // maybe do a final price check here to see if sell conditions are still met?
         // or... better yet... early out and let the tracker re-send if price cond'n met
         logError("Early-out of sell since tx was not confirmed... tracker will resend", position);
@@ -67,19 +73,19 @@ export async function sell(positionID: string,
     }
 
     // check one last time position isn't gone, closed, or closing (awaits can happen, dude)
-    const recheckPosition = await getPosition(position.positionID);
+    const recheckPosition = await getPosition(position.positionID, position.token.address, position.vsToken.address, env);
     if (recheckPosition == null || recheckPosition.status == PositionStatus.Closing || recheckPosition.status === PositionStatus.Closed) {
         logInfo("Final check on position status showed position was closed/closing/removed");
         return;
     }
 
     // marking as closing will prevent double-sells until the sell is confirmed
-    await markAsClosing(position.positionID);
+    await markAsClosing(position.positionID, position.token.address, position.vsToken.address, env);
 
     // TODO: how can I prevent an extra sell attempt from sneaking between these lines of code? is there a way to block?
 
     // do the swap
-    const parsedSwapSummary = await executeAndConfirmSignedTx(position, signedTx, wallet, env, notificationChannel, connection, maxTimeMS);
+    const parsedSwapSummary = await executeAndConfirmSignedTx(position, signedTx, wallet, env, notificationChannel, connection);
 
     if (parsedSwapSummary === 'could-not-retrieve-tx') {
         //TODO: mark as unconfirmed.
@@ -89,25 +95,15 @@ export async function sell(positionID: string,
     }
     else if (parsedSwapSummary === 'swap-failed') {
         logError("Could not execute sell tx, marking position as open again", position);
-        await setAsOpen(position.positionID);
-        return;
+        await markAsOpen(position.positionID, position.token.address, position.vsToken.address, env);
     }
     else if (parsedSwapSummary === 'tx-failed') {
         logError("Could not execute sell swap, marking position as open again", position);
-        await setAsOpen(position.positionID);
-        return;
+        await markAsOpen(position.positionID, position.token.address, position.vsToken.address, env);
     }
     else if (isSuccessfullyParsedSwapSummary(parsedSwapSummary)) {
         // otherwise, mark position as closed.
-        await closePosition(position.positionID);
-
-        // send a request to the price tracker to stop tracking the position
-        const removeFromPriceTrackingRequest : MarkPositionAsClosedRequest = { 
-            positionID : position.positionID, 
-            tokenAddress: position.token.address, 
-            vsTokenAddress : position.vsToken.address 
-        };
-        await removePositionFromPriceTracking(removeFromPriceTrackingRequest, env);
+        await markAsClosed(position.positionID, position.token.address, position.vsToken.address, env);
     }
     else {
         assertNever(parsedSwapSummary);
@@ -120,7 +116,6 @@ export async function sell(positionID: string,
 async function tryToConfirmPriorBuyInOrderToSell(position : Position, 
     wallet : Wallet, 
     connection : Connection,
-    userPositionTracker : UserPositionTracker, 
     env : Env) : Promise<ParsedSuccessfulSwapSummary|undefined> {
         
     // we are confirming the buy side, so the 'in' is the vsToken and the 'out' is the token
@@ -138,7 +133,7 @@ async function tryToConfirmPriorBuyInOrderToSell(position : Position,
     if (isSuccessfullyParsedSwapSummary(maybeParsed)) {
         // mark the position as confirmed and update the tracker
         updatePositionWithParsedTxInfo(position, maybeParsed);
-        userPositionTracker.storePositions([position]);
+        await upsertPosition(position, env);
         return maybeParsed;
     }
 
@@ -168,7 +163,7 @@ async function tryToConfirmPriorBuyInOrderToSell(position : Position,
 
     // we are successful.  mark the position as confirmed and update the tracker.
     updatePositionWithParsedTxInfo(position, maybeParsed);
-    userPositionTracker.storePositions([position]);
+    await upsertPosition(position, env);
     return maybeParsed;
 }
 

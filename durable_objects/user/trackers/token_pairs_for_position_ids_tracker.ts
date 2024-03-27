@@ -1,7 +1,13 @@
-import { Position, PositionStatus } from "../../../positions";
 
-export class UserPositionTracker {
-    positions : Record<string,Position> = {};
+export interface TokenPairForAPosition {
+    positionID : string,
+    // this is a bit awkward, but necessary for backwards compat with existing values from testing
+    token : { address : string },
+    vsToken : { address : string }
+}
+
+export class TokenPairsForPositionIDsTracker {
+    tokenPairsForPositionIDs : Record<string,TokenPairForAPosition> = {};
     dirtyTracking : Set<string> = new Set<string>();
     deletedKeys : Set<string> = new Set<string>();
     constructor() {
@@ -12,7 +18,7 @@ export class UserPositionTracker {
             const positionIDKey = PositionIDKey.parse(entryKey);
             if (positionIDKey != null) {
                 const position = entries.get(positionIDKey.toString());
-                this.positions[positionIDKey.toString()] = position;
+                this.tokenPairsForPositionIDs[positionIDKey.toString()] = position;
             }
         }
     }
@@ -20,9 +26,9 @@ export class UserPositionTracker {
         if (this.dirtyTracking.size == 0 && this.deletedKeys.size == 0) {
             return;
         }
-        const putEntries : Record<string,Position> = {};
+        const putEntries : Record<string,TokenPairForAPosition> = {};
         for (const key of this.dirtyTracking) {
-            const value = this.positions[key];
+            const value = this.tokenPairsForPositionIDs[key];
             putEntries[key] = value;
         }
         const putPromise = storage.put(putEntries).then(() => {
@@ -33,50 +39,21 @@ export class UserPositionTracker {
         });
         await Promise.allSettled([putPromise, deletePromise]);
     }
-    storePositions(positions: Position[]) {
-        for (const position of positions) {
-            const positionIDKey = new PositionIDKey(position.positionID);
-            this.positions[positionIDKey.toString()] = position;
-            this.markAsDirty(positionIDKey);
-        }
+    storePosition(position: TokenPairForAPosition) {
+        const positionIDKey = new PositionIDKey(position.positionID);
+        this.tokenPairsForPositionIDs[positionIDKey.toString()] = position;
+        this.markAsDirty(positionIDKey);  
     }
     removePositions(positionIDs : string[]) {
         for (const positionID of positionIDs) {
             const positionIDKey = new PositionIDKey(positionID);
-            delete this.positions[positionIDKey.toString()];
+            delete this.tokenPairsForPositionIDs[positionIDKey.toString()];
             this.markAsDeleted(positionIDKey);
         }
     }
-    closePosition(positionID : string) {
-        // TODO: maybe, keep in list and mark status as closed???
-        if (positionID in Object.keys(this.positions)) {
-            const positionIDKey = new PositionIDKey(positionID);
-            delete this.positions[positionIDKey.toString()];
-            this.markAsDeleted(positionIDKey);
-        }
-    }
-    listPositions() : Position[] {
-        return Object.values(this.positions);
-    }
-    getPosition(positionID : string) : Position|null {
+    getPosition(positionID : string) : TokenPairForAPosition|null {
         const positionIDKey = new PositionIDKey(positionID);
-        return this.positions[positionIDKey.toString()]||null;
-    }
-    markAsClosing(positionID : string) {
-        const positionIDKey = new PositionIDKey(positionID);
-        const position = this.positions[positionIDKey.toString()];
-        if (position) {
-            position.status = PositionStatus.Closing;
-            this.markAsDirty(positionIDKey);
-        }
-    }
-    setAsOpen(positionID : string) {
-        const positionIDKey = new PositionIDKey(positionID);
-        const position = this.positions[positionIDKey.toString()];
-        if (position) {
-            position.status = PositionStatus.Open;
-            this.markAsDirty(positionIDKey);
-        }
+        return this.tokenPairsForPositionIDs[positionIDKey.toString()]||null;
     }
     private markAsDirty(key : PositionIDKey) {
         this.deletedKeys.delete(key.toString());

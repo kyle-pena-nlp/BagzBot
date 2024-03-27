@@ -22,10 +22,10 @@ export async function createAndSignTx(s : Swappable,
     notificationChannel : UpdateableNotification) : Promise<VersionedTransaction|undefined> {
 
 
-    // get swap route / quote
+    // get friendly description of what we are doing
     const swapOfX = getSwapOfXDescription(s);
-    const SwapOfX = getSwapOfXDescription(s, true);
 
+    // get a swap route. if fails, early out.
     const swapRoute = await getSwapRoute(s, env).catch(r => null);
     if (swapRoute == null || isGetQuoteFailure(swapRoute)) {
         logError("Failed getting swap route", s, swapRoute);
@@ -36,7 +36,7 @@ export async function createAndSignTx(s : Swappable,
         TGStatusMessage.queue(notificationChannel, `Quote found for ${swapOfX}`, false);
     }
 
-    // serialize swap route 
+    // serialize swap route. if fails, early out.
     const txBuffer = await serializeSwapRouteTransaction(swapRoute, wallet.publicKey, shouldIncludeReferralPlatformFee(s), env).catch(r => null);
     if (txBuffer == null || isTransactionPreparationFailure(txBuffer)) {
         logError("Failed serializing transaction", s, txBuffer);
@@ -47,7 +47,7 @@ export async function createAndSignTx(s : Swappable,
         TGStatusMessage.queue(notificationChannel, `Transaction serialized for ${swapOfX}`, false);
     }
 
-    // sign tx
+    // sign tx. if fails, early out.
     const signedTx = await signTransaction(txBuffer, wallet, s.userID, env).catch(r => null);
     if (signedTx == null || isTransactionPreparationFailure(signedTx)) {
         logError("Failed signing transaction", s, signedTx);
@@ -66,10 +66,9 @@ export async function executeAndConfirmSignedTx(s: Swappable,
     wallet : Wallet, 
     env : Env,
     notificationChannel : UpdateableNotification,
-    connection : Connection,
-    maxTimeMS : number) : Promise<ParsedSuccessfulSwapSummary|'could-not-retrieve-tx'|'tx-failed'|'swap-failed'> {
-
-    const swapOfX = getSwapOfXDescription(s);
+    connection : Connection) : Promise<ParsedSuccessfulSwapSummary|'could-not-retrieve-tx'|'tx-failed'|'swap-failed'> {
+    
+    // get a friendly description of what we are doing
     const SwapOfX = getSwapOfXDescription(s, true);
 
     // get some stuff we'll need
@@ -88,7 +87,7 @@ export async function executeAndConfirmSignedTx(s: Swappable,
         return 'tx-failed';        
     }
 
-    // transaction went through, but swap failed
+    // transaction went through, but swap failed. early out.
     if (isFailedSwapTxExecution(maybeExecutedTx)) {
         logError('Swap failed', s, maybeExecutedTx);
         const msg = makeSwapSummaryFailedMessage(maybeExecutedTx.status, s);
@@ -98,7 +97,7 @@ export async function executeAndConfirmSignedTx(s: Swappable,
 
     let parsedSwapSummary : ParsedSwapSummary|null = null;
 
-    // tx went through, attempt parse.
+    // if tx went through, attempt parse.
     if (isConfirmedTxExecution(maybeExecutedTx)) {
         logDebug('Transaction confirmed - preparing to parse', s, maybeExecutedTx);
         parsedSwapSummary = await parseSwapTransaction(s, maybeExecutedTx, userAddress, connection, env).catch(r => {
@@ -107,7 +106,7 @@ export async function executeAndConfirmSignedTx(s: Swappable,
         });
     }
     
-    // if the act of retrieving the parsed transaction failed...
+    // if the act of retrieving the parsed transaction failed... early out.
     if (parsedSwapSummary == null) {
         logError('Unexpected error retrieving transaction', s, { signature : signature });
         const msg = `There was a problem retrieving information about your transaction.`;
@@ -115,7 +114,7 @@ export async function executeAndConfirmSignedTx(s: Swappable,
         return 'could-not-retrieve-tx';
     }
 
-    // if parsing the confirmed tx shows there was a problem with the swap
+    // if parsing the confirmed tx shows there was a problem with the swap, early out.
     if (isSwapExecutionErrorParseSwapSummary(parsedSwapSummary)) {
         logError('Swap execution error', s, parsedSwapSummary);
         const failedMsg = makeSwapSummaryFailedMessage(parsedSwapSummary.status, s);
@@ -130,6 +129,7 @@ export async function executeAndConfirmSignedTx(s: Swappable,
         TGStatusMessage.queue(notificationChannel, msg, false);
     }
 
+    // if we couldn't confirm.
     if (isUnknownTransactionParseSummary(parsedSwapSummary)) {
         logInfo('Tx did not exist', s, parsedSwapSummary);
         const msg = `Could not confirm ${SwapOfX}.`;

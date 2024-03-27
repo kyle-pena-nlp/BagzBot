@@ -6,6 +6,7 @@ import { GetPositionFromPriceTrackerRequest, GetPositionFromPriceTrackerResponse
 import { ListPositionsByUserRequest, ListPositionsByUserResponse } from "./actions/list_positions_by_user";
 import { MarkPositionAsClosedRequest, MarkPositionAsClosedResponse } from "./actions/mark_position_as_closed";
 import { MarkPositionAsClosingRequest, MarkPositionAsClosingResponse } from "./actions/mark_position_as_closing";
+import { MarkPositionAsOpenRequest, MarkPositionAsOpenResponse } from "./actions/mark_position_as_open";
 import { RemovePositionRequest, RemovePositionResponse } from "./actions/remove_position";
 import { UpsertPositionsRequest, UpsertPositionsResponse } from "./actions/upsert_positions";
 import { WakeupRequest, WakeupResponse } from "./actions/wake_up";
@@ -16,8 +17,8 @@ export enum TokenPairPositionTrackerDOFetchMethod {
 	upsertPositions = "upsertPositions",
 	markPositionAsClosing = "markPositionAsClosing",
 	markPositionAsClosed = "markPositionAsClosed",
+	markPositionAsOpen = "markPositionAsOpen",	
 	removePosition = "removePosition",
-	markPositionAsOpen = "markPositionAsOpen",
 	getTokenPrice = "getTokenPrice",
 	getPosition = "getPosition",
 	listPositionsByUser = "listPositionsByUser"
@@ -36,7 +37,7 @@ export async function getPosition(positionID : string, tokenAddress : string, vs
 	return response.maybePosition;
 }
 
-export async function storePosition(position : Position, env : Env) : Promise<UpsertPositionsResponse> {
+export async function upsertPosition(position : Position, env : Env) : Promise<UpsertPositionsResponse> {
 	const method = TokenPairPositionTrackerDOFetchMethod.upsertPositions;
 	const request : UpsertPositionsRequest = { positions: [position], tokenAddress: position.token.address, vsTokenAddress: position.vsToken.address };
 	const response = await sendJSONRequestToTokenPairPositionTracker<UpsertPositionsRequest,UpsertPositionsResponse>(method, request, request.tokenAddress, request.vsTokenAddress, env);
@@ -79,8 +80,9 @@ export async function wakeUpTokenPairPositionTracker(tokenAddress : string, vsTo
 
 
 
-export async function markPositionAsClosedInTokenPairPositionTracker(request : MarkPositionAsClosedRequest, env : Env) : Promise<MarkPositionAsClosedResponse> {
+export async function markAsClosed(positionID : string, tokenAddress : string, vsTokenAddress : string, env : Env) : Promise<MarkPositionAsClosedResponse> {
 	const method = TokenPairPositionTrackerDOFetchMethod.markPositionAsClosed;
+	const request : MarkPositionAsClosedRequest = { positionID, tokenAddress, vsTokenAddress };
 	return await sendJSONRequestToTokenPairPositionTracker<MarkPositionAsClosedRequest,MarkPositionAsClosedResponse>(
 		method, 
 		request, 
@@ -89,14 +91,22 @@ export async function markPositionAsClosedInTokenPairPositionTracker(request : M
 		env);
 }
 
-export async function markPositionAsClosingInTokenPairPositionTracker(request : MarkPositionAsClosingRequest, env : Env) : Promise<MarkPositionAsClosingResponse> {
+export async function markAsClosing(positionID : string, tokenAddress : string, vsTokenAddress : string, env : Env) : Promise<MarkPositionAsClosingResponse> {
 	const method = TokenPairPositionTrackerDOFetchMethod.markPositionAsClosing;
+	const request : MarkPositionAsClosingRequest = { positionID, tokenAddress, vsTokenAddress };
 	return await sendJSONRequestToTokenPairPositionTracker<MarkPositionAsClosingRequest,MarkPositionAsClosingResponse>(
 		method,
 		request,
 		request.tokenAddress,
 		request.tokenAddress,
 		env);
+}
+
+export async function markAsOpen(positionID : string, tokenAddress : string, vsTokenAddress : string, env : Env) : Promise<MarkPositionAsOpenResponse> {
+	const method = TokenPairPositionTrackerDOFetchMethod.markPositionAsOpen;
+	const request : MarkPositionAsOpenRequest = { positionID, tokenAddress, vsTokenAddress };
+	const response = await sendJSONRequestToTokenPairPositionTracker<MarkPositionAsOpenRequest,MarkPositionAsOpenResponse>(method, request, tokenAddress, vsTokenAddress, env);
+	return response;
 }
 
 export async function importNewPosition(position : Position, env : Env) : Promise<UpsertPositionsResponse> {

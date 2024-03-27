@@ -3,7 +3,7 @@ import { Wallet, encryptPrivateKey, generateEd25519Keypair } from "../../crypto"
 import { DecimalizedAmount } from "../../decimalized";
 import { Env } from "../../env";
 import { logError } from "../../logging";
-import { PositionPreRequest, PositionStatus, PositionType } from "../../positions";
+import { PositionPreRequest, PositionType } from "../../positions";
 import { getSOLBalance } from "../../rpc/rpc_wallet";
 import { POSITION_REQUEST_STORAGE_KEY } from "../../storage_keys";
 import { WEN_ADDRESS, getVsTokenInfo } from "../../tokens";
@@ -33,9 +33,10 @@ import { UserData } from "./model/user_data";
 import { AddressBookEntryTracker } from "./trackers/address_book_entry_tracker";
 import { SessionTracker } from "./trackers/session_tracker";
 import { SOLBalanceTracker } from "./trackers/sol_balance_tracker";
+import { TokenPairsForPositionIDsTracker } from "./trackers/token_pairs_for_position_ids_tracker";
 import { UserDOFetchMethod, parseUserDOFetchMethod } from "./userDO_interop";
 import { buy } from "./user_buy";
-import { sell } from "./user_sell";
+import { sell, sellPosition } from "./user_sell";
 
 // TODO: all requests to UserDo include telegramUserID and telegramUserName
 // and ensure initialization.  That way, no purpose-specific initialization call is required
@@ -90,6 +91,9 @@ export class UserDO {
     // has the user signed legal?
     legalAgreementStatus : ChangeTrackedValue<'agreed'|'refused'|'has-not-responded'> = new ChangeTrackedValue<'agreed'|'refused'|'has-not-responded'>('hasSignedLegal', 'has-not-responded');
 
+    // stores just the positionID / tokenAddress / vsTokenAddress
+    tokenPairsForPositionIDsTracker : TokenPairsForPositionIDsTracker = new TokenPairsForPositionIDsTracker();
+
     constructor(state : DurableObjectState, env : any) {
         // persistent state object which reaches eventual consistency
         this.env                = env;
@@ -111,6 +115,7 @@ export class UserDO {
         this.solBalanceTracker.initialize(storage); // rate limits RPC calls. will refresh on access.
         this.legalAgreementStatus.initialize(storage);
         this.defaultTrailingStopLossRequest.initialize(storage);
+        this.tokenPairsForPositionIDsTracker.initialize(storage);
     }
 
     async flushToStorage() {
@@ -122,7 +127,8 @@ export class UserDO {
             this.addressBookEntryTracker.flushToStorage(this.state.storage),
             this.solBalanceTracker.flushToStorage(this.state.storage),
             this.legalAgreementStatus.flushToStorage(this.state.storage),
-            this.defaultTrailingStopLossRequest.flushToStorage(this.state.storage)
+            this.defaultTrailingStopLossRequest.flushToStorage(this.state.storage),
+            this.tokenPairsForPositionIDsTracker.flushToStorage(this.state.storage)
         ]);
     }
 
@@ -443,58 +449,35 @@ export class UserDO {
     async handleOpenNewPosition(openPositionRequest : OpenPositionRequest) : Promise<Response> {
         // fire and forget (async callback will handle success and failure cases for swap)
         const positionRequest = openPositionRequest.positionRequest;       
+        this.tokenPairsForPositionIDsTracker.storePosition({
+            positionID: openPositionRequest.positionRequest.positionID,
+            token: { address : openPositionRequest.positionRequest.token.address },
+            vsToken: { address : openPositionRequest.positionRequest.vsToken.address }
+        });
         /*
             This is deliberately not awaited.
             Durable Objects will continue processing requests for up to 30 seconds
             (Which means the buy has to happen in 30 secs!!!)
-        */
+        */        
         buy(positionRequest, this.wallet.value!!, this.env);
         return makeJSONResponse<OpenPositionResponse>({});
     }
     
     async handleManuallyClosePositionRequest(manuallyClosePositionRequest : ManuallyClosePositionRequest) : Promise<Response> {
-        
         const positionID = manuallyClosePositionRequest.positionID;
-        const position = await getPosition(positionID);
-        if (position == null) {
-            return makeJSONResponse<ManuallyClosePositionResponse>({ message: 'Position does not exist.' });
+        const tokenPair = this.tokenPairsForPositionIDsTracker.getPosition(positionID);
+        if (tokenPair == null) {
+            logError(`Could not find tokenPair for position ID ${positionID}`, this.telegramUserID);
+            return makeJSONResponse<ManuallyClosePositionResponse>({ message: 'Could not find token pair for position' });
         }
-        else if (position.status === PositionStatus.Closing) {
-            return makeJSONResponse<ManuallyClosePositionResponse>({ message: 'Position are being closed.' });
-        }
-        else if (position.status === PositionStatus.Closed) {
-            return makeJSONResponse<ManuallyClosePositionResponse>({ message: 'Position already closed.' });
-        }
-        sell(position.positionID, this.wallet.value!!, this.env);
+        sell(positionID, tokenPair.token.address, tokenPair.vsToken.address, this.wallet.value!!, this.env);
         return makeJSONResponse<ManuallyClosePositionResponse>({ message: 'Position will now be closed. '});
     }
 
     async handleAutomaticallyClosePositionsRequest(closePositionsRequest : AutomaticallyClosePositionsRequest) : Promise<Response> {
         const positions = closePositionsRequest.positions;
         for (const position of positions) {
-
-            // before we sell, we verify the position is still active
-            const userTrackedPosition = await getPosition(position.positionID);
-            
-            // if it's already gone, don't try to re-sell it
-            if (userTrackedPosition == null) {
-                continue;
-            } 
-
-            // if it's already in the process of being sold, don't try to re-sell it
-            if (userTrackedPosition.status === PositionStatus.Closing) {
-                continue;
-            }
-
-            // if it's already sold, don't try to re-sell it
-            if (position.status === PositionStatus.Closed) {
-                continue;
-            }
-
-            // TODO: handle unconfirmed status.
-
-            // otherwise, try to sell it.
-            sell(position.positionID, this.wallet.value!!, this.env);
+            sellPosition(position, this.wallet.value!!, this.env);
         }
         return makeJSONResponse<AutomaticallyClosePositionsResponse>({});
     }

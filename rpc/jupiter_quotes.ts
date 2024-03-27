@@ -3,7 +3,6 @@ import { DecimalizedAmount, MATH_DECIMAL_PLACES, dDiv } from "../decimalized";
 import { Env } from "../env";
 import { Position, PositionPreRequest, PositionRequest, Quote } from "../positions";
 import { TokenInfo, getVsTokenDecimalsMultiplier, getVsTokenInfo } from "../tokens";
-import { assertNever } from "../util";
 import { JupiterQuoteAPIParams, SwapRoute } from "./jupiter_types";
 import { GetQuoteFailure, isGetQuoteFailure } from "./rpc_types";
 
@@ -79,13 +78,13 @@ export async function getBuyTokenSwapRoute(positionRequest : PositionPreRequest|
 }
 
 function getTokenAddress(p : PositionPreRequest|PositionRequest) : string {
-    if ('token' in p) {
+    if (!('tokenAddress' in p)) {
         return p.token.address;
     }
-    else if ('tokenAddress' in p) {
+    else if (!('token' in p)) {
         return p.tokenAddress;
     }
-    assertNever(p);
+    throw new Error("Programmer error.");
 }
 
 export async function getSellTokenSwapRoute(position : Position, env : Env) : Promise<SwapRoute|GetQuoteFailure> {
