@@ -40,7 +40,11 @@ export function toFriendlyString(x : DecimalizedAmount, maxSigFigs : number,
         // If there are multiple zeros between the decimal and some non-zero stuff to the right...
         if (useSubscripts && zeros.length > 1 && (wholePart == '0'||wholePart == '') && rest.length > 0) {
             // replace all those zeros with 0₇, for example
-            zeros = "0" + subscriptDigits[zeros.length];
+            let subscripts = '';
+            for (const character of (zeros.length).toString()) {
+                subscripts += subscriptDigits[parseInt(character,10)];
+            }
+            zeros = "0" + subscripts;
         }
         // If there are multiple zeros after the decimal but nothing to the right of them
         if (zeros.length > 1 && rest.length === 0) {

@@ -7,7 +7,7 @@ test("tracker_stores_position", () => {
     const triggerPct = 10;
     const tracker = new PeakPricePositionTracker(prefix());
     const pos = posWithPriceAndTrigger(d(250,0), triggerPct);
-    tracker.push(pos.fillPrice, pos);
+    tracker.add(pos.fillPrice, pos);
     expect(tracker.itemsByPeakPrice.size).toEqual(1);
 });
 
@@ -16,7 +16,7 @@ test("tracker_does_not_trigger_small_price_drop", () => {
     const triggerPct = 10;
     const tracker = new PeakPricePositionTracker(prefix());
     const pos = posWithPriceAndTrigger(d(250,0), triggerPct);
-    tracker.push(pos.fillPrice, pos);
+    tracker.add(pos.fillPrice, pos);
     const triggeredPositions = tracker.update(d(249,0));
     expect(triggeredPositions).toHaveLength(0);
 });
@@ -25,7 +25,7 @@ test("tracker_does_not_trigger_price_same", () => {
     const triggerPct = 10;
     const tracker = new PeakPricePositionTracker(prefix());
     const pos = posWithPriceAndTrigger(d(250,0), triggerPct);
-    tracker.push(pos.fillPrice, pos);
+    tracker.add(pos.fillPrice, pos);
     const triggeredPositions = tracker.update(d(250,0));
     expect(triggeredPositions).toHaveLength(0);
 });
@@ -34,7 +34,7 @@ test("tracker_does_not_trigger_price_increase", () => {
     const triggerPct = 10;
     const tracker = new PeakPricePositionTracker(prefix());
     const pos = posWithPriceAndTrigger(d(250,0), triggerPct);
-    tracker.push(pos.fillPrice, pos);
+    tracker.add(pos.fillPrice, pos);
     const triggeredPositions = tracker.update(d(260,0));
     expect(triggeredPositions).toHaveLength(0);
 });
@@ -44,7 +44,7 @@ test("tracker_triggers_big_price_drop", () => {
     const triggerPct = 10;
     const tracker = new PeakPricePositionTracker(prefix());
     const pos = posWithPriceAndTrigger(d(250,0), triggerPct);
-    tracker.push(pos.fillPrice, pos);
+    tracker.add(pos.fillPrice, pos);
     const triggeredPositions = tracker.update(d(225,0));
     expect(triggeredPositions).toHaveLength(1);
 });
@@ -53,7 +53,7 @@ test("tracker_triggers_price_drop_after_peak", () => {
     const triggerPct = 10;
     const tracker = new PeakPricePositionTracker(prefix());
     const pos = posWithPriceAndTrigger(d(250,0), triggerPct);
-    tracker.push(pos.fillPrice, pos);
+    tracker.add(pos.fillPrice, pos);
     const triggeredPositions1 = tracker.update(d(300,0));
     expect(triggeredPositions1).toHaveLength(0);
     const triggeredPositions2 = tracker.update(d(270,0));
@@ -65,10 +65,10 @@ test("tracker_triggers_one_position_but_not_other", () => {
     const tracker = new PeakPricePositionTracker(prefix());
 
     const pos1 = posWithPriceAndTrigger(d(280,0), triggerPct, "A");
-    tracker.push(pos1.fillPrice, pos1);
+    tracker.add(pos1.fillPrice, pos1);
 
     const pos2 = posWithPriceAndTrigger(d(300,0), triggerPct, "B");
-    tracker.push(pos2.fillPrice, pos2);
+    tracker.add(pos2.fillPrice, pos2);
     
     const triggeredPositions = tracker.update(d(270,0));
     expect(triggeredPositions).toHaveLength(1);
@@ -79,11 +79,11 @@ test("tracker_triggers_both_positions_after_peak_consolidation", () => {
     const triggerPct = 10;
     const tracker = new PeakPricePositionTracker(prefix());
 
-    const pos1 = posWithPriceAndTrigger(d(280,0), triggerPct);
-    tracker.push(pos1.fillPrice, pos1);
+    const pos1 = posWithPriceAndTrigger(d(280,0), triggerPct , "A");
+    tracker.add(pos1.fillPrice, pos1);
 
-    const pos2 = posWithPriceAndTrigger(d(290,0), triggerPct);
-    tracker.push(pos2.fillPrice, pos2);
+    const pos2 = posWithPriceAndTrigger(d(290,0), triggerPct, "B");
+    tracker.add(pos2.fillPrice, pos2);
     
     const triggeredPositions1 = tracker.update(d(300,0));
     expect(triggeredPositions1).toHaveLength(0);

@@ -112,7 +112,6 @@ function logIt(xs : any[], level : 'error'|'info'|'debug') {
             break;
         default:
             assertNever(level);
-            throw new Error("Programmer error.");
     }
 }
 

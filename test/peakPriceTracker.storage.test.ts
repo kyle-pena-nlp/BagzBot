@@ -15,10 +15,10 @@ test("storage_roundtrip_preserves_state", async () => {
 
     const tracker = new PeakPricePositionTracker(prefix());
     const pos1 = pos(d(280,0), "A");
-    tracker.push(pos1.fillPrice, pos1);
+    tracker.add(pos1.fillPrice, pos1);
 
     const pos2 = pos(d(290,0), "B");
-    tracker.push(pos2.fillPrice, pos2);
+    tracker.add(pos2.fillPrice, pos2);
 
     await tracker.flushToStorage(fakeStorage as unknown as DurableObjectStorage);
     
@@ -36,15 +36,15 @@ test("storage_only_dumps_deltas", async () => {
 
     const tracker = new PeakPricePositionTracker(prefix());
     const pos1 = pos(d(280,0), "A");
-    tracker.push(pos1.fillPrice, pos1);
+    tracker.add(pos1.fillPrice, pos1);
 
     await tracker.flushToStorage(fakeStorage as unknown as DurableObjectStorage);
 
     expect([...Object.values(fakeStorage.puts)]).toEqual([pos1]);
 
     const pos2 = pos(d(290,0), "B");
-    tracker.push(pos2.fillPrice, pos2);
-    tracker.removePosition("A");
+    tracker.add(pos2.fillPrice, pos2);
+    tracker.remove("A");
 
     await tracker.flushToStorage(fakeStorage as unknown as DurableObjectStorage);
 
@@ -166,22 +166,22 @@ async function runEvents(
     for (const event of events) {
         // perform an operation on storage according to the kind of event
         if (isAddPositionEvent(event)) {
-            tracker.push(event.fillPrice, event);
+            tracker.add(event.fillPrice, event);
         }
         else if (isAddPositionsEvent(event)) {
             for (const position of event) {
-                tracker.push(position.fillPrice, position);
+                tracker.add(position.fillPrice, position);
             }
         }
         else if (isRemovePositionEvent(event)) {
-            tracker.removePosition(event.remove);
+            tracker.remove(event.remove);
         }
         else if (isUpdatePriceEvent(event)) {
             const positionsToClose = tracker.update(event);
             // if it's a close position request, 
             // go ahead and remove the position from the tracker
             for (const position of positionsToClose) {
-                tracker.removePosition(position.positionID);
+                tracker.remove(position.positionID);
             }
             closedPositionGroups.push(positionsToClose);            
         }

@@ -80,10 +80,10 @@ export async function getBuyTokenSwapRoute(positionRequest : PositionPreRequest|
 }
 
 function getTokenAddress(p : PositionPreRequest|PositionRequest) : string {
-    if (!('tokenAddress' in p)) {
-        return p.token.address;
+    if (('token' in p)) {
+        return (p.token as TokenInfo).address;
     }
-    else if (!('token' in p)) {
+    else if (('tokenAddress' in p)) {
         return p.tokenAddress;
     }
     throw new Error("Programmer error.");
