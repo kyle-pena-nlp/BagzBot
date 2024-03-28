@@ -10,10 +10,10 @@ import { OpenPositionRequest } from "../durable_objects/user/actions/open_new_po
 import { CompletedAddressBookEntry, JustAddressBookEntryID, JustAddressBookEntryName } from "../durable_objects/user/model/address_book_entry";
 import { QuantityAndToken } from "../durable_objects/user/model/quantity_and_token";
 import { TokenSymbolAndAddress } from "../durable_objects/user/model/token_name_and_address";
-import { getAddressBookEntry, getDefaultTrailingStopLoss, getPositionFromUserDO, getUserData, getWalletData, impersonateUser, listAddressBookEntries, listPositionsFromUserDO, manuallyClosePosition, maybeReadSessionObj, readSessionObj, requestNewPosition, storeAddressBookEntry, storeLegalAgreementStatus, storeSessionObj, storeSessionObjProperty, storeSessionValues, unimpersonateUser } from "../durable_objects/user/userDO_interop";
+import { getAddressBookEntry, getDefaultTrailingStopLoss, getPositionFromUserDO, getUserData, getWalletData, impersonateUser, listAddressBookEntries, listPositionsFromUserDO, manuallyClosePosition, maybeReadSessionObj, readSessionObj, requestNewPosition, sendMessageToUser, storeAddressBookEntry, storeLegalAgreementStatus, storeSessionObj, storeSessionObjProperty, storeSessionValues, unimpersonateUser } from "../durable_objects/user/userDO_interop";
 import { Env } from "../env";
 import { logDebug, logError } from "../logging";
-import { BaseMenu, LegalAgreement, MenuBetaInviteFriends, MenuCode, MenuConfirmAddressBookEntry, MenuConfirmTrailingStopLossPositionRequest, MenuContinueMessage, MenuEditPositionHelp, MenuEditTrailingStopLossPositionRequest, MenuError, MenuFAQ, MenuHelp, MenuListPositions, MenuMain, MenuPickTransferFundsRecipient, MenuPleaseEnterToken, MenuStartTransferFunds, MenuTODO, MenuTrailingStopLossAutoRetrySell, MenuTrailingStopLossEntryBuyQuantity, MenuTrailingStopLossPickVsToken, MenuTrailingStopLossSlippagePercent, MenuTrailingStopLossTriggerPercent, MenuTransferFundsTestOrSubmitNow, MenuViewDecryptedWallet, MenuViewOpenPosition, MenuWallet, PositiveDecimalKeypad, PositiveIntegerKeypad, WelcomeScreenPart1, WelcomeScreenPart2 } from "../menus";
+import { BaseMenu, LegalAgreement, MenuBetaInviteFriends, MenuCode, MenuConfirmAddressBookEntry, MenuConfirmTrailingStopLossPositionRequest, MenuContinueMessage, MenuEditPositionHelp, MenuEditTrailingStopLossPositionRequest, MenuError, MenuFAQ, MenuHelp, MenuListPositions, MenuMain, MenuOKClose, MenuPickTransferFundsRecipient, MenuPleaseEnterToken, MenuStartTransferFunds, MenuTODO, MenuTrailingStopLossAutoRetrySell, MenuTrailingStopLossEntryBuyQuantity, MenuTrailingStopLossPickVsToken, MenuTrailingStopLossSlippagePercent, MenuTrailingStopLossTriggerPercent, MenuTransferFundsTestOrSubmitNow, MenuViewDecryptedWallet, MenuViewOpenPosition, MenuWallet, PositiveDecimalKeypad, PositiveIntegerKeypad, WelcomeScreenPart1, WelcomeScreenPart2 } from "../menus";
 import { PositionPreRequest, PositionRequest, convertPreRequestToRequest } from "../positions";
 import { ReplyQuestion, ReplyQuestionCode } from "../reply_question";
 import { ReplyQuestionData, replyQuestionHasNextSteps } from "../reply_question/reply_question_data";
@@ -23,7 +23,7 @@ import { isGetQuoteFailure } from "../rpc/rpc_types";
 import { POSITION_REQUEST_STORAGE_KEY } from "../storage_keys";
 import { TelegramWebhookInfo, deleteTGMessage, sendMessageToTG, sendRequestToTG, updateTGMessage } from "../telegram";
 import { WEN_ADDRESS, getVsTokenInfo } from "../tokens";
-import { Structural, assertNever, makeFakeFailedRequestResponse, makeSuccessResponse, tryParseFloat, tryParseInt } from "../util";
+import { Structural, assertNever, makeFakeFailedRequestResponse, makeSuccessResponse, strictParseBoolean, strictParseInt, tryParseFloat, tryParseInt } from "../util";
 import { CallbackHandlerParams } from "./model/callback_handler_params";
 import { TokenAddressExtractor } from "./token_address_extractor";
 
@@ -492,9 +492,35 @@ export class Worker {
                 return this.createMainMenu(params, this.env);
             case MenuCode.EditPositionHelp:
                 return new MenuEditPositionHelp(undefined);
+            case MenuCode.BetaFeedbackQuestion:
+                return new ReplyQuestion(
+                    "Enter your feedback - it will be reviewed by the administrators", 
+                    ReplyQuestionCode.SendBetaFeedback, 
+                    this.context, {
+                        callback: {
+                            linkedMessageID: messageID,
+                            nextMenuCode: MenuCode.SubmitBetaFeedback
+                        },
+                        timeoutMS: 45
+                    });
+            case MenuCode.SubmitBetaFeedback:
+                const betaFeedbackAnswer = (callbackData.menuArg||'').trim();
+                if (betaFeedbackAnswer !== '') {
+                    this.context.waitUntil(this.sendBetaFeedbackToSuperAdmin(betaFeedbackAnswer));
+                }
+                const thankYouDialogueRequest = new MenuOKClose("Thank you!").getCreateNewMenuRequest(chatID, this.env);
+                await fetch(thankYouDialogueRequest).catch(r => {
+                    logError("Failed to send thank you");
+                    return null;
+                });
+                return;
             default:
                 assertNever(callbackData.menuCode);
         }
+    }
+
+    private async sendBetaFeedbackToSuperAdmin(feedback : string) : Promise<void> {
+        await sendMessageToUser(strictParseInt(this.env.SUPER_ADMIN_USER_ID), feedback, this.env);
     }
 
     private async createMainMenu(info : CallbackHandlerParams, env : Env) : Promise<BaseMenu> {
@@ -504,7 +530,8 @@ export class Worker {
             isImpersonatingUser: info.isImpersonatingAUser(),
             impersonatedUserID: info.isImpersonatingAUser() ? info.getTelegramUserID() : undefined,
             botName : this.getBotName(env),
-            botTagline: env.TELEGRAM_BOT_TAGLINE
+            botTagline: env.TELEGRAM_BOT_TAGLINE,
+            isBeta : strictParseBoolean(env.IS_BETA_CODE_GATED)
         });
     }
 
@@ -629,6 +656,8 @@ export class Worker {
                 break;
             case ReplyQuestionCode.ImpersonateUser:
                 break;
+            case ReplyQuestionCode.SendBetaFeedback:
+                break;
             default:
                 assertNever(replyQuestionCode);
         }
@@ -680,7 +709,8 @@ export class Worker {
                     isImpersonatingUser : info.isImpersonatingAUser(), 
                     impersonatedUserID: info.isImpersonatingAUser() ? info.getTelegramUserID() : undefined,
                     botName : this.getBotName(env),
-                    botTagline: env.TELEGRAM_BOT_TAGLINE
+                    botTagline: env.TELEGRAM_BOT_TAGLINE,
+                    isBeta: strictParseBoolean(env.IS_BETA_CODE_GATED)
                 })];
             case '/menu':
                 const menuUserData = await getUserData(info.getTelegramUserID(), info.messageID, false, env);
@@ -690,7 +720,8 @@ export class Worker {
                     isImpersonatingUser: info.isImpersonatingAUser(), 
                     impersonatedUserID: info.isImpersonatingAUser() ? info.getTelegramUserID() : undefined,
                     botName : this.getBotName(env),
-                    botTagline: env.TELEGRAM_BOT_TAGLINE 
+                    botTagline: env.TELEGRAM_BOT_TAGLINE,
+                    isBeta : strictParseBoolean(env.IS_BETA_CODE_GATED)
                 })];
             case '/welcome_screen':
                 return ['...', new WelcomeScreenPart1(undefined)];

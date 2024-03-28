@@ -6,9 +6,9 @@ import { logError } from "../../logging";
 import { Position, PositionPreRequest, PositionType } from "../../positions";
 import { getSOLBalance } from "../../rpc/rpc_wallet";
 import { POSITION_REQUEST_STORAGE_KEY } from "../../storage_keys";
-import { TGStatusMessage, UpdateableNotification } from "../../telegram";
+import { TGStatusMessage, UpdateableNotification, sendMessageToTG } from "../../telegram";
 import { WEN_ADDRESS, getVsTokenInfo } from "../../tokens";
-import { ChangeTrackedValue, Structural, assertNever, groupIntoBatches, makeFailureResponse, makeJSONResponse, makeSuccessResponse, maybeGetJson, strictParseBoolean } from "../../util";
+import { ChangeTrackedValue, Structural, assertNever, groupIntoBatches, makeFailureResponse, makeJSONResponse, makeSuccessResponse, maybeGetJson, sleep, strictParseBoolean } from "../../util";
 import { listUnclaimedBetaInviteCodes } from "../beta_invite_codes/beta_invite_code_interop";
 import { AutomaticallyClosePositionsRequest, AutomaticallyClosePositionsResponse } from "../token_pair_position_tracker/actions/automatically_close_positions";
 import { PositionAndMaybePNL } from "../token_pair_position_tracker/model/position_and_PNL";
@@ -29,6 +29,7 @@ import { ManuallyClosePositionRequest, ManuallyClosePositionResponse } from "./a
 import { OpenPositionRequest, OpenPositionResponse } from "./actions/open_new_position";
 import { RemoveAddressBookEntryRequest, RemoveAddressBookEntryResponse } from "./actions/remove_address_book_entry";
 import { DefaultTrailingStopLossRequestRequest, DefaultTrailingStopLossRequestResponse } from "./actions/request_default_position_request";
+import { SendMessageToUserRequest, SendMessageToUserResponse } from "./actions/send_message_to_user";
 import { StoreAddressBookEntryRequest, StoreAddressBookEntryResponse } from "./actions/store_address_book_entry";
 import { StoreLegalAgreementStatusRequest, StoreLegalAgreementStatusResponse } from "./actions/store_legal_agreement_status";
 import { StoreSessionValuesRequest, StoreSessionValuesResponse } from "./actions/store_session_values";
@@ -73,6 +74,9 @@ export class UserDO {
     // user's ID
     telegramUserID : ChangeTrackedValue<number|null> = new ChangeTrackedValue<number|null>('telegramUserID', null);
 
+    // most recent chatID with telegram
+    chatID : ChangeTrackedValue<number|null> = new ChangeTrackedValue<number|null>("chatID", null);
+
     // if the user is impersonating someone, this is populated.
     // all other properties pertain to the 'real user' per telegramUserID, not the impersonated user
     impersonatedUserID : ChangeTrackedValue<number|null> = new ChangeTrackedValue<number|null>("impersonatedUserID", null);
@@ -101,6 +105,10 @@ export class UserDO {
 
     userPNLTracker : UserPNLTracker = new UserPNLTracker();
 
+    inbox: string[] = [];
+    // TODO: way to make arrays compatible with ChangeTrackedValue?
+    //inbox : ChangeTrackedValue<string[]> = new ChangeTrackedValue<string[]>("inbox", []);
+
     constructor(state : DurableObjectState, env : any) {
         this.env                = env;
         this.state              = state;
@@ -121,6 +129,7 @@ export class UserDO {
         this.defaultTrailingStopLossRequest.initialize(storage);
         this.tokenPairsForPositionIDsTracker.initialize(storage);
         this.userPNLTracker.initialize(storage);
+        this.chatID.initialize(storage);
     }
 
     async flushToStorage() {
@@ -134,7 +143,8 @@ export class UserDO {
             this.legalAgreementStatus.flushToStorage(this.state.storage),
             this.defaultTrailingStopLossRequest.flushToStorage(this.state.storage),
             this.tokenPairsForPositionIDsTracker.flushToStorage(this.state.storage),
-            this.userPNLTracker.flushToStorage(this.state.storage)
+            this.userPNLTracker.flushToStorage(this.state.storage),
+            this.chatID.flushToStorage(this.state.storage)
         ]);
     }
 
@@ -253,11 +263,45 @@ export class UserDO {
             case UserDOFetchMethod.listPositionsFromUserDO:
                 response = await this.handleListPositionsFromUserDO(userAction);
                 break;
+            case UserDOFetchMethod.sendMessageToUser:
+                response = await this.handleSendMessageToUser(userAction);
+                break;
             default:
                 assertNever(method);
         }
 
         return [method,userAction,response];
+    }
+
+    async handleSendMessageToUser(request : SendMessageToUserRequest) : Promise<Response> {
+        await this.handleSendMessageToUserInternal(request);
+        const response: SendMessageToUserResponse = {};
+        return makeJSONResponse(response);
+    }
+
+    async handleSendMessageToUserInternal(request : SendMessageToUserRequest) : Promise<void> {
+        this.inbox.push(request.message);
+        if (this.chatID.value == null) {
+            return;
+        }
+        const chatID = this.chatID.value;
+        const sendSuccessIdxs : number[] = [];
+        this.inbox.forEach(async (message,index) => {
+            const result = await sendMessageToTG(chatID, message, this.env);
+            if (result.success) {
+                sendSuccessIdxs.push(index);
+            }
+            if (index !== this.inbox.length - 1) {
+                sleep(500);
+            }  
+        });
+        const inboxMinusSentMessages : string[] = [];
+        this.inbox.forEach((message,index) => {
+            if (!sendSuccessIdxs.includes(index)) {
+                inboxMinusSentMessages.push(message);
+            }
+        })
+        this.inbox = inboxMinusSentMessages;
     }
 
     async handleGetPositionFromUserDO(request : GetPositionFromUserDORequest) : Promise<Response> {

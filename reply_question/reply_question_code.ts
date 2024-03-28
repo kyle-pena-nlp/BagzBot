@@ -7,6 +7,8 @@ export enum ReplyQuestionCode {
     EnterBuyQuantity = "EnterBuyQuantity",
     EnterTriggerPercent = "EnterTriggerPercent",
     EditPositionChangeToken = "EditPositionChangeToken",
-    ImpersonateUser = "ImpersonateUser"
+    ImpersonateUser = "ImpersonateUser",
+
+    SendBetaFeedback = "SendBetaFeedback"
     
 }

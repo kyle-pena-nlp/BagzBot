@@ -82,5 +82,8 @@ export enum MenuCode {
 	TrailingStopLossConfirmMenu = "TSL.ConfirmMenu",
 	TrailingStopLossEditorFinalSubmit = "TSL.EditorFinalSubmit",
 
+	BetaFeedbackQuestion = "BetaFeedbackQuestion",
+	SubmitBetaFeedback = "SubmitBetaFeedback",
+
 	Close = "Close"
 };

@@ -20,7 +20,11 @@ export interface BotTagline {
     botTagline : string
 }
 
-export class MenuMain extends Menu<UserData & AdminStatus & BotName & BotTagline> implements MenuCapabilities {
+export interface IsBeta {
+    isBeta : boolean
+}
+
+export class MenuMain extends Menu<UserData & AdminStatus & BotName & BotTagline & IsBeta> implements MenuCapabilities {
     renderText(): string {
         const lines = [];
         
@@ -53,6 +57,7 @@ export class MenuMain extends Menu<UserData & AdminStatus & BotName & BotTagline
         if (this.menuData.isImpersonatingUser) {
             lines.push(`Currently IMPERSONATING '${this.menuData.impersonatedUserID||''}'`)
         }
+
         return lines.join("\r\n");
     }
     renderOptions(): CallbackButton[][] {
@@ -70,6 +75,9 @@ export class MenuMain extends Menu<UserData & AdminStatus & BotName & BotTagline
             }
             if (this.menuData.isAdminOrSuperAdmin && !this.menuData.isImpersonatingUser) {
                 this.insertButtonNextLine(options, 'ADMIN: Impersonate a User', this.menuCallback(MenuCode.ImpersonateUser));
+            }
+            if (this.menuData.isBeta) {
+                this.insertButtonNextLine(options, ':love_letter: Send Feedback :love_letter:', this.menuCallback(MenuCode.BetaFeedbackQuestion));
             }
             this.createHelpMenuLine(options);
         }

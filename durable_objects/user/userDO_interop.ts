@@ -19,6 +19,7 @@ import { ManuallyClosePositionRequest, ManuallyClosePositionResponse } from "./a
 import { OpenPositionRequest, OpenPositionResponse } from "./actions/open_new_position";
 import { RemoveAddressBookEntryRequest, RemoveAddressBookEntryResponse } from "./actions/remove_address_book_entry";
 import { DefaultTrailingStopLossRequestRequest, DefaultTrailingStopLossRequestResponse } from "./actions/request_default_position_request";
+import { SendMessageToUserRequest, SendMessageToUserResponse } from "./actions/send_message_to_user";
 import { StoreAddressBookEntryRequest, StoreAddressBookEntryResponse } from "./actions/store_address_book_entry";
 import { StoreLegalAgreementStatusRequest, StoreLegalAgreementStatusResponse } from "./actions/store_legal_agreement_status";
 import { StoreSessionValuesRequest, StoreSessionValuesResponse } from "./actions/store_session_values";
@@ -49,7 +50,15 @@ export enum UserDOFetchMethod {
 	impersonateUser = "impersonateUser",
 	unimpersonateUser = "unimpersonateUser",
 	listPositionsFromUserDO = "listPositionsFromUserDO",
-	getPositionFromUserDO = "getPositionFromUserDO"
+	getPositionFromUserDO = "getPositionFromUserDO",
+	sendMessageToUser = "sendMessageToUser"
+}
+
+export async function sendMessageToUser(telegramUserID : number, message : string, env : Env) : Promise<SendMessageToUserResponse> {
+	const request : SendMessageToUserRequest = { telegramUserID, message };
+	const method = UserDOFetchMethod.sendMessageToUser;
+	const response = await sendJSONRequestToUserDO<SendMessageToUserRequest,SendMessageToUserResponse>(telegramUserID, method, request, env);
+	return response;
 }
 
 export async function listPositionsFromUserDO(telegramUserID : number, env : Env) : Promise<PositionAndMaybePNL[]> {
