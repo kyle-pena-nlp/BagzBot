@@ -9,6 +9,7 @@ import { safe } from "../util";
 import { waitUntilCurrentBlockFinalized } from "./rpc_blocks";
 import { parseInstructionError } from "./rpc_parse_instruction_error";
 import { ParsedSwapSummary, PreparseConfirmedSwapResult, PreparseSwapResult, SwapSummary } from "./rpc_types";
+import { dZero } from "../decimalized/decimalized_amount";
 
 // This may come in handy at some point: https://github.com/cocrafts/walless/blob/a05d20f8275c8167a26de976a3b6701d64472765/apps/wallet/src/engine/runners/solana/history/swapHistory.ts#L85
 
@@ -80,7 +81,7 @@ export async function parseSwapTransaction(
     }
 
     // in / out <-> SOL / CHONKY <-> $$ / taco <-> taco costs $1.50
-    const fillPrice = dDiv(swapInTokenDiff, swapOutTokenDiff, MATH_DECIMAL_PLACES);
+    const fillPrice = dDiv(swapInTokenDiff, swapOutTokenDiff, MATH_DECIMAL_PLACES) || dZero();
 
     const fees = parsedTransaction.meta?.fee || 0;
 

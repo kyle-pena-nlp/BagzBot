@@ -1,5 +1,6 @@
 
 import { DecimalizedAmount, MATH_DECIMAL_PLACES, dDiv } from "../decimalized";
+import { dZero } from "../decimalized/decimalized_amount";
 import { Env } from "../env";
 import { Position, PositionPreRequest, PositionRequest, Quote } from "../positions";
 import { TokenInfo, getVsTokenDecimalsMultiplier, getVsTokenInfo } from "../tokens";
@@ -41,7 +42,7 @@ async function makeQuote(swapRoute : GetQuoteFailure|SwapRoute, inTokenInfo : To
     const outTokenAmt = { tokenAmount : outTokenAmount, decimals : outTokenInfo.decimals };
     // For the buy:
     // in / out <-> SOL / chonky <-> $$ / taco <-> a taco cost $1.50
-    const fillPrice = dDiv(inTokenAmt, outTokenAmt, MATH_DECIMAL_PLACES);
+    const fillPrice = dDiv(inTokenAmt, outTokenAmt, MATH_DECIMAL_PLACES) || dZero();
     const quote : Quote = {
         inToken: inTokenInfo,
         inTokenAmt: inTokenAmt,

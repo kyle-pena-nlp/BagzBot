@@ -1,4 +1,4 @@
-import { DecimalizedAmount, moveDecimalInString } from "./decimalized_amount";
+import { DecimalizedAmount, dZero, moveDecimalInString } from "./decimalized_amount";
 
 export function dAdd(a : DecimalizedAmount, b : DecimalizedAmount) : DecimalizedAmount {
     const decimals = Math.max(a.decimals, b.decimals);
@@ -41,10 +41,13 @@ export function dMult(a : DecimalizedAmount, b : DecimalizedAmount) : Decimalize
 /*
  * @warning This can be a lossy operation
 */
-export function dDiv(a : DecimalizedAmount, b : DecimalizedAmount, decimalPlaces : number) : DecimalizedAmount {
+export function dDiv(a : DecimalizedAmount, b : DecimalizedAmount, decimalPlaces : number) : DecimalizedAmount|undefined {
     const decimals = Math.max(a.decimals, b.decimals);
     a = convertToLargerDecimals(a, decimals);
     b = convertToLargerDecimals(b, decimals);
+    if (dCompare(b, dZero()) === 0) {
+        return;
+    }
     const decimalPlaceMultiplier = BigInt("1" + ("0".repeat(decimalPlaces)));
     const scaledResultBI = ((BigInt(a.tokenAmount) * decimalPlaceMultiplier) / BigInt(b.tokenAmount));
     return {
@@ -55,6 +58,9 @@ export function dDiv(a : DecimalizedAmount, b : DecimalizedAmount, decimalPlaces
 
 export function percentOf(price : DecimalizedAmount, peakPrice : DecimalizedAmount) : number {
     const fraction = dDiv(price, peakPrice, 6);
+    if (fraction == null) {
+        return 0.0;
+    }
     const number = dAsNumber(fraction);
     return number;
 }

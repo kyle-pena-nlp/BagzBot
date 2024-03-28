@@ -37,6 +37,7 @@ export interface Env {
 	START_POLLING_ON_START : string
 	POLLING_ON : string
 	USER_PNL_CALCULATION_REFRESH_MS : string
+	TOKEN_LIST_REFRESH_TIMEOUT : string
 
 	UserDO : any // i'd like to strongly type this as DurableObjectNamespace, but can't for technical reasons
 	TokenPairPositionTrackerDO : any // ditto

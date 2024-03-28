@@ -44,12 +44,12 @@ export class UserPNLTracker {
                     PNL = dAdd(PNL, positionWithPNL.PNL.PNL)
                 }
             }
-            const PNLpercent = dMult(dDiv(PNL, originalTotalValue, MATH_DECIMAL_PLACES), fromNumber(100));
+            const PNLpercent = dDiv(dMult(PNL, fromNumber(100)), originalTotalValue, MATH_DECIMAL_PLACES);
             this.maybeUserPNL.value = {
                 originalTotalValue: originalTotalValue,
                 currentTotalValue: currentTotalValue,
                 PNL: PNL,
-                PNLpercent: PNLpercent
+                PNLpercent: PNLpercent||dZero()
             }
         }
         return this.maybeUserPNL.value||null;

@@ -1,10 +1,9 @@
 import { DurableObjectState } from "@cloudflare/workers-types";
 import { Env } from "../../env";
 import { StagedTokenInfo, TokenInfo } from "../../tokens";
-import { assertNever, makeFailureResponse, makeJSONResponse, makeSuccessResponse, maybeGetJson } from "../../util";
+import { assertNever, makeJSONResponse, makeSuccessResponse, maybeGetJson } from "../../util";
 import { GetTokenInfoRequest, GetTokenInfoResponse } from "./actions/get_token_info";
 import { PolledTokenPairListDOFetchMethod, parsePolledTokenPairListDOFetchMethod } from "./polled_token_pair_list_DO_interop";
-import { PolledTokenPairTracker } from "./trackers/polled_token_pair_tracker";
 import { TokenTracker } from "./trackers/token_tracker";
 
 type TokensByVsToken = Map<string,string[]>;
@@ -16,18 +15,15 @@ interface PriceAPIRequestSpec {
 
 export class PolledTokenPairListDO {
     /*
-        Maintains a list of tokens to poll for price updates
+        Maintains a list of tokens
     */
-
     state: DurableObjectState;
     env : Env;
-    polledTokenPairTracker : PolledTokenPairTracker;
     tokenTracker : TokenTracker;
 
     constructor(state : DurableObjectState, env : Env) {
         this.state = state;
         this.env = env;
-        this.polledTokenPairTracker = new PolledTokenPairTracker();
         this.tokenTracker = new TokenTracker();
         this.state.blockConcurrencyWhile(async () => {
             await this.loadStateFromStorage(this.state.storage);
@@ -36,13 +32,11 @@ export class PolledTokenPairListDO {
 
     async loadStateFromStorage(storage : DurableObjectStorage) {
         const storageEntries = await storage.list();
-        this.polledTokenPairTracker.initialize(storageEntries);
         this.tokenTracker.initialize(storageEntries);        
     }
 
     async flushToStorage() {
         await Promise.allSettled([
-            this.polledTokenPairTracker.flushToStorage(this.state.storage),
             this.tokenTracker.flushToStorage(this.state.storage)
         ]);
     }
@@ -63,7 +57,6 @@ export class PolledTokenPairListDO {
                 return makeJSONResponse(validateTokenResponse);
             default:
                 assertNever(method);
-                return makeFailureResponse("Unknown method.");
         }
     }
 
@@ -78,18 +71,8 @@ export class PolledTokenPairListDO {
                 tokenInfo: null
             };
         }
-
-        // TODO: retry of existence check under certain circumstances (which circumstances?)
-        // if the token is already known to not exist, return invalid
-        if (this.tokenTracker.isRepeatedlyNonExistent(tokenAddress)) {
-            return {
-                type: 'invalid',
-                tokenInfo: null
-            };
-        }
-
         // if the token is already in the tracker, respond with the token info
-        const tokenInfo = this.tokenTracker.get(tokenAddress);
+        const tokenInfo = await this.tokenTracker.getTokenInfo(tokenAddress, this.env);
         if (tokenInfo) {
             return {
                 type : 'valid',
@@ -97,28 +80,10 @@ export class PolledTokenPairListDO {
             };
         }
 
-        // If the token isn't in the tracker, re-fetch all tokens list from jupiter.  
-        const allTokens = await this.getAllTokensFromJupiter();
-
-        // If it's in the list of returned tokens, add it to the token tracker and respond that the token is validated
-        if (tokenAddress in allTokens) {
-            const stagedTokenInfo = allTokens[tokenAddress];
-            const tokenInfo = await this.addFeeAccount(stagedTokenInfo);
-            this.tokenTracker.addToken(tokenInfo);
-            this.tokenTracker.flushToStorage(this.state.storage); // fire and forget
-            return {
-                type : 'valid',
-                tokenInfo : tokenInfo
-            };
-        }
-        // otherwise, note it doesn't exist. (TODO: periodically flush non-existence list)
-        else {
-            this.tokenTracker.markAsNonExistent(tokenAddress);
-            return {
-                type: 'invalid',
-                tokenInfo: null
-            };
-        }
+        return {
+            type: 'invalid',
+            tokenInfo: null
+        };
     }
 
     async addFeeAccount(stagedTokenInfo : StagedTokenInfo) : Promise<TokenInfo> {
@@ -166,19 +131,6 @@ export class PolledTokenPairListDO {
         return [method,jsonBody];
     }
 
-    doScheduledUpdate(env : any) {
-        const tokensByVsToken = this.groupTokensByVsToken();
-        const priceAPIUrls = this.toPriceAPIRequests(tokensByVsToken);
-        // TODO: investigate rate limiting, etc. since these are parallel requests.
-        priceAPIUrls.forEach(priceApiRequestSpec => {
-            fetch(priceApiRequestSpec.url).then(response => {
-                this.processPriceAPIResponse(response, env, priceApiRequestSpec);
-            }).catch(error => {
-                this.processPriceAPIResponseFailure(error, env, priceApiRequestSpec);
-            });
-        });
-    }
-
     async processPriceAPIResponse(response : Response, env: any, priceApiRequestSpec : PriceAPIRequestSpec) {
         if (!response.ok) {            
             // TODO: logging, handling
@@ -212,18 +164,6 @@ export class PolledTokenPairListDO {
 
     processPriceAPIResponseFailure(env : any, token : string, priceApiRequestSpec : PriceAPIRequestSpec) {
         // TODO: logging, etc.
-    }
-
-    groupTokensByVsToken() : TokensByVsToken {
-        const tokensByVsToken = new Map();
-        for (const [token,vsToken] of this.polledTokenPairTracker.list()) {
-            if (!tokensByVsToken.has(vsToken)) {
-                tokensByVsToken.set(vsToken, []);
-            }
-            const batch = tokensByVsToken.get(vsToken);
-            batch.push(token);
-        }
-        return tokensByVsToken;
     }
 
     toPriceAPIRequests(tokensByVsToken : Map<string,string[]>) {

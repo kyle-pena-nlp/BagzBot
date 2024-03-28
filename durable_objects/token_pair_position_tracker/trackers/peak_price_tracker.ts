@@ -60,9 +60,9 @@ export class PeakPricePositionTracker {
                     ...positionWithPeakPrice,
                     PNL: {
                         currentPrice: currentPrice,
-                        fracBelowPeak: fracBelowPeak,
+                        fracBelowPeak: fracBelowPeak || dZero(),
                         PNL: PNL,
-                        PNLfrac: PNLfrac,
+                        PNLfrac: PNLfrac || dZero(),
                         currentValue: currentValue                     
                     }
                 })
@@ -147,7 +147,10 @@ export class PeakPricePositionTracker {
             }
 
             // compute percent price decrease fraction from the peak
-            const priceDecreaseFrac = dMath.dDiv(dMath.dSub(peakPrice, newPrice), peakPrice, MATH_DECIMAL_PLACES);
+            const priceDecreaseFrac = dMath.dDiv(
+                dMath.dSub(peakPrice, newPrice), 
+                peakPrice, 
+                MATH_DECIMAL_PLACES) || dZero();
             
             // for each position in this group
             (this.itemsByPeakPrice.get(peakPrice)||[]).forEach((position,index) => {

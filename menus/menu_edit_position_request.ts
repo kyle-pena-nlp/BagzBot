@@ -47,13 +47,13 @@ export class MenuEditTrailingStopLossPositionRequest extends Menu<PositionReques
         return lines;
     }
     private tokenAmountString() {
-        return toFriendlyString(this.menuData.quote.outTokenAmt,4,true,false);
+        return toFriendlyString(this.menuData.quote.outTokenAmt,4, { addCommas: false });
     }
     private tokenSymbol() {
         return this.menuData.token.symbol;
     }
     private vsTokenAmountString() {
-        return toFriendlyString(this.menuData.quote.inTokenAmt,4,true,false);
+        return toFriendlyString(this.menuData.quote.inTokenAmt,4, { addCommas: false });
     }
     private vsTokenSymbol() {
         return this.menuData.vsToken.symbol;

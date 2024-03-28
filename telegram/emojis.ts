@@ -123,10 +123,10 @@ export function interpretSOLAmount(amt : number) : emojiTag {
     if (amt <= 0.0001) {
         return ':microbe:';
     }
-    if (amt <= 0.01) {
+    if (amt <= 5) {
         return ':shrimp:';
     }
-    else if (amt <= 5) {
+    else if (amt <= 10) {
         return ':dolphin:';
     }
     else if (amt <= 100) {

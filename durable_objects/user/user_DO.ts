@@ -94,6 +94,7 @@ export class UserDO {
     // has the user signed legal?
     legalAgreementStatus : ChangeTrackedValue<'agreed'|'refused'|'has-not-responded'> = new ChangeTrackedValue<'agreed'|'refused'|'has-not-responded'>('hasSignedLegal', 'has-not-responded');
 
+    // TODO: periodic trimming of this list.
     // stores just the positionID / tokenAddress / vsTokenAddress
     tokenPairsForPositionIDsTracker : TokenPairsForPositionIDsTracker = new TokenPairsForPositionIDsTracker();
 
@@ -150,6 +151,7 @@ export class UserDO {
             return makeSuccessResponse();
         }
         finally {
+            // deliberately not awaited.
             this.flushToStorage();
         }
     }

@@ -28,11 +28,24 @@ export function toKey(x : DecimalizedAmount) : string {
 
 const subscriptDigits = ['₀', '₁', '₂', '₃', '₄', '₅', '₆', '₇', '₈', '₉'];
 
+export interface toFriendlyStringOpts {
+    useSubscripts ?: boolean
+    addCommas ?: boolean
+    includePlusSign ?: boolean
+    maxDecimalPlaces ?: number
+}
+
+function optDefaults(x : toFriendlyStringOpts) : toFriendlyStringOpts {
+    const useSubscripts = x.useSubscripts == null ? true : false;
+    const addCommas = x.addCommas == null ? true : false;
+    const includePlusSign = x.includePlusSign == null ? false : true;
+    const maxDecimalPlaces  = x.maxDecimalPlaces;
+    return { useSubscripts, addCommas, includePlusSign, maxDecimalPlaces };
+}
+
 export function toFriendlyString(x : DecimalizedAmount, maxSigFigs : number, 
-    useSubscripts : boolean = true, 
-    addCommas : boolean = true,
-    includePlusSign : boolean = false,
-    maxDecimalPlaces ?: number) : string {
+    opts ?: toFriendlyStringOpts) : string {
+    opts = optDefaults(opts||{});
     const longDecimalRepr = moveDecimalInString(x.tokenAmount, -x.decimals);
     const numberParts = longDecimalRepr.split(".");
     if (numberParts.length == 1) {
@@ -47,7 +60,7 @@ export function toFriendlyString(x : DecimalizedAmount, maxSigFigs : number,
         }
         let { zeros, rest } = splitIntoZerosAndRest(fractionalPart); // 0000444 -> { zeros: '0000', rest: '444' }
         // If there are multiple zeros between the decimal and some non-zero stuff to the right...
-        if (useSubscripts && zeros.length > 1 && (wholePart == '0'||wholePart == '') && rest.length > 0) {
+        if (opts.useSubscripts && zeros.length > 1 && (wholePart == '0'||wholePart == '') && rest.length > 0) {
             // replace all those zeros with 0₇, for example
             let subscripts = '';
             for (const character of (zeros.length).toString()) {
@@ -68,16 +81,16 @@ export function toFriendlyString(x : DecimalizedAmount, maxSigFigs : number,
             rest = Math.round(parseFloat(rest.substring(0, maxSigFigs + 1))/10).toString();
         }
         // Add commas to whole part of number.
-        const localizedWholePart = addCommas ? 
+        const localizedWholePart = opts.addCommas ? 
             parseFloat(wholePart).toLocaleString() : 
             parseFloat(wholePart).toString();
-        if (includePlusSign && sign === '') {
+        if (opts.includePlusSign && sign === '') {
             sign = '+';
         }
         let zerosAndRest = zeros + rest;
-        if (maxDecimalPlaces != null) {
+        if (opts.maxDecimalPlaces != null) {
             // TODO: proper rounding
-            zerosAndRest = zerosAndRest.slice(0, maxDecimalPlaces);
+            zerosAndRest = zerosAndRest.slice(0, opts.maxDecimalPlaces);
         }
         return sign + localizedWholePart + "." + zerosAndRest;
     }

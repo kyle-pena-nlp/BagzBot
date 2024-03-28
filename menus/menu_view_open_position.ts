@@ -1,6 +1,7 @@
 import { dSub, toFriendlyString } from "../decimalized";
-import { PositionAndMaybeCurrentValue } from "../positions";
+import { PositionAndMaybeCurrentValue, PositionStatus } from "../positions";
 import { CallbackButton } from "../telegram";
+import { assertNever } from "../util";
 import { CallbackData } from "./callback_data";
 import { Menu, MenuCapabilities } from "./menu";
 import { MenuCode } from "./menu_code";
@@ -23,11 +24,23 @@ export class MenuViewOpenPosition extends Menu<PositionAndMaybeCurrentValue> imp
     renderOptions(): CallbackButton[][] {
         const options = this.emptyMenu();
 
-        const closePositionCallbackData = new CallbackData(MenuCode.ClosePositionManuallyAction, this.menuData.position.positionID);
-        this.insertButtonNextLine(options, "Close Position Manually", closePositionCallbackData);
-        
-        const refreshPositionCallbackData = new CallbackData(MenuCode.ViewOpenPosition, this.menuData.position.positionID);
-        this.insertButtonNextLine(options, "Refresh", refreshPositionCallbackData);
+        if (this.menuData.position.status === PositionStatus.Closing) {
+            const refreshPositionCallbackData = new CallbackData(MenuCode.ViewOpenPosition, this.menuData.position.positionID);
+            this.insertButtonNextLine(options, ":refresh: Refresh", refreshPositionCallbackData);
+        }
+        else if (this.menuData.position.status === PositionStatus.Closed) {
+            // no-op
+        }
+        else if (this.menuData.position.status === PositionStatus.Open) {
+            const closePositionCallbackData = new CallbackData(MenuCode.ClosePositionManuallyAction, this.menuData.position.positionID);
+            this.insertButtonNextLine(options, ":stop: Stop Monitoring And Sell", closePositionCallbackData);
+            
+            const refreshPositionCallbackData = new CallbackData(MenuCode.ViewOpenPosition, this.menuData.position.positionID);
+            this.insertButtonNextLine(options, ":refresh: Refresh", refreshPositionCallbackData);
+        }
+        else {
+            assertNever(this.menuData.position.status);
+        }
 
         this.insertBackToMainButtonOnNewLine(options);
 

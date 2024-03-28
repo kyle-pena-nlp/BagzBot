@@ -11,12 +11,14 @@ export class MenuListPositions extends Menu<PositionAndMaybePNL[]> implements Me
         const lines = [ `<b>Your Open Positions</b>` ];
         const maybeTotalPNL = this.maybeCalcTotalPNL();
         if (maybeTotalPNL != null) {
-            let pnlLine = `<b>Total Unrealized PNL</b> ${toFriendlyString(maybeTotalPNL, 4, false, true, true)} SOL`;
+            let pnlLine = `<b>Total Unrealized PNL</b> ${toFriendlyString(maybeTotalPNL, 4, { useSubscripts: false, addCommas: true, includePlusSign: true })} SOL`;
             const originalTotalValue = this.calcOriginalTotalValue();
             if (dCompare(originalTotalValue, dZero()) > 0) {
-                const fracTotalPNL = dDiv(maybeTotalPNL, originalTotalValue, MATH_DECIMAL_PLACES);
+                const fracTotalPNL = dDiv(maybeTotalPNL, 
+                    originalTotalValue, 
+                    MATH_DECIMAL_PLACES) || dZero();
                 const pctTotalPNL = dMult(fracTotalPNL, fromNumber(100));
-                pnlLine += `| ${toFriendlyString(pctTotalPNL, 2, false, false, true)}%`;
+                pnlLine += `| ${toFriendlyString(pctTotalPNL, 2, { useSubscripts: false, addCommas: false, includePlusSign: true })}%`;
             }
             lines.push(pnlLine);
         }
@@ -28,7 +30,7 @@ export class MenuListPositions extends Menu<PositionAndMaybePNL[]> implements Me
         for (const p of this.menuData) {
             const position = p.position;
             const pnlPercent = p.PNL == null ? null : dMult(p.PNL.PNLfrac,fromNumber(100));
-            const pnlPercentString = pnlPercent == null ? `` : `(${toFriendlyString(pnlPercent, 2, false, false, true)}%)`;
+            const pnlPercentString = pnlPercent == null ? `` : `(${toFriendlyString(pnlPercent, 2,  { useSubscripts: false, addCommas: false, includePlusSign: true })}%)`;
             const positionLabel = `${toFriendlyString(position.tokenAmt,2)} $${position.token.symbol} ${pnlPercentString}`;
             const callbackData = new CallbackData(MenuCode.ViewOpenPosition, position.positionID);
             this.insertButtonNextLine(options, positionLabel, callbackData);
