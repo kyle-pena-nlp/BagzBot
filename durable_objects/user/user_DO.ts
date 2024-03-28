@@ -2,7 +2,7 @@ import { DurableObjectState } from "@cloudflare/workers-types";
 import { Wallet, encryptPrivateKey, generateEd25519Keypair } from "../../crypto";
 import { DecimalizedAmount, toFriendlyString } from "../../decimalized";
 import { Env } from "../../env";
-import { logError } from "../../logging";
+import { logError, logInfo } from "../../logging";
 import { Position, PositionPreRequest, PositionType } from "../../positions";
 import { getSOLBalance } from "../../rpc/rpc_wallet";
 import { POSITION_REQUEST_STORAGE_KEY } from "../../storage_keys";
@@ -13,7 +13,7 @@ import { listUnclaimedBetaInviteCodes } from "../beta_invite_codes/beta_invite_c
 import { AutomaticallyClosePositionsRequest, AutomaticallyClosePositionsResponse } from "../token_pair_position_tracker/actions/automatically_close_positions";
 import { PositionAndMaybePNL } from "../token_pair_position_tracker/model/position_and_PNL";
 import { getPosition, listPositionsByUser } from "../token_pair_position_tracker/token_pair_position_tracker_do_interop";
-import { BaseUserDORequest } from "./actions/base_user_do_request";
+import { BaseUserDORequest, isBaseUserDORequest } from "./actions/base_user_do_request";
 import { DeleteSessionRequest, DeleteSessionResponse } from "./actions/delete_session";
 import { GetAddressBookEntryRequest, GetAddressBookEntryResponse } from "./actions/get_address_book_entry";
 import { GetImpersonatedUserIDRequest, GetImpersonatedUserIDResponse } from "./actions/get_impersonated_user_id";
@@ -29,7 +29,7 @@ import { ManuallyClosePositionRequest, ManuallyClosePositionResponse } from "./a
 import { OpenPositionRequest, OpenPositionResponse } from "./actions/open_new_position";
 import { RemoveAddressBookEntryRequest, RemoveAddressBookEntryResponse } from "./actions/remove_address_book_entry";
 import { DefaultTrailingStopLossRequestRequest, DefaultTrailingStopLossRequestResponse } from "./actions/request_default_position_request";
-import { SendMessageToUserRequest, SendMessageToUserResponse } from "./actions/send_message_to_user";
+import { SendMessageToUserRequest, SendMessageToUserResponse, isSendMessageToUserRequest } from "./actions/send_message_to_user";
 import { StoreAddressBookEntryRequest, StoreAddressBookEntryResponse } from "./actions/store_address_book_entry";
 import { StoreLegalAgreementStatusRequest, StoreLegalAgreementStatusResponse } from "./actions/store_legal_agreement_status";
 import { StoreSessionValuesRequest, StoreSessionValuesResponse } from "./actions/store_session_values";
@@ -105,7 +105,7 @@ export class UserDO {
 
     userPNLTracker : UserPNLTracker = new UserPNLTracker();
 
-    inbox: string[] = [];
+    inbox: { from : string, message : string }[] = [];
     // TODO: way to make arrays compatible with ChangeTrackedValue?
     //inbox : ChangeTrackedValue<string[]> = new ChangeTrackedValue<string[]>("inbox", []);
 
@@ -181,19 +181,16 @@ export class UserDO {
             this.wallet.value = await this.generateWallet();
         }
 
-        // set most recent chat ID
-        this.chatID.value = userAction.chatID;
+        // set most recent chat ID.
+        if (userAction.chatID > 0) {
+            this.chatID.value = userAction.chatID;
+        }
     }
 
     async _fetch(request : Request) : Promise<[UserDOFetchMethod,any,Response]> {
 
-        const [method,userRequest] = await this.validateFetchRequest(request);
+        const [method,userAction] = await this.validateFetchRequest(request);
         let response : Response|null = null;
-
-        await this.ensureIsInitialized(userRequest);
-
-        // it's ugly but better than a complicated type setup or a bunch of casts
-        const userAction = userRequest as any;
 
         switch(method) {
             case UserDOFetchMethod.get:
@@ -283,14 +280,15 @@ export class UserDO {
     }
 
     async handleSendMessageToUserInternal(request : SendMessageToUserRequest) : Promise<void> {
-        this.inbox.push(request.message);
+        this.inbox.push({ from: request.fromTelegramUserName,  message: request.message });
         if (this.chatID.value == null) {
             return;
         }
         const chatID = this.chatID.value;
         const sendSuccessIdxs : number[] = [];
         this.inbox.forEach(async (message,index) => {
-            const result = await sendMessageToTG(chatID, message, this.env);
+            const messageWithContext = `${this.env.TELEGRAM_BOT_INSTANCE} :: '${message.from}' says: "${message.message}"`;
+            const result = await sendMessageToTG(chatID, messageWithContext, this.env);
             if (result.success) {
                 sendSuccessIdxs.push(index);
             }
@@ -298,7 +296,7 @@ export class UserDO {
                 sleep(500);
             }  
         });
-        const inboxMinusSentMessages : string[] = [];
+        const inboxMinusSentMessages : { from : string, message:string }[] = [];
         this.inbox.forEach((message,index) => {
             if (!sendSuccessIdxs.includes(index)) {
                 inboxMinusSentMessages.push(message);
@@ -590,16 +588,32 @@ export class UserDO {
         return makeJSONResponse<AutomaticallyClosePositionsResponse>({});
     }
 
-    async validateFetchRequest(request : Request) : Promise<[UserDOFetchMethod,BaseUserDORequest]> {
-        const jsonBody : any = await maybeGetJson(request);
-        if (!('telegramUserID' in jsonBody)) {
-            throw new Error("All requests to UserDO must include telegramUserID");
-        }
+    async validateFetchRequest(request : Request) : Promise<[UserDOFetchMethod,any]> {
+
         const methodName = new URL(request.url).pathname.substring(1);
+
         const method : UserDOFetchMethod|null = parseUserDOFetchMethod(methodName);
+        
         if (method == null) {
             throw new Error(`Unknown method ${method}`);
         }
+
+        const jsonBody = await maybeGetJson(request);
+
+        if (jsonBody == null) {
+            throw new Error(`No JSON body in UserDO request - ${method}`)
+        }
+
+        if (isBaseUserDORequest(jsonBody)) {
+            this.ensureIsInitialized(jsonBody);
+        }
+        else if (method === UserDOFetchMethod.sendMessageToUser && isSendMessageToUserRequest(jsonBody)) {
+            logInfo("Message received", jsonBody);
+        }
+        else {
+            throw new Error(`UserDO method must either be a ${UserDOFetchMethod.sendMessageToUser} or be a BaseUserDORequest`);
+        }
+        
         return [method,jsonBody];
     }
 

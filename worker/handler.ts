@@ -507,7 +507,7 @@ export class Worker {
             case MenuCode.SubmitBetaFeedback:
                 const betaFeedbackAnswer = (callbackData.menuArg||'').trim();
                 if (betaFeedbackAnswer !== '') {
-                    this.context.waitUntil(this.sendBetaFeedbackToSuperAdmin(betaFeedbackAnswer, chatID));
+                    this.context.waitUntil(this.sendBetaFeedbackToSuperAdmin(betaFeedbackAnswer, params.getTelegramUserName()));
                 }
                 const thankYouDialogueRequest = new MenuOKClose("Thank you!").getCreateNewMenuRequest(chatID, this.env);
                 await fetch(thankYouDialogueRequest).catch(r => {
@@ -520,8 +520,8 @@ export class Worker {
         }
     }
 
-    private async sendBetaFeedbackToSuperAdmin(feedback : string, chatID : number) : Promise<void> {
-        await sendMessageToUser(strictParseInt(this.env.SUPER_ADMIN_USER_ID), chatID, feedback, this.env);
+    private async sendBetaFeedbackToSuperAdmin(feedback : string, myUserName : string) : Promise<void> {
+        await sendMessageToUser(strictParseInt(this.env.SUPER_ADMIN_USER_ID), myUserName, feedback, this.env);
     }
 
     private async createMainMenu(info : CallbackHandlerParams, env : Env) : Promise<BaseMenu> {

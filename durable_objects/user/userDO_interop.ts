@@ -54,10 +54,10 @@ export enum UserDOFetchMethod {
 	sendMessageToUser = "sendMessageToUser"
 }
 
-export async function sendMessageToUser(telegramUserID : number, chatID : number, message : string, env : Env) : Promise<SendMessageToUserResponse> {
-	const request : SendMessageToUserRequest = { telegramUserID, chatID, message };
+export async function sendMessageToUser(toTelegramUserID : number, fromTelegramUserName : string, message : string, env : Env) : Promise<SendMessageToUserResponse> {
+	const request : SendMessageToUserRequest = { toTelegramUserID, fromTelegramUserName, message };
 	const method = UserDOFetchMethod.sendMessageToUser;
-	const response = await sendJSONRequestToUserDO<SendMessageToUserRequest,SendMessageToUserResponse>(telegramUserID, method, request, env);
+	const response = await sendJSONRequestToUserDO<SendMessageToUserRequest,SendMessageToUserResponse>(toTelegramUserID, method, request, env);
 	return response;
 }
 

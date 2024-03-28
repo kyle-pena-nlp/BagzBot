@@ -1,7 +1,12 @@
-import { BaseUserDORequest } from "./base_user_do_request";
 
-export interface SendMessageToUserRequest extends BaseUserDORequest {
+export interface SendMessageToUserRequest {
     message : string
+    toTelegramUserID : number
+    fromTelegramUserName : string
+}
+
+export function isSendMessageToUserRequest(x : any) : x is SendMessageToUserRequest {
+    return 'toTelegramUserID' in x; 
 }
 
 export interface SendMessageToUserResponse {

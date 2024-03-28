@@ -335,12 +335,14 @@ export class TokenPairPositionTrackerDO {
         if (!(isHeartbeatRequest(jsonBody))) {
             const tokenAddress = jsonBody.tokenAddress;
             const vsTokenAddress = jsonBody.vsTokenAddress;
-            if (this.tokenAddress.initialized && tokenAddress != this.tokenAddress.value) {
+            if (this.tokenAddress.value != null && tokenAddress != this.tokenAddress.value) {
                 throw new Error(`tokenAddress did not match expected tokenAddress. Expected: ${this.tokenAddress.value} Was: ${tokenAddress}`);
             }
-            if (this.vsTokenAddress.initialized && vsTokenAddress != this.vsTokenAddress.value) {
+            if (this.vsTokenAddress.value != null && vsTokenAddress != this.vsTokenAddress.value) {
                 throw new Error(`vsTokenAddress did not match expected vsTokenAddress. Expected: ${this.vsTokenAddress.value} Was: ${vsTokenAddress}`);
             }
+            this.tokenAddress.value = tokenAddress;
+            this.vsTokenAddress.value = vsTokenAddress;
         }
         logDebug(`TokenPairPositionTrackerDO ${this.tokenPairID()} - executing ${method}`);
         return [method,jsonBody];
