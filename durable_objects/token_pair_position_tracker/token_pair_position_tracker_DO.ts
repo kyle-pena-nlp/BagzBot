@@ -9,7 +9,7 @@ import { AutomaticallyClosePositionsRequest } from "./actions/automatically_clos
 import { GetPositionFromPriceTrackerRequest, GetPositionFromPriceTrackerResponse } from "./actions/get_position";
 import { GetTokenPriceRequest, GetTokenPriceResponse } from "./actions/get_token_price";
 import { HasPairAddresses } from "./actions/has_pair_addresses";
-import { HeartbeatWakeupRequest, isHeartbeatRequest } from "./actions/heartbeat_wake_up";
+import { HeartbeatWakeupRequestForTokenPairPositionTracker, isHeartbeatRequest } from "./actions/heartbeat_wake_up_for_token_pair_position_tracker";
 import { ListPositionsByUserRequest, ListPositionsByUserResponse } from "./actions/list_positions_by_user";
 import { MarkPositionAsClosedRequest, MarkPositionAsClosedResponse } from "./actions/mark_position_as_closed";
 import { MarkPositionAsClosingRequest, MarkPositionAsClosingResponse } from "./actions/mark_position_as_closing";
@@ -246,7 +246,7 @@ export class TokenPairPositionTrackerDO {
         return makeJSONResponse(responseBody);
     }
 
-    async handleHeartbeatWakeup(body : HeartbeatWakeupRequest) {
+    async handleHeartbeatWakeup(body : HeartbeatWakeupRequestForTokenPairPositionTracker) {
         // simply invoking any fetch method causes the DO to reschedule polling if needed
         return makeJSONResponse({});
     }

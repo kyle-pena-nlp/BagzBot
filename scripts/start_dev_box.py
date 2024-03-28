@@ -12,6 +12,10 @@ def run_cloudflare_worker():
     poll_until_port_is_occupied(LOCAL_CLOUDFLARE_WORKER_PORT)
     return child_proc
 
+def start_CRON_poller():
+    command = START_CRON_POLLER_COMMAND
+    child_proc = subprocess.Popen(command, shell = True)
+    return child_proc
 
 def parse_args():
     # NEVER CHANGE THIS because this script takes down the bot and migratres it to the local server
@@ -39,8 +43,9 @@ def do_it(args):
         bot_secret_token = get_var_from_dev_vars("TELEGRAM_BOT_WEBHOOK_SECRET_TOKEN")
         migrate_and_configure_bot_for_local_server(bot_token, bot_secret_token)
 
-        print("You may wish to start the wrangler debugger now.")
+        child_procs.append(start_CRON_poller())
 
+        print("You may wish to start the wrangler debugger now.")
         print("Cloudflare worker and local bot api server ARE RUNNING!")
         print("Press any key to shut them down.")
         wait_for_any_key()

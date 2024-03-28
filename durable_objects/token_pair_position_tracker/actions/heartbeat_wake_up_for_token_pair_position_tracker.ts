@@ -1,4 +1,4 @@
-export interface HeartbeatWakeupRequest {
+export interface HeartbeatWakeupRequestForTokenPairPositionTracker {
     isHeartbeat: true
 }
 

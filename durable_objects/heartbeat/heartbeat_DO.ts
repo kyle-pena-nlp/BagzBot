@@ -2,9 +2,10 @@ import { DurableObjectState, DurableObjectStorage } from "@cloudflare/workers-ty
 import { Env } from "../../env";
 import { logError } from "../../logging";
 import { MapWithStorage, assertNever, makeJSONRequest, makeJSONResponse, maybeGetJson } from "../../util";
-import { HeartbeatWakeupRequest } from "../token_pair_position_tracker/actions/heartbeat_wake_up";
+import { HeartbeatWakeupRequestForTokenPairPositionTracker } from "../token_pair_position_tracker/actions/heartbeat_wake_up_for_token_pair_position_tracker";
 import { TokenPairKey, TokenPairPositionTrackerDOFetchMethod } from "../token_pair_position_tracker/token_pair_position_tracker_DO_interop";
-import { HeartbeatDOFetchMethod, RegisterTokenPairRequest, RegisterTokenPairResponse, parseHeartbeatDOFetchMethod } from "./heartbeat_do_interop";
+import { RegisterTokenPairRequest, RegisterTokenPairResponse } from "./actions/register_token_pair";
+import { HeartbeatDOFetchMethod, parseHeartbeatDOFetchMethod } from "./heartbeat_do_interop";
 
 export class HeartbeatDO {
     /*
@@ -63,14 +64,14 @@ export class HeartbeatDO {
         return response;
     }
 
-    async handleWakeup(request : HeartbeatWakeupRequest) : Promise<void> {
+    async handleWakeup(request : HeartbeatWakeupRequestForTokenPairPositionTracker) : Promise<void> {
         this.processing = true;
         try {
             const namespace = this.env.TokenPairPositionTrackerDO;
             for (const tokenPairID of this.tokenPairPositionTrackerInstances.keys()) {
                 const durableObjectID = namespace.idFromName(tokenPairID);
                 const stub = namespace.get(durableObjectID);
-                const requestBody : HeartbeatWakeupRequest = { isHeartbeat : true };
+                const requestBody : HeartbeatWakeupRequestForTokenPairPositionTracker = { isHeartbeat : true };
                 const method = TokenPairPositionTrackerDOFetchMethod.wakeUp;
                 const jsonRequest = makeJSONRequest(`http://tokenPairPositionTracker/${method.toString()}`, requestBody);
                 const response = await stub.fetch(jsonRequest);
@@ -92,6 +93,5 @@ export class HeartbeatDO {
             throw new Error(`Unknown method ${method}`);
         }
         return [method,jsonBody];
-    }  
-
+    }
 }

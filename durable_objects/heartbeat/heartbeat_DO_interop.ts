@@ -1,26 +1,11 @@
 import { Env } from "../../env";
 import { makeJSONResponse } from "../../util";
+import { HeartbeatWakeupRequest, HeartbeatWakeupResponse } from "./actions/hearbeat_wake_up";
+import { RegisterTokenPairRequest, RegisterTokenPairResponse } from "./actions/register_token_pair";
 
 export enum HeartbeatDOFetchMethod {
     Wakeup = "Wakeup",
     RegisterTokenPair = "RegisterTokenPair" 
-}
-
-export interface HeartbeatWakeupRequest {
-
-}
-
-export interface HeartbeatWakeupResponse {
-
-}
-
-export interface RegisterTokenPairRequest {
-    tokenAddress : string
-    vsTokenAddress : string
-}
-
-export interface RegisterTokenPairResponse {
-
 }
 
 export function parseHeartbeatDOFetchMethod(value : string) : HeartbeatDOFetchMethod|null {

@@ -19,6 +19,6 @@ bindings = [
     {name = "HeartbeatRequestDO", class_name = "HeartbeatRequestDO" }
 ]
 
-# The 'wake up!' cron trigger
+# The 'wake up!' cron trigger - keeps the price tracker tracking the prices.
 [triggers]
 crons = [ "* * * * *" ]
