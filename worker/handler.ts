@@ -5,14 +5,14 @@ import { claimInviteCode, listUnclaimedBetaInviteCodes } from "../durable_object
 import { doHeartbeatWakeup } from "../durable_objects/heartbeat/heartbeat_do_interop";
 import { GetTokenInfoResponse, isInvalidTokenInfoResponse, isValidTokenInfoResponse } from "../durable_objects/polled_token_pair_list/actions/get_token_info";
 import { getTokenInfo } from "../durable_objects/polled_token_pair_list/polled_token_pair_list_DO_interop";
-import { getTokenPrice } from "../durable_objects/token_pair_position_tracker/token_pair_position_tracker_DO_interop";
+import { getTokenPrice } from "../durable_objects/token_pair_position_tracker/token_pair_position_tracker_do_interop";
 import { OpenPositionRequest } from "../durable_objects/user/actions/open_new_position";
 import { CompletedAddressBookEntry, JustAddressBookEntryID, JustAddressBookEntryName } from "../durable_objects/user/model/address_book_entry";
 import { QuantityAndToken } from "../durable_objects/user/model/quantity_and_token";
 import { TokenSymbolAndAddress } from "../durable_objects/user/model/token_name_and_address";
 import { getAddressBookEntry, getDefaultTrailingStopLoss, getPositionFromUserDO, getUserData, getWalletData, impersonateUser, listAddressBookEntries, listPositionsFromUserDO, manuallyClosePosition, maybeReadSessionObj, readSessionObj, requestNewPosition, storeAddressBookEntry, storeLegalAgreementStatus, storeSessionObj, storeSessionObjProperty, storeSessionValues, unimpersonateUser } from "../durable_objects/user/userDO_interop";
 import { Env } from "../env";
-import { logError } from "../logging";
+import { logDebug, logError } from "../logging";
 import { BaseMenu, LegalAgreement, MenuBetaInviteFriends, MenuCode, MenuConfirmAddressBookEntry, MenuConfirmTrailingStopLossPositionRequest, MenuContinueMessage, MenuEditPositionHelp, MenuEditTrailingStopLossPositionRequest, MenuError, MenuFAQ, MenuHelp, MenuListPositions, MenuMain, MenuPickTransferFundsRecipient, MenuPleaseEnterToken, MenuStartTransferFunds, MenuTODO, MenuTrailingStopLossAutoRetrySell, MenuTrailingStopLossEntryBuyQuantity, MenuTrailingStopLossPickVsToken, MenuTrailingStopLossSlippagePercent, MenuTrailingStopLossTriggerPercent, MenuTransferFundsTestOrSubmitNow, MenuViewDecryptedWallet, MenuViewOpenPosition, MenuWallet, PositiveDecimalKeypad, PositiveIntegerKeypad, WelcomeScreenPart1, WelcomeScreenPart2 } from "../menus";
 import { PositionPreRequest, PositionRequest, convertPreRequestToRequest } from "../positions";
 import { ReplyQuestion, ReplyQuestionCode } from "../reply_question";
@@ -49,7 +49,7 @@ export class Worker {
         return [];
     } 
 
-    // I am interpreting any message sent to handleMessage as a token address
+    // This is if the user directly messages the bot.
     async handleMessage(info : TelegramWebhookInfo) : Promise<Response> {
         
         // alias some things
@@ -146,7 +146,9 @@ export class Worker {
     async handleCallbackQueryInternal(params : CallbackHandlerParams) : Promise<BaseMenu|ReplyQuestion|void> {
         const messageID = params.messageID;
         const chatID = params.chatID;
-        const callbackData = params.callbackData!!;
+        const callbackData = params.callbackData;
+        logDebug(`Invoking callback with ${callbackData.toString()}`);
+        // TODO: factor this giant state machine switch statement into handlers (chain-of-responsibility-esque?)
         switch(callbackData.menuCode) {
             case MenuCode.Main:
                 return this.createMainMenu(params, this.env);
@@ -498,7 +500,8 @@ export class Worker {
             isAdminOrSuperAdmin: info.isAdminOrSuperAdmin(env), 
             isImpersonatingUser: info.isImpersonatingAUser(),
             impersonatedUserID: info.isImpersonatingAUser() ? info.getTelegramUserID() : undefined,
-            botName : this.getBotName(env)
+            botName : this.getBotName(env),
+            botTagline: env.TELEGRAM_BOT_TAGLINE
         });
     }
 
@@ -673,7 +676,8 @@ export class Worker {
                     isAdminOrSuperAdmin: info.isAdminOrSuperAdmin(env), 
                     isImpersonatingUser : info.isImpersonatingAUser(), 
                     impersonatedUserID: info.isImpersonatingAUser() ? info.getTelegramUserID() : undefined,
-                    botName : this.getBotName(env)
+                    botName : this.getBotName(env),
+                    botTagline: env.TELEGRAM_BOT_TAGLINE
                 })];
             case '/menu':
                 const menuUserData = await getUserData(info.getTelegramUserID(), info.messageID, false, env);
@@ -682,7 +686,9 @@ export class Worker {
                     isAdminOrSuperAdmin : info.isAdminOrSuperAdmin(env), 
                     isImpersonatingUser: info.isImpersonatingAUser(), 
                     impersonatedUserID: info.isImpersonatingAUser() ? info.getTelegramUserID() : undefined,
-                    botName : this.getBotName(env) })];
+                    botName : this.getBotName(env),
+                    botTagline: env.TELEGRAM_BOT_TAGLINE 
+                })];
             case '/welcome_screen':
                 return ['...', new WelcomeScreenPart1(undefined)];
             case '/legal_agreement':

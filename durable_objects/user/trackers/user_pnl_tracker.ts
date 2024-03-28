@@ -3,7 +3,7 @@ import { dAdd, dDiv, dMult } from "../../../decimalized";
 import { MATH_DECIMAL_PLACES, dZero, fromNumber } from "../../../decimalized/decimalized_amount";
 import { Env } from "../../../env";
 import { ChangeTrackedValue, strictParseFloat } from "../../../util";
-import { listPositionsByUser } from "../../token_pair_position_tracker/token_pair_position_tracker_DO_interop";
+import { listPositionsByUser } from "../../token_pair_position_tracker/token_pair_position_tracker_do_interop";
 import { TokenPair } from "../model/token_pair";
 import { UserPNL } from "../model/user_data";
 

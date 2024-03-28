@@ -8,7 +8,7 @@ import { parseSwapTransaction } from "../../rpc/rpc_parse";
 import { ParsedSuccessfulSwapSummary, isSuccessfullyParsedSwapSummary, isSwapExecutionErrorParseSummary, isSwapExecutionErrorParseSwapSummary, isUnknownTransactionParseSummary } from "../../rpc/rpc_types";
 import { TGStatusMessage } from "../../telegram";
 import { assertNever } from "../../util";
-import { getPosition, markAsClosed, markAsClosing, markAsOpen, upsertPosition } from "../token_pair_position_tracker/token_pair_position_tracker_DO_interop";
+import { getPosition, markAsClosed, markAsClosing, markAsOpen, upsertPosition } from "../token_pair_position_tracker/token_pair_position_tracker_do_interop";
 import { createAndSignTx, executeAndConfirmSignedTx } from "./user_swap";
 
 export async function sell(positionID: string, 

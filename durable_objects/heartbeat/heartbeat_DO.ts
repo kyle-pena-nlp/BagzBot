@@ -1,9 +1,9 @@
 import { DurableObjectState, DurableObjectStorage } from "@cloudflare/workers-types";
 import { Env } from "../../env";
-import { logError } from "../../logging";
+import { logDebug, logError } from "../../logging";
 import { MapWithStorage, assertNever, makeJSONRequest, makeJSONResponse, maybeGetJson } from "../../util";
 import { HeartbeatWakeupRequestForTokenPairPositionTracker } from "../token_pair_position_tracker/actions/heartbeat_wake_up_for_token_pair_position_tracker";
-import { TokenPairKey, TokenPairPositionTrackerDOFetchMethod } from "../token_pair_position_tracker/token_pair_position_tracker_DO_interop";
+import { TokenPairKey, TokenPairPositionTrackerDOFetchMethod } from "../token_pair_position_tracker/token_pair_position_tracker_do_interop";
 import { RegisterTokenPairRequest, RegisterTokenPairResponse } from "./actions/register_token_pair";
 import { HeartbeatDOFetchMethod, parseHeartbeatDOFetchMethod } from "./heartbeat_do_interop";
 
@@ -68,13 +68,19 @@ export class HeartbeatDO {
         this.processing = true;
         try {
             const namespace = this.env.TokenPairPositionTrackerDO;
-            for (const tokenPairID of this.tokenPairPositionTrackerInstances.keys()) {
+            const tokenPairIDs = this.tokenPairPositionTrackerInstances.keys();
+            let any : boolean = false;
+            for (const tokenPairID of tokenPairIDs) {
+                any = true;
                 const durableObjectID = namespace.idFromName(tokenPairID);
                 const stub = namespace.get(durableObjectID);
                 const requestBody : HeartbeatWakeupRequestForTokenPairPositionTracker = { isHeartbeat : true };
                 const method = TokenPairPositionTrackerDOFetchMethod.wakeUp;
                 const jsonRequest = makeJSONRequest(`http://tokenPairPositionTracker/${method.toString()}`, requestBody);
                 const response = await stub.fetch(jsonRequest);
+            }
+            if (!any) {
+                logError("HeartbeatDO: No token pairs found to track!");
             }
         }
         catch(e) {
@@ -90,8 +96,11 @@ export class HeartbeatDO {
         const methodName = new URL(request.url).pathname.substring(1);
         const method : HeartbeatDOFetchMethod|null = parseHeartbeatDOFetchMethod(methodName);
         if (method == null) {
-            throw new Error(`Unknown method ${method}`);
+            const errorMsg = `Unknown method ${methodName} for HeartbeatDO`;
+            logError(errorMsg);
+            throw new Error(errorMsg);
         }
+        logDebug(`Invoking ${method.toString()} on HeartbeatDO`);
         return [method,jsonBody];
     }
 }

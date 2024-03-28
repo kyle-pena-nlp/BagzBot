@@ -16,7 +16,11 @@ export interface BotName {
     botName : string
 }
 
-export class MenuMain extends Menu<UserData & AdminStatus & BotName> implements MenuCapabilities {
+export interface BotTagline {
+    botTagline : string
+}
+
+export class MenuMain extends Menu<UserData & AdminStatus & BotName & BotTagline> implements MenuCapabilities {
     renderText(): string {
         const lines = [];
         
@@ -24,6 +28,7 @@ export class MenuMain extends Menu<UserData & AdminStatus & BotName> implements 
             const unspentSOLEmoji = interpretSOLAmount(toNumber(this.menuData.maybeSOLBalance));
             lines.push(
                 `<b>:bot: ${this.menuData.botName} Main Menu</b>`,
+                `<i>${this.menuData.botTagline}</i>`,
                 `:wallet: <b>Wallet</b>: <code>${this.menuData.address}</code>`,
                 `<b>Unspent SOL Balance</b>: ${toFriendlyString(this.menuData.maybeSOLBalance, 4)} SOL ${unspentSOLEmoji}`,
             );

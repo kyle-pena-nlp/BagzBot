@@ -10,7 +10,7 @@ import { getUserHasClaimedBetaInviteCode } from "./durable_objects/beta_invite_c
 import { BetaInviteCodesDO } from "./durable_objects/beta_invite_codes/beta_invite_codes_DO";
 import { HeartbeatDO } from "./durable_objects/heartbeat/heartbeat_do";
 import { PolledTokenPairListDO } from "./durable_objects/polled_token_pair_list/polled_token_pair_list_DO";
-import { TokenPairPositionTrackerDO } from "./durable_objects/token_pair_position_tracker/token_pair_position_tracker_DO";
+import { TokenPairPositionTrackerDO } from "./durable_objects/token_pair_position_tracker/token_pair_position_tracker_do";
 import { getImpersonatedUserID, getLegalAgreementStatus, maybeReadSessionObj, unimpersonateUser } from "./durable_objects/user/userDO_interop";
 import { UserDO } from "./durable_objects/user/user_DO";
 import { logError } from "./logging";

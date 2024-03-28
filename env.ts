@@ -3,6 +3,7 @@ export interface Env {
 	ENVIRONMENT : string
 	TELEGRAM_BOT_NAME : string
 	TELEGRAM_BOT_INSTANCE : string
+	TELEGRAM_BOT_TAGLINE : string
 	TELEGRAM_BOT_USERNAME : string
 	TELEGRAM_BOT_SERVER_URL : string
 	TELEGRAM_BOT_ID : string
@@ -43,7 +44,7 @@ export interface Env {
 	TokenPairPositionTrackerDO : any // ditto
 	PolledTokenPairListDO : any // ditto
 	BetaInviteCodesDO : any
-	HeartbeatRequestDO: any
+	HeartbeatDO: any
 };
 
 /*

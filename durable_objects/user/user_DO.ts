@@ -11,7 +11,7 @@ import { ChangeTrackedValue, Structural, assertNever, makeFailureResponse, makeJ
 import { listUnclaimedBetaInviteCodes } from "../beta_invite_codes/beta_invite_code_interop";
 import { AutomaticallyClosePositionsRequest, AutomaticallyClosePositionsResponse } from "../token_pair_position_tracker/actions/automatically_close_positions";
 import { PositionAndMaybePNL } from "../token_pair_position_tracker/model/position_and_PNL";
-import { getPosition, listPositionsByUser } from "../token_pair_position_tracker/token_pair_position_tracker_DO_interop";
+import { getPosition, listPositionsByUser } from "../token_pair_position_tracker/token_pair_position_tracker_do_interop";
 import { BaseUserDORequest } from "./actions/base_user_do_request";
 import { DeleteSessionRequest, DeleteSessionResponse } from "./actions/delete_session";
 import { GetAddressBookEntryRequest, GetAddressBookEntryResponse } from "./actions/get_address_book_entry";

@@ -18,7 +18,7 @@ import { RemovePositionRequest, RemovePositionResponse } from "./actions/remove_
 import { UpdatePriceRequest, UpdatePriceResponse } from "./actions/update_price";
 import { UpsertPositionsRequest, UpsertPositionsResponse } from "./actions/upsert_positions";
 import { WakeupTokenPairPositionTrackerRequest, WakeupTokenPairPositionTrackerResponse } from "./actions/wake_up";
-import { TokenPairPositionTrackerDOFetchMethod, parseTokenPairPositionTrackerDOFetchMethod } from "./token_pair_position_tracker_DO_interop";
+import { TokenPairPositionTrackerDOFetchMethod, parseTokenPairPositionTrackerDOFetchMethod } from "./token_pair_position_tracker_do_interop";
 import { CurrentPriceTracker } from "./trackers/current_price_tracker";
 import { TokenPairPositionTracker } from "./trackers/token_pair_position_tracker";
 /*
@@ -44,7 +44,7 @@ export class TokenPairPositionTrackerDO {
     // initialized properties - token and the 'swap-from' vsToken (i.e; USDC)
     tokenAddress :   ChangeTrackedValue<string|null> = new ChangeTrackedValue<string|null>("tokenAddress",null);
     vsTokenAddress : ChangeTrackedValue<string|null> = new ChangeTrackedValue<string|null>("vsTokenAddress",null);
-    isPolling : boolean; // deliberately not change tracked.
+    
     
     // this performs all the book keeping and determines what RPC actions to take
     tokenPairPositionTracker : TokenPairPositionTracker = new TokenPairPositionTracker();
@@ -54,14 +54,14 @@ export class TokenPairPositionTrackerDO {
 
     // when the DO loads up, it registers itself with HeartbeatDO
     // (which later sends heartbeat requests to keep the DO awake)
-    needsToEnsureIsRegistered : boolean = true
+    needsToEnsureIsRegistered : boolean = true // deliberately not change tracker
+    isPolling : boolean = false; // deliberately not change tracked.
 
     env : Env;
 
     constructor(state : DurableObjectState, env : Env) {
 
         this.state       = state; // access to persistent storage (as opposed to in-memory)
-        this.isPolling   = false;
         this.env         = env;
         this.state.blockConcurrencyWhile(async () => {
             await this.loadStateFromStorage(this.state.storage);
@@ -91,7 +91,20 @@ export class TokenPairPositionTrackerDO {
     }
 
     shouldBePolling() : boolean {
-        return this.tokenPairPositionTracker.any() && this.initialized() && strictParseBoolean(this.env.POLLING_ON);
+        if (!strictParseBoolean(this.env.POLLING_ON)) {
+            logDebug(`${this.tokenPairID()} Price polling is turned off AND should not be price polling.`)
+            return false;
+        }
+        if (!this.initialized()) {
+            logDebug(`${this.tokenPairID()} not initialized AND should not be price polling.`)
+            return false;
+        }
+        const anyPositionsToTrack = this.tokenPairPositionTracker.any();
+        if (!anyPositionsToTrack) {
+            logDebug(`${this.tokenPairID()} - No positions to track AND should not be price polling.`);
+            return false;
+        }
+        return true;
     }
 
     initialized() : boolean {
@@ -100,11 +113,12 @@ export class TokenPairPositionTrackerDO {
     }
 
     async alarm() {
+        logDebug(`${this.tokenPairID()} - invoking alarm`);
         try {
             await this._alarm();
         }
         catch(e : any) {
-            console.error(e.toString());
+            logError("alarm execution failed", this.tokenPairID(), e);
         }
         finally {
             await this.flushToStorage();
@@ -127,12 +141,17 @@ export class TokenPairPositionTrackerDO {
             logError("Price polling failed.", e, this.tokenAddress, this.vsTokenAddress);
         }
         if (!this.shouldBePolling()) {
+            logDebug(`Turning off polling for ${this.tokenPairID()} - no longer needed`)
             this.isPolling = false;
             return;
         }
         else {
             await this.scheduleNextPoll(beginExecutionTime);
         }
+    }
+
+    tokenPairID() : string {
+        return `${this.tokenAddress.value}:${this.vsTokenAddress.value}`;
     }
 
     async scheduleNextPoll(begin : number) {
@@ -149,13 +168,14 @@ export class TokenPairPositionTrackerDO {
     }
 
     async fetch(request : Request) : Promise<Response> {
-        this.tryToEnsureTokenPairIsRegistered();
         const [method,body] = await this.validateFetchRequest(request);
         try {
+            // ensure the token is registered with heartbeatDO
+            if (!isHeartbeatRequest(body)) {
+                this.tryToEnsureTokenPairIsRegistered();
+            }            
             const response = await this._fetch(method,body);
-            if (this.shouldBePolling() && !this.isPolling) {
-                this.scheduleNextPoll(Date.now());
-            }
+            this.ensureIsPollingPrice();
             return response;
         }
         catch(e : any) {
@@ -167,18 +187,41 @@ export class TokenPairPositionTrackerDO {
         return makeSuccessResponse();
     }
 
+    async ensureIsPollingPrice() {
+        const shouldBePolling = this.shouldBePolling();
+        if (shouldBePolling && !this.isPolling) {
+            logDebug(`${this.tokenPairID()} - not price polling and should be. scheduling next price poll.`)
+            this.scheduleNextPoll(Date.now());
+        }
+        else if (shouldBePolling && this.isPolling) {
+            // too chatty
+            //logDebug("Price polling should be on and *is* on - no polling scheduling necessary");
+        }
+        else if (!shouldBePolling && this.isPolling) {
+            logDebug(`${this.tokenPairID()} - price polling is on but shouldn't be - not rescheduling polling`);
+        }
+        else if (!shouldBePolling && !this.isPolling) {
+            // too chatty
+            //logDebug(`${this.tokenPairID()} - price polling not activated, polling already turned off`);
+        }
+    }
+
     async tryToEnsureTokenPairIsRegistered() {
         if (this.needsToEnsureIsRegistered) {
             const tokenAddress = this.tokenAddress.value;
             const vsTokenAddress = this.vsTokenAddress.value;
             if (tokenAddress == null) {
+                logError(`Could not register ${this.tokenPairID()} with heartBeat - tokenAddress was null`);
                 return;
             }
             if (vsTokenAddress == null) {
+                logError(`Could not register ${this.tokenPairID()} with heartBeat - vsTokenAddress was null`);
                 return;
             }
+            logDebug(`Registering token pair ${this.tokenPairID()}`);
             await ensureTokenPairIsRegistered(tokenAddress, vsTokenAddress, this.env).then(() => {
                 this.needsToEnsureIsRegistered = false;
+                logDebug(`Token pair ${tokenAddress}:${vsTokenAddress} is now registered with heartbeat!`);
             })
         }
     }
@@ -298,7 +341,7 @@ export class TokenPairPositionTrackerDO {
                 throw new Error(`vsTokenAddress did not match expected vsTokenAddress. Expected: ${this.vsTokenAddress.value} Was: ${vsTokenAddress}`);
             }
         }
-        logDebug(`token pair position tracker - executing ${method}`);
+        logDebug(`TokenPairPositionTrackerDO ${this.tokenPairID()} - executing ${method}`);
         return [method,jsonBody];
     }
 

@@ -9,11 +9,15 @@ def parse_args():
     return args
 
 def do_it(args):
-    url = f'http://localhost:{args.port}/__scheduled?cron=*+*+*+*+*"'
+    url = f'http://localhost:{args.port}/__scheduled?cron=*+*+*+*+*'
     while True:
-        print("_scheduled invocation")
-        requests.post(url)
-        time.sleep(60)
+        try:
+            print("_scheduled invocation")
+            requests.post(url)
+        except Exception as e:
+            print("_scheduled invocation failed: " + str(e))
+        finally:
+            time.sleep(60)
 
 
 if __name__ == "__main__":

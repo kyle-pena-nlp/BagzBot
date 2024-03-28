@@ -10,7 +10,7 @@ import { Position, PositionRequest, PositionStatus, Quote, getSwapOfXDescription
 import { SwapSummary, isSuccessfulSwapSummary } from "../../rpc/rpc_types";
 import { TGStatusMessage, UpdateableNotification } from "../../telegram";
 import { assertNever } from "../../util";
-import { upsertPosition } from "../token_pair_position_tracker/token_pair_position_tracker_DO_interop";
+import { upsertPosition } from "../token_pair_position_tracker/token_pair_position_tracker_do_interop";
 import { createAndSignTx, executeAndConfirmSignedTx } from "./user_swap";
 
 export async function buy(positionRequest : PositionRequest,
