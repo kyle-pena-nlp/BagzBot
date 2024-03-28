@@ -21,6 +21,17 @@ export async function createAndSignTx(s : Swappable,
     env: Env,
     notificationChannel : UpdateableNotification) : Promise<VersionedTransaction|undefined> {
 
+    // last minute check to make sure we aren't swapping forbidden tokens
+
+    const forbidden_tokens = env.FORBIDDEN_TOKENS.split(",");
+
+    if (forbidden_tokens.includes(s.token.address)) {
+        throw new Error(`Cannot swap vsToken ${s.token.address}`);
+    }
+
+    if (forbidden_tokens.includes(s.vsToken.address)) {
+        throw new Error(`Cannot swap vsToken ${s.vsToken.address}`);
+    }
 
     // get friendly description of what we are doing
     const swapOfX = getSwapOfXDescription(s);
@@ -61,12 +72,18 @@ export async function createAndSignTx(s : Swappable,
     return signedTx;
 }
 
+/* 
+    This method should not throw any exceptions and should be absolutely bullet proof to exceptional circumstances
+*/
 export async function executeAndConfirmSignedTx(s: Swappable, 
     signedTx : VersionedTransaction,
     wallet : Wallet, 
     env : Env,
     notificationChannel : UpdateableNotification,
-    connection : Connection) : Promise<ParsedSuccessfulSwapSummary|'could-not-retrieve-tx'|'tx-failed'|'swap-failed'> {
+    connection : Connection) : Promise<ParsedSuccessfulSwapSummary|
+    'could-not-retrieve-tx'|
+    'tx-failed'|
+    'swap-failed'> {
     
     // get a friendly description of what we are doing
     const SwapOfX = getSwapOfXDescription(s, true);

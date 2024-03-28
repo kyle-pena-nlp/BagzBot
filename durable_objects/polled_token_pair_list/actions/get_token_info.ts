@@ -7,6 +7,7 @@ export interface GetTokenInfoRequest {
 export interface InvalidTokenResponse {
 	type : 'invalid'
 	tokenInfo : null
+	isForbiddenToken : boolean
 }
 
 export interface ValidTokenResponse {

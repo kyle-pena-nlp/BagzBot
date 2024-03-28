@@ -6,3 +6,9 @@ export function isEnumValue<T extends Record<string,string|number>>(value: any, 
 export function assertNever(x: never): never {
     throw new Error("Unexpected object: " + x);
 }
+
+type OnlyEver<T,V> = V extends T ? V : never; 
+
+export function assertIs<T,V extends T>() {
+    return true;
+}

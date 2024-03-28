@@ -70,7 +70,10 @@ export class Worker {
         
         // if it's not valid, early-out
         if (isInvalidTokenInfoResponse(validateTokenResponse)) {
-            await sendMessageToTG(chatID, `The token address '${initiatingMessage}' is not a known token.`, this.env);
+            const invalidTokenMsg = validateTokenResponse.isForbiddenToken ? 
+                `The token address ${maybeTokenAddress} is not permitted for trading on ${this.env.TELEGRAM_BOT_NAME}` : 
+                `The token address '${maybeTokenAddress}' is not a known token.`;
+            await sendMessageToTG(chatID, invalidTokenMsg, this.env);
             return makeFakeFailedRequestResponse(404, "Token does not exist");
         }
 

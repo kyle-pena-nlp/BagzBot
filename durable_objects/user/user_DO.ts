@@ -1,13 +1,14 @@
 import { DurableObjectState } from "@cloudflare/workers-types";
 import { Wallet, encryptPrivateKey, generateEd25519Keypair } from "../../crypto";
-import { DecimalizedAmount } from "../../decimalized";
+import { DecimalizedAmount, toFriendlyString } from "../../decimalized";
 import { Env } from "../../env";
 import { logError } from "../../logging";
 import { Position, PositionPreRequest, PositionType } from "../../positions";
 import { getSOLBalance } from "../../rpc/rpc_wallet";
 import { POSITION_REQUEST_STORAGE_KEY } from "../../storage_keys";
+import { TGStatusMessage, UpdateableNotification } from "../../telegram";
 import { WEN_ADDRESS, getVsTokenInfo } from "../../tokens";
-import { ChangeTrackedValue, Structural, assertNever, makeFailureResponse, makeJSONResponse, makeSuccessResponse, maybeGetJson, strictParseBoolean } from "../../util";
+import { ChangeTrackedValue, Structural, assertNever, groupIntoBatches, makeFailureResponse, makeJSONResponse, makeSuccessResponse, maybeGetJson, strictParseBoolean } from "../../util";
 import { listUnclaimedBetaInviteCodes } from "../beta_invite_codes/beta_invite_code_interop";
 import { AutomaticallyClosePositionsRequest, AutomaticallyClosePositionsResponse } from "../token_pair_position_tracker/actions/automatically_close_positions";
 import { PositionAndMaybePNL } from "../token_pair_position_tracker/model/position_and_PNL";
@@ -521,9 +522,24 @@ export class UserDO {
 
     async handleAutomaticallyClosePositionsRequest(closePositionsRequest : AutomaticallyClosePositionsRequest) : Promise<Response> {
         const positions = closePositionsRequest.positions;
-        for (const position of positions) {
-            sellPosition(position, this.wallet.value!!, this.env);
+        if (positions.length == 0) {
+            return makeJSONResponse<AutomaticallyClosePositionsResponse>({});
         }
+        positions.sort(p => -p.vsTokenAmt); // TODO: sort by currentValue desc rather than vsTokenAmt desc
+        const positionBatches = groupIntoBatches(positions,4);
+        const notificationChannels : UpdateableNotification[] = [];
+        for (const batch of positionBatches) {
+            // fire-and-forget in batches
+            const promises = batch.map(p => {
+                const sellMessage = `Initiating auto-sell of ${toFriendlyString(p.tokenAmt, 4)} $${p.token.symbol}`;
+                const notificationChannel = TGStatusMessage.createAndSend(sellMessage, false, p.chatID, this.env);
+                notificationChannels.push(notificationChannel);
+                return sellPosition(p, this.wallet.value!!, this.env, notificationChannel)
+            });
+            await Promise.allSettled(promises);
+        }
+        // fire and forget, finalize all channels
+        Promise.allSettled(notificationChannels.map(channel => TGStatusMessage.finalize(channel)));
         return makeJSONResponse<AutomaticallyClosePositionsResponse>({});
     }
 

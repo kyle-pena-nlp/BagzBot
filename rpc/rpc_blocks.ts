@@ -1,22 +1,27 @@
 import { Connection } from "@solana/web3.js";
-import { Env } from "../env";
 import { logError } from "../logging";
-import { sleep } from "../util";
 
-export async function waitUntilCurrentBlockFinalized(connection : Connection, env : Env) {
-    try {
-        const currentSlot = await connection.getSlot('processed');
-        let finalizedSlot = await connection.getSlot('finalized');
-        while(currentSlot > finalizedSlot) {
-            await sleep(2000);
-            finalizedSlot = await connection.getSlot('finalized');
-        }
-        return;
+export async function waitUntilCurrentBlockFinalized(connection : Connection, lastValidBlockheight ?: number) {
+    if (lastValidBlockheight == null) {
+        const latestBlockhash = await connection.getLatestBlockhash('confirmed');  
+        lastValidBlockheight = latestBlockhash.lastValidBlockHeight;
     }
-    catch(e) {
-        // What else can I do...
-        logError("Failed querying slot numbers");
-        await sleep(2 * parseInt(env.MAX_BLOCK_FINALIZATION_TIME_MS, 10));
-        return;
+
+    let reattempt = true;
+    let rpcExceptionCount = 0;
+    while (reattempt) {
+        let blockheight = await connection.getBlockHeight('confirmed').catch(r => {
+            logError("Could not poll blockheight");
+            return null;
+        });
+        if (blockheight == null) {
+            rpcExceptionCount += 1;
+        }
+        if (rpcExceptionCount > 10) {
+            reattempt = false;
+        }
+        if (blockheight != null) {
+            reattempt = blockheight <= lastValidBlockheight;
+        }
     }
 }

@@ -39,14 +39,22 @@ export async function executeAndMaybeConfirmTx(
     let stopSendingTx = false;
     let stopConfirming = false;
 
-    // the blockhash that the tx executes with (assigned by jup swap API)
-    const txRecentBlockhash = rawSignedTx.message.recentBlockhash;
-
     // whether at least 1 tx has been sent (irregardless of if it actually executed)
     let anyTxSent = false;
 
     // TODO: RPC node heath check, per: https://solana.com/docs/core/transactions/confirmation#use-healthy-rpc-nodes-when-fetching-blockhashes 
-    let latestBlockhash = await connection.getLatestBlockhash('confirmed');    
+    let latestBlockhash = await connection.getLatestBlockhash('confirmed').catch(r => {
+        logError(`Could not get latestBlockhash`, r);
+        return null;
+    });
+
+    if (latestBlockhash == null) {
+        return {
+            positionID : positionID,
+            status: TransactionExecutionError.CouldNotPollBlockheightNoTxSent,
+            signature : signature
+        };
+    }
 
     const resendTxTask = (async () => {
 

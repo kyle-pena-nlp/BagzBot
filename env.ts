@@ -35,10 +35,12 @@ export interface Env {
 	WALLET_BALANCE_REFRESH_INTERVAL_MS : string
 	ADMIN_TELEGRAM_USER_IDS: string
 	SUPER_ADMIN_USER_ID : string
-	START_POLLING_ON_START : string
 	POLLING_ON : string
 	USER_PNL_CALCULATION_REFRESH_MS : string
 	TOKEN_LIST_REFRESH_TIMEOUT : string
+	BETA_SOL_BUY_LIMIT : string
+	PRICE_POLL_INTERVAL_MS : string
+	FORBIDDEN_TOKENS : string
 
 	UserDO : any // i'd like to strongly type this as DurableObjectNamespace, but can't for technical reasons
 	TokenPairPositionTrackerDO : any // ditto

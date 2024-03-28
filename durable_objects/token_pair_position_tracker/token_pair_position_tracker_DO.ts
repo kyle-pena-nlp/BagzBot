@@ -2,7 +2,7 @@ import { DurableObjectState } from "@cloudflare/workers-types";
 import { DecimalizedAmount } from "../../decimalized";
 import { Env } from "../../env";
 import { logDebug, logError, logInfo } from "../../logging";
-import { ChangeTrackedValue, assertNever, makeJSONResponse, makeSuccessResponse, strictParseBoolean } from "../../util";
+import { ChangeTrackedValue, assertNever, makeJSONResponse, makeSuccessResponse, strictParseBoolean, strictParseInt } from "../../util";
 import { ensureTokenPairIsRegistered } from "../heartbeat/heartbeat_do_interop";
 import { sendClosePositionOrdersToUserDOs } from "../user/userDO_interop";
 import { AutomaticallyClosePositionsRequest } from "./actions/automatically_close_positions";
@@ -158,11 +158,12 @@ export class TokenPairPositionTrackerDO {
         this.isPolling = true;
         const end = Date.now();
         const elapsed = end - begin;
-        if (elapsed > 1000) {
+        const pricePollInterval = strictParseInt(this.env.PRICE_POLL_INTERVAL_MS);
+        if (elapsed > pricePollInterval) {
             logInfo("Tracker ran longer than 1s", this.tokenAddress, this.vsTokenAddress);
         }
-        const remainder = elapsed % 1000;
-        const nextAlarm = 1000 - remainder;
+        const remainder = elapsed % pricePollInterval;
+        const nextAlarm = pricePollInterval - remainder;
         const alarmTime = Date.now() + nextAlarm;
         await this.state.storage.setAlarm(alarmTime);
     }

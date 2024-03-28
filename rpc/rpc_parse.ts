@@ -1,15 +1,14 @@
 import { Connection, ParsedTransactionWithMeta, TokenBalance } from "@solana/web3.js";
 import { UserAddress } from "../crypto";
 import { DecimalizedAmount, MATH_DECIMAL_PLACES, dAdd, dDiv, dNegate, dSub, fromTokenAmount } from "../decimalized";
+import { dZero } from "../decimalized/decimalized_amount";
 import { Env } from "../env";
 import { logError } from "../logging";
-import { Position, PositionRequest, Swappable, isPosition, isPositionRequest } from "../positions";
+import { Position, PositionRequest } from "../positions";
 import { SOL_ADDRESS, deriveTokenAccount, getVsTokenInfo } from "../tokens";
 import { safe } from "../util";
-import { waitUntilCurrentBlockFinalized } from "./rpc_blocks";
 import { parseInstructionError } from "./rpc_parse_instruction_error";
 import { ParsedSwapSummary, PreparseConfirmedSwapResult, PreparseSwapResult, SwapSummary } from "./rpc_types";
-import { dZero } from "../decimalized/decimalized_amount";
 
 // This may come in handy at some point: https://github.com/cocrafts/walless/blob/a05d20f8275c8167a26de976a3b6701d64472765/apps/wallet/src/engine/runners/solana/history/swapHistory.ts#L85
 
@@ -171,20 +170,5 @@ function getTokenAccountAddress(tokenAddress : string, userAddress : UserAddress
     return tokenAccountAddress;
 }
 
-export async function waitForBlockFinalizationAndParse(s : Swappable,
-    signature : string,
-    userAddress : UserAddress,
-    connection : Connection,
-    env : Env) : Promise<ParsedSwapSummary> {
-        await waitUntilCurrentBlockFinalized(connection, env);
-        if (isPositionRequest(s)) {
-            return parseSwapTransaction(signature, s.vsToken.address, s.token.address, userAddress, connection, env);
-        }
-        else if (isPosition(s)) {
-            return parseSwapTransaction(signature, s.token.address, s.vsToken.address, userAddress, connection, env);
-        }
-        else {
-            throw new Error("Programmer error.");
-        }
-}
+
 

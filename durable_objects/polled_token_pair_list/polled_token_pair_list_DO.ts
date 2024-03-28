@@ -68,9 +68,19 @@ export class PolledTokenPairListDO {
         if (!this.looksLikeATokenAddress(tokenAddress)) {
             return {
                 type: 'invalid',
-                tokenInfo: null
+                tokenInfo: null,
+                isForbiddenToken: false
             };
         }
+
+        if (this.isForbiddenToken(tokenAddress)) {
+            return {
+                type: 'invalid',
+                tokenInfo: null,
+                isForbiddenToken : true
+            }
+        }
+
         // if the token is already in the tracker, respond with the token info
         const tokenInfo = await this.tokenTracker.getTokenInfo(tokenAddress, this.env);
         if (tokenInfo) {
@@ -82,8 +92,13 @@ export class PolledTokenPairListDO {
 
         return {
             type: 'invalid',
-            tokenInfo: null
+            tokenInfo: null,
+            isForbiddenToken: false
         };
+    }
+
+    isForbiddenToken(address : string) {
+        return this.env.FORBIDDEN_TOKENS.split(",").includes(address);
     }
 
     async addFeeAccount(stagedTokenInfo : StagedTokenInfo) : Promise<TokenInfo> {
