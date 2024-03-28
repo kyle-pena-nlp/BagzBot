@@ -180,6 +180,8 @@ export class UserDO {
         if (this.wallet.initializationAttempted && !this.wallet.initialized) {
             this.wallet.value = await this.generateWallet();
         }
+
+        this.chatID.value = userAction.chatID;
     }
 
     async _fetch(request : Request) : Promise<[UserDOFetchMethod,any,Response]> {

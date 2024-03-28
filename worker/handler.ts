@@ -501,7 +501,7 @@ export class Worker {
                             linkedMessageID: messageID,
                             nextMenuCode: MenuCode.SubmitBetaFeedback
                         },
-                        timeoutMS: 45
+                        timeoutMS: 45000
                     });
             case MenuCode.SubmitBetaFeedback:
                 const betaFeedbackAnswer = (callbackData.menuArg||'').trim();
