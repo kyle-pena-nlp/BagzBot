@@ -25,6 +25,7 @@ import { WEN_ADDRESS, getVsTokenInfo } from "../tokens";
 import { Structural, assertNever, makeFakeFailedRequestResponse, makeSuccessResponse, tryParseFloat, tryParseInt } from "../util";
 import { CallbackHandlerParams } from "./model/callback_handler_params";
 import { TokenAddressExtractor } from "./token_address_extractor";
+import { doHeartbeatWakeup } from "../durable_objects/heartbeat/heartbeat_DO_interop";
 
 
 const QUESTION_TIMEOUT_MS = 10000
@@ -40,8 +41,7 @@ export class Worker {
     }
 
     async handleMinuteCRONJob(env : Env) : Promise<void> {
-        const namespace = env.TokenPairPositionTrackerDO as DurableObjectNamespace;
-        //const objectList = await listObjectsInNamespace('TokenPairPositionTrackerDO', namespace);
+        await doHeartbeatWakeup(env);
     }
 
     async listDurableObjectIDsInNamespace(namespace : DurableObjectNamespace) : Promise<string[]> {

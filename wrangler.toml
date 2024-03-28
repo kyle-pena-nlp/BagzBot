@@ -15,7 +15,8 @@ bindings = [
     {name = "UserDO", class_name = "UserDO" },
     {name = "TokenPairPositionTrackerDO", class_name = "TokenPairPositionTrackerDO" },
     {name = "PolledTokenPairListDO", class_name = "PolledTokenPairListDO" },
-    {name = "BetaInviteCodesDO", class_name = "BetaInviteCodesDO" }
+    {name = "BetaInviteCodesDO", class_name = "BetaInviteCodesDO" },
+    {name = "HeartbeatRequestDO", class_name = "HeartbeatRequestDO" }
 ]
 
 # The 'wake up!' cron trigger

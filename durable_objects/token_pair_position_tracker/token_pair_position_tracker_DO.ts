@@ -3,11 +3,13 @@ import { DecimalizedAmount } from "../../decimalized";
 import { Env } from "../../env";
 import { logDebug, logError, logInfo } from "../../logging";
 import { ChangeTrackedValue, assertNever, makeJSONResponse, makeSuccessResponse, strictParseBoolean } from "../../util";
+import { ensureTokenPairIsRegistered } from "../heartbeat/heartbeat_DO_interop";
 import { sendClosePositionOrdersToUserDOs } from "../user/userDO_interop";
 import { AutomaticallyClosePositionsRequest } from "./actions/automatically_close_positions";
 import { GetPositionFromPriceTrackerRequest, GetPositionFromPriceTrackerResponse } from "./actions/get_position";
 import { GetTokenPriceRequest, GetTokenPriceResponse } from "./actions/get_token_price";
 import { HasPairAddresses } from "./actions/has_pair_addresses";
+import { HeartbeatWakeupRequest, isHeartbeatRequest } from "./actions/heartbeat_wake_up";
 import { ListPositionsByUserRequest, ListPositionsByUserResponse } from "./actions/list_positions_by_user";
 import { MarkPositionAsClosedRequest, MarkPositionAsClosedResponse } from "./actions/mark_position_as_closed";
 import { MarkPositionAsClosingRequest, MarkPositionAsClosingResponse } from "./actions/mark_position_as_closing";
@@ -15,7 +17,7 @@ import { MarkPositionAsOpenRequest, MarkPositionAsOpenResponse } from "./actions
 import { RemovePositionRequest, RemovePositionResponse } from "./actions/remove_position";
 import { UpdatePriceRequest, UpdatePriceResponse } from "./actions/update_price";
 import { UpsertPositionsRequest, UpsertPositionsResponse } from "./actions/upsert_positions";
-import { WakeupRequest, WakeupResponse } from "./actions/wake_up";
+import { WakeupTokenPairPositionTrackerRequest, WakeupTokenPairPositionTrackerResponse } from "./actions/wake_up";
 import { TokenPairPositionTrackerDOFetchMethod, parseTokenPairPositionTrackerDOFetchMethod } from "./token_pair_position_tracker_DO_interop";
 import { CurrentPriceTracker } from "./trackers/current_price_tracker";
 import { TokenPairPositionTracker } from "./trackers/token_pair_position_tracker";
@@ -49,6 +51,10 @@ export class TokenPairPositionTrackerDO {
     
     // this contains (and queries for) the current price of the pair in $token/$vsToken
     currentPriceTracker : CurrentPriceTracker = new CurrentPriceTracker();
+
+    // when the DO loads up, it registers itself with HeartbeatDO
+    // (which later sends heartbeat requests to keep the DO awake)
+    needsToEnsureIsRegistered : boolean = true
 
     env : Env;
 
@@ -143,6 +149,7 @@ export class TokenPairPositionTrackerDO {
     }
 
     async fetch(request : Request) : Promise<Response> {
+        this.tryToEnsureTokenPairIsRegistered();
         const [method,body] = await this.validateFetchRequest(request);
         try {
             const response = await this._fetch(method,body);
@@ -158,6 +165,22 @@ export class TokenPairPositionTrackerDO {
             await this.flushToStorage();
         }
         return makeSuccessResponse();
+    }
+
+    async tryToEnsureTokenPairIsRegistered() {
+        if (this.needsToEnsureIsRegistered) {
+            const tokenAddress = this.tokenAddress.value;
+            const vsTokenAddress = this.vsTokenAddress.value;
+            if (tokenAddress == null) {
+                return;
+            }
+            if (vsTokenAddress == null) {
+                return;
+            }
+            await ensureTokenPairIsRegistered(tokenAddress, vsTokenAddress, this.env).then(() => {
+                this.needsToEnsureIsRegistered = false;
+            })
+        }
     }
 
     async _fetch(method : TokenPairPositionTrackerDOFetchMethod, body : any) : Promise<Response> {
@@ -182,6 +205,8 @@ export class TokenPairPositionTrackerDO {
                 return await this.handleRemovePosition(body);
             case TokenPairPositionTrackerDOFetchMethod.getPosition:
                 return await this.handleGetPosition(body);
+            case TokenPairPositionTrackerDOFetchMethod.heartbeatWakeup:
+                return await this.handleHeartbeatWakeup(body);
             default:
                 assertNever(method);
         }
@@ -215,10 +240,15 @@ export class TokenPairPositionTrackerDO {
         return makeJSONResponse<GetTokenPriceResponse>({ price : price });
     }
 
-    async handleWakeup(body : WakeupRequest) {
+    async handleWakeup(body : WakeupTokenPairPositionTrackerRequest) {
         // this is a no-op, because by simply calling a request we wake up the DO
-        const responseBody : WakeupResponse = {};
+        const responseBody : WakeupTokenPairPositionTrackerResponse = {};
         return makeJSONResponse(responseBody);
+    }
+
+    async handleHeartbeatWakeup(body : HeartbeatWakeupRequest) {
+        // simply invoking any fetch method causes the DO to reschedule polling if needed
+        return makeJSONResponse({});
     }
 
     async handleUpsertPositions(body : UpsertPositionsRequest) {
@@ -255,6 +285,18 @@ export class TokenPairPositionTrackerDO {
         const method : TokenPairPositionTrackerDOFetchMethod|null = parseTokenPairPositionTrackerDOFetchMethod(methodName);
         if (method == null) {
             throw new Error(`Unknown method ${method}`);
+        }
+        // NOTE: A heartbeat request is the only exception to the rule
+        // that all requests must have tokenAddress and vsTokenAddress identified.
+        if (!(isHeartbeatRequest(jsonBody))) {
+            const tokenAddress = jsonBody.tokenAddress;
+            const vsTokenAddress = jsonBody.vsTokenAddress;
+            if (this.tokenAddress.initialized && tokenAddress != this.tokenAddress.value) {
+                throw new Error(`tokenAddress did not match expected tokenAddress. Expected: ${this.tokenAddress.value} Was: ${tokenAddress}`);
+            }
+            if (this.vsTokenAddress.initialized && vsTokenAddress != this.vsTokenAddress.value) {
+                throw new Error(`vsTokenAddress did not match expected vsTokenAddress. Expected: ${this.vsTokenAddress.value} Was: ${vsTokenAddress}`);
+            }
         }
         logDebug(`token pair position tracker - executing ${method}`);
         return [method,jsonBody];

@@ -9,11 +9,12 @@ import { MarkPositionAsClosingRequest, MarkPositionAsClosingResponse } from "./a
 import { MarkPositionAsOpenRequest, MarkPositionAsOpenResponse } from "./actions/mark_position_as_open";
 import { RemovePositionRequest, RemovePositionResponse } from "./actions/remove_position";
 import { UpsertPositionsRequest, UpsertPositionsResponse } from "./actions/upsert_positions";
-import { WakeupRequest, WakeupResponse } from "./actions/wake_up";
+import { WakeupTokenPairPositionTrackerRequest, WakeupTokenPairPositionTrackerResponse } from "./actions/wake_up";
 import { PositionAndMaybePNL } from "./model/position_and_PNL";
 
 export enum TokenPairPositionTrackerDOFetchMethod {
 	wakeUp = "wakeUp",
+	heartbeatWakeup = "heartbeatWakeup",
 	updatePrice = "updatePrice",
 	upsertPositions = "upsertPositions",
 	markPositionAsClosing = "markPositionAsClosing",
@@ -65,12 +66,12 @@ export async function listPositionsByUser(telegramUserID : number, tokenAddress 
 }
 
 /* This should be called on cold-start */
-export async function wakeUpTokenPairPositionTracker(tokenAddress : string, vsTokenAddress : string, env : Env) : Promise<WakeupResponse> {
+export async function wakeUpTokenPairPositionTracker(tokenAddress : string, vsTokenAddress : string, env : Env) : Promise<WakeupTokenPairPositionTrackerResponse> {
 	const body = { 
 		tokenAddress: tokenAddress, 
 		vsTokenAddress : vsTokenAddress 
 	};
-	const response = await sendJSONRequestToTokenPairPositionTracker<WakeupRequest,WakeupResponse>(
+	const response = await sendJSONRequestToTokenPairPositionTracker<WakeupTokenPairPositionTrackerRequest,WakeupTokenPairPositionTrackerResponse>(
 		TokenPairPositionTrackerDOFetchMethod.wakeUp, 
 		body, 
 		tokenAddress, 
@@ -138,9 +139,21 @@ export async function getTokenPrice(tokenAddress : string, vsTokenAddress : stri
 	return priceResponse.price;
 }
 
+export class TokenPairKey {
+	tokenAddress : string
+	vsTokenAddress : string
+	constructor(tokenAddress : string, vsTokenAddress : string) {
+		this.tokenAddress = tokenAddress;
+		this.vsTokenAddress = vsTokenAddress;
+	}
+	toString() : string {
+		return `${this.tokenAddress}:${this.vsTokenAddress}`;
+	}
+}
+
 function getTokenPairPositionTrackerDO(tokenAddress : string, vsTokenAddress : string, env : Env) {
 	const namespace : DurableObjectNamespace = env.TokenPairPositionTrackerDO;
-	const id = namespace.idFromName(`${tokenAddress}:${vsTokenAddress}`);
+	const id = namespace.idFromName(new TokenPairKey(tokenAddress, vsTokenAddress).toString());
 	const stub = namespace.get(id);
 	return stub;
 }

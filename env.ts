@@ -43,6 +43,7 @@ export interface Env {
 	TokenPairPositionTrackerDO : any // ditto
 	PolledTokenPairListDO : any // ditto
 	BetaInviteCodesDO : any
+	HeartbeatRequestDO: any
 };
 
 /*
