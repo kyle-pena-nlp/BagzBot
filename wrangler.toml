@@ -16,7 +16,7 @@ bindings = [
     {name = "TokenPairPositionTrackerDO", class_name = "TokenPairPositionTrackerDO" },
     {name = "PolledTokenPairListDO", class_name = "PolledTokenPairListDO" },
     {name = "BetaInviteCodesDO", class_name = "BetaInviteCodesDO" },
-    {name = "HeartbeatRequestDO", class_name = "HeartbeatRequestDO" }
+    {name = "HeartbeatDO", class_name = "HeartbeatDO" }
 ]
 
 # The 'wake up!' cron trigger - keeps the price tracker tracking the prices.

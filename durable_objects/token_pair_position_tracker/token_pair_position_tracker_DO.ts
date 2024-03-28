@@ -3,7 +3,7 @@ import { DecimalizedAmount } from "../../decimalized";
 import { Env } from "../../env";
 import { logDebug, logError, logInfo } from "../../logging";
 import { ChangeTrackedValue, assertNever, makeJSONResponse, makeSuccessResponse, strictParseBoolean } from "../../util";
-import { ensureTokenPairIsRegistered } from "../heartbeat/heartbeat_DO_interop";
+import { ensureTokenPairIsRegistered } from "../heartbeat/heartbeat_do_interop";
 import { sendClosePositionOrdersToUserDOs } from "../user/userDO_interop";
 import { AutomaticallyClosePositionsRequest } from "./actions/automatically_close_positions";
 import { GetPositionFromPriceTrackerRequest, GetPositionFromPriceTrackerResponse } from "./actions/get_position";

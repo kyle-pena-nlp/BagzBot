@@ -8,6 +8,7 @@ import { Worker as Handler } from "./worker/handler";
 import { isAnAdminUserID, isTheSuperAdminUserID } from "./admins";
 import { getUserHasClaimedBetaInviteCode } from "./durable_objects/beta_invite_codes/beta_invite_code_interop";
 import { BetaInviteCodesDO } from "./durable_objects/beta_invite_codes/beta_invite_codes_DO";
+import { HeartbeatDO } from "./durable_objects/heartbeat/heartbeat_do";
 import { PolledTokenPairListDO } from "./durable_objects/polled_token_pair_list/polled_token_pair_list_DO";
 import { TokenPairPositionTrackerDO } from "./durable_objects/token_pair_position_tracker/token_pair_position_tracker_DO";
 import { getImpersonatedUserID, getLegalAgreementStatus, maybeReadSessionObj, unimpersonateUser } from "./durable_objects/user/userDO_interop";
@@ -19,7 +20,7 @@ import { ReplyQuestionData } from "./reply_question/reply_question_data";
 import { CallbackHandlerParams } from "./worker/model/callback_handler_params";
 
 /* Export of imported DO's (required by wrangler) */
-export { BetaInviteCodesDO, PolledTokenPairListDO, TokenPairPositionTrackerDO, UserDO };
+export { BetaInviteCodesDO, HeartbeatDO, PolledTokenPairListDO, TokenPairPositionTrackerDO, UserDO };
 
 enum ERRORS {
    UNHANDLED_EXCEPTION = 500,
