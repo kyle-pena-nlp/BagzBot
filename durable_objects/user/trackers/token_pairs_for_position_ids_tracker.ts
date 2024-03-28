@@ -1,14 +1,10 @@
+import { TokenPair } from "../model/token_pair";
 
 export interface TokenPairForAPosition {
     positionID : string,
     // this is a bit awkward, but necessary for backwards compat with existing values from testing
     token : { address : string },
     vsToken : { address : string }
-}
-
-export interface TokenPair {
-    tokenAddress : string
-    vsTokenAddress : string
 }
 
 export class TokenPairsForPositionIDsTracker {

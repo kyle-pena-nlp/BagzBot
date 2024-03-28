@@ -10,20 +10,23 @@ export class SOLBalanceTracker {
 
     // TODO : to change tracked value
     maybeSOLBalance : ChangeTrackedValue<DecimalizedAmount|null> = new ChangeTrackedValue<DecimalizedAmount|null>('maybeSOLBalance', null);
-    lastRefreshedSOLBalance : ChangeTrackedValue<number> = new ChangeTrackedValue<number>('lastRefreshedSOLBalance', 0); // ms since epoch
+    lastRefreshedSOLBalance : number = 0; //ChangeTrackedValue<number> = new ChangeTrackedValue<number>('lastRefreshedSOLBalance', 0); // ms since epoch
 
     constructor() {
     }
 
     initialize(entries : Map<string,any>) {
         this.maybeSOLBalance.initialize(entries);
-        this.lastRefreshedSOLBalance.initialize(entries);
+        //this.lastRefreshedSOLBalance.initialize(entries);
     }
 
     async flushToStorage(storage : DurableObjectStorage) {
         const flushSOLBalance = this.maybeSOLBalance.flushToStorage(storage);
-        const flushLastRefresh = this.lastRefreshedSOLBalance.flushToStorage(storage);
-        return await Promise.allSettled([flushSOLBalance,flushLastRefresh]);
+        //const flushLastRefresh = this.lastRefreshedSOLBalance.flushToStorage(storage);
+        return await Promise.allSettled([
+            flushSOLBalance,
+            //flushLastRefresh
+        ]);
     }
 
     async maybeGetBalance(address : string|undefined, forceRefresh : boolean, env : Env) : Promise<DecimalizedAmount|null> {
@@ -34,14 +37,14 @@ export class SOLBalanceTracker {
             const refreshedBalance = await this.getBalanceFromRPC(address, env);
             if (refreshedBalance != null) {
                 this.maybeSOLBalance.value = refreshedBalance;
-                this.lastRefreshedSOLBalance.value = Date.now();
+                this.lastRefreshedSOLBalance = Date.now();
             }
         }
         return this.maybeSOLBalance.value||null;
     }
 
     private refreshIntervalExpired(env : Env) {
-        return (Date.now()  - this.lastRefreshedSOLBalance.value) > strictParseFloat(env.WALLET_BALANCE_REFRESH_INTERVAL_MS);
+        return (Date.now()  - this.lastRefreshedSOLBalance) > strictParseFloat(env.WALLET_BALANCE_REFRESH_INTERVAL_MS);
     }
 
     private async getBalanceFromRPC(address : string, env : Env) : Promise<DecimalizedAmount|undefined> {

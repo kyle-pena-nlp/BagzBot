@@ -33,11 +33,13 @@ import { StoreLegalAgreementStatusRequest, StoreLegalAgreementStatusResponse } f
 import { StoreSessionValuesRequest, StoreSessionValuesResponse } from "./actions/store_session_values";
 import { UnimpersonateUserRequest, UnimpersonateUserResponse } from "./actions/unimpersonate_user";
 import { UserInitializeRequest, UserInitializeResponse } from "./actions/user_initialize";
+import { TokenPair } from "./model/token_pair";
 import { UserData } from "./model/user_data";
 import { AddressBookEntryTracker } from "./trackers/address_book_entry_tracker";
 import { SessionTracker } from "./trackers/session_tracker";
 import { SOLBalanceTracker } from "./trackers/sol_balance_tracker";
-import { TokenPair, TokenPairsForPositionIDsTracker } from "./trackers/token_pairs_for_position_ids_tracker";
+import { TokenPairsForPositionIDsTracker } from "./trackers/token_pairs_for_position_ids_tracker";
+import { UserPNLTracker } from "./trackers/user_pnl_tracker";
 import { UserDOFetchMethod, parseUserDOFetchMethod } from "./userDO_interop";
 import { buy } from "./user_buy";
 import { sell, sellPosition } from "./user_sell";
@@ -86,9 +88,6 @@ export class UserDO {
     // tracks variable values associated with the current messageID
     sessionTracker : SessionTracker = new SessionTracker();
 
-    // tracks the positions currently open (or closing but not confirmed closed) for this user
-    //userPositionTracker : UserPositionTracker = new UserPositionTracker();
-
     // tracks the address book entries to which the user can send funds
     addressBookEntryTracker : AddressBookEntryTracker = new AddressBookEntryTracker();
 
@@ -97,6 +96,8 @@ export class UserDO {
 
     // stores just the positionID / tokenAddress / vsTokenAddress
     tokenPairsForPositionIDsTracker : TokenPairsForPositionIDsTracker = new TokenPairsForPositionIDsTracker();
+
+    userPNLTracker : UserPNLTracker = new UserPNLTracker();
 
     constructor(state : DurableObjectState, env : any) {
         this.env                = env;
@@ -117,6 +118,7 @@ export class UserDO {
         this.legalAgreementStatus.initialize(storage);
         this.defaultTrailingStopLossRequest.initialize(storage);
         this.tokenPairsForPositionIDsTracker.initialize(storage);
+        this.userPNLTracker.initialize(storage);
     }
 
     async flushToStorage() {
@@ -129,7 +131,8 @@ export class UserDO {
             this.solBalanceTracker.flushToStorage(this.state.storage),
             this.legalAgreementStatus.flushToStorage(this.state.storage),
             this.defaultTrailingStopLossRequest.flushToStorage(this.state.storage),
-            this.tokenPairsForPositionIDsTracker.flushToStorage(this.state.storage)
+            this.tokenPairsForPositionIDsTracker.flushToStorage(this.state.storage),
+            this.userPNLTracker.flushToStorage(this.state.storage)
         ]);
     }
 
@@ -405,7 +408,8 @@ export class UserDO {
     async handleGet(jsonRequestBody : GetUserDataRequest) : Promise<Response> {
         const messageID = jsonRequestBody.messageID;
         const forceRefreshSOLBalance = jsonRequestBody.forceRefreshBalance;
-        return makeJSONResponse(await this.makeUserData(forceRefreshSOLBalance));
+        const telegramUserID = jsonRequestBody.telegramUserID;
+        return makeJSONResponse(await this.makeUserData(telegramUserID, forceRefreshSOLBalance));
     }
 
     async handleDeleteSession(jsonRequestBody : DeleteSessionRequest) : Promise<Response> {
@@ -558,18 +562,21 @@ export class UserDO {
         }
     }
 
-    async makeUserData(forceRefreshBalance : boolean) : Promise<UserData> {
+
+    async makeUserData(telegramUserID : number, forceRefreshBalance : boolean) : Promise<UserData> {
         const hasInviteBetaCodes = await this.getHasBetaCodes();
         const hasWallet = !!(this.wallet.value);
         const address = this.wallet.value?.publicKey;
         const maybeSOLBalance = await this.solBalanceTracker.maybeGetBalance(address, forceRefreshBalance, this.env);
-
+        const uniqueTokenPairs = this.tokenPairsForPositionIDsTracker.listUniqueTokenPairs();
+        const maybePNL = await this.userPNLTracker.maybeGetPNL(telegramUserID, uniqueTokenPairs, forceRefreshBalance, this.env)
         return {
             hasWallet: hasWallet,
             address : address,
             initialized: this.initialized(),
             hasInviteBetaCodes: hasInviteBetaCodes,
-            maybeSOLBalance : maybeSOLBalance
+            maybeSOLBalance : maybeSOLBalance,
+            maybePNL: maybePNL
         };
     }
 

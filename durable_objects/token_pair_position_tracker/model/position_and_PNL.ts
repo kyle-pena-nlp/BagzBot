@@ -6,6 +6,7 @@ export interface PositionAndMaybePNL {
     peakPrice : DecimalizedAmount
     PNL ?: {
         currentPrice : DecimalizedAmount
+        currentValue : DecimalizedAmount
         fracBelowPeak : DecimalizedAmount
         PNL : DecimalizedAmount
         PNLfrac : DecimalizedAmount

@@ -31,7 +31,8 @@ const subscriptDigits = ['₀', '₁', '₂', '₃', '₄', '₅', '₆', '₇',
 export function toFriendlyString(x : DecimalizedAmount, maxSigFigs : number, 
     useSubscripts : boolean = true, 
     addCommas : boolean = true,
-    includePlusSign : boolean = false) : string {
+    includePlusSign : boolean = false,
+    maxDecimalPlaces ?: number) : string {
     const longDecimalRepr = moveDecimalInString(x.tokenAmount, -x.decimals);
     const numberParts = longDecimalRepr.split(".");
     if (numberParts.length == 1) {
@@ -73,7 +74,12 @@ export function toFriendlyString(x : DecimalizedAmount, maxSigFigs : number,
         if (includePlusSign && sign === '') {
             sign = '+';
         }
-        return sign + localizedWholePart + "." + zeros + rest;
+        let zerosAndRest = zeros + rest;
+        if (maxDecimalPlaces != null) {
+            // TODO: proper rounding
+            zerosAndRest = zerosAndRest.slice(0, maxDecimalPlaces);
+        }
+        return sign + localizedWholePart + "." + zerosAndRest;
     }
 }
 
@@ -114,7 +120,11 @@ export function fromNumber(x : number, decimalPlaces? : number) : DecimalizedAmo
     };
 }
 
-
+export function toNumber(x : DecimalizedAmount) : number {
+    const longDecimalRepr = moveDecimalInString(x.tokenAmount, -x.decimals);
+    const xNumber = parseFloat(longDecimalRepr);
+    return xNumber;
+}
 
 export function fromTokenAmount(tokenAmount : TokenAmount) : DecimalizedAmount {
     return {

@@ -62,7 +62,8 @@ export class PeakPricePositionTracker {
                         currentPrice: currentPrice,
                         fracBelowPeak: fracBelowPeak,
                         PNL: PNL,
-                        PNLfrac: PNLfrac                       
+                        PNLfrac: PNLfrac,
+                        currentValue: currentValue                     
                     }
                 })
             }
