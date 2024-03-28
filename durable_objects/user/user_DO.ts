@@ -181,6 +181,7 @@ export class UserDO {
             this.wallet.value = await this.generateWallet();
         }
 
+        // set most recent chat ID
         this.chatID.value = userAction.chatID;
     }
 

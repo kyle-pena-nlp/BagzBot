@@ -84,14 +84,14 @@ export default {
 
 		// allow the unimpersonate request
 		if (telegramWebhookInfo.callbackData && telegramWebhookInfo.callbackData.menuCode === MenuCode.UnimpersonateUser) {
-			await unimpersonateUser(telegramWebhookInfo.getTelegramUserID('real'), env);
+			await unimpersonateUser(telegramWebhookInfo.getTelegramUserID('real'), telegramWebhookInfo.chatID, env);
 			telegramWebhookInfo.unimpersonate(env);
 			return handler.handleCallback(new CallbackHandlerParams(telegramWebhookInfo));
 		}
 
 		// do user impersonation, if an admin or *the* super admin is impersonating another user
 		if (isAnAdminUserID(telegramWebhookInfo.getTelegramUserID('real'), env) || isTheSuperAdminUserID(telegramWebhookInfo.getTelegramUserID('real'), env)) {
-			const impersonatedUserID = (await getImpersonatedUserID(telegramWebhookInfo.getTelegramUserID('real'), env)).impersonatedUserID;
+			const impersonatedUserID = (await getImpersonatedUserID(telegramWebhookInfo.getTelegramUserID('real'), telegramWebhookInfo.chatID, env)).impersonatedUserID;
 			if (impersonatedUserID !=  null) {
 				const impersonationSuccess = telegramWebhookInfo.impersonate(impersonatedUserID, env);
 				if (impersonationSuccess === 'not-permitted') {
@@ -196,7 +196,7 @@ export default {
 		const command = telegramWebhookInfo.command;
 		// Of note: I am using real User ID for legal agreement gating.
 		// That way, we can't circumvent legal agreement by impersonating.
-		const response = await getLegalAgreementStatus(telegramWebhookInfo.getTelegramUserID('real'), env);
+		const response = await getLegalAgreementStatus(telegramWebhookInfo.getTelegramUserID('real'), telegramWebhookInfo.chatID, env);
 		const legalAgreementStatus = response.status;
 		const LegalAgreementMenuCodes = [ MenuCode.LegalAgreement, MenuCode.LegalAgreementAgree, MenuCode.LegalAgreementRefuse ];
 		if (legalAgreementStatus === 'agreed') {
@@ -250,7 +250,7 @@ export default {
 		// if the user is beta-gated and they are responding to a bot message (which might be: "enter a beta code")
 		else if (userHasClaimedBetaInviteCode.status === 'has-not' && messageType === 'replyToBot') {
 			// fetch the stored question being asked
-			const replyQuestionData = await maybeReadSessionObj<ReplyQuestionData>(info.getTelegramUserID('real'), messageID, "replyQuestion", env);
+			const replyQuestionData = await maybeReadSessionObj<ReplyQuestionData>(info.getTelegramUserID('real'), info.chatID, messageID, "replyQuestion", env);
 			// if there is no question being asked... do not proceed.
 			if (replyQuestionData == null) {
 				return 'beta-restricted';

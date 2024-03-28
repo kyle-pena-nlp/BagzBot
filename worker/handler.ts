@@ -118,6 +118,7 @@ export class Worker {
 
         // store the fully formed request in session, associated with the conversation.
         await storeSessionObj<PositionRequest>(info.getTelegramUserID(), 
+            info.chatID,
             conversationMessageID, 
             positionRequest, 
             POSITION_REQUEST_STORAGE_KEY, 
@@ -172,7 +173,7 @@ export class Worker {
                     return new MenuContinueMessage(`Could not get a quote for ${tokenInfo.symbol}. Please try again soon.`, MenuCode.Main);
                 }
                 const request = convertPreRequestToRequest(newPrerequest, quote, tokenInfoResponse.tokenInfo);
-                await storeSessionObj<PositionRequest>(params.getTelegramUserID(), messageID, request, POSITION_REQUEST_STORAGE_KEY, this.env);
+                await storeSessionObj<PositionRequest>(params.getTelegramUserID(), params.chatID, messageID, request, POSITION_REQUEST_STORAGE_KEY, this.env);
                 return new MenuEditTrailingStopLossPositionRequest(request);
             case MenuCode.Error:
                 return new MenuError(undefined);
@@ -180,7 +181,7 @@ export class Worker {
                 if (params.isImpersonatingAUser()) {
                     return new MenuContinueMessage('Not permitted to view an impersonated users private key', MenuCode.Main);
                 }
-                const walletDataResponse = await getWalletData(params.getTelegramUserID(), this.env);
+                const walletDataResponse = await getWalletData(params.getTelegramUserID(), params.chatID, this.env);
                 const decryptedPrivateKey = await decryptPrivateKey(walletDataResponse.wallet.encryptedPrivateKey, params.getTelegramUserID(), this.env);
                 return new MenuViewDecryptedWallet({ publicKey: walletDataResponse.wallet.publicKey, decryptedPrivateKey: decryptedPrivateKey })
             case MenuCode.FAQ:
@@ -192,11 +193,11 @@ export class Worker {
             case MenuCode.PleaseEnterToken:
                 return new MenuPleaseEnterToken(undefined);
             case MenuCode.ListPositions:
-                const positions = await listPositionsFromUserDO(params.getTelegramUserID(), this.env);
+                const positions = await listPositionsFromUserDO(params.getTelegramUserID(), params.chatID, this.env);
                 return new MenuListPositions(positions);
             case MenuCode.ViewOpenPosition:
                 const viewPositionID = callbackData.menuArg!!;
-                const position = await getPositionFromUserDO(params.getTelegramUserID(), viewPositionID, this.env);
+                const position = await getPositionFromUserDO(params.getTelegramUserID(), params.chatID, viewPositionID, this.env);
                 if (position == null) {
                     return new MenuContinueMessage('Sorry - this position was not found.', MenuCode.Main);
                 }
@@ -212,7 +213,7 @@ export class Worker {
             case MenuCode.ClosePositionManuallyAction:
                 const closePositionID = callbackData.menuArg;
                 if (closePositionID != null) {
-                    await this.handleManuallyClosePosition(params.getTelegramUserID(), closePositionID, this.env);
+                    await this.handleManuallyClosePosition(params.getTelegramUserID(), params.chatID, closePositionID, this.env);
                 }
                 return this.createMainMenu(params, this.env);
             case MenuCode.CustomSlippagePct:
@@ -235,9 +236,9 @@ export class Worker {
                     return new MenuContinueMessage(`Sorry - '${callbackData.menuArg||''}' is not a valid percentage.`, MenuCode.TrailingStopLossSlippagePctMenu);
                 }
                 if (slipPctEntry) {
-                    await storeSessionObjProperty(params.getTelegramUserID(), messageID, "slippagePercent", slipPctEntry, POSITION_REQUEST_STORAGE_KEY, this.env);
+                    await storeSessionObjProperty(params.getTelegramUserID(), params.chatID, messageID, "slippagePercent", slipPctEntry, POSITION_REQUEST_STORAGE_KEY, this.env);
                 }
-                const positionRequestAfterEditingSlippagePct = await readSessionObj<PositionRequest>(params.getTelegramUserID(), messageID, POSITION_REQUEST_STORAGE_KEY, this.env);
+                const positionRequestAfterEditingSlippagePct = await readSessionObj<PositionRequest>(params.getTelegramUserID(), params.chatID, messageID, POSITION_REQUEST_STORAGE_KEY, this.env);
                 return await this.makeStopLossRequestEditorMenu(positionRequestAfterEditingSlippagePct, this.env);                
             case MenuCode.CustomBuyQuantity:
                 const buyQuantityQuestion  = new ReplyQuestion(
@@ -257,17 +258,17 @@ export class Worker {
                 if (!submittedBuyQuantity || submittedBuyQuantity <= 0.0) {
                     return new MenuContinueMessage(`Sorry - '${callbackData.menuArg||''}' is not a valid quantity of SOL to buy.`, MenuCode.TrailingStopLossSlippagePctMenu);
                 }
-                await storeSessionObjProperty(params.getTelegramUserID(), messageID, "vsTokenAmt", submittedBuyQuantity, POSITION_REQUEST_STORAGE_KEY, this.env);
-                const trailingStopLossRequestStateAfterBuyQuantityEdited = await readSessionObj<PositionRequest>(params.getTelegramUserID(), messageID, POSITION_REQUEST_STORAGE_KEY, this.env);
+                await storeSessionObjProperty(params.getTelegramUserID(), params.chatID, messageID, "vsTokenAmt", submittedBuyQuantity, POSITION_REQUEST_STORAGE_KEY, this.env);
+                const trailingStopLossRequestStateAfterBuyQuantityEdited = await readSessionObj<PositionRequest>(params.getTelegramUserID(), params.chatID, messageID, POSITION_REQUEST_STORAGE_KEY, this.env);
                 return await this.makeStopLossRequestEditorMenu(trailingStopLossRequestStateAfterBuyQuantityEdited, this.env);
             case MenuCode.TrailingStopLossChooseAutoRetrySellMenu:
                 return new MenuTrailingStopLossAutoRetrySell(undefined);
             case MenuCode.TrailingStopLossChooseAutoRetrySellSubmit:
-                await storeSessionObjProperty(params.getTelegramUserID(), messageID, "retrySellIfSlippageExceeded", callbackData.menuArg === "true", POSITION_REQUEST_STORAGE_KEY, this.env);
-                const trailingStopLossRequestStateAfterAutoRetrySellEdited = await readSessionObj<PositionRequest>(params.getTelegramUserID(), messageID, POSITION_REQUEST_STORAGE_KEY, this.env);
+                await storeSessionObjProperty(params.getTelegramUserID(), params.chatID, messageID, "retrySellIfSlippageExceeded", callbackData.menuArg === "true", POSITION_REQUEST_STORAGE_KEY, this.env);
+                const trailingStopLossRequestStateAfterAutoRetrySellEdited = await readSessionObj<PositionRequest>(params.getTelegramUserID(), params.chatID, messageID, POSITION_REQUEST_STORAGE_KEY, this.env);
                 return await this.makeStopLossRequestEditorMenu(trailingStopLossRequestStateAfterAutoRetrySellEdited, this.env);
             case MenuCode.TrailingStopLossConfirmMenu:
-                const trailingStopLossRequestAfterDoneEditing = await readSessionObj<PositionRequest>(params.getTelegramUserID(), messageID, POSITION_REQUEST_STORAGE_KEY, this.env);
+                const trailingStopLossRequestAfterDoneEditing = await readSessionObj<PositionRequest>(params.getTelegramUserID(), params.chatID, messageID, POSITION_REQUEST_STORAGE_KEY, this.env);
                 return await this.makeStopLossConfirmMenu(trailingStopLossRequestAfterDoneEditing, this.env);
             case MenuCode.CustomTriggerPct:
                 const triggerPctQuestion = new ReplyQuestion(
@@ -289,12 +290,12 @@ export class Worker {
                         `Sorry - '${callbackData.menuArg||''}' is not a valid percentage`,
                         MenuCode.TrailingStopLossTriggerPercentMenu);
                 }
-                await storeSessionObjProperty(params.getTelegramUserID(), messageID, "triggerPercent", triggerPctEntry, POSITION_REQUEST_STORAGE_KEY, this.env);
-                const updatedTSL = await readSessionObj<PositionRequest>(params.getTelegramUserID(), messageID, POSITION_REQUEST_STORAGE_KEY, this.env);
+                await storeSessionObjProperty(params.getTelegramUserID(), params.chatID, messageID, "triggerPercent", triggerPctEntry, POSITION_REQUEST_STORAGE_KEY, this.env);
+                const updatedTSL = await readSessionObj<PositionRequest>(params.getTelegramUserID(), params.chatID, messageID, POSITION_REQUEST_STORAGE_KEY, this.env);
                 return await this.makeStopLossRequestEditorMenu(updatedTSL, this.env);                
             case MenuCode.TrailingStopLossEditorFinalSubmit:
                 // TODO: do the read within UserDO to avoid the extra roundtrip
-                const positionRequestAfterFinalSubmit = await readSessionObj<PositionRequest>(params.getTelegramUserID(), messageID, POSITION_REQUEST_STORAGE_KEY, this.env);
+                const positionRequestAfterFinalSubmit = await readSessionObj<PositionRequest>(params.getTelegramUserID(), params.chatID, messageID, POSITION_REQUEST_STORAGE_KEY, this.env);
                 const positionRequestRequest : OpenPositionRequest = { 
                     chatID: chatID, 
                     telegramUserID: params.getTelegramUserID(), 
@@ -303,46 +304,46 @@ export class Worker {
                 await requestNewPosition(params.getTelegramUserID(), positionRequestRequest, this.env);
                 return;
             case MenuCode.TrailingStopLossEntryBuyQuantityMenu:
-                const quantityAndTokenForBuyQuantityMenu : QuantityAndToken = await this.getTrailingStopLossPositionQuantityAndVsTokenFromSession(params.getTelegramUserID(), messageID, this.env);
+                const quantityAndTokenForBuyQuantityMenu : QuantityAndToken = await this.getTrailingStopLossPositionQuantityAndVsTokenFromSession(params.getTelegramUserID(), params.chatID, messageID, this.env);
                 return new MenuTrailingStopLossEntryBuyQuantity(quantityAndTokenForBuyQuantityMenu);
             case MenuCode.TrailingStopLossPickVsTokenMenu:
-                const trailingStopLossVsTokenNameAndAddress : TokenSymbolAndAddress = await this.getTrailingStopLossPositionVsTokenFromSession(params.getTelegramUserID(), messageID, this.env);
+                const trailingStopLossVsTokenNameAndAddress : TokenSymbolAndAddress = await this.getTrailingStopLossPositionVsTokenFromSession(params.getTelegramUserID(), params.chatID, messageID, this.env);
                 return new MenuTrailingStopLossPickVsToken(trailingStopLossVsTokenNameAndAddress);
             case MenuCode.TrailingStopLossPickVsTokenMenuSubmit:
                 const trailingStopLossSelectedVsToken = callbackData.menuArg!!;
                 const vsTokenAddress = getVsTokenInfo(trailingStopLossSelectedVsToken).address;
                 const vsToken = getVsTokenInfo(trailingStopLossSelectedVsToken);
-                await storeSessionValues(params.getTelegramUserID(), messageID, new Map<string,Structural>([
+                await storeSessionValues(params.getTelegramUserID(), params.chatID, messageID, new Map<string,Structural>([
                     ["vsToken", vsToken],
                     //["vsTokenAddress", vsTokenAddress]
                 ]), POSITION_REQUEST_STORAGE_KEY, this.env);
-                const trailingStopLossPositionRequestAfterSubmittingVsToken = await readSessionObj<PositionRequest>(params.getTelegramUserID(), messageID, POSITION_REQUEST_STORAGE_KEY, this.env);
+                const trailingStopLossPositionRequestAfterSubmittingVsToken = await readSessionObj<PositionRequest>(params.getTelegramUserID(), params.chatID, messageID, POSITION_REQUEST_STORAGE_KEY, this.env);
                 return await this.makeStopLossRequestEditorMenu(trailingStopLossPositionRequestAfterSubmittingVsToken, this.env);
             case MenuCode.TransferFunds:
                 // TODO
                 return this.TODOstubbedMenu(this.env);
             case MenuCode.Wallet:
-                const userData = await getUserData(params.getTelegramUserID(), messageID, true, this.env);
+                const userData = await getUserData(params.getTelegramUserID(), params.chatID, messageID, true, this.env);
                 return new MenuWallet(userData);
             case MenuCode.Close:
                 await this.handleMenuClose(params.chatID, params.messageID, this.env);
                 return;
             case MenuCode.TrailingStopLossSlippagePctMenu:
-                const x = await readSessionObj<PositionRequest>(params.getTelegramUserID(), messageID, POSITION_REQUEST_STORAGE_KEY, this.env);
+                const x = await readSessionObj<PositionRequest>(params.getTelegramUserID(), params.chatID, messageID, POSITION_REQUEST_STORAGE_KEY, this.env);
                 const slippagePercent = x.slippagePercent;
                 return new MenuTrailingStopLossSlippagePercent(slippagePercent);
             case MenuCode.TrailingStopLossTriggerPercentMenu:
-                const y = await readSessionObj<PositionRequest>(params.getTelegramUserID(), messageID, POSITION_REQUEST_STORAGE_KEY, this.env);
+                const y = await readSessionObj<PositionRequest>(params.getTelegramUserID(), params.chatID, messageID, POSITION_REQUEST_STORAGE_KEY, this.env);
                 const triggerPercent = y.triggerPercent;
                 return new MenuTrailingStopLossTriggerPercent(triggerPercent);
             case MenuCode.TrailingStopLossRequestReturnToEditorMenu:
-                const z = await readSessionObj<PositionRequest>(params.getTelegramUserID(), messageID, POSITION_REQUEST_STORAGE_KEY, this.env);
+                const z = await readSessionObj<PositionRequest>(params.getTelegramUserID(), params.chatID, messageID, POSITION_REQUEST_STORAGE_KEY, this.env);
                 return await this.makeStopLossRequestEditorMenu(z, this.env);
             case MenuCode.AddFundsRecipientAddress:
                 const addressBookEntry : JustAddressBookEntryID = { 
                     addressBookEntryID : randomUUID()
                 };
-                await storeSessionObj<JustAddressBookEntryID>(params.getTelegramUserID(), messageID, addressBookEntry, "addressBookEntry", this.env);
+                await storeSessionObj<JustAddressBookEntryID>(params.getTelegramUserID(), params.chatID, messageID, addressBookEntry, "addressBookEntry", this.env);
                 return new ReplyQuestion("Choose a name for this recipient", 
                     ReplyQuestionCode.EnterAddressBookEntryName, 
                     this.context, 
@@ -354,9 +355,9 @@ export class Worker {
                         timeoutMS: QUESTION_TIMEOUT_MS
                     });
             case MenuCode.SubmitAddressBookEntryName:
-                const addressBookEntry2 = await readSessionObj<JustAddressBookEntryID>(params.getTelegramUserID(), messageID, "addressBookEntry", this.env);
+                const addressBookEntry2 = await readSessionObj<JustAddressBookEntryID>(params.getTelegramUserID(), params.chatID, messageID, "addressBookEntry", this.env);
                 const addressBookEntry3 : JustAddressBookEntryName = { ...addressBookEntry2, name : callbackData.menuArg||'' } ;//name = callbackData.menuArg;
-                await storeSessionObj<JustAddressBookEntryName>(params.getTelegramUserID(), messageID, addressBookEntry3, "addressBookEntry", this.env);
+                await storeSessionObj<JustAddressBookEntryName>(params.getTelegramUserID(), params.chatID, messageID, addressBookEntry3, "addressBookEntry", this.env);
                 return new ReplyQuestion("Paste in the address", 
                     ReplyQuestionCode.EnterTransferFundsRecipient, 
                     this.context, 
@@ -368,28 +369,28 @@ export class Worker {
                         timeoutMS: QUESTION_TIMEOUT_MS
                     });
             case MenuCode.SubmitAddressBookEntryAddress: 
-                const addressBookEntry4 = await readSessionObj<JustAddressBookEntryName>(params.getTelegramUserID(), messageID, "addressBookEntry", this.env);
+                const addressBookEntry4 = await readSessionObj<JustAddressBookEntryName>(params.getTelegramUserID(), params.chatID, messageID, "addressBookEntry", this.env);
                 const addressBookEntry5 : CompletedAddressBookEntry = { ...addressBookEntry4, address: callbackData.menuArg||'', confirmed : false };
-                await storeSessionObj<CompletedAddressBookEntry>(params.getTelegramUserID(), messageID, addressBookEntry5, "addressBookEntry", this.env);
+                await storeSessionObj<CompletedAddressBookEntry>(params.getTelegramUserID(), params.chatID, messageID, addressBookEntry5, "addressBookEntry", this.env);
                 return new MenuConfirmAddressBookEntry(addressBookEntry5);
             case MenuCode.SubmitAddressBookEntry:
-                const addressBookEntryFinal = await readSessionObj<CompletedAddressBookEntry>(params.getTelegramUserID(), messageID, "addressBookEntry", this.env);
-                const response = await storeAddressBookEntry(params.getTelegramUserID(), addressBookEntryFinal, this.env);
+                const addressBookEntryFinal = await readSessionObj<CompletedAddressBookEntry>(params.getTelegramUserID(), params.chatID, messageID, "addressBookEntry", this.env);
+                const response = await storeAddressBookEntry(params.getTelegramUserID(), params.chatID, addressBookEntryFinal, this.env);
                 if (!response.success) {
                     return new MenuContinueMessage(`Could not store address book entry`, MenuCode.TransferFunds);
                 }
                 return new MenuStartTransferFunds(undefined);
             case MenuCode.PickTransferFundsRecipient:
-                const addressBookEntries = await listAddressBookEntries(params.getTelegramUserID(), this.env);
+                const addressBookEntries = await listAddressBookEntries(params.getTelegramUserID(), params.chatID, this.env);
                 return new MenuPickTransferFundsRecipient(addressBookEntries.addressBookEntries);
             case MenuCode.TransferFundsRecipientSubmitted:
                 const addressBookId = callbackData.menuArg||'';
-                const selectedAddressBookEntry = await getAddressBookEntry(params.getTelegramUserID(), addressBookId, this.env);
+                const selectedAddressBookEntry = await getAddressBookEntry(params.getTelegramUserID(), params.chatID, addressBookId, this.env);
                 if (selectedAddressBookEntry == null) {
                     return new MenuContinueMessage(`Address book entry not found`, MenuCode.TransferFunds);
                 }
                 const partialTransferFundsRequest : PartialTransferFundsRequest = { recipientAddress: selectedAddressBookEntry.address };
-                await storeSessionObj<PartialTransferFundsRequest>(params.getTelegramUserID(), messageID, partialTransferFundsRequest, "transferFundsRequest", this.env);
+                await storeSessionObj<PartialTransferFundsRequest>(params.getTelegramUserID(), params.chatID, messageID, partialTransferFundsRequest, "transferFundsRequest", this.env);
                 return new PositiveDecimalKeypad("${currentValue} SOL", MenuCode.KeypadTransferFundsQuantity, MenuCode.SubmitTransferFundsQuantity, MenuCode.TransferFunds, "1.0", 0.0);
             case MenuCode.KeypadTransferFundsQuantity:
                 const tfEntry = callbackData.menuArg||'';
@@ -399,9 +400,9 @@ export class Worker {
                 if (tfQuantity == null) {
                     return new MenuContinueMessage(`Invalid transfer funds quantity`, MenuCode.TransferFunds);
                 }
-                const tfFundsRequest = await readSessionObj<PartialTransferFundsRequest>(params.getTelegramUserID(), messageID, "transferFundsRequest", this.env);
+                const tfFundsRequest = await readSessionObj<PartialTransferFundsRequest>(params.getTelegramUserID(), params.chatID, messageID, "transferFundsRequest", this.env);
                 const completeTfFundsRequest : CompleteTransferFundsRequest = { ...tfFundsRequest, solQuantity: tfQuantity };
-                await storeSessionObj<CompleteTransferFundsRequest>(params.getTelegramUserID(), messageID, completeTfFundsRequest, "transferFundsRequest", this.env);
+                await storeSessionObj<CompleteTransferFundsRequest>(params.getTelegramUserID(), params.chatID, messageID, completeTfFundsRequest, "transferFundsRequest", this.env);
                 return new MenuTransferFundsTestOrSubmitNow(completeTfFundsRequest);
             case MenuCode.TransferFundsDoTestTransfer:
                 throw new Error("");
@@ -436,7 +437,7 @@ export class Worker {
                 if (newTokenAddress == null) {
                     return new MenuContinueMessage(`Sorry - we couldn't interpret this as a token address.`, MenuCode.TrailingStopLossRequestReturnToEditorMenu);
                 }
-                const positionRequest = await readSessionObj<PositionRequest>(params.getTelegramUserID(), messageID, POSITION_REQUEST_STORAGE_KEY, this.env);
+                const positionRequest = await readSessionObj<PositionRequest>(params.getTelegramUserID(), params.chatID, messageID, POSITION_REQUEST_STORAGE_KEY, this.env);
                 if (positionRequest.token.address === newTokenAddress) {
                     return new MenuEditTrailingStopLossPositionRequest(positionRequest);
                 }                
@@ -451,7 +452,7 @@ export class Worker {
                     return new MenuContinueMessage(`Sorry - could not get a quote for $${newTokenInfo.symbol}`, MenuCode.TrailingStopLossRequestReturnToEditorMenu);
                 }
                 positionRequest.quote = maybeQuote;
-                await storeSessionObj<PositionRequest>(params.getTelegramUserID(), messageID, positionRequest, POSITION_REQUEST_STORAGE_KEY, this.env);
+                await storeSessionObj<PositionRequest>(params.getTelegramUserID(), params.chatID, messageID, positionRequest, POSITION_REQUEST_STORAGE_KEY, this.env);
                 return new MenuEditTrailingStopLossPositionRequest(positionRequest);
             case MenuCode.WelcomeScreenPart1:
                 return new WelcomeScreenPart1(undefined);
@@ -460,10 +461,10 @@ export class Worker {
             case MenuCode.LegalAgreement:
                 return new LegalAgreement(undefined);
             case MenuCode.LegalAgreementAgree:
-                await storeLegalAgreementStatus(params.getTelegramUserID('real'), 'agreed', this.env);
+                await storeLegalAgreementStatus(params.getTelegramUserID('real'), params.chatID, 'agreed', this.env);
                 return new WelcomeScreenPart1(undefined);
             case MenuCode.LegalAgreementRefuse:
-                await storeLegalAgreementStatus(params.getTelegramUserID('real'), 'refused', this.env);
+                await storeLegalAgreementStatus(params.getTelegramUserID('real'), params.chatID, 'refused', this.env);
                 await sendMessageToTG(chatID, "You can agree at any time by opening the legal agreement in the menu", this.env);
                 await this.handleMenuClose(chatID, messageID, this.env);
                 return;
@@ -483,11 +484,11 @@ export class Worker {
                 if (!userIDToImpersonate) {
                     return new MenuContinueMessage(`Sorry, that can't be interpreted as a user ID: '${callbackData.menuArg||''}'`, MenuCode.Main);
                 }
-                await impersonateUser(params.getTelegramUserID('real'), userIDToImpersonate, this.env);
+                await impersonateUser(params.getTelegramUserID('real'), params.chatID, userIDToImpersonate, this.env);
                 params.impersonate(userIDToImpersonate, this.env);
                 return this.createMainMenu(params, this.env);
             case MenuCode.UnimpersonateUser:
-                await unimpersonateUser(params.getTelegramUserID('real'), this.env);
+                await unimpersonateUser(params.getTelegramUserID('real'), params.chatID, this.env);
                 params.unimpersonate(this.env);
                 return this.createMainMenu(params, this.env);
             case MenuCode.EditPositionHelp:
@@ -506,7 +507,7 @@ export class Worker {
             case MenuCode.SubmitBetaFeedback:
                 const betaFeedbackAnswer = (callbackData.menuArg||'').trim();
                 if (betaFeedbackAnswer !== '') {
-                    this.context.waitUntil(this.sendBetaFeedbackToSuperAdmin(betaFeedbackAnswer));
+                    this.context.waitUntil(this.sendBetaFeedbackToSuperAdmin(betaFeedbackAnswer, chatID));
                 }
                 const thankYouDialogueRequest = new MenuOKClose("Thank you!").getCreateNewMenuRequest(chatID, this.env);
                 await fetch(thankYouDialogueRequest).catch(r => {
@@ -519,12 +520,12 @@ export class Worker {
         }
     }
 
-    private async sendBetaFeedbackToSuperAdmin(feedback : string) : Promise<void> {
-        await sendMessageToUser(strictParseInt(this.env.SUPER_ADMIN_USER_ID), feedback, this.env);
+    private async sendBetaFeedbackToSuperAdmin(feedback : string, chatID : number) : Promise<void> {
+        await sendMessageToUser(strictParseInt(this.env.SUPER_ADMIN_USER_ID), chatID, feedback, this.env);
     }
 
     private async createMainMenu(info : CallbackHandlerParams, env : Env) : Promise<BaseMenu> {
-        const userData = await getUserData(info.getTelegramUserID(), info.messageID, false, env);
+        const userData = await getUserData(info.getTelegramUserID(), info.chatID, info.messageID, false, env);
         return new MenuMain({ ...userData, 
             isAdminOrSuperAdmin: info.isAdminOrSuperAdmin(env), 
             isImpersonatingUser: info.isImpersonatingAUser(),
@@ -549,16 +550,16 @@ export class Worker {
         }
     }
 
-    private async getTrailingStopLossPositionVsTokenFromSession(telegramUserID : number, messageID : number, env : Env) : Promise<TokenSymbolAndAddress> {
-        const positionRequest = await readSessionObj<PositionRequest>(telegramUserID, messageID, POSITION_REQUEST_STORAGE_KEY, env);
+    private async getTrailingStopLossPositionVsTokenFromSession(telegramUserID : number, chatID : number, messageID : number, env : Env) : Promise<TokenSymbolAndAddress> {
+        const positionRequest = await readSessionObj<PositionRequest>(telegramUserID, chatID, messageID, POSITION_REQUEST_STORAGE_KEY, env);
         return {
             tokenSymbol: positionRequest.vsToken.symbol,
             tokenAddress: positionRequest.vsToken.address
         };
     }
 
-    private async getTrailingStopLossPositionQuantityAndVsTokenFromSession(telegramUserID : number, messageID : number, env: Env) : Promise<QuantityAndToken> {
-        const positionRequest = await readSessionObj<PositionRequest>(telegramUserID, messageID, POSITION_REQUEST_STORAGE_KEY, env);
+    private async getTrailingStopLossPositionQuantityAndVsTokenFromSession(telegramUserID : number, chatID : number, messageID : number, env: Env) : Promise<QuantityAndToken> {
+        const positionRequest = await readSessionObj<PositionRequest>(telegramUserID, chatID, messageID, POSITION_REQUEST_STORAGE_KEY, env);
         return {
             thisTokenSymbol:  positionRequest.vsToken.symbol,
             thisTokenAddress: positionRequest.vsToken.address,
@@ -591,8 +592,8 @@ export class Worker {
         return new MenuTODO(undefined);
     }
 
-    private async handleManuallyClosePosition(telegramUserID : number, positionID : string, env : Env) : Promise<Response> {
-        const result = await manuallyClosePosition(telegramUserID, positionID, env);
+    private async handleManuallyClosePosition(telegramUserID : number, chatID : number, positionID : string, env : Env) : Promise<Response> {
+        const result = await manuallyClosePosition(telegramUserID, chatID, positionID, env);
         return makeSuccessResponse();
     }
 
@@ -610,7 +611,7 @@ export class Worker {
             return makeSuccessResponse();
         }
         if (storeSessionObjectRequest != null) {
-            await storeSessionObj(telegramWebhookInfo.getTelegramUserID(), conversationMessageID, storeSessionObjectRequest.obj, storeSessionObjectRequest.prefix, this.env);
+            await storeSessionObj(telegramWebhookInfo.getTelegramUserID(), telegramWebhookInfo.chatID, conversationMessageID, storeSessionObjectRequest.obj, storeSessionObjectRequest.prefix, this.env);
         }
         if (menu != null) {
             const menuDisplayRequest = menu.getUpdateExistingMenuRequest(telegramWebhookInfo.chatID, conversationMessageID, this.env);
@@ -624,7 +625,7 @@ export class Worker {
 
         // read the callback data tucked away about the reply question
         const questionMessageID = info.messageID;
-        const replyQuestionData = await maybeReadSessionObj<ReplyQuestionData>(info.getTelegramUserID('real'), questionMessageID, "replyQuestion", this.env);
+        const replyQuestionData = await maybeReadSessionObj<ReplyQuestionData>(info.getTelegramUserID('real'), info.chatID, questionMessageID, "replyQuestion", this.env);
         if (replyQuestionData == null) {
             return makeSuccessResponse();
         }
@@ -702,7 +703,7 @@ export class Worker {
         
         switch(command) {
             case '/start':
-                const userData = await getUserData(info.getTelegramUserID(), info.messageID, false, env);
+                const userData = await getUserData(info.getTelegramUserID(), info.chatID, info.messageID, false, env);
                 return ["...", new MenuMain({ 
                     ...userData, 
                     isAdminOrSuperAdmin: info.isAdminOrSuperAdmin(env), 
@@ -713,7 +714,7 @@ export class Worker {
                     isBeta: strictParseBoolean(env.IS_BETA_CODE_GATED)
                 })];
             case '/menu':
-                const menuUserData = await getUserData(info.getTelegramUserID(), info.messageID, false, env);
+                const menuUserData = await getUserData(info.getTelegramUserID(), info.chatID, info.messageID, false, env);
                 return ['...', new MenuMain({ 
                     ...menuUserData, 
                     isAdminOrSuperAdmin : info.isAdminOrSuperAdmin(env), 
