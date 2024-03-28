@@ -3,6 +3,7 @@ import { Env } from "../../env";
 import { Position } from "../../positions";
 import { makeJSONRequest, makeRequest } from "../../util";
 import { GetPositionFromPriceTrackerRequest, GetPositionFromPriceTrackerResponse } from "./actions/get_position";
+import { GetTokenPriceRequest, GetTokenPriceResponse } from "./actions/get_token_price";
 import { ListPositionsByUserRequest, ListPositionsByUserResponse } from "./actions/list_positions_by_user";
 import { MarkPositionAsClosedRequest, MarkPositionAsClosedResponse } from "./actions/mark_position_as_closed";
 import { MarkPositionAsClosingRequest, MarkPositionAsClosingResponse } from "./actions/mark_position_as_closing";
@@ -132,10 +133,10 @@ async function sendJSONRequestToTokenPairPositionTracker<TRequestBody,TResponseB
 }
 
 // TODO: replace with non-anonymous interfaces
-export async function getTokenPrice(tokenAddress : string, vsTokenAddress : string, env : Env) : Promise<DecimalizedAmount|undefined> {
+export async function getTokenPrice(tokenAddress : string, vsTokenAddress : string, env : Env) : Promise<DecimalizedAmount|null> {
 	const method = TokenPairPositionTrackerDOFetchMethod.getTokenPrice;
-	const requestBody = {};
-	const priceResponse = await sendJSONRequestToTokenPairPositionTracker<{},{price : DecimalizedAmount|undefined }>(method, requestBody, tokenAddress, vsTokenAddress, env);
+	const requestBody = { tokenAddress, vsTokenAddress };
+	const priceResponse = await sendJSONRequestToTokenPairPositionTracker<GetTokenPriceRequest,GetTokenPriceResponse>(method, requestBody, tokenAddress, vsTokenAddress, env);
 	return priceResponse.price;
 }
 

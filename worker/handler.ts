@@ -201,7 +201,7 @@ export class Worker {
                 if (position == null) {
                     return new MenuContinueMessage('Sorry - this position was not found.', MenuCode.Main);
                 }
-                const price : DecimalizedAmount|undefined = await getTokenPrice(position.token.address, position.vsToken.address, this.env);
+                const price : DecimalizedAmount|null = await getTokenPrice(position.token.address, position.vsToken.address, this.env);
                 if (price != null) {
                     const currentValue = dMult(price, position.tokenAmt);
                     return new MenuViewOpenPosition({ position: position, currentValue: currentValue })
