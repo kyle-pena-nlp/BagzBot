@@ -3,10 +3,10 @@ import { UserAddress } from "../crypto";
 import { DecimalizedAmount, MATH_DECIMAL_PLACES, dAdd, dDiv, dNegate, dSub, fromTokenAmount } from "../decimalized";
 import { dZero } from "../decimalized/decimalized_amount";
 import { Env } from "../env";
-import { logError } from "../logging";
+import { logDebug, logError } from "../logging";
 import { Position, PositionRequest } from "../positions";
 import { SOL_ADDRESS, deriveTokenAccount, getVsTokenInfo } from "../tokens";
-import { safe } from "../util";
+import { safe, sleep } from "../util";
 import { parseInstructionError } from "./rpc_parse_instruction_error";
 import { ParsedSwapSummary, PreparseConfirmedSwapResult, PreparseSwapResult, SwapSummary } from "./rpc_types";
 
@@ -41,6 +41,8 @@ export async function parseSellSwapTransaction(position : Position,
         env);    
 }
 
+type ParsedTx = ParsedTransactionWithMeta | 'tx-DNE' | 'error-retrieving-tx';
+
 // REFERENCE: https://github.com/StrataFoundation/strata-data-pipelines/blob/b42b07152c378151bcc722eee73e3102d1087a93/src/event-transformer/transformers/tokenAccounts.ts#L34
 export async function parseSwapTransaction(
     signature : string, 
@@ -49,19 +51,39 @@ export async function parseSwapTransaction(
     userAddress : UserAddress,
     connection : Connection,
     env : Env) : Promise<ParsedSwapSummary> {
-    
-    const parsedTransaction = await connection.getParsedTransaction(signature, {
-        maxSupportedTransactionVersion: 0,
-        commitment: 'confirmed'
-    }).catch(r => {
-        logError("Hard error retrieving parsed transaction", userAddress, { signature : signature }, r);
-        return null;
-    });
 
-    if (!parsedTransaction) {
+    // this is a really hacky retry loop... i'm running short on time.  
+    // i will do a proper blockheight based poll later.
+    // todo: enforce that any usage of this method is with a tx with a confirmed signature
+    // todo: pass along lastValidBlockheight
+    let parsedTransaction : ParsedTx = 'tx-DNE';
+    let parseAttempts = 0;
+    while (parsedTransaction === 'tx-DNE') {
+        logDebug(`Attempting confirm of tx ${signature}`);
+        parsedTransaction = await connection.getParsedTransaction(signature, {
+            maxSupportedTransactionVersion: 0,
+            commitment: 'confirmed'
+        })
+        .then(tx => tx == null ? 'tx-DNE' : tx)
+        .catch(r => 'error-retrieving-tx');
+        sleep(500);
+        if (parseAttempts > 10) {
+            break;
+        }
+    }
+
+    if (parsedTransaction == 'tx-DNE') {
+        logError("Could not find tx", userAddress, { signature : signature });
         return {  
             status: 'unknown-transaction'
         };
+    }
+
+    if (parsedTransaction === 'error-retrieving-tx') {
+        logError("Hard error retrieving parsed transaction", userAddress, { signature : signature });
+        return {
+            status : 'unknown-transaction'
+        }
     }
 
     const err = parsedTransaction.meta?.err;
@@ -142,25 +164,44 @@ function calculateTokenBalanceChange(parsedTransaction : ParsedTransactionWithMe
         return dAdd(solBalanceDiff, solFeeDecimalized);
     }
     else {
-        const preTokenBalance = findWithMintAndPubKey(preTokenBalances, accountKeys, tokenAddress, userAddress);
-        const postTokenBalance = findWithMintAndPubKey(postTokenBalances, accountKeys, tokenAddress, userAddress);
-    
-        if (preTokenBalance == null || postTokenBalance == null) {
+
+        // TODO: check that innerInstructions are loaded, per: 
+        // https://www.quicknode.com/docs/solana/getParsedTransaction
+        // indicates that pre/post token balances only populated if inner instructions loaded
+
+        let preTokenBalance = findWithMintAndPubKey(preTokenBalances, accountKeys, tokenAddress, userAddress);
+        let postTokenBalance = findWithMintAndPubKey(postTokenBalances, accountKeys, tokenAddress, userAddress);
+
+        // no balances in pre- or post-... something fishy is going on
+        if (preTokenBalance == null && postTokenBalance == null) {
+            logError(`No balance for token ${tokenAddress} in either pre or postTokenBalances for ${parsedTransaction.transaction.signatures[0]} by ${userAddress}`);
             return null;
         }
     
-        const preAmount = fromTokenAmount(preTokenBalance.uiTokenAmount);
-        const postAmount = fromTokenAmount(postTokenBalance.uiTokenAmount);
+        const preAmount = convertToTokenAmount(preTokenBalance);
+        const postAmount = convertToTokenAmount(postTokenBalance);
     
         return dSub(postAmount,preAmount);
     }
 }
 
-function findWithMintAndPubKey(tokenBalances : TokenBalance[], accountKeys : string[], tokenAddress : string, userAddress : UserAddress) {
-    
+function convertToTokenAmount(tokenBalance : (TokenBalance & {accountAddress : string })|undefined) {
+    // if the token isn't found in the balances list, assume it is zero balance.
+    if (tokenBalance == null) {
+        return dZero();
+    }
+    else {
+        return fromTokenAmount(tokenBalance.uiTokenAmount);
+    }
+}
+
+function findWithMintAndPubKey(tokenBalances : TokenBalance[], accountKeys : string[], tokenAddress : string, userAddress : UserAddress) : (TokenBalance & { accountAddress : string })|undefined {
     const tokenAccountAddress = getTokenAccountAddress(tokenAddress, userAddress);
     const tokenBalance = tokenBalances
-        .map(e => { return { ...e, accountAddress: accountKeys[e.accountIndex] }; })
+        .map(e => { 
+            const t : TokenBalance & { accountAddress : string } = { ...e, accountAddress: accountKeys[e.accountIndex] }; 
+            return t;
+        })
         .find(e => (e.accountAddress === tokenAccountAddress) && (e.mint === tokenAddress));
     return tokenBalance;
 }

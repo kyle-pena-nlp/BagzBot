@@ -188,15 +188,18 @@ async function tryToConfirmPriorBuyBeforeSelling(position : Position,
     env : Env) : Promise<Position|'swap-failed'|'confirm-failed'> {
         
     // we are confirming the buy side, so the 'in' is the vsToken and the 'out' is the token
-    const tryToGetSwapSummary = async () => await parseSwapTransaction(position.txSignature, 
-        position.vsToken.address, 
-        position.token.address, 
-        toUserAddress(wallet), 
-        connection, 
-        env).catch(r => {
-            logError(`Error parsing swap transaction`, position.txSignature);
-            return null;
-        });
+    const tryToGetSwapSummary = async () => {
+        return await parseSwapTransaction(position.txSignature, 
+            position.vsToken.address, 
+            position.token.address, 
+            toUserAddress(wallet), 
+            connection, 
+            env)
+            .catch(r => {
+                logError(`Error parsing swap transaction`, position.txSignature);
+                return null;
+            });
+    }
 
     // try to get tx
     let maybeParsed = await tryToGetSwapSummary();
