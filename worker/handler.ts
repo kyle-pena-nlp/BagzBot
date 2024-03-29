@@ -258,6 +258,9 @@ export class Worker {
                 if (!submittedBuyQuantity || submittedBuyQuantity <= 0.0) {
                     return new MenuContinueMessage(`Sorry - '${callbackData.menuArg||''}' is not a valid quantity of SOL to buy.`, MenuCode.TrailingStopLossSlippagePctMenu);
                 }
+                if (submittedBuyQuantity > 5.0 && strictParseBoolean(this.env.IS_BETA_CODE_GATED)) {
+                    return new MenuContinueMessage(`Sorry - ${this.env.TELEGRAM_BOT_NAME} is in BETA and does not allow purchases of over 5.0 SOL`, MenuCode.TrailingStopLossSlippagePctMenu); 
+                }
                 await storeSessionObjProperty(params.getTelegramUserID(), params.chatID, messageID, "vsTokenAmt", submittedBuyQuantity, POSITION_REQUEST_STORAGE_KEY, this.env);
                 const trailingStopLossRequestStateAfterBuyQuantityEdited = await readSessionObj<PositionRequest>(params.getTelegramUserID(), params.chatID, messageID, POSITION_REQUEST_STORAGE_KEY, this.env);
                 return await this.makeStopLossRequestEditorMenu(trailingStopLossRequestStateAfterBuyQuantityEdited, this.env);
