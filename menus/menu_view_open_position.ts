@@ -1,7 +1,7 @@
 import { dCompare, dMult, fromNumber, toFriendlyString } from "../decimalized";
 import { dZero, toNumber } from "../decimalized/decimalized_amount";
 import { PositionAndMaybePNL } from "../durable_objects/token_pair_position_tracker/model/position_and_PNL";
-import { PositionStatus } from "../positions";
+import { Position, PositionStatus } from "../positions";
 import { CallbackButton } from "../telegram";
 import { interpretPct } from "../telegram/emojis";
 import { assertNever } from "../util";
@@ -9,12 +9,16 @@ import { CallbackData } from "./callback_data";
 import { Menu, MenuCapabilities } from "./menu";
 import { MenuCode } from "./menu_code";
 
-export class MenuViewOpenPosition extends Menu<PositionAndMaybePNL> implements MenuCapabilities {
+export class MenuViewOpenPosition extends Menu<PositionAndMaybePNL|{ brandNewPosition : true, position : Position }> implements MenuCapabilities {
     renderText(): string {
         const position = this.menuData.position;
         const lines = [
             `<i>$${position.token.symbol}</i> position (${toFriendlyString(position.tokenAmt,4)} $${position.token.symbol})`
         ];
+        if ('brandNewPosition' in this.menuData) {
+            lines.push("This position is brand new! Refresh in a few moments to get more detailed information.");
+            return lines.join("\r\n");
+        }
         if (position.status === PositionStatus.Closing) {
             lines.push("The bot is currently selling this position.");
         }

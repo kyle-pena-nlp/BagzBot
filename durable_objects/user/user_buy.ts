@@ -33,10 +33,7 @@ export async function buy(positionRequest : PositionRequest,
         // take straight to position view
         const newPosition = result.newPosition;
         const currentValue = dMult(newPosition.tokenAmt, newPosition.fillPrice);
-        const viewOpenPositionMenuRequest = new MenuViewOpenPosition({
-            position: newPosition,
-            currentValue
-        }).getUpdateExistingMenuRequest(positionRequest.chatID, positionRequest.messageID, env);
+        const viewOpenPositionMenuRequest = new MenuViewOpenPosition({ brandNewPosition : true, position: newPosition }).getUpdateExistingMenuRequest(positionRequest.chatID, positionRequest.messageID, env);
         await fetch(viewOpenPositionMenuRequest); 
     }
 }

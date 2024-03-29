@@ -8,6 +8,6 @@ export interface EditTriggerPercentOnOpenPositionRequest extends BaseUserDOReque
 
 export type EditTriggerPercentOnOpenPositionResponse = 'position-DNE'|'is-closing'|'is-closed'|'invalid-percent'|PositionAndMaybePNL
 
-export function isEditOpenPositionTriggerPctSuccess(response : EditTriggerPercentOnOpenPositionResponse) : obj is PositionAndMaybePNL  {
+export function isEditOpenPositionTriggerPctSuccess(response : EditTriggerPercentOnOpenPositionResponse) : response is PositionAndMaybePNL  {
     return typeof response !== 'string';
 }
