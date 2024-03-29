@@ -35,17 +35,6 @@ const fnsToLookFor = [
 
 const FORBIDDEN_LOG_KEYS = ['wallet','privateKey','encryptedPrivateKey','bytesAsHexString'];
 
-export class BotError {
-    userID : number;
-    chatID : number;
-    message : string;
-    constructor(userID : number, chatID : number, message : string) {
-        this.userID = userID;
-        this.chatID = chatID;
-        this.message = message;
-    }
-}
-
 function digest(x : any, memo : WeakMap<object,string>) : string {
     if (x == null || 
         typeof x === 'string' || 
@@ -98,8 +87,7 @@ function logIt(xs : any[], level : 'error'|'info'|'debug') {
         digestStrings.push(digest(x, memo));
     }
     const digestString = digestStrings.join(" // ");
-    const now = Date.now().toLocaleString();
-    const logMsg = `${now} :: ${digestString}`;
+    const logMsg = `${digestString}`;
     switch(level) {
         case 'error':
             console.error(logMsg);
