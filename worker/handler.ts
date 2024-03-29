@@ -469,7 +469,7 @@ export class Worker {
                 await this.handleMenuClose(chatID, messageID, this.env);
                 return;
             case MenuCode.ImpersonateUser:
-                const replyQuestion = new ReplyQuestion("Enter the user ID to impersonate: ",
+                const replyQuestion = new ReplyQuestion("Enter the user ID to begin user support for: ",
                     ReplyQuestionCode.ImpersonateUser,
                     this.context, 
                     {
