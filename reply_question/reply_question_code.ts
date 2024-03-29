@@ -9,6 +9,7 @@ export enum ReplyQuestionCode {
     EditPositionChangeToken = "EditPositionChangeToken",
     ImpersonateUser = "ImpersonateUser",
 
-    SendBetaFeedback = "SendBetaFeedback"
+    SendBetaFeedback = "SendBetaFeedback",
+    AdminDevSetPrice = "AdminDevSetPrice"
     
 }

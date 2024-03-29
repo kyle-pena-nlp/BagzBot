@@ -1,7 +1,7 @@
 import { DecimalizedAmount } from "../../decimalized";
 import { Env } from "../../env";
 import { Position } from "../../positions";
-import { makeJSONRequest, makeRequest } from "../../util";
+import { makeJSONRequest, makeRequest, strictParseInt } from "../../util";
 import { GetPositionFromPriceTrackerRequest, GetPositionFromPriceTrackerResponse } from "./actions/get_position";
 import { GetTokenPriceRequest, GetTokenPriceResponse } from "./actions/get_token_price";
 import { ListPositionsByUserRequest, ListPositionsByUserResponse } from "./actions/list_positions_by_user";
@@ -9,6 +9,7 @@ import { MarkPositionAsClosedRequest, MarkPositionAsClosedResponse } from "./act
 import { MarkPositionAsClosingRequest, MarkPositionAsClosingResponse } from "./actions/mark_position_as_closing";
 import { MarkPositionAsOpenRequest, MarkPositionAsOpenResponse } from "./actions/mark_position_as_open";
 import { RemovePositionRequest, RemovePositionResponse } from "./actions/remove_position";
+import { UpdatePriceRequest, UpdatePriceResponse } from "./actions/update_price";
 import { UpsertPositionsRequest, UpsertPositionsResponse } from "./actions/upsert_positions";
 import { WakeupTokenPairPositionTrackerRequest, WakeupTokenPairPositionTrackerResponse } from "./actions/wake_up";
 import { PositionAndMaybePNL } from "./model/position_and_PNL";
@@ -28,6 +29,18 @@ export enum TokenPairPositionTrackerDOFetchMethod {
 }
 
 
+export async function _devOnlyFeatureUpdatePrice(telegramUserID : number, tokenAddress : string, vsTokenAddress : string, price : DecimalizedAmount, env : Env) {
+	if (telegramUserID != strictParseInt(env.SUPER_ADMIN_USER_ID)) {
+		throw new Error("Cannot do that if not the super admin");
+	}
+	if (env.ENVIRONMENT !== 'dev') {
+		throw new Error("Cannot do that if environment is not 'dev'");
+	}
+	const request : UpdatePriceRequest = { tokenAddress, vsTokenAddress, price };
+	const method = TokenPairPositionTrackerDOFetchMethod.updatePrice;
+	const response = await sendJSONRequestToTokenPairPositionTracker<UpdatePriceRequest,UpdatePriceResponse>(method,request,tokenAddress,vsTokenAddress,env);
+	return response;
+}
 
 export function parseTokenPairPositionTrackerDOFetchMethod(value : string) : TokenPairPositionTrackerDOFetchMethod|null {
 	return Object.values(TokenPairPositionTrackerDOFetchMethod).find(x => x === value)||null;

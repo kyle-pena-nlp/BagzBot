@@ -6,25 +6,17 @@ import { interpretPct, interpretSOLAmount } from "../telegram/emojis";
 import { Menu, MenuCapabilities } from "./menu";
 import { MenuCode } from "./menu_code";
 
-export interface AdminStatus {
+export interface Stuff {
     isAdminOrSuperAdmin : boolean
     isImpersonatingUser: boolean
     impersonatedUserID : number|undefined
-}
-
-export interface BotName {
     botName : string
-}
-
-export interface BotTagline {
     botTagline : string
-}
-
-export interface IsBeta {
     isBeta : boolean
+    isDev : boolean
 }
 
-export class MenuMain extends Menu<UserData & AdminStatus & BotName & BotTagline & IsBeta> implements MenuCapabilities {
+export class MenuMain extends Menu<UserData & Stuff> implements MenuCapabilities {
     renderText(): string {
         const lines = [];
         
@@ -57,7 +49,6 @@ export class MenuMain extends Menu<UserData & AdminStatus & BotName & BotTagline
         if (this.menuData.isImpersonatingUser) {
             lines.push(`Currently IMPERSONATING '${this.menuData.impersonatedUserID||''}'`)
         }
-
         return lines.join("\r\n");
     }
     renderOptions(): CallbackButton[][] {
@@ -79,6 +70,9 @@ export class MenuMain extends Menu<UserData & AdminStatus & BotName & BotTagline
             if (this.menuData.isBeta) {
                 this.insertButtonNextLine(options, ':love_letter: Send Feedback :love_letter:', this.menuCallback(MenuCode.BetaFeedbackQuestion));
             }
+            if (this.menuData.isAdminOrSuperAdmin && this.menuData.isDev) {
+                this.insertButtonNextLine(options, 'ADMIN (Dev Only): Set Price', this.menuCallback(MenuCode.AdminDevSetPrice));
+            }            
             this.createHelpMenuLine(options);
         }
         this.insertCloseButtonNextLine(options);

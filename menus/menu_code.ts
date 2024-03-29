@@ -84,6 +84,8 @@ export enum MenuCode {
 
 	BetaFeedbackQuestion = "BetaFeedbackQuestion",
 	SubmitBetaFeedback = "SubmitBetaFeedback",
+	AdminDevSetPrice = "AdminDevSetPrice",
+	SubmitAdminDevSetPrice = "SubmitAdminDevSetPrice",
 
 	Close = "Close"
 };

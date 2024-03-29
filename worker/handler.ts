@@ -1,11 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { decryptPrivateKey } from "../crypto";
-import { DecimalizedAmount, dMult } from "../decimalized";
+import { DecimalizedAmount, dMult, fromNumber } from "../decimalized";
 import { claimInviteCode, listUnclaimedBetaInviteCodes } from "../durable_objects/beta_invite_codes/beta_invite_code_interop";
 import { doHeartbeatWakeup } from "../durable_objects/heartbeat/heartbeat_do_interop";
 import { GetTokenInfoResponse, isInvalidTokenInfoResponse, isValidTokenInfoResponse } from "../durable_objects/polled_token_pair_list/actions/get_token_info";
 import { getTokenInfo } from "../durable_objects/polled_token_pair_list/polled_token_pair_list_DO_interop";
-import { getTokenPrice } from "../durable_objects/token_pair_position_tracker/token_pair_position_tracker_do_interop";
+import { _devOnlyFeatureUpdatePrice, getTokenPrice } from "../durable_objects/token_pair_position_tracker/token_pair_position_tracker_do_interop";
 import { OpenPositionRequest } from "../durable_objects/user/actions/open_new_position";
 import { CompletedAddressBookEntry, JustAddressBookEntryID, JustAddressBookEntryName } from "../durable_objects/user/model/address_book_entry";
 import { QuantityAndToken } from "../durable_objects/user/model/quantity_and_token";
@@ -515,6 +515,35 @@ export class Worker {
                     return null;
                 });
                 return;
+            case MenuCode.AdminDevSetPrice:
+                return new ReplyQuestion(
+                    "Enter in format: tokenAddress/vsTokenAddress/price", 
+                    ReplyQuestionCode.AdminDevSetPrice, 
+                    this.context, {
+                        callback: {
+                            linkedMessageID: messageID,
+                            nextMenuCode: MenuCode.SubmitAdminDevSetPrice
+                        },
+                        timeoutMS: 45000
+                    });
+            case MenuCode.SubmitAdminDevSetPrice:                
+                const setPriceTokens = (callbackData.menuArg||'').split("/");
+                if (setPriceTokens.length !== 3) {
+                    return new MenuContinueMessage("Not in correct format", MenuCode.Main);
+                }
+                const [tA,vTA,priceString] = setPriceTokens;
+                const manuallyRevisedPrice = tryParseFloat(priceString);
+                if (manuallyRevisedPrice == null) {
+                    return new MenuContinueMessage(`Not a valid float: ${priceString}`, MenuCode.Main);
+                }
+                const decimalizedPrice = fromNumber(manuallyRevisedPrice);
+                const result = await _devOnlyFeatureUpdatePrice(params.getTelegramUserID(),tA,vTA,decimalizedPrice,this.env).catch(r => {
+                    return null;
+                });
+                if (result == null) {
+                    return new MenuContinueMessage(`Failure occurred when trying to update price of pair  ${tA}/${vTA} to ${manuallyRevisedPrice}`, MenuCode.Main);
+                }
+                return new MenuContinueMessage(`Price of pair ${tA}/${vTA} updated to ${manuallyRevisedPrice}`, MenuCode.Main)
             default:
                 assertNever(callbackData.menuCode);
         }
@@ -532,7 +561,8 @@ export class Worker {
             impersonatedUserID: info.isImpersonatingAUser() ? info.getTelegramUserID() : undefined,
             botName : this.getBotName(env),
             botTagline: env.TELEGRAM_BOT_TAGLINE,
-            isBeta : strictParseBoolean(env.IS_BETA_CODE_GATED)
+            isBeta : strictParseBoolean(env.IS_BETA_CODE_GATED),
+            isDev : env.ENVIRONMENT === 'dev'
         });
     }
 
@@ -659,6 +689,8 @@ export class Worker {
                 break;
             case ReplyQuestionCode.SendBetaFeedback:
                 break;
+            case ReplyQuestionCode.AdminDevSetPrice:
+                break;
             default:
                 assertNever(replyQuestionCode);
         }
@@ -711,7 +743,8 @@ export class Worker {
                     impersonatedUserID: info.isImpersonatingAUser() ? info.getTelegramUserID() : undefined,
                     botName : this.getBotName(env),
                     botTagline: env.TELEGRAM_BOT_TAGLINE,
-                    isBeta: strictParseBoolean(env.IS_BETA_CODE_GATED)
+                    isBeta: strictParseBoolean(env.IS_BETA_CODE_GATED),
+                    isDev : env.ENVIRONMENT === 'dev'
                 })];
             case '/menu':
                 const menuUserData = await getUserData(info.getTelegramUserID(), info.chatID, info.messageID, false, env);
@@ -722,7 +755,8 @@ export class Worker {
                     impersonatedUserID: info.isImpersonatingAUser() ? info.getTelegramUserID() : undefined,
                     botName : this.getBotName(env),
                     botTagline: env.TELEGRAM_BOT_TAGLINE,
-                    isBeta : strictParseBoolean(env.IS_BETA_CODE_GATED)
+                    isBeta : strictParseBoolean(env.IS_BETA_CODE_GATED),
+                    isDev : env.ENVIRONMENT === 'dev'
                 })];
             case '/welcome_screen':
                 return ['...', new WelcomeScreenPart1(undefined)];
