@@ -1,6 +1,8 @@
-import { DecimalizedAmount, DecimalizedAmountMap } from "../../../decimalized";
+import { DecimalizedAmount, DecimalizedAmountMap, MATH_DECIMAL_PLACES, dDiv, dMult, dSub } from "../../../decimalized";
+import { dZero } from "../../../decimalized/decimalized_amount";
 import { logError, logInfo } from "../../../logging";
 import { Position, PositionStatus } from "../../../positions";
+import { PositionAndMaybePNL } from "../model/position_and_PNL";
 import { PeakPriceLocation, UserPeakPriceLocationMap as UserIDLocationMap, toObjectLocationString } from "./location";
 import { ReadonlySparseArray } from "./readonly_sparse_array";
 
@@ -31,15 +33,33 @@ export class PositionsAssociatedWithPeakPrices extends DecimalizedAmountMap<Read
         return super.get(price);
     }
 
-    // get the position associated with this position id
     getPosition(positionID : string) : Position|undefined {
+        const result = this.getPositionInternal(positionID);
+        if (result == null) {
+            return undefined;
+        }
+        const [position,_] = result;
+        return position;
+    }
+
+    // get the position associated with this position id
+    getPositionAndMaybePNL(positionID : string, currentPrice : DecimalizedAmount|null) : PositionAndMaybePNL|undefined {
+        const result = this.getPositionInternal(positionID);
+        if (result == null) {
+            return undefined;
+        }
+        const [position,peakPrice] = result;
+        return this.maybeAddPNLCalculationToPosition(position, currentPrice, peakPrice);
+    }
+
+    private getPositionInternal(positionID : string) : [Position,DecimalizedAmount]|undefined {
         const location = this.positionIDMap.get(positionID);
         if (location == null) {
             // no location for position - indicated position DNE (which can be fine)
             return undefined;
         }
-        const [price,index] = location;
-        const position = (this.get(price)||[])[index];
+        const [peakPrice,index] = location;
+        const position = (this.get(peakPrice)||[])[index];
         if (position == null) {
             logError(`positionIDMap pointed to non-existent position for '${positionID}': ${toObjectLocationString(location)}`)
             return;
@@ -48,16 +68,16 @@ export class PositionsAssociatedWithPeakPrices extends DecimalizedAmountMap<Read
             logError(`positionIDMap pointed to position with unexpected positionID for ${toObjectLocationString(location)} Expected: ${positionID} Was: ${position.positionID}`)
             return;
         }
-        return position;
+        return [position,peakPrice];
     }
 
     // list all the positions by user
-    listByUser(userID : number) : { position: Position, peakPrice: DecimalizedAmount }[] {
+    listByUser(userID : number, currentPrice : DecimalizedAmount|null) : PositionAndMaybePNL[] {
         const locations = this.userIDMap.list(userID);
         if (locations == null) {
             return [];
         }
-        const result : { position: Position, peakPrice: DecimalizedAmount }[] = [];
+        const result : PositionAndMaybePNL[] = [];
         for (const location of locations) {
             const [peakPrice,index] = location;
             const position = (this.get(peakPrice)||[])[index];
@@ -69,9 +89,34 @@ export class PositionsAssociatedWithPeakPrices extends DecimalizedAmountMap<Read
                 logError(`userIDMap pointed to position with wrong user ID for [${toObjectLocationString(location)}]. Expected ${userID}, was ${position.userID}`);
                 continue;
             }
-            result.push({ position: position, peakPrice: peakPrice });
+            result.push(this.maybeAddPNLCalculationToPosition(position, currentPrice, peakPrice));
         }
         return result;
+    }
+
+    private maybeAddPNLCalculationToPosition(position : Position, currentPrice : DecimalizedAmount|null, peakPrice : DecimalizedAmount) : PositionAndMaybePNL {
+        if (currentPrice == null) {
+            return {
+                position: position,
+                peakPrice: peakPrice
+            };
+        }
+        const originalValue = position.vsTokenAmt;
+        const currentValue = dMult(currentPrice, position.tokenAmt);
+        const fracBelowPeak = dDiv(dSub(peakPrice, currentPrice), peakPrice, MATH_DECIMAL_PLACES);
+        const PNL = dSub(currentValue, originalValue);
+        const PNLfrac = dDiv(PNL, originalValue, MATH_DECIMAL_PLACES);
+        return {
+            position : position,
+            peakPrice: peakPrice,
+            PNL: {
+                currentPrice: currentPrice,
+                fracBelowPeak: fracBelowPeak || dZero(),
+                PNL: PNL,
+                PNLfrac: PNLfrac || dZero(),
+                currentValue: currentValue                     
+            }
+        };
     }
 
     // *idempotentally* add a new position to this peak price
@@ -160,15 +205,17 @@ export class PositionsAssociatedWithPeakPrices extends DecimalizedAmountMap<Read
     }
     // idempotentally mark as open
     markAsOpen(positionID : string) {
-        const position = this.getPosition(positionID);
-        if (position != null) {
+        const result = this.getPositionInternal(positionID);
+        if (result != null) {
+            const [position,_] = result;
             position.status = PositionStatus.Open;
         }
     }
     // idempotentally mark as closing
     markAsClosing(positionID : string) {
-        const position = this.getPosition(positionID);
-        if (position != null) {
+        const result = this.getPositionInternal(positionID);
+        if (result != null) {
+            const [position,_] = result;
             position.status = PositionStatus.Closing;
         }
     }

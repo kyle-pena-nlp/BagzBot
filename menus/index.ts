@@ -5,6 +5,7 @@ import { MenuCode } from "./menu_code";
 import { MenuConfirmAddressBookEntry } from "./menu_confirm_address_book_entry";
 import { MenuConfirmTrailingStopLossPositionRequest } from "./menu_confirm_trailing_stop_loss_position_request";
 import { MenuContinueMessage } from "./menu_continue_message";
+import { MenuEditOpenPositionTriggerPercent, SubmittedTriggerPctKey } from "./menu_edit_open_position_trigger_percent";
 import { MenuEditPositionHelp } from "./menu_edit_position_help";
 import { MenuEditTrailingStopLossPositionRequest } from "./menu_edit_position_request";
 import { MenuError } from "./menu_error";
@@ -34,7 +35,7 @@ import { WelcomeScreenPart1 } from "./welcome_screen_part_1";
 import { WelcomeScreenPart2 } from "./welcome_screen_part_2";
 
 export {
-    BaseMenu, LegalAgreement, MenuBetaInviteFriends, MenuCode, MenuConfirmAddressBookEntry, MenuConfirmTrailingStopLossPositionRequest, MenuContinueMessage, MenuEditPositionHelp, MenuEditTrailingStopLossPositionRequest, MenuError, MenuFAQ, MenuHelp,
+    BaseMenu, LegalAgreement, MenuBetaInviteFriends, MenuCode, MenuConfirmAddressBookEntry, MenuConfirmTrailingStopLossPositionRequest, MenuContinueMessage, MenuEditOpenPositionTriggerPercent, MenuEditPositionHelp, MenuEditTrailingStopLossPositionRequest, MenuError, MenuFAQ, MenuHelp,
     MenuListPositions, MenuMain, MenuOKClose, MenuPickTransferFundsRecipient, MenuPleaseEnterToken, MenuPleaseWait, MenuRetryBuy, MenuTransferFundsMainMenu as MenuStartTransferFunds, MenuTODO, MenuTrailingStopLossAutoRetrySell,
     MenuTrailingStopLossEntryBuyQuantity,
     MenuTrailingStopLossPickVsToken,
@@ -42,6 +43,6 @@ export {
     MenuTrailingStopLossTriggerPercent, MenuTransferFundsTestOrSubmitNow, MenuViewDecryptedWallet, MenuViewOpenPosition,
     MenuWallet,
     PositiveDecimalKeypad,
-    PositiveIntegerKeypad, WelcomeScreenPart1, WelcomeScreenPart2
+    PositiveIntegerKeypad, SubmittedTriggerPctKey, WelcomeScreenPart1, WelcomeScreenPart2
 };
 

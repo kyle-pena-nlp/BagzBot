@@ -5,8 +5,9 @@ import { MenuCode } from "./menu_code";
 
 export class MenuContinueMessage extends Menu<string> implements MenuCapabilities {
     continueMenuCode: MenuCode;
+    menuArg ?: string
     messageParseMode : 'HTML'|'MarkdownV2';
-    constructor(message : string, continueMenuCode : MenuCode, messageParseMode : 'HTML'|'MarkdownV2' = 'HTML') {
+    constructor(message : string, continueMenuCode : MenuCode, messageParseMode : 'HTML'|'MarkdownV2' = 'HTML', menuArg ?: string) {
         super(message);
         this.continueMenuCode = continueMenuCode;
         this.messageParseMode = messageParseMode;
@@ -16,7 +17,7 @@ export class MenuContinueMessage extends Menu<string> implements MenuCapabilitie
     }
     renderOptions(): CallbackButton[][] {
         const options = this.emptyMenu();
-        this.insertButtonNextLine(options, "Continue", new CallbackData(this.continueMenuCode));
+        this.insertButtonNextLine(options, "Continue", new CallbackData(this.continueMenuCode, this.menuArg));
         return options;
     }
     parseMode(): "MarkdownV2" | "HTML" {

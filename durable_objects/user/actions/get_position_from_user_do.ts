@@ -1,4 +1,5 @@
 import { Position } from "../../../positions";
+import { PositionAndMaybePNL } from "../../token_pair_position_tracker/model/position_and_PNL";
 import { BaseUserDORequest } from "./base_user_do_request";
 
 export interface GetPositionFromUserDORequest  extends BaseUserDORequest {
@@ -6,5 +7,5 @@ export interface GetPositionFromUserDORequest  extends BaseUserDORequest {
 };
 
 export interface GetPositionFromUserDOResponse {
-	position: Position|undefined
+	position: PositionAndMaybePNL|undefined
 }

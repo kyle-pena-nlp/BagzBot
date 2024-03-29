@@ -1,6 +1,6 @@
 import { DecimalizedAmount } from "../../../decimalized";
 import { logError } from "../../../logging";
-import { Position, PositionStatus } from "../../../positions";
+import { Position } from "../../../positions";
 import { MapWithStorage } from "../../../util";
 import { PositionAndMaybePNL } from "../model/position_and_PNL";
 import { PeakPricePositionTracker } from "./peak_price_tracker";
@@ -24,8 +24,13 @@ export class TokenPairPositionTracker {
         return  this.pricePeaks.any();
     }
 
+    getPositionAndMaybePNL(positionID : string) : PositionAndMaybePNL|undefined {
+        return this.pricePeaks.getPositionAndMaybePNL(positionID);
+    }
+
     getPosition(positionID : string) : Position|undefined {
-        return this.pricePeaks.getPosition(positionID);
+        const result = this.pricePeaks.getPosition(positionID);
+        return result;
     }
 
     listByUser(userID : number) : PositionAndMaybePNL[] {

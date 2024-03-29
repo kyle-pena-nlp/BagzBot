@@ -1,5 +1,5 @@
 import * as dMath from "../../../decimalized";
-import { DecimalizedAmount, DecimalizedAmountSet, MATH_DECIMAL_PLACES, dAdd, dDiv, dMult, dSub, fromKey, fromNumber, toKey } from "../../../decimalized";
+import { DecimalizedAmount, DecimalizedAmountSet, MATH_DECIMAL_PLACES, dAdd, fromKey, fromNumber, toKey } from "../../../decimalized";
 import { dZero } from "../../../decimalized/decimalized_amount";
 import { logError, logInfo } from "../../../logging";
 import { Position, PositionStatus, PositionType } from "../../../positions";
@@ -42,33 +42,8 @@ export class PeakPricePositionTracker {
     }
     listByUser(userID : number) : PositionAndMaybePNL[] {
         const result : PositionAndMaybePNL[] = [];
-        const positionsWithPeakPrices = this.itemsByPeakPrice.listByUser(userID);
-        for (const positionWithPeakPrice of positionsWithPeakPrices) {
-            // TODO: make sure currentPrice is updated.
-            const currentPrice = this.currentPrice.value;
-            if (currentPrice == null) {
-                result.push(positionWithPeakPrice);
-            }
-            else {
-                const originalValue = positionWithPeakPrice.position.vsTokenAmt;
-                const currentValue = dMult(currentPrice, positionWithPeakPrice.position.tokenAmt);
-                const peak = positionWithPeakPrice.peakPrice;
-                const fracBelowPeak = dDiv(dSub(peak, currentPrice), peak, MATH_DECIMAL_PLACES);
-                const PNL = dSub(currentValue, originalValue);
-                const PNLfrac = dDiv(PNL, originalValue, MATH_DECIMAL_PLACES);
-                result.push({
-                    ...positionWithPeakPrice,
-                    PNL: {
-                        currentPrice: currentPrice,
-                        fracBelowPeak: fracBelowPeak || dZero(),
-                        PNL: PNL,
-                        PNLfrac: PNLfrac || dZero(),
-                        currentValue: currentValue                     
-                    }
-                })
-            }
-        }
-        return result;
+        const positionsAndMaybePNLs = this.itemsByPeakPrice.listByUser(userID, this.currentPrice.value);
+        return positionsAndMaybePNLs;
     }
     measurePNLForUser(userID : number) : DecimalizedAmount|undefined {
         if (this.currentPrice.value == null) {
@@ -129,6 +104,9 @@ export class PeakPricePositionTracker {
     }
     getPeakPrice(positionID : string) : DecimalizedAmount|undefined {
         return this.itemsByPeakPrice.getPeakPrice(positionID);
+    }
+    getPositionAndMaybePNL(positionID : string) : PositionAndMaybePNL|undefined {
+        return this.itemsByPeakPrice.getPositionAndMaybePNL(positionID, this.currentPrice.value);
     }
     getPosition(positionID : string) : Position|undefined {
         return this.itemsByPeakPrice.getPosition(positionID);

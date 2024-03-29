@@ -3,10 +3,14 @@ import { DecimalizedAmount } from "../../decimalized";
 import { toNumber } from "../../decimalized/decimalized_amount";
 import { Env } from "../../env";
 import { logDebug, logError, logInfo } from "../../logging";
+import { PositionStatus } from "../../positions";
 import { ChangeTrackedValue, assertNever, makeJSONResponse, makeSuccessResponse, strictParseBoolean, strictParseInt } from "../../util";
 import { ensureTokenPairIsRegistered } from "../heartbeat/heartbeat_do_interop";
+import { EditTriggerPercentOnOpenPositionResponse } from "../user/actions/edit_trigger_percent_on_open_position";
 import { sendClosePositionOrdersToUserDOs } from "../user/userDO_interop";
+import { EditTriggerPercentOnOpenPositionInTrackerRequest } from "./actions/edit_trigger_percent_on_open_position_in_tracker";
 import { GetPositionFromPriceTrackerRequest, GetPositionFromPriceTrackerResponse } from "./actions/get_position";
+import { GetPositionAndMaybePNLFromPriceTrackerRequest, GetPositionAndMaybePNLFromPriceTrackerResponse } from "./actions/get_position_and_maybe_pnl";
 import { GetTokenPriceRequest, GetTokenPriceResponse } from "./actions/get_token_price";
 import { HasPairAddresses } from "./actions/has_pair_addresses";
 import { HeartbeatWakeupRequestForTokenPairPositionTracker, isHeartbeatRequest } from "./actions/heartbeat_wake_up_for_token_pair_position_tracker";
@@ -250,19 +254,60 @@ export class TokenPairPositionTrackerDO {
                 return await this.handleListPositionsByUser(body);
             case TokenPairPositionTrackerDOFetchMethod.removePosition:
                 return await this.handleRemovePosition(body);
-            case TokenPairPositionTrackerDOFetchMethod.getPosition:
-                return await this.handleGetPosition(body);
+            case TokenPairPositionTrackerDOFetchMethod.getPositionAndMaybePNL:
+                return await this.handleGetPositionAndMaybePNL(body);
             case TokenPairPositionTrackerDOFetchMethod.heartbeatWakeup:
                 return await this.handleHeartbeatWakeup(body);
+            case TokenPairPositionTrackerDOFetchMethod.getPosition:
+                return await this.handleGetPosition(body);
+            case TokenPairPositionTrackerDOFetchMethod.editTriggerPercentOnOpenPosition:
+                return await this.handleEditTriggerPercentOnOpenPosition(body);
             default:
                 assertNever(method);
         }
     }
 
-    async handleGetPosition(body : GetPositionFromPriceTrackerRequest) : Promise<Response> {
+    async handleEditTriggerPercentOnOpenPosition(body : EditTriggerPercentOnOpenPositionInTrackerRequest) : Promise<Response> {
+        const response = await this.handleEditTriggerPercentOnOpenPositionInternal(body);
+        return makeJSONResponse<EditTriggerPercentOnOpenPositionResponse>(response);
+    }
+
+    private async handleEditTriggerPercentOnOpenPositionInternal(body: EditTriggerPercentOnOpenPositionInTrackerRequest) : Promise<EditTriggerPercentOnOpenPositionResponse> {
+        const positionID = body.positionID;
+        const percent = body.percent;
+        if (percent <= 0 || percent >= 100) {
+            return 'invalid-percent';
+        }
+        const positionAndMaybePNL = this.tokenPairPositionTracker.getPositionAndMaybePNL(positionID);
+        if (positionAndMaybePNL == null) {
+            return 'position-DNE';
+        }
+        else if (positionAndMaybePNL.position.status === PositionStatus.Closing) {
+            return 'is-closing';
+        }
+        else if (positionAndMaybePNL.position.status === PositionStatus.Closed) {
+            return 'is-closed';
+        }
+        else if (positionAndMaybePNL.position.status === PositionStatus.Open) {
+            positionAndMaybePNL.position.triggerPercent = percent;
+            return positionAndMaybePNL;
+        }
+        else {
+            assertNever(positionAndMaybePNL.position.status);
+        }
+    }
+
+    async handleGetPosition(body: GetPositionFromPriceTrackerRequest) : Promise<Response> {
         const positionID = body.positionID;
         const maybePosition = this.tokenPairPositionTracker.getPosition(positionID);
-        const response : GetPositionFromPriceTrackerResponse = { maybePosition : maybePosition };
+        const response : GetPositionFromPriceTrackerResponse = { maybePosition: maybePosition };
+        return makeJSONResponse(response);
+    }
+
+    async handleGetPositionAndMaybePNL(body : GetPositionAndMaybePNLFromPriceTrackerRequest) : Promise<Response> {
+        const positionID = body.positionID;
+        const maybePosition = this.tokenPairPositionTracker.getPositionAndMaybePNL(positionID);
+        const response : GetPositionAndMaybePNLFromPriceTrackerResponse = { maybePosition : maybePosition };
         return makeJSONResponse(response);
     }
 

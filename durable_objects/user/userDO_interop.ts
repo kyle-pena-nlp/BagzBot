@@ -5,6 +5,7 @@ import { Structural, groupIntoMap, makeJSONRequest, makeRequest } from "../../ut
 import { AutomaticallyClosePositionsRequest, AutomaticallyClosePositionsResponse } from "../token_pair_position_tracker/actions/automatically_close_positions";
 import { PositionAndMaybePNL } from "../token_pair_position_tracker/model/position_and_PNL";
 import { DeleteSessionRequest } from "./actions/delete_session";
+import { EditTriggerPercentOnOpenPositionRequest, EditTriggerPercentOnOpenPositionResponse } from "./actions/edit_trigger_percent_on_open_position";
 import { GetAddressBookEntryRequest, GetAddressBookEntryResponse } from "./actions/get_address_book_entry";
 import { GetImpersonatedUserIDRequest, GetImpersonatedUserIDResponse } from "./actions/get_impersonated_user_id";
 import { GetLegalAgreementStatusRequest, GetLegalAgreementStatusResponse } from "./actions/get_legal_agreement_status";
@@ -51,7 +52,8 @@ export enum UserDOFetchMethod {
 	unimpersonateUser = "unimpersonateUser",
 	listPositionsFromUserDO = "listPositionsFromUserDO",
 	getPositionFromUserDO = "getPositionFromUserDO",
-	sendMessageToUser = "sendMessageToUser"
+	sendMessageToUser = "sendMessageToUser",
+	editTriggerPercentOnOpenPosition = "editTriggerPercentOnOpenPosition"
 }
 
 export async function sendMessageToUser(toTelegramUserID : number, fromTelegramUserName : string, message : string, env : Env) : Promise<SendMessageToUserResponse> {
@@ -68,7 +70,14 @@ export async function listPositionsFromUserDO(telegramUserID : number, chatID : 
 	return response.positions;
 }
 
-export async function getPositionFromUserDO(telegramUserID : number, chatID : number, positionID : string, env : Env) : Promise<Position|undefined> {
+export async function editTriggerPercentOnOpenPositionFromUserDO(telegramUserID : number, chatID : number, positionID : string, percent : number, env : Env) : Promise<EditTriggerPercentOnOpenPositionResponse> {
+	const request : EditTriggerPercentOnOpenPositionRequest = { telegramUserID, chatID, positionID, percent };
+	const method = UserDOFetchMethod.editTriggerPercentOnOpenPosition;
+	const response = await sendJSONRequestToUserDO<EditTriggerPercentOnOpenPositionRequest,EditTriggerPercentOnOpenPositionResponse>(telegramUserID, method, request, env);
+	return response;
+}
+
+export async function getPositionFromUserDO(telegramUserID : number, chatID : number, positionID : string, env : Env) : Promise<PositionAndMaybePNL|undefined> {
 	const request : GetPositionFromUserDORequest = { telegramUserID, chatID, positionID };
 	const method = UserDOFetchMethod.getPositionFromUserDO;
 	const response = await sendJSONRequestToUserDO<GetPositionFromUserDORequest,GetPositionFromUserDOResponse>(telegramUserID, method, request, env);

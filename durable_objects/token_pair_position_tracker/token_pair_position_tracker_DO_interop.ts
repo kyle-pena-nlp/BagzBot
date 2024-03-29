@@ -2,7 +2,10 @@ import { DecimalizedAmount } from "../../decimalized";
 import { Env } from "../../env";
 import { Position } from "../../positions";
 import { makeJSONRequest, makeRequest, strictParseInt } from "../../util";
+import { EditTriggerPercentOnOpenPositionResponse } from "../user/actions/edit_trigger_percent_on_open_position";
+import { EditTriggerPercentOnOpenPositionInTrackerRequest } from "./actions/edit_trigger_percent_on_open_position_in_tracker";
 import { GetPositionFromPriceTrackerRequest, GetPositionFromPriceTrackerResponse } from "./actions/get_position";
+import { GetPositionAndMaybePNLFromPriceTrackerRequest, GetPositionAndMaybePNLFromPriceTrackerResponse } from "./actions/get_position_and_maybe_pnl";
 import { GetTokenPriceRequest, GetTokenPriceResponse } from "./actions/get_token_price";
 import { ListPositionsByUserRequest, ListPositionsByUserResponse } from "./actions/list_positions_by_user";
 import { MarkPositionAsClosedRequest, MarkPositionAsClosedResponse } from "./actions/mark_position_as_closed";
@@ -24,8 +27,10 @@ export enum TokenPairPositionTrackerDOFetchMethod {
 	markPositionAsOpen = "markPositionAsOpen",	
 	removePosition = "removePosition",
 	getTokenPrice = "getTokenPrice",
+	getPositionAndMaybePNL = "getPositionAndMaybePNL",
 	getPosition = "getPosition",
-	listPositionsByUser = "listPositionsByUser"
+	listPositionsByUser = "listPositionsByUser",
+	editTriggerPercentOnOpenPosition = "editTriggerPercentOnOpenPosition"
 }
 
 
@@ -44,6 +49,20 @@ export async function _devOnlyFeatureUpdatePrice(telegramUserID : number, tokenA
 
 export function parseTokenPairPositionTrackerDOFetchMethod(value : string) : TokenPairPositionTrackerDOFetchMethod|null {
 	return Object.values(TokenPairPositionTrackerDOFetchMethod).find(x => x === value)||null;
+}
+
+export async function editTriggerPercentOnOpenPositionInTracker(positionID : string, tokenAddress : string, vsTokenAddress : string, percent : number, env : Env) : Promise<EditTriggerPercentOnOpenPositionResponse> {
+	const method = TokenPairPositionTrackerDOFetchMethod.editTriggerPercentOnOpenPosition;
+	const request : EditTriggerPercentOnOpenPositionInTrackerRequest = { positionID, tokenAddress, vsTokenAddress, percent };
+	const response = await sendJSONRequestToTokenPairPositionTracker<EditTriggerPercentOnOpenPositionInTrackerRequest,EditTriggerPercentOnOpenPositionResponse>(method, request, tokenAddress, vsTokenAddress, env);
+	return response;
+}
+
+export async function getPositionAndMaybePNL(positionID : string, tokenAddress : string, vsTokenAddress : string, env : Env) : Promise<PositionAndMaybePNL|undefined> {
+	const method = TokenPairPositionTrackerDOFetchMethod.getPositionAndMaybePNL;
+	const request : GetPositionAndMaybePNLFromPriceTrackerRequest = { positionID, tokenAddress, vsTokenAddress };
+	const response = await sendJSONRequestToTokenPairPositionTracker<GetPositionAndMaybePNLFromPriceTrackerRequest,GetPositionAndMaybePNLFromPriceTrackerResponse>(method, request, tokenAddress, vsTokenAddress, env);
+	return response.maybePosition;
 }
 
 export async function getPosition(positionID : string, tokenAddress : string, vsTokenAddress : string, env : Env) : Promise<Position|undefined> {

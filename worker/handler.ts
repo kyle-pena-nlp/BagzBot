@@ -1,19 +1,19 @@
 import { randomUUID } from "node:crypto";
 import { decryptPrivateKey } from "../crypto";
-import { DecimalizedAmount, dMult, fromNumber } from "../decimalized";
+import { fromNumber } from "../decimalized";
 import { claimInviteCode, listUnclaimedBetaInviteCodes } from "../durable_objects/beta_invite_codes/beta_invite_code_interop";
 import { doHeartbeatWakeup } from "../durable_objects/heartbeat/heartbeat_do_interop";
 import { GetTokenInfoResponse, isInvalidTokenInfoResponse, isValidTokenInfoResponse } from "../durable_objects/polled_token_pair_list/actions/get_token_info";
 import { getTokenInfo } from "../durable_objects/polled_token_pair_list/polled_token_pair_list_DO_interop";
-import { _devOnlyFeatureUpdatePrice, getTokenPrice } from "../durable_objects/token_pair_position_tracker/token_pair_position_tracker_do_interop";
+import { _devOnlyFeatureUpdatePrice } from "../durable_objects/token_pair_position_tracker/token_pair_position_tracker_do_interop";
 import { OpenPositionRequest } from "../durable_objects/user/actions/open_new_position";
 import { CompletedAddressBookEntry, JustAddressBookEntryID, JustAddressBookEntryName } from "../durable_objects/user/model/address_book_entry";
 import { QuantityAndToken } from "../durable_objects/user/model/quantity_and_token";
 import { TokenSymbolAndAddress } from "../durable_objects/user/model/token_name_and_address";
-import { getAddressBookEntry, getDefaultTrailingStopLoss, getPositionFromUserDO, getUserData, getWalletData, impersonateUser, listAddressBookEntries, listPositionsFromUserDO, manuallyClosePosition, maybeReadSessionObj, readSessionObj, requestNewPosition, sendMessageToUser, storeAddressBookEntry, storeLegalAgreementStatus, storeSessionObj, storeSessionObjProperty, storeSessionValues, unimpersonateUser } from "../durable_objects/user/userDO_interop";
+import { editTriggerPercentOnOpenPositionFromUserDO, getAddressBookEntry, getDefaultTrailingStopLoss, getPositionFromUserDO, getUserData, getWalletData, impersonateUser, listAddressBookEntries, listPositionsFromUserDO, manuallyClosePosition, maybeReadSessionObj, readSessionObj, requestNewPosition, sendMessageToUser, storeAddressBookEntry, storeLegalAgreementStatus, storeSessionObj, storeSessionObjProperty, storeSessionValues, unimpersonateUser } from "../durable_objects/user/userDO_interop";
 import { Env } from "../env";
 import { logDebug, logError } from "../logging";
-import { BaseMenu, LegalAgreement, MenuBetaInviteFriends, MenuCode, MenuConfirmAddressBookEntry, MenuConfirmTrailingStopLossPositionRequest, MenuContinueMessage, MenuEditPositionHelp, MenuEditTrailingStopLossPositionRequest, MenuError, MenuFAQ, MenuHelp, MenuListPositions, MenuMain, MenuOKClose, MenuPickTransferFundsRecipient, MenuPleaseEnterToken, MenuStartTransferFunds, MenuTODO, MenuTrailingStopLossAutoRetrySell, MenuTrailingStopLossEntryBuyQuantity, MenuTrailingStopLossPickVsToken, MenuTrailingStopLossSlippagePercent, MenuTrailingStopLossTriggerPercent, MenuTransferFundsTestOrSubmitNow, MenuViewDecryptedWallet, MenuViewOpenPosition, MenuWallet, PositiveDecimalKeypad, PositiveIntegerKeypad, WelcomeScreenPart1, WelcomeScreenPart2 } from "../menus";
+import { BaseMenu, LegalAgreement, MenuBetaInviteFriends, MenuCode, MenuConfirmAddressBookEntry, MenuConfirmTrailingStopLossPositionRequest, MenuContinueMessage, MenuEditOpenPositionTriggerPercent, MenuEditPositionHelp, MenuEditTrailingStopLossPositionRequest, MenuError, MenuFAQ, MenuHelp, MenuListPositions, MenuMain, MenuOKClose, MenuPickTransferFundsRecipient, MenuPleaseEnterToken, MenuStartTransferFunds, MenuTODO, MenuTrailingStopLossAutoRetrySell, MenuTrailingStopLossEntryBuyQuantity, MenuTrailingStopLossPickVsToken, MenuTrailingStopLossSlippagePercent, MenuTrailingStopLossTriggerPercent, MenuTransferFundsTestOrSubmitNow, MenuViewDecryptedWallet, MenuViewOpenPosition, MenuWallet, PositiveDecimalKeypad, PositiveIntegerKeypad, SubmittedTriggerPctKey, WelcomeScreenPart1, WelcomeScreenPart2 } from "../menus";
 import { PositionPreRequest, PositionRequest, convertPreRequestToRequest } from "../positions";
 import { ReplyQuestion, ReplyQuestionCode } from "../reply_question";
 import { ReplyQuestionData, replyQuestionHasNextSteps } from "../reply_question/reply_question_data";
@@ -197,19 +197,11 @@ export class Worker {
                 return new MenuListPositions(positions);
             case MenuCode.ViewOpenPosition:
                 const viewPositionID = callbackData.menuArg!!;
-                const position = await getPositionFromUserDO(params.getTelegramUserID(), params.chatID, viewPositionID, this.env);
-                if (position == null) {
+                const positionAndMaybePNL = await getPositionFromUserDO(params.getTelegramUserID(), params.chatID, viewPositionID, this.env);
+                if (positionAndMaybePNL == null) {
                     return new MenuContinueMessage('Sorry - this position was not found.', MenuCode.Main);
                 }
-                const price : DecimalizedAmount|null = await getTokenPrice(position.token.address, position.vsToken.address, this.env);
-                if (price != null) {
-                    const currentValue = dMult(price, position.tokenAmt);
-                    return new MenuViewOpenPosition({ position: position, currentValue: currentValue })
-                }
-                else {
-                    return new MenuViewOpenPosition({ position: position });
-                }
-                
+                return new MenuViewOpenPosition(positionAndMaybePNL);
             case MenuCode.ClosePositionManuallyAction:
                 const closePositionID = callbackData.menuArg;
                 if (closePositionID != null) {
@@ -547,6 +539,37 @@ export class Worker {
                     return new MenuContinueMessage(`Failure occurred when trying to update price of pair  ${tA}/${vTA} to ${manuallyRevisedPrice}`, MenuCode.Main);
                 }
                 return new MenuContinueMessage(`Price of pair ${tA}/${vTA} updated to ${manuallyRevisedPrice}`, MenuCode.Main)
+            case MenuCode.EditOpenPositionTriggerPercent:
+                const positionID = callbackData.menuArg||'';
+                return new MenuEditOpenPositionTriggerPercent(positionID);
+            case MenuCode.SubmitOpenPositionTriggerPct:
+                const parsedCallbackData = SubmittedTriggerPctKey.parse(callbackData.menuArg||'');
+                if (parsedCallbackData == null) {
+                    return new MenuContinueMessage("Sorry - did not interpret this input", MenuCode.ListPositions);
+                }
+                const positionToEditID = parsedCallbackData.positionID;
+                const editTriggerPercentResult = await editTriggerPercentOnOpenPositionFromUserDO(params.getTelegramUserID(), params.chatID, positionToEditID, parsedCallbackData.percent, this.env).catch(r => {
+                    logError(r);
+                    return null;
+                });
+                if (editTriggerPercentResult == null) {
+                    return new MenuContinueMessage(`Sorry - there was a problem editing the trigger percent`, MenuCode.ListPositions);
+                }
+                else if (editTriggerPercentResult === 'is-closing') {
+                    return new MenuContinueMessage(`Sorry - this position can no longer be edited because it is being sold`, MenuCode.ViewOpenPosition, 'HTML', parsedCallbackData.positionID);
+                }
+                else if (editTriggerPercentResult === 'is-closed') {
+                    return new MenuContinueMessage(`Sorry - this position can no longer be edited because it is has been sold`, MenuCode.ViewOpenPosition, 'HTML', parsedCallbackData.positionID);
+                }
+                else if (editTriggerPercentResult === 'position-DNE') {
+                    return new MenuContinueMessage(`Sorry - this position can no longer be edited because it is has been sold or does not exist`, MenuCode.ViewOpenPosition, 'HTML', parsedCallbackData.positionID);
+                }
+                else if (editTriggerPercentResult === 'invalid-percent') {
+                    return new MenuContinueMessage(`Sorry - please choose a percent greater than zero and less than 100`, MenuCode.ViewOpenPosition, 'HTML', parsedCallbackData.positionID);
+                }
+                else {
+                    return new MenuViewOpenPosition(editTriggerPercentResult);
+                }
             default:
                 assertNever(callbackData.menuCode);
         }

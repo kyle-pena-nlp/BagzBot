@@ -7,8 +7,10 @@ const emojis = {
     ':winged_money:': '💸',
     ':dollars:': '💵',
     ':wallet:': '💰',
+    ':eyes:': '👀',
 
     ':notify:': '🔔',
+    ':mountain:': '🏔️',
 
     ':black-square:': '◾',
     ':big-black-square:': '⬛',

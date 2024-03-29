@@ -13,6 +13,9 @@ export enum MenuCode {
 	NewPosition = "NewPosition",
 	EditPositionHelp = "EditPositionHelp",
 
+	EditOpenPositionTriggerPercent = "EOP.Trigger",
+	SubmitOpenPositionTriggerPct = "SEOP.Trigger",
+
 	// welcome screen
 	WelcomeScreenPart1 = "WelcomeScreenPart1",
 	WelcomeScreenPart2 = "WelcomeScreenPart2",

@@ -3,7 +3,7 @@ import { Wallet, encryptPrivateKey, generateEd25519Keypair } from "../../crypto"
 import { DecimalizedAmount } from "../../decimalized";
 import { Env } from "../../env";
 import { logError, logInfo } from "../../logging";
-import { Position, PositionPreRequest, PositionType } from "../../positions";
+import { PositionPreRequest, PositionType } from "../../positions";
 import { getSOLBalance } from "../../rpc/rpc_wallet";
 import { POSITION_REQUEST_STORAGE_KEY } from "../../storage_keys";
 import { TGStatusMessage, UpdateableNotification, sendMessageToTG } from "../../telegram";
@@ -12,9 +12,10 @@ import { ChangeTrackedValue, Structural, assertNever, groupIntoBatches, makeFail
 import { listUnclaimedBetaInviteCodes } from "../beta_invite_codes/beta_invite_code_interop";
 import { AutomaticallyClosePositionsRequest, AutomaticallyClosePositionsResponse } from "../token_pair_position_tracker/actions/automatically_close_positions";
 import { PositionAndMaybePNL } from "../token_pair_position_tracker/model/position_and_PNL";
-import { getPosition, listPositionsByUser } from "../token_pair_position_tracker/token_pair_position_tracker_do_interop";
+import { editTriggerPercentOnOpenPositionInTracker, getPositionAndMaybePNL, listPositionsByUser } from "../token_pair_position_tracker/token_pair_position_tracker_do_interop";
 import { BaseUserDORequest, isBaseUserDORequest } from "./actions/base_user_do_request";
 import { DeleteSessionRequest, DeleteSessionResponse } from "./actions/delete_session";
+import { EditTriggerPercentOnOpenPositionRequest, EditTriggerPercentOnOpenPositionResponse } from "./actions/edit_trigger_percent_on_open_position";
 import { GetAddressBookEntryRequest, GetAddressBookEntryResponse } from "./actions/get_address_book_entry";
 import { GetImpersonatedUserIDRequest, GetImpersonatedUserIDResponse } from "./actions/get_impersonated_user_id";
 import { GetLegalAgreementStatusRequest, GetLegalAgreementStatusResponse } from "./actions/get_legal_agreement_status";
@@ -266,11 +267,35 @@ export class UserDO {
             case UserDOFetchMethod.sendMessageToUser:
                 response = await this.handleSendMessageToUser(userAction);
                 break;
+            case UserDOFetchMethod.editTriggerPercentOnOpenPosition:
+                response = await this.handleEditTriggerPercentOnOpenPosition(userAction);
+                break;
             default:
                 assertNever(method);
         }
 
         return [method,userAction,response];
+    }
+
+    async handleEditTriggerPercentOnOpenPosition(request: EditTriggerPercentOnOpenPositionRequest) : Promise<Response> {
+        const response = await this.handleEditTriggerPercentOnOpenPositionInternal(request);
+        return makeJSONResponse<EditTriggerPercentOnOpenPositionResponse>(response);
+    }
+
+    async handleEditTriggerPercentOnOpenPositionInternal(request : EditTriggerPercentOnOpenPositionRequest) : Promise<EditTriggerPercentOnOpenPositionResponse> {
+        const positionID = request.positionID;
+        const tokenPair = this.tokenPairsForPositionIDsTracker.getPositionPair(positionID);
+        if (tokenPair == null) {
+            throw new Error(`Unable to find TokenPair when editing trigger percent on open position with ID ${positionID}`);
+        }
+        const tokenAddress = tokenPair.token.address;
+        const vsTokenAddress = tokenPair.vsToken.address;
+        const percent = request.percent;
+        if (percent <= 0 || percent >= 100) {
+            return 'invalid-percent';
+        }
+        const response = await editTriggerPercentOnOpenPositionInTracker(positionID, tokenAddress, vsTokenAddress, percent, this.env);
+        return response;
     }
 
     async handleSendMessageToUser(request : SendMessageToUserRequest) : Promise<Response> {
@@ -308,11 +333,11 @@ export class UserDO {
     async handleGetPositionFromUserDO(request : GetPositionFromUserDORequest) : Promise<Response> {
         const positionID = request.positionID;
         const tokenPair = this.tokenPairsForPositionIDsTracker.getPositionPair(positionID);
-        let position : Position|undefined = undefined;
+        let position : PositionAndMaybePNL|undefined = undefined;
         if (tokenPair != null) {
             const tokenAddress = tokenPair.token.address;
             const vsTokenAddress = tokenPair.vsToken.address;
-            position = await getPosition(positionID, tokenAddress, vsTokenAddress, this.env);
+            position = await getPositionAndMaybePNL(positionID, tokenAddress, vsTokenAddress, this.env);
         }
         const response : GetPositionFromUserDOResponse = { position : position };
         return makeJSONResponse(response);

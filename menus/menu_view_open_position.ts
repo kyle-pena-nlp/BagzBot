@@ -1,23 +1,53 @@
-import { dSub, toFriendlyString } from "../decimalized";
-import { PositionAndMaybeCurrentValue, PositionStatus } from "../positions";
+import { dCompare, dMult, fromNumber, toFriendlyString } from "../decimalized";
+import { dZero, toNumber } from "../decimalized/decimalized_amount";
+import { PositionAndMaybePNL } from "../durable_objects/token_pair_position_tracker/model/position_and_PNL";
+import { PositionStatus } from "../positions";
 import { CallbackButton } from "../telegram";
+import { interpretPct } from "../telegram/emojis";
 import { assertNever } from "../util";
 import { CallbackData } from "./callback_data";
 import { Menu, MenuCapabilities } from "./menu";
 import { MenuCode } from "./menu_code";
 
-export class MenuViewOpenPosition extends Menu<PositionAndMaybeCurrentValue> implements MenuCapabilities {
+export class MenuViewOpenPosition extends Menu<PositionAndMaybePNL> implements MenuCapabilities {
     renderText(): string {
         const position = this.menuData.position;
         const lines = [
             `<i>$${position.token.symbol}</i> position (${toFriendlyString(position.tokenAmt,4)} $${position.token.symbol})`
         ];
-        if ('currentValue' in this.menuData) {
-            //const currentValueString = toFriendlyString(this.menuData.currentSOLValue,4);
-            const originalValue = position.vsTokenAmt;
-            const profit = dSub(this.menuData.currentValue,originalValue);
-            const profitFriendlyString = toFriendlyString(profit, 4);
-            lines.push(`<b>Profit</b>: ${profitFriendlyString} ${position.vsToken.symbol}`);
+        if (position.status === PositionStatus.Closing) {
+            lines.push("The bot is currently selling this position.");
+        }
+        else if (position.status === PositionStatus.Closed) {
+            lines.push("This position has been closed!");
+        }
+
+        lines.push(`:mountain: <b>Peak Price</b>: ${toFriendlyString(this.menuData.peakPrice,4)} :mountain:`)
+        if (this.menuData.PNL != null) {
+            const pctBelowPeak = dMult(fromNumber(100), this.menuData.PNL.fracBelowPeak);
+            const isBelowPeak = dCompare(pctBelowPeak, dZero()) > 0;
+            if (isBelowPeak) {
+                const pctBelowPeakString = toFriendlyString(pctBelowPeak, 4, { useSubscripts: false, maxDecimalPlaces: 1 });
+                lines.push(`:bullet: <b>% Below Peak Price</b>: ${pctBelowPeakString}% :chart_down:`);
+            }
+            else {
+                lines.push(`:bullet: Currently at peak price! :sparkle:`);
+            }
+            const triggerPercent = this.menuData.position.triggerPercent;
+            lines.push(`:bullet: <b>Trigger Percent</b>: ${triggerPercent.toFixed(1)}%`);
+            const isTriggered = toNumber(pctBelowPeak) > triggerPercent;
+            const willTriggerSoon = (triggerPercent - toNumber(pctBelowPeak)) < 1.0;
+            if (isTriggered) {
+                lines.push(`This position's trigger condition has been met, and is about to be sold!`);
+            }
+            else if (willTriggerSoon) {
+                lines.push(`This position is close to being triggered :eyes:`);
+            }
+            const currentPNLString = toFriendlyString(this.menuData.PNL.PNL, 4, { useSubscripts: false, maxDecimalPlaces: 4 });
+            const pnlPct = dMult(fromNumber(100), this.menuData.PNL.PNLfrac);
+            const currentPNLPctString = toFriendlyString(pnlPct, 4, { useSubscripts: false, maxDecimalPlaces: 1 });
+            const currentPNLEmoji = interpretPct(toNumber(pnlPct));
+            lines.push(`:bullet: <b>Current PNL</b> ${currentPNLString} (${currentPNLPctString}% ${currentPNLEmoji})`);
         }
         return lines.join("\r\n");
     }
@@ -25,8 +55,7 @@ export class MenuViewOpenPosition extends Menu<PositionAndMaybeCurrentValue> imp
         const options = this.emptyMenu();
 
         if (this.menuData.position.status === PositionStatus.Closing) {
-            const refreshPositionCallbackData = new CallbackData(MenuCode.ViewOpenPosition, this.menuData.position.positionID);
-            this.insertButtonNextLine(options, ":refresh: Refresh", refreshPositionCallbackData);
+            // no-op
         }
         else if (this.menuData.position.status === PositionStatus.Closed) {
             // no-op
@@ -35,6 +64,8 @@ export class MenuViewOpenPosition extends Menu<PositionAndMaybeCurrentValue> imp
             const closePositionCallbackData = new CallbackData(MenuCode.ClosePositionManuallyAction, this.menuData.position.positionID);
             this.insertButtonNextLine(options, ":stop: Stop Monitoring And Sell", closePositionCallbackData);
             
+            this.insertButtonNextLine(options, "Change Trigger Percent", new CallbackData(MenuCode.EditOpenPositionTriggerPercent, this.menuData.position.positionID));
+
             const refreshPositionCallbackData = new CallbackData(MenuCode.ViewOpenPosition, this.menuData.position.positionID);
             this.insertButtonNextLine(options, ":refresh: Refresh", refreshPositionCallbackData);
         }
@@ -42,7 +73,7 @@ export class MenuViewOpenPosition extends Menu<PositionAndMaybeCurrentValue> imp
             assertNever(this.menuData.position.status);
         }
 
-        this.insertBackToMainButtonOnNewLine(options);
+        this.insertButtonNextLine(options, "Back", this.menuCallback(MenuCode.ListPositions));
 
         return options;
     }
