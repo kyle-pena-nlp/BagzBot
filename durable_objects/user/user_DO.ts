@@ -1,6 +1,6 @@
 import { DurableObjectState } from "@cloudflare/workers-types";
 import { Wallet, encryptPrivateKey, generateEd25519Keypair } from "../../crypto";
-import { DecimalizedAmount, toFriendlyString } from "../../decimalized";
+import { DecimalizedAmount } from "../../decimalized";
 import { Env } from "../../env";
 import { logError, logInfo } from "../../logging";
 import { Position, PositionPreRequest, PositionType } from "../../positions";
@@ -44,7 +44,7 @@ import { TokenPairsForPositionIDsTracker } from "./trackers/token_pairs_for_posi
 import { UserPNLTracker } from "./trackers/user_pnl_tracker";
 import { UserDOFetchMethod, parseUserDOFetchMethod } from "./userDO_interop";
 import { buy } from "./user_buy";
-import { sell, sellPosition } from "./user_sell";
+import { sell } from "./user_sell";
 
 // TODO: all requests to UserDo include telegramUserID and telegramUserName
 // and ensure initialization.  That way, no purpose-specific initialization call is required
@@ -307,7 +307,7 @@ export class UserDO {
 
     async handleGetPositionFromUserDO(request : GetPositionFromUserDORequest) : Promise<Response> {
         const positionID = request.positionID;
-        const tokenPair = this.tokenPairsForPositionIDsTracker.getPosition(positionID);
+        const tokenPair = this.tokenPairsForPositionIDsTracker.getPositionPair(positionID);
         let position : Position|undefined = undefined;
         if (tokenPair != null) {
             const tokenAddress = tokenPair.token.address;
@@ -556,7 +556,7 @@ export class UserDO {
     
     async handleManuallyClosePositionRequest(manuallyClosePositionRequest : ManuallyClosePositionRequest) : Promise<Response> {
         const positionID = manuallyClosePositionRequest.positionID;
-        const tokenPair = this.tokenPairsForPositionIDsTracker.getPosition(positionID);
+        const tokenPair = this.tokenPairsForPositionIDsTracker.getPositionPair(positionID);
         if (tokenPair == null) {
             logError(`Could not find tokenPair for position ID ${positionID}`, this.telegramUserID);
             return makeJSONResponse<ManuallyClosePositionResponse>({ message: 'Could not find token pair for position' });
@@ -566,22 +566,28 @@ export class UserDO {
     }
 
     async handleAutomaticallyClosePositionsRequest(closePositionsRequest : AutomaticallyClosePositionsRequest) : Promise<Response> {
-        const positions = closePositionsRequest.positions;
-        if (positions.length == 0) {
+        const positionIDsToClose = closePositionsRequest.positionIDs;
+        if (positionIDsToClose.length == 0) {
             return makeJSONResponse<AutomaticallyClosePositionsResponse>({});
         }
-        positions.sort(p => -p.vsTokenAmt); // TODO: sort by currentValue desc rather than vsTokenAmt desc
-        const positionBatches = groupIntoBatches(positions,4);
+        const positionBatches = groupIntoBatches(positionIDsToClose,4);
         const notificationChannels : UpdateableNotification[] = [];
-        for (const batch of positionBatches) {
-            // fire-and-forget in batches
-            const promises = batch.map(p => {
-                const sellMessage = `Initiating auto-sell of ${toFriendlyString(p.tokenAmt, 4)} $${p.token.symbol}`;
-                const notificationChannel = TGStatusMessage.createAndSend(sellMessage, false, p.chatID, this.env);
+        for (const positionBatch of positionBatches) {
+            // fire off a bunch of promises per batch (4)
+            let sellPositionPromises = positionBatch.map(positionID => {
+                const tokenPair = this.tokenPairsForPositionIDsTracker.getPositionPair(positionID);
+                if (tokenPair == null) {
+                    logError(`Could not find token pair for position ID ${positionID}`, this.telegramUserID);
+                    return;
+                }
+                const tokenAddress = tokenPair.token.address;
+                const vsTokenAddress = tokenPair.vsToken.address;
+                const notificationChannel = TGStatusMessage.createAndSend(`Initiating auto-sell`, false, this.chatID.value||0, this.env);
                 notificationChannels.push(notificationChannel);
-                return sellPosition(p, this.wallet.value!!, this.env, notificationChannel)
-            });
-            await Promise.allSettled(promises);
+                return sell(positionID, tokenAddress, vsTokenAddress, this.wallet.value!!, this.env);
+            }).filter(sellPromise => sellPromise != null);
+            // but wait for the entire batch to settle before doing the next batch
+            await Promise.allSettled(sellPositionPromises);
         }
         // fire and forget, finalize all channels
         Promise.allSettled(notificationChannels.map(channel => TGStatusMessage.finalize(channel)));

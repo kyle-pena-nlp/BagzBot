@@ -1,4 +1,3 @@
-import { Position } from "../../../positions/position";
 import { HasPairAddresses } from "./has_pair_addresses";
 
 export interface AutomaticallyClosePositionRequest extends HasPairAddresses {
@@ -6,7 +5,7 @@ export interface AutomaticallyClosePositionRequest extends HasPairAddresses {
 };
 
 export interface AutomaticallyClosePositionsRequest {
-    positions : Position[]
+    positionIDs : string[]
 };
 
 

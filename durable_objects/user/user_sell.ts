@@ -18,13 +18,6 @@ export async function sell(positionID: string,
     wallet : Wallet, 
     env : Env) : Promise<void> {
     
-
-    // if it doesn't exist, either:
-    //  it's already been sold or... 
-    //  the system determined that the tx certainly never executed.
-    // early-out.
-
-
     const maybePosition = await prepareToSell(positionID, tokenAddress, vsTokenAddress, wallet, env);
 
     switch(maybePosition) {
@@ -50,8 +43,6 @@ export async function sell(positionID: string,
     const sellStatus = await sellPosition(maybePosition, wallet, env, notificationChannel);
 
     switch(sellStatus) {
-        case 'already-selling':
-            break;
         case 'already-sold':
             break;
         case 'could-not-confirm-sell':
@@ -86,19 +77,13 @@ async function prepareToSell(positionID : string,
         return 'already-sold';
     }
 
-    // if the position is already being sold (Closing), don't double-attempt sell.
-    if (position.status === PositionStatus.Closing) {
-        logInfo("Sell attempted on position already closing", position);
-        return 'already-selling';
-    }
-
     // if position has already been sold, no further action needed.
     if (position.status === PositionStatus.Closed) {
         logInfo("Sell attempted on position already closed", position);
         return 'already-sold';
     }
 
-    assertIs<PositionStatus.Open, typeof position.status>();
+    assertIs<PositionStatus.Open | PositionStatus.Closing, typeof position.status>();
 
     const connection = new Connection(env.RPC_ENDPOINT_URL);
 
@@ -135,24 +120,25 @@ export async function sellPosition(position : Position, wallet : Wallet, env : E
         return 'sell-failed';
     }
 
-    // check one last time position isn't gone, closed, or closing (awaits can happen, dude)
+    // check one last time position isn't gone, closed, or closing (in case the user or price polling sold it while we were signing the tx)
     const recheckPosition = await getPosition(position.positionID, position.token.address, position.vsToken.address, env);
     if (recheckPosition == null) {
         logInfo("Final check on position status showed position was closed/closing/removed");
         return 'already-sold';
     }
-    else if (recheckPosition.status == PositionStatus.Closing) {
-        return 'already-selling';
-    }
     else if (recheckPosition.status === PositionStatus.Closed) {
         return 'already-sold';
     }
 
-    assertIs<PositionStatus.Open,typeof recheckPosition.status>();
+    // Closing is okay (and expected) -- this pos was marked as closing before sending it here to be sold
+    assertIs<PositionStatus.Open|PositionStatus.Closing,typeof recheckPosition.status>();
 
     // marking as closing will prevent double-sells until the sell is confirmed
+    // (although this should already be marked as closing)
     try {
-        await markAsClosing(position.positionID, position.token.address, position.vsToken.address, env);
+        if (position.status !== PositionStatus.Closing) {
+            await markAsClosing(position.positionID, position.token.address, position.vsToken.address, env);
+        }
     }
     catch(e) {
         logError(`Could not mark as Closing`, position);

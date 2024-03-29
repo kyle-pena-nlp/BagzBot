@@ -13,7 +13,47 @@ export class TokenAddressExtractor {
         else if (this.isBirdeye(message)) {
             return this.extractFromBirdeye(message);
         }
+        else if (this.isSolscan(message)) {
+            return this.extractFromSolscan(message);
+        }
+        else if (this.isSolanaFM(message)) {
+            return this.extractFromSolanaFM(message);
+        }
         else  {
+            return;
+        }
+    }
+
+    private isSolanaFM(message : string) : boolean {
+        const host = this.extractHost(message);
+        return host != null && host.toLowerCase() === 'solana.fm';
+    }
+
+    private extractFromSolanaFM(message : string) : string|undefined {
+        const url = new URL(message);
+        const pathname = url.pathname;
+        const pathParts = pathname.split('/').filter(part => part !== '');
+        if (pathParts[0] === 'address' && pathParts[1] != null) {
+            return pathParts[1];
+        }
+        else {
+            return;
+        }
+    }
+
+    private isSolscan(message: string) : boolean {
+        const host = this.extractHost(message);
+        return host != null && host.toLowerCase() === 'solscan.io';
+    }
+
+    private extractFromSolscan(message : string) : string|undefined {
+        const url = new URL(message);
+        const pathname = url.pathname;
+        const pathParts = pathname.split('/').filter(part => part !== '');
+        if (pathParts[0] === 'account' && pathParts[1] != null) {
+            return pathParts[1];
+        }
+        else {
             return;
         }
     }

@@ -48,9 +48,9 @@ export class TokenPairPositionTracker {
         // SUPER CRITICAL to mark as closing to prevent them from;
         // 1. Being double-sold
         // 2. To keep them being monitored in case the sell fails
-        for (const positionToClose of positionsToClose) {
+        /*for (const positionToClose of positionsToClose) {
             positionToClose.status = PositionStatus.Closing;
-        }
+        }*/
 
         return {
             positionsToClose: positionsToClose

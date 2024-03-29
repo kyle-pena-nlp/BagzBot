@@ -5,7 +5,6 @@ import { strictParseInt } from "../../../util";
 
 export class TokenTracker {
     tokenInfos : Record<string,TokenInfo> = {};
-    nonExistentTokenAddresses : Record<string,Date> = {};
     dirtyTracking : Set<string> = new Set<string>();
     deletedKeys : Set<string> = new Set<string>();
     lastRefreshedMS : number = 0;
@@ -21,22 +20,30 @@ export class TokenTracker {
             }
         }
     }
-    async getTokenInfo(tokenAddress : string, env : Env, forceRefresh : boolean = false) : Promise<TokenInfo|undefined> {
-        if (this.isTimeoutExpired(env) || forceRefresh) {
-            // deliberate fire and forget
-            this.rebuildTokenList();
-        }
+    async getTokenInfo(tokenAddress : string, env : Env, storage : DurableObjectStorage) : Promise<TokenInfo|undefined> {
         const tokenAddressKey = new TokenAddressKey(tokenAddress);
-        const maybeTokenInfo = this.tokenInfos[tokenAddressKey.toString()];
+        let maybeTokenInfo = this.tokenInfos[tokenAddressKey.toString()];
+        if (maybeTokenInfo == null && (this.isTimeoutExpired(env))) {
+            // deliberate fire and forget - next person will have accurate list.
+            this.rebuildTokenList(storage);
+            maybeTokenInfo = this.tokenInfos[tokenAddressKey.toString()];
+        }        
         return maybeTokenInfo;
     }
-    addToken(tokenInfo : TokenInfo) {
+    upsertToken(tokenInfo : TokenInfo) {
         const tokenAddressKey = new TokenAddressKey(tokenInfo.address);
         const existingTokenInfo = this.tokenInfos[tokenAddressKey.toString()];
         // only mark the key dirty if it doesn't already exist or if the token info changed.
-        if (!existingTokenInfo || (existingTokenInfo && !this.tokenInfoEquals(existingTokenInfo, tokenInfo))) {
+        if (existingTokenInfo == null || (existingTokenInfo && !this.tokenInfoEquals(existingTokenInfo, tokenInfo))) {
             this.tokenInfos[tokenAddressKey.toString()] = tokenInfo;
             this.markDirty(tokenAddressKey.toString()); 
+        }
+    }
+    deleteToken(address : string) {
+        const tokenAddressKey = new TokenAddressKey(address);
+        if (tokenAddressKey.toString() in this.tokenInfos) {
+            delete this.tokenInfos[tokenAddressKey.toString()];
+            this.markDeleted(tokenAddressKey.toString());
         }
     }
     isTimeoutExpired(env : Env) {
@@ -47,14 +54,30 @@ export class TokenTracker {
             return false;
         }
     }
-    private async rebuildTokenList() : Promise<void> {
+    private async rebuildTokenList(storage : DurableObjectStorage) : Promise<void> {
         if (this.isRebuilding) {
             return;
         }
         else {
             this.isRebuilding = true;
             try {
-                this.tokenInfos = await this.getAllTokensFromJupiter();
+                const jupTokens = await this.getAllTokensFromJupiter();
+                if (jupTokens != null) {
+                    // originally: drop tokens that drop off the list.
+                    // but I changed my mind: will keep them so that people can still execute their trades
+                    /*
+                    const oldTokenAddressSet = new Set<string>(Object.values(this.tokenInfos).map(t => t.address));
+                    const newTokenAddressSet = new Set<string>(Object.values(jupTokens).map(t => t.address));
+                    const deadTokens = setDifference(oldTokenAddressSet, newTokenAddressSet, Set<string>);
+                    for (const deadToken of deadTokens) {
+                        this.deleteToken(deadToken);
+                    }*/
+                    for (const tokenInfo of Object.values(jupTokens)) {
+                        this.upsertToken(tokenInfo);
+                    }
+                    this.lastRefreshedMS = Date.now(); 
+                    await this.flushToStorage(storage);
+                }
             }
             catch(e) {
                 logError("Unable to rebuild token list");
@@ -64,9 +87,12 @@ export class TokenTracker {
             }
         }
     }
-    private async getAllTokensFromJupiter() : Promise<Record<string,TokenInfo>> {
+    private async getAllTokensFromJupiter() : Promise<Record<string,TokenInfo>|undefined> {
         const url = "https://token.jup.ag/all";
         const response = await fetch(url);
+        if (!response.ok) {
+            return;
+        }
         const allTokensJSON = await response.json() as any[];
         const tokenInfos : Record<string,TokenInfo> = {};
         for (const tokenJSON of allTokensJSON) {

@@ -68,7 +68,7 @@ export class TokenPairsForPositionIDsTracker {
             this.markAsDeleted(positionIDKey);
         }
     }
-    getPosition(positionID : string) : TokenPairForAPosition|null {
+    getPositionPair(positionID : string) : TokenPairForAPosition|null {
         const positionIDKey = new PositionIDKey(positionID);
         return this.tokenPairsForPositionIDs[positionIDKey.toString()]||null;
     }

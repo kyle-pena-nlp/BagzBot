@@ -119,17 +119,21 @@ export async function getWalletData(telegramUserID : number, chatID : number, en
 }
 
 // TODO: batching?
-export async function sendClosePositionOrdersToUserDOs(request: AutomaticallyClosePositionsRequest, env : Env) {
-	const positionsGroupedByUser = groupIntoMap(request.positions, (p : Position) => p.userID);
+export async function sendClosePositionOrdersToUserDOs(positionsToClose: Position[], env : Env) {
+	const positionsGroupedByUser = groupIntoMap(positionsToClose, (p : Position) => p.userID);
 	const promises = [];
 	const method = UserDOFetchMethod.automaticallyClosePositions;
+	// TODO: reimplement batching (groups of 4, per user, awaited.)
 	for (const userID of positionsGroupedByUser.keys()) {
 		const positions = positionsGroupedByUser.get(userID)||[];
-		const individualRequestForUserDO : AutomaticallyClosePositionsRequest = { positions: positions };
-		const promise = sendJSONRequestToUserDO<AutomaticallyClosePositionsRequest,AutomaticallyClosePositionsResponse>(userID, method, individualRequestForUserDO, env);
-		promises.push(promise);
+		const positionIDs = positions.map(p => p.positionID);
+		const individualRequestForUserDO : AutomaticallyClosePositionsRequest = { positionIDs: positionIDs };
+		await sendJSONRequestToUserDO<AutomaticallyClosePositionsRequest,AutomaticallyClosePositionsResponse>(userID, method, individualRequestForUserDO, env);
+		//promises.push(promise);
 	}
-	return await Promise.allSettled(promises);
+	/*if (promises.length > 0) {
+		return await Promise.allSettled(promises);
+	}*/
 }
 
 export function parseUserDOFetchMethod(value : string) : UserDOFetchMethod|null {

@@ -1,11 +1,11 @@
 import { DurableObjectState } from "@cloudflare/workers-types";
 import { DecimalizedAmount } from "../../decimalized";
+import { toNumber } from "../../decimalized/decimalized_amount";
 import { Env } from "../../env";
 import { logDebug, logError, logInfo } from "../../logging";
 import { ChangeTrackedValue, assertNever, makeJSONResponse, makeSuccessResponse, strictParseBoolean, strictParseInt } from "../../util";
 import { ensureTokenPairIsRegistered } from "../heartbeat/heartbeat_do_interop";
 import { sendClosePositionOrdersToUserDOs } from "../user/userDO_interop";
-import { AutomaticallyClosePositionsRequest } from "./actions/automatically_close_positions";
 import { GetPositionFromPriceTrackerRequest, GetPositionFromPriceTrackerResponse } from "./actions/get_position";
 import { GetTokenPriceRequest, GetTokenPriceResponse } from "./actions/get_token_price";
 import { HasPairAddresses } from "./actions/has_pair_addresses";
@@ -126,10 +126,13 @@ export class TokenPairPositionTrackerDO {
     }
 
     async _alarm() {
+        if (this.tokenAddress.value == null || this.vsTokenAddress.value == null) {
+            throw new Error("Couldn't get token price because token pair addresses not initialized");
+        }        
         const beginExecutionTime = Date.now();
         await this.state.storage.deleteAlarm();
         try {
-            const price = await this.currentPriceTracker.getPrice();
+            const price = await this.currentPriceTracker.getPrice(this.tokenAddress.value, this.vsTokenAddress.value);
             if (price != null) {
                 this.updatePositionTracker(price);
             }
@@ -174,7 +177,7 @@ export class TokenPairPositionTrackerDO {
             // ensure the token is registered with heartbeatDO
             if (!isHeartbeatRequest(body)) {
                 this.tryToEnsureTokenPairIsRegistered();
-            }            
+            }
             const response = await this._fetch(method,body);
             this.ensureIsPollingPrice();
             return response;
@@ -280,7 +283,10 @@ export class TokenPairPositionTrackerDO {
     }
 
     async handleGetTokenPrice(body : GetTokenPriceRequest) : Promise<Response> {
-        const price = await this.currentPriceTracker.getPrice();
+        if (this.tokenAddress.value == null || this.vsTokenAddress.value == null) {
+            throw new Error("Couldn't get token price because token pair addresses not initialized");
+        }
+        const price = await this.currentPriceTracker.getPrice(this.tokenAddress.value, this.vsTokenAddress.value);
         return makeJSONResponse<GetTokenPriceResponse>({ price : price });
     }
 
@@ -358,8 +364,8 @@ export class TokenPairPositionTrackerDO {
         this.ensureIsInitialized(request);
         const newPrice = request.price;
         const actionsToTake = this.updatePositionTracker(newPrice);
-        const closePositionsRequest : AutomaticallyClosePositionsRequest = { positions: actionsToTake.positionsToClose };
-        sendClosePositionOrdersToUserDOs(closePositionsRequest, this.env);
+        actionsToTake.positionsToClose.sort(p => -toNumber(p.vsTokenAmt)); // biggest first, roughly speaking
+        sendClosePositionOrdersToUserDOs(actionsToTake.positionsToClose, this.env);
         const responseBody : UpdatePriceResponse = {};
         return makeJSONResponse(responseBody);
     }

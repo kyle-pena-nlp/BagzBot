@@ -82,7 +82,9 @@ export class PolledTokenPairListDO {
         }
 
         // if the token is already in the tracker, respond with the token info
-        const tokenInfo = await this.tokenTracker.getTokenInfo(tokenAddress, this.env);
+        // if it's not and a counter has expired, fetch a new token list in the background
+        // TODO (post-beta): fetch specific tokens instead of all of them.  then have per-token-address cooldowns.
+        const tokenInfo = await this.tokenTracker.getTokenInfo(tokenAddress, this.env, this.state.storage);
         if (tokenInfo) {
             return {
                 type : 'valid',
