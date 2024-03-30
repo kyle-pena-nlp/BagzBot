@@ -81,7 +81,7 @@ export class MenuViewOpenPosition extends Menu<PositionAndMaybePNL|{ brandNewPos
             lines.push("<b>Price</b>")
             lines.push(`:bullet: <b>Fill Price</b>: ${fillPriceString} SOL`);
             lines.push(`:bullet: <b>Current Price</b>: ${currentPriceString} SOL`);
-            lines.push(`:bullet: <b>Price Change</b>: ${priceDeltaString} ${priceDeltaEmoji}`);
+            lines.push(`:bullet: <b>Price Change</b>: ${priceDeltaString}`);
 
             const fillValue = this.menuData.position.vsTokenAmt;
             const fillValueEmoji = interpretSignedSOLAmount(toNumber(fillValue));

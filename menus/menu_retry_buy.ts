@@ -5,7 +5,7 @@ import { MenuCode } from "./menu_code";
 
 export class MenuRetryBuy extends Menu<PositionRequest> implements MenuCapabilities {
     renderText(): string {
-        return `Would you like to retry opening your $${this.menuData.token.symbol} position?`;
+        return `Your purchase of $${this.menuData.token.symbol} failed. Would you like to retry?`;
     }
     renderOptions(): CallbackButton[][] {
         const options = this.emptyMenu();

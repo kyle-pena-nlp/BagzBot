@@ -51,11 +51,11 @@ test("neg_frac_with_many_leading_fractional_zeros", () => {
 })
 
 test("pos_frac_with_multiple_leading_fractional_zeros", () => {
-    expect(toFriendlyString(d(100,5),SIG_FIGS)).toEqual("0.0₂1");
+    expect(toFriendlyString(d(100,7),SIG_FIGS)).toEqual("0.0₄1");
 })
 
 test("neg_frac_with_multiple_leading_fractional_zeros", () => {
-    expect(toFriendlyString(d(-100,5),SIG_FIGS)).toEqual("-0.0₂1");
+    expect(toFriendlyString(d(-100,7),SIG_FIGS)).toEqual("-0.0₄1");
 })
 
 function d(s : string|number, d : number) : DecimalizedAmount {

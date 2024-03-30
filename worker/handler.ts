@@ -185,7 +185,11 @@ export class Worker {
                 const decryptedPrivateKey = await decryptPrivateKey(walletDataResponse.wallet.encryptedPrivateKey, params.getTelegramUserID(), this.env);
                 return new MenuViewDecryptedWallet({ publicKey: walletDataResponse.wallet.publicKey, decryptedPrivateKey: decryptedPrivateKey })
             case MenuCode.FAQ:
-                return new MenuFAQ(undefined);
+                return new MenuFAQ({ 
+                    botName : this.env.TELEGRAM_BOT_NAME,
+                    botInstance : this.env.TELEGRAM_BOT_INSTANCE,
+                    botTagline: this.env.TELEGRAM_BOT_TAGLINE
+                });
             case MenuCode.Help:
                 return new MenuHelp(undefined);
             case MenuCode.Invite:

@@ -23,7 +23,6 @@
 		"wrangler": "^3.0.0"
 	},
 	"dependencies": {
-		"@jup-ag/referral-sdk": "^0.1.6",
 		"@solana/web3.js": "^1.90.1",
 		"bs58": "^5.0.0"
 	}

@@ -70,7 +70,7 @@ export function toFriendlyString(x : DecimalizedAmount, maxSigFigs : number,
         }
         let { zeros, rest } = splitIntoZerosAndRest(fractionalPart); // 0000444 -> { zeros: '0000', rest: '444' }
         // If there are multiple zeros between the decimal and some non-zero stuff to the right...
-        if (defaultedOpts.useSubscripts && zeros.length > 1 && (wholePart == '0'||wholePart == '') && rest.length > 0) {
+        if (defaultedOpts.useSubscripts && zeros.length > 3 && (wholePart == '0'||wholePart == '') && rest.length > 0) {
             // replace all those zeros with 0₇, for example
             let subscripts = '';
             for (const character of (zeros.length).toString()) {
