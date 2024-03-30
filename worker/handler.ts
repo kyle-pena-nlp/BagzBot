@@ -1,3 +1,4 @@
+import { DurableObjectNamespace } from "@cloudflare/workers-types";
 import { randomUUID } from "node:crypto";
 import { decryptPrivateKey } from "../crypto";
 import { fromNumber } from "../decimalized";

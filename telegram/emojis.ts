@@ -12,14 +12,12 @@ const emojis = {
     ':notify:': '🔔',
     ':mountain:': '🏔️',
 
-    ':black-square:': '◾',
-    ':big-black-square:': '⬛',
-    ':down-red:': '🔻',
     ':bullet:': '•',
     ':pencil:': '✏️',
     ':refresh:': '🔄',
     ':twisted_arrows:': '🔀',
     ':cancel:': '🥜',
+
 
     ':chart_up:': '📈',
     ':chart_down:': '📉',
@@ -44,9 +42,8 @@ const emojis = {
     ':money_bag:': '💰',
     ':credit_card:': '💳',
     ':gem:': '💎',
-    ':bank:': '🏦',
+    
     ':briefcase:': '💼',
-    ':dead:': '💀',
     ':envelope:': '✉️',
     ':ticket:': '🎟️',
     ':love_letter:': '💌',
@@ -61,15 +58,8 @@ const emojis = {
     ':money_face:': '🤑',
     ':thumbs_up:': '👍', 
     ':thumbs_down:': '👎',
-
-
     ':sign:': '✍',
     ':help:': '🤔',
-
-    ':bread:': '🍞',
-    ':office:': '🏢',
-
-    ':delivery_truck:': '🚚',
     ':stop:': '🛑',
     ':none:': ''
 }
