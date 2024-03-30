@@ -123,7 +123,11 @@ def configure_bot_commands(bot_token, bot_secret_token):
             {
                 'command': 'faq',
                 'description': 'Shows the FAQ'
-            }            
+            },
+            { 
+                'command': 'new_position',
+                'description': 'Creates a new position'
+            }           
         ],
         'scope': {
             'type': 'all_private_chats'

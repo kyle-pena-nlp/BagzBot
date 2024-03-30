@@ -21,8 +21,9 @@ import { quoteBuy } from "../rpc/jupiter_quotes";
 import { isGetQuoteFailure } from "../rpc/rpc_types";
 import { POSITION_REQUEST_STORAGE_KEY } from "../storage_keys";
 import { TelegramWebhookInfo, deleteTGMessage, sendMessageToTG, sendRequestToTG, updateTGMessage } from "../telegram";
-import { WEN_ADDRESS, getVsTokenInfo } from "../tokens";
+import { TokenInfo, WEN_ADDRESS, getVsTokenInfo } from "../tokens";
 import { Structural, assertNever, makeFakeFailedRequestResponse, makeSuccessResponse, strictParseBoolean, strictParseInt, tryParseFloat, tryParseInt } from "../util";
+import { assertIs } from "../util/enums";
 import { CallbackHandlerParams } from "./model/callback_handler_params";
 import { TokenAddressExtractor } from "./token_address_extractor";
 
@@ -699,6 +700,32 @@ export class Worker {
                 return ['...', new LegalAgreement(undefined)];
             case '/faq':
                 return ['...', new MenuFAQ({ botName : env.TELEGRAM_BOT_INSTANCE, botInstance: env.TELEGRAM_BOT_INSTANCE, botTagline: env.TELEGRAM_BOT_INSTANCE })]
+            case '/new_position':
+                const defaultPr = await getDefaultTrailingStopLoss(info.getTelegramUserID(), info.chatID, info.messageID, env);
+                const prerequest = defaultPr.prerequest;
+                let tokenInfo : TokenInfo|null|'failed' = await getTokenInfo(prerequest.tokenAddress, env).then(r => r.tokenInfo).catch(r => 'failed');
+                if (tokenInfo === 'failed') {
+                    return ['...', new MenuOKClose(`Sorry - couldn't create a new position at this time`)];
+                }
+                else if (tokenInfo == null) {
+                    // retry with WEN if default / last used token fails.
+                    tokenInfo = await getTokenInfo(WEN_ADDRESS, env).then(r => r.tokenInfo);
+                }
+                if (tokenInfo == null || tokenInfo === 'failed') {
+                    // If even WEN fails... out of luck, dear user.
+                    return ['...', new MenuOKClose(`Sorry - couldn't create a new position at this time`)];
+                }
+                assertIs<TokenInfo,typeof tokenInfo>();
+                const quote = await quoteBuy(prerequest, tokenInfo, this.env);
+
+                // if getting the quote fails, early-out
+                if (isGetQuoteFailure(quote)) {
+                    return ['...', new MenuOKClose(`Sorry - couldn't create a new position at this time`)];
+                }
+
+                // now that we have a quote and tokenInfo, convert the pre-request to a request
+                const positionRequest = convertPreRequestToRequest(prerequest, quote, tokenInfo);
+                return ['...', new MenuEditTrailingStopLossPositionRequest(positionRequest)];
             default:
                 throw new Error(`Unrecognized command: ${command}`);
         }

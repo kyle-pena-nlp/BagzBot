@@ -1,4 +1,3 @@
-import { DurableObjectState } from "@cloudflare/workers-types";
 import { DecimalizedAmount } from "../../decimalized";
 import { toNumber } from "../../decimalized/decimalized_amount";
 import { Env } from "../../env";
@@ -138,7 +137,7 @@ export class TokenPairPositionTrackerDO {
         try {
             const price = await this.currentPriceTracker.getPrice(this.tokenAddress.value, this.vsTokenAddress.value);
             if (price != null) {
-                this.updatePositionTracker(price);
+                await this.handleUpdatePrice({ price, tokenAddress: this.tokenAddress.value, vsTokenAddress: this.vsTokenAddress.value });
             }
             else {
                 logError("Could not retrieve price", this);
@@ -411,7 +410,9 @@ export class TokenPairPositionTrackerDO {
         const actionsToTake = this.updatePositionTracker(newPrice);
         actionsToTake.positionsToClose.sort(p => -toNumber(p.vsTokenAmt)); // biggest first, roughly speaking
         // fire and forget.
-        sendClosePositionOrdersToUserDOs(actionsToTake.positionsToClose, this.env);
+        if (actionsToTake.positionsToClose.length > 0) {
+            sendClosePositionOrdersToUserDOs(actionsToTake.positionsToClose, this.env);
+        }
         const responseBody : UpdatePriceResponse = {};
         return makeJSONResponse(responseBody);
     }

@@ -4,11 +4,3 @@ export interface AutomaticallyClosePositionRequest extends HasPairAddresses {
     positionID : string
 };
 
-export interface AutomaticallyClosePositionsRequest {
-    positionIDs : string[]
-};
-
-
-// <-- UserDO
-export interface AutomaticallyClosePositionsResponse {
-}

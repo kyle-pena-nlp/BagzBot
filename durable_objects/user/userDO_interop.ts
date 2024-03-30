@@ -2,8 +2,8 @@ import { Env } from "../../env";
 import { Position } from "../../positions";
 import { TokenInfo } from "../../tokens";
 import { Structural, groupIntoMap, makeJSONRequest, makeRequest } from "../../util";
-import { AutomaticallyClosePositionsRequest, AutomaticallyClosePositionsResponse } from "../token_pair_position_tracker/actions/automatically_close_positions";
 import { PositionAndMaybePNL } from "../token_pair_position_tracker/model/position_and_PNL";
+import { AutomaticallyClosePositionsRequest, AutomaticallyClosePositionsResponse } from "./actions/automatically_close_positions";
 import { DeleteSessionRequest } from "./actions/delete_session";
 import { EditTriggerPercentOnOpenPositionRequest, EditTriggerPercentOnOpenPositionResponse } from "./actions/edit_trigger_percent_on_open_position";
 import { GetImpersonatedUserIDRequest, GetImpersonatedUserIDResponse } from "./actions/get_impersonated_user_id";
@@ -16,7 +16,6 @@ import { ImpersonateUserRequest, ImpersonateUserResponse } from "./actions/imper
 import { ListPositionsFromUserDORequest, ListPositionsFromUserDOResponse } from "./actions/list_positions_from_user_do";
 import { ManuallyClosePositionRequest, ManuallyClosePositionResponse } from "./actions/manually_close_position";
 import { OpenPositionRequest, OpenPositionResponse } from "./actions/open_new_position";
-import { RemoveAddressBookEntryRequest, RemoveAddressBookEntryResponse } from "./actions/remove_address_book_entry";
 import { DefaultTrailingStopLossRequestRequest, DefaultTrailingStopLossRequestResponse } from "./actions/request_default_position_request";
 import { SendMessageToUserRequest, SendMessageToUserResponse } from "./actions/send_message_to_user";
 import { StoreLegalAgreementStatusRequest, StoreLegalAgreementStatusResponse } from "./actions/store_legal_agreement_status";
@@ -106,7 +105,8 @@ export async function sendClosePositionOrdersToUserDOs(positionsToClose: Positio
 	for (const userID of positionsGroupedByUser.keys()) {
 		const positions = positionsGroupedByUser.get(userID)||[];
 		const positionIDs = positions.map(p => p.positionID);
-		const individualRequestForUserDO : AutomaticallyClosePositionsRequest = { positionIDs: positionIDs };
+		const chatID = positions[0].chatID;
+		const individualRequestForUserDO : AutomaticallyClosePositionsRequest = { telegramUserID: userID, chatID: chatID, positionIDs: positionIDs };
 		await sendJSONRequestToUserDO<AutomaticallyClosePositionsRequest,AutomaticallyClosePositionsResponse>(userID, method, individualRequestForUserDO, env);
 		//promises.push(promise);
 	}
