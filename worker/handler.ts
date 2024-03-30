@@ -8,18 +8,16 @@ import { GetTokenInfoResponse, isInvalidTokenInfoResponse, isValidTokenInfoRespo
 import { getTokenInfo } from "../durable_objects/polled_token_pair_list/polled_token_pair_list_DO_interop";
 import { _devOnlyFeatureUpdatePrice } from "../durable_objects/token_pair_position_tracker/token_pair_position_tracker_do_interop";
 import { OpenPositionRequest } from "../durable_objects/user/actions/open_new_position";
-import { CompletedAddressBookEntry, JustAddressBookEntryID, JustAddressBookEntryName } from "../durable_objects/user/model/address_book_entry";
 import { QuantityAndToken } from "../durable_objects/user/model/quantity_and_token";
 import { TokenSymbolAndAddress } from "../durable_objects/user/model/token_name_and_address";
-import { editTriggerPercentOnOpenPositionFromUserDO, getAddressBookEntry, getDefaultTrailingStopLoss, getPositionFromUserDO, getUserData, getWalletData, impersonateUser, listAddressBookEntries, listPositionsFromUserDO, manuallyClosePosition, maybeReadSessionObj, readSessionObj, requestNewPosition, sendMessageToUser, storeAddressBookEntry, storeLegalAgreementStatus, storeSessionObj, storeSessionObjProperty, storeSessionValues, unimpersonateUser } from "../durable_objects/user/userDO_interop";
+import { editTriggerPercentOnOpenPositionFromUserDO, getDefaultTrailingStopLoss, getPositionFromUserDO, getUserData, getWalletData, impersonateUser, listPositionsFromUserDO, manuallyClosePosition, maybeReadSessionObj, readSessionObj, requestNewPosition, sendMessageToUser, storeLegalAgreementStatus, storeSessionObj, storeSessionObjProperty, storeSessionValues, unimpersonateUser } from "../durable_objects/user/userDO_interop";
 import { Env } from "../env";
 import { logDebug, logError } from "../logging";
-import { BaseMenu, LegalAgreement, MenuBetaInviteFriends, MenuCode, MenuConfirmAddressBookEntry, MenuConfirmTrailingStopLossPositionRequest, MenuContinueMessage, MenuEditOpenPositionTriggerPercent, MenuEditPositionHelp, MenuEditTrailingStopLossPositionRequest, MenuError, MenuFAQ, MenuHelp, MenuListPositions, MenuMain, MenuOKClose, MenuPickTransferFundsRecipient, MenuPleaseEnterToken, MenuStartTransferFunds, MenuTODO, MenuTrailingStopLossAutoRetrySell, MenuTrailingStopLossEntryBuyQuantity, MenuTrailingStopLossPickVsToken, MenuTrailingStopLossSlippagePercent, MenuTrailingStopLossTriggerPercent, MenuTransferFundsTestOrSubmitNow, MenuViewDecryptedWallet, MenuViewOpenPosition, MenuWallet, PositiveDecimalKeypad, PositiveIntegerKeypad, SubmittedTriggerPctKey, WelcomeScreenPart1, WelcomeScreenPart2 } from "../menus";
+import { BaseMenu, LegalAgreement, MenuBetaInviteFriends, MenuCode, MenuContinueMessage, MenuEditOpenPositionTriggerPercent, MenuEditPositionHelp, MenuEditTrailingStopLossPositionRequest, MenuError, MenuFAQ, MenuListPositions, MenuMain, MenuOKClose, MenuPleaseEnterToken, MenuTODO, MenuTrailingStopLossAutoRetrySell, MenuTrailingStopLossEntryBuyQuantity, MenuTrailingStopLossPickVsToken, MenuTrailingStopLossSlippagePercent, MenuTrailingStopLossTriggerPercent, MenuViewDecryptedWallet, MenuViewOpenPosition, MenuWallet, SubmittedTriggerPctKey, WelcomeScreenPart1, WelcomeScreenPart2 } from "../menus";
 import { PositionPreRequest, PositionRequest, convertPreRequestToRequest } from "../positions";
 import { ReplyQuestion, ReplyQuestionCode } from "../reply_question";
 import { ReplyQuestionData, replyQuestionHasNextSteps } from "../reply_question/reply_question_data";
 import { quoteBuy } from "../rpc/jupiter_quotes";
-import { CompleteTransferFundsRequest, PartialTransferFundsRequest } from "../rpc/rpc_transfer_funds";
 import { isGetQuoteFailure } from "../rpc/rpc_types";
 import { POSITION_REQUEST_STORAGE_KEY } from "../storage_keys";
 import { TelegramWebhookInfo, deleteTGMessage, sendMessageToTG, sendRequestToTG, updateTGMessage } from "../telegram";
@@ -191,8 +189,6 @@ export class Worker {
                     botInstance : this.env.TELEGRAM_BOT_INSTANCE,
                     botTagline: this.env.TELEGRAM_BOT_TAGLINE
                 });
-            case MenuCode.Help:
-                return new MenuHelp(undefined);
             case MenuCode.Invite:
                 return this.TODOstubbedMenu(this.env);
             case MenuCode.PleaseEnterToken:
@@ -267,9 +263,6 @@ export class Worker {
                 await storeSessionObjProperty(params.getTelegramUserID(), params.chatID, messageID, "retrySellIfSlippageExceeded", callbackData.menuArg === "true", POSITION_REQUEST_STORAGE_KEY, this.env);
                 const trailingStopLossRequestStateAfterAutoRetrySellEdited = await readSessionObj<PositionRequest>(params.getTelegramUserID(), params.chatID, messageID, POSITION_REQUEST_STORAGE_KEY, this.env);
                 return await this.makeStopLossRequestEditorMenu(trailingStopLossRequestStateAfterAutoRetrySellEdited, this.env);
-            case MenuCode.TrailingStopLossConfirmMenu:
-                const trailingStopLossRequestAfterDoneEditing = await readSessionObj<PositionRequest>(params.getTelegramUserID(), params.chatID, messageID, POSITION_REQUEST_STORAGE_KEY, this.env);
-                return await this.makeStopLossConfirmMenu(trailingStopLossRequestAfterDoneEditing, this.env);
             case MenuCode.CustomTriggerPct:
                 const triggerPctQuestion = new ReplyQuestion(
                     "Enter a custom trigger percent",
@@ -339,79 +332,6 @@ export class Worker {
             case MenuCode.TrailingStopLossRequestReturnToEditorMenu:
                 const z = await readSessionObj<PositionRequest>(params.getTelegramUserID(), params.chatID, messageID, POSITION_REQUEST_STORAGE_KEY, this.env);
                 return await this.makeStopLossRequestEditorMenu(z, this.env);
-            case MenuCode.AddFundsRecipientAddress:
-                const addressBookEntry : JustAddressBookEntryID = { 
-                    addressBookEntryID : randomUUID()
-                };
-                await storeSessionObj<JustAddressBookEntryID>(params.getTelegramUserID(), params.chatID, messageID, addressBookEntry, "addressBookEntry", this.env);
-                return new ReplyQuestion("Choose a name for this recipient", 
-                    ReplyQuestionCode.EnterAddressBookEntryName, 
-                    this.context, 
-                    { 
-                        callback: { 
-                            nextMenuCode: MenuCode.SubmitAddressBookEntryName, 
-                            linkedMessageID: messageID 
-                        },
-                        timeoutMS: QUESTION_TIMEOUT_MS
-                    });
-            case MenuCode.SubmitAddressBookEntryName:
-                const addressBookEntry2 = await readSessionObj<JustAddressBookEntryID>(params.getTelegramUserID(), params.chatID, messageID, "addressBookEntry", this.env);
-                const addressBookEntry3 : JustAddressBookEntryName = { ...addressBookEntry2, name : callbackData.menuArg||'' } ;//name = callbackData.menuArg;
-                await storeSessionObj<JustAddressBookEntryName>(params.getTelegramUserID(), params.chatID, messageID, addressBookEntry3, "addressBookEntry", this.env);
-                return new ReplyQuestion("Paste in the address", 
-                    ReplyQuestionCode.EnterTransferFundsRecipient, 
-                    this.context, 
-                    { 
-                        callback: { 
-                            nextMenuCode: MenuCode.SubmitAddressBookEntryAddress, 
-                            linkedMessageID: messageID 
-                        },
-                        timeoutMS: QUESTION_TIMEOUT_MS
-                    });
-            case MenuCode.SubmitAddressBookEntryAddress: 
-                const addressBookEntry4 = await readSessionObj<JustAddressBookEntryName>(params.getTelegramUserID(), params.chatID, messageID, "addressBookEntry", this.env);
-                const addressBookEntry5 : CompletedAddressBookEntry = { ...addressBookEntry4, address: callbackData.menuArg||'', confirmed : false };
-                await storeSessionObj<CompletedAddressBookEntry>(params.getTelegramUserID(), params.chatID, messageID, addressBookEntry5, "addressBookEntry", this.env);
-                return new MenuConfirmAddressBookEntry(addressBookEntry5);
-            case MenuCode.SubmitAddressBookEntry:
-                const addressBookEntryFinal = await readSessionObj<CompletedAddressBookEntry>(params.getTelegramUserID(), params.chatID, messageID, "addressBookEntry", this.env);
-                const response = await storeAddressBookEntry(params.getTelegramUserID(), params.chatID, addressBookEntryFinal, this.env);
-                if (!response.success) {
-                    return new MenuContinueMessage(`Could not store address book entry`, MenuCode.TransferFunds);
-                }
-                return new MenuStartTransferFunds(undefined);
-            case MenuCode.PickTransferFundsRecipient:
-                const addressBookEntries = await listAddressBookEntries(params.getTelegramUserID(), params.chatID, this.env);
-                return new MenuPickTransferFundsRecipient(addressBookEntries.addressBookEntries);
-            case MenuCode.TransferFundsRecipientSubmitted:
-                const addressBookId = callbackData.menuArg||'';
-                const selectedAddressBookEntry = await getAddressBookEntry(params.getTelegramUserID(), params.chatID, addressBookId, this.env);
-                if (selectedAddressBookEntry == null) {
-                    return new MenuContinueMessage(`Address book entry not found`, MenuCode.TransferFunds);
-                }
-                const partialTransferFundsRequest : PartialTransferFundsRequest = { recipientAddress: selectedAddressBookEntry.address };
-                await storeSessionObj<PartialTransferFundsRequest>(params.getTelegramUserID(), params.chatID, messageID, partialTransferFundsRequest, "transferFundsRequest", this.env);
-                return new PositiveDecimalKeypad("${currentValue} SOL", MenuCode.KeypadTransferFundsQuantity, MenuCode.SubmitTransferFundsQuantity, MenuCode.TransferFunds, "1.0", 0.0);
-            case MenuCode.KeypadTransferFundsQuantity:
-                const tfEntry = callbackData.menuArg||'';
-                return new PositiveDecimalKeypad("${currentValue} SOL", MenuCode.KeypadTransferFundsQuantity, MenuCode.SubmitTransferFundsQuantity, MenuCode.TransferFunds, tfEntry, 0.0);
-            case MenuCode.SubmitTransferFundsQuantity:
-                const tfQuantity = tryParseFloat(callbackData.menuArg||'');
-                if (tfQuantity == null) {
-                    return new MenuContinueMessage(`Invalid transfer funds quantity`, MenuCode.TransferFunds);
-                }
-                const tfFundsRequest = await readSessionObj<PartialTransferFundsRequest>(params.getTelegramUserID(), params.chatID, messageID, "transferFundsRequest", this.env);
-                const completeTfFundsRequest : CompleteTransferFundsRequest = { ...tfFundsRequest, solQuantity: tfQuantity };
-                await storeSessionObj<CompleteTransferFundsRequest>(params.getTelegramUserID(), params.chatID, messageID, completeTfFundsRequest, "transferFundsRequest", this.env);
-                return new MenuTransferFundsTestOrSubmitNow(completeTfFundsRequest);
-            case MenuCode.TransferFundsDoTestTransfer:
-                throw new Error("");
-            case MenuCode.TransferFundsDoTransfer:
-                throw new Error("");
-            case MenuCode.AddressBookEntryPerformTestTransfer:
-                throw new Error("");
-            case MenuCode.RemoveAddressBookEntry:
-                throw new Error("");
             case MenuCode.BetaGateInviteFriends:
                 const unclaimedBetaCodes = await listUnclaimedBetaInviteCodes({ userID : params.getTelegramUserID() }, this.env);
                 if (!unclaimedBetaCodes.success) {
@@ -628,25 +548,9 @@ export class Worker {
         };
     }
 
-    private makeTrailingStopLossCustomTriggerPercentKeypad(currentValue : string) {
-        return new PositiveIntegerKeypad(
-            "${currentValue}%", // intentional double quotes - syntax is parsed later
-            MenuCode.CustomTriggerPct,
-            MenuCode.SubmitTriggerPct,
-            MenuCode.TrailingStopLossRequestReturnToEditorMenu,
-            currentValue,
-            1,
-            100);
-    }
-
     private async makeStopLossRequestEditorMenu(positionRequest : PositionRequest, env : Env) : Promise<BaseMenu> {
         await this.refreshQuote(positionRequest, env);
         return new MenuEditTrailingStopLossPositionRequest(positionRequest);
-    }
-
-    private async makeStopLossConfirmMenu(positionRequest: PositionRequest, env : Env) : Promise<BaseMenu> {
-        await this.refreshQuote(positionRequest, env);
-        return new MenuConfirmTrailingStopLossPositionRequest(positionRequest);
     }
 
     private TODOstubbedMenu(env : Env) : BaseMenu {
@@ -793,8 +697,8 @@ export class Worker {
                 return ['...', new WelcomeScreenPart1(undefined)];
             case '/legal_agreement':
                 return ['...', new LegalAgreement(undefined)];
-            case '/help':
-                return ['...', new MenuHelp(undefined)];
+            case '/faq':
+                return ['...', new MenuFAQ({ botName : env.TELEGRAM_BOT_INSTANCE, botInstance: env.TELEGRAM_BOT_INSTANCE, botTagline: env.TELEGRAM_BOT_INSTANCE })]
             default:
                 throw new Error(`Unrecognized command: ${command}`);
         }

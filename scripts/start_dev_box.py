@@ -121,8 +121,8 @@ def configure_bot_commands(bot_token, bot_secret_token):
                 'description': 'Displays the legal agreement'
             },            
             {
-                'command': 'help',
-                'description': 'Displays information about this bot'
+                'command': 'faq',
+                'description': 'Shows the FAQ'
             }            
         ],
         'scope': {

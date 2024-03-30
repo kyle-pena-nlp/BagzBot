@@ -8,10 +8,10 @@ export enum MenuCode {
 	ListPositions = "List.POS",
 	Invite = "Invite",
 	FAQ = "FAQ",
-	Help = "Help",
 	Error = "Error",
 	NewPosition = "NewPosition",
 	EditPositionHelp = "EditPositionHelp",
+	TransferFunds = "TransferFunds",
 
 	EditOpenPositionTriggerPercent = "EOP.Trigger",
 	SubmitOpenPositionTriggerPct = "SEOP.Trigger",
@@ -33,22 +33,7 @@ export enum MenuCode {
 	UnimpersonateUser = "UnimpersonateUser",
 	SubmitImpersonateUser = "SubmitImpersonateUser",
 
-	// address book stuff
-	SubmitAddressBookEntryName = "Submit.ABE.N",
-	SubmitAddressBookEntryAddress = "Submit.ABE.A",
-	AddressBookEntryPerformTestTransfer  = "Test.ABE.FT",
-	SubmitAddressBookEntry = "Submit.ABE",
-	RemoveAddressBookEntry = "Remove.ABE",
-	PickTransferFundsRecipient = "Pick.ABE.FT",
-	TransferFundsRecipientSubmitted = "FT.Sub",
-	KeypadTransferFundsQuantity = "FT.Keypad",
-	SubmitTransferFundsQuantity = "FT.Q.Sub",
-	TransferFundsDoTransfer = "FT.DoIt",
-	TransferFundsDoTestTransfer = "FT.TestIt",
-
 	PleaseEnterToken = "PleaseEnterToken",
-	TransferFunds = "TransferFunds",
-	AddFundsRecipientAddress = "AddFundsRecipientAddress",
 	ViewOpenPosition = "ViewOpenPosition",
 	ClosePositionManuallyAction = "Pos.Close.Manually",
 
@@ -81,8 +66,6 @@ export enum MenuCode {
 	TrailingStopLossChooseAutoRetrySellMenu = "TSL.AutoRetrySellMenu",
 	TrailingStopLossChooseAutoRetrySellSubmit = "TSL.AutoRetrySellSubmit",
 
-	
-	TrailingStopLossConfirmMenu = "TSL.ConfirmMenu",
 	TrailingStopLossEditorFinalSubmit = "TSL.EditorFinalSubmit",
 
 	BetaFeedbackQuestion = "BetaFeedbackQuestion",

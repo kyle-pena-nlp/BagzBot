@@ -122,11 +122,6 @@ export abstract class Menu<T> extends BaseMenu {
         this.insertButton(options, 'Back', callbackData, lineNumber);
     }
 
-    protected createHelpMenuLine(options : CallbackButton[][]) {
-        const lineNumber = options.length + 1;
-        this.insertButton(options, ':help: Help', new CallbackData(MenuCode.Help, undefined), lineNumber);
-    }
-
     protected insertCloseButtonNextLine(options : CallbackButton[][]) {
         const lineNumber = options.length + 1;
         this.insertButton(options, "Close", this.menuCallback(MenuCode.Close), lineNumber);

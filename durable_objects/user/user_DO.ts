@@ -1,4 +1,3 @@
-import { DurableObjectState } from "@cloudflare/workers-types";
 import { Wallet, encryptPrivateKey, generateEd25519Keypair } from "../../crypto";
 import { DecimalizedAmount } from "../../decimalized";
 import { Env } from "../../env";
@@ -16,7 +15,6 @@ import { editTriggerPercentOnOpenPositionInTracker, getPositionAndMaybePNL, list
 import { BaseUserDORequest, isBaseUserDORequest } from "./actions/base_user_do_request";
 import { DeleteSessionRequest, DeleteSessionResponse } from "./actions/delete_session";
 import { EditTriggerPercentOnOpenPositionRequest, EditTriggerPercentOnOpenPositionResponse } from "./actions/edit_trigger_percent_on_open_position";
-import { GetAddressBookEntryRequest, GetAddressBookEntryResponse } from "./actions/get_address_book_entry";
 import { GetImpersonatedUserIDRequest, GetImpersonatedUserIDResponse } from "./actions/get_impersonated_user_id";
 import { GetLegalAgreementStatusRequest, GetLegalAgreementStatusResponse } from "./actions/get_legal_agreement_status";
 import { GetPositionFromUserDORequest, GetPositionFromUserDOResponse } from "./actions/get_position_from_user_do";
@@ -24,21 +22,17 @@ import { GetSessionValuesRequest, GetSessionValuesWithPrefixRequest, GetSessionV
 import { GetUserDataRequest } from "./actions/get_user_data";
 import { GetWalletDataRequest, GetWalletDataResponse } from "./actions/get_wallet_data";
 import { ImpersonateUserRequest, ImpersonateUserResponse } from "./actions/impersonate_user";
-import { ListAddressBookEntriesRequest, ListAddressBookEntriesResponse } from "./actions/list_address_book_entries";
 import { ListPositionsFromUserDORequest, ListPositionsFromUserDOResponse } from "./actions/list_positions_from_user_do";
 import { ManuallyClosePositionRequest, ManuallyClosePositionResponse } from "./actions/manually_close_position";
 import { OpenPositionRequest, OpenPositionResponse } from "./actions/open_new_position";
-import { RemoveAddressBookEntryRequest, RemoveAddressBookEntryResponse } from "./actions/remove_address_book_entry";
 import { DefaultTrailingStopLossRequestRequest, DefaultTrailingStopLossRequestResponse } from "./actions/request_default_position_request";
 import { SendMessageToUserRequest, SendMessageToUserResponse, isSendMessageToUserRequest } from "./actions/send_message_to_user";
-import { StoreAddressBookEntryRequest, StoreAddressBookEntryResponse } from "./actions/store_address_book_entry";
 import { StoreLegalAgreementStatusRequest, StoreLegalAgreementStatusResponse } from "./actions/store_legal_agreement_status";
 import { StoreSessionValuesRequest, StoreSessionValuesResponse } from "./actions/store_session_values";
 import { UnimpersonateUserRequest, UnimpersonateUserResponse } from "./actions/unimpersonate_user";
 import { UserInitializeRequest, UserInitializeResponse } from "./actions/user_initialize";
 import { TokenPair } from "./model/token_pair";
 import { UserData } from "./model/user_data";
-import { AddressBookEntryTracker } from "./trackers/address_book_entry_tracker";
 import { SessionTracker } from "./trackers/session_tracker";
 import { SOLBalanceTracker } from "./trackers/sol_balance_tracker";
 import { TokenPairsForPositionIDsTracker } from "./trackers/token_pairs_for_position_ids_tracker";
@@ -94,9 +88,6 @@ export class UserDO {
     // tracks variable values associated with the current messageID
     sessionTracker : SessionTracker = new SessionTracker();
 
-    // tracks the address book entries to which the user can send funds
-    addressBookEntryTracker : AddressBookEntryTracker = new AddressBookEntryTracker();
-
     // has the user signed legal?
     legalAgreementStatus : ChangeTrackedValue<'agreed'|'refused'|'has-not-responded'> = new ChangeTrackedValue<'agreed'|'refused'|'has-not-responded'>('hasSignedLegal', 'has-not-responded');
 
@@ -124,7 +115,6 @@ export class UserDO {
         this.telegramUserID.initialize(storage);
         this.impersonatedUserID.initialize(storage);
         this.sessionTracker.initialize(storage);
-        this.addressBookEntryTracker.initialize(storage);
         this.solBalanceTracker.initialize(storage); // rate limits RPC calls. will refresh on access.
         this.legalAgreementStatus.initialize(storage);
         this.defaultTrailingStopLossRequest.initialize(storage);
@@ -139,7 +129,6 @@ export class UserDO {
             this.impersonatedUserID.flushToStorage(this.state.storage),
             this.wallet.flushToStorage(this.state.storage),
             this.sessionTracker.flushToStorage(this.state.storage),
-            this.addressBookEntryTracker.flushToStorage(this.state.storage),
             this.solBalanceTracker.flushToStorage(this.state.storage),
             this.legalAgreementStatus.flushToStorage(this.state.storage),
             this.defaultTrailingStopLossRequest.flushToStorage(this.state.storage),
@@ -230,18 +219,6 @@ export class UserDO {
             case UserDOFetchMethod.automaticallyClosePositions:
                 this.assertUserHasWallet();
                 response = await this.handleAutomaticallyClosePositionsRequest(userAction);
-                break;
-            case UserDOFetchMethod.storeAddressBookEntry:
-                response = await this.handleStoreAddressBookEntry(userAction);
-                break;
-            case UserDOFetchMethod.listAddressBookEntries:
-                response = await this.handleListAddressBookEntries(userAction);
-                break;
-            case UserDOFetchMethod.removeAddressBookEntry:
-                response = await this.handleRemoveAddressBookEntry(userAction);
-                break;
-            case UserDOFetchMethod.getAddressBookEntry:
-                response = await this.handleGetAddressBookEntry(userAction);
                 break;
             case UserDOFetchMethod.getLegalAgreementStatus:
                 response = await this.handleGetLegalAgreementStatus(userAction);
@@ -390,63 +367,12 @@ export class UserDO {
         return makeJSONResponse(responseBody);
     }
 
-    async handleRemoveAddressBookEntry(request : RemoveAddressBookEntryRequest) : Promise<Response> {
-        const response = this._handleRemoveAddressBookEntry(request);
-        return makeJSONResponse<RemoveAddressBookEntryResponse>(response);
-    }
 
-    _handleRemoveAddressBookEntry(request : RemoveAddressBookEntryRequest) : RemoveAddressBookEntryResponse {
-        this.addressBookEntryTracker.delete(request.addressBookEntryID);
-        return {};
-    }
 
-    async handleGetAddressBookEntry(request : GetAddressBookEntryRequest) : Promise<Response> {
-        const response = this._handleGetAddressBookEntry(request);
-        return makeJSONResponse<GetAddressBookEntryResponse>(response);
-    }
 
-    _handleGetAddressBookEntry(request : GetAddressBookEntryRequest) : GetAddressBookEntryResponse {
-        const addressBookEntry = this.addressBookEntryTracker.get(request.addressBookEntryID);
-        return { addressBookEntry : addressBookEntry };
-    }
 
-    async handleStoreAddressBookEntry(request : StoreAddressBookEntryRequest) : Promise<Response> {
-        const response = await this._handleStoreAddressBookEntry(request);
-        return makeJSONResponse<StoreAddressBookEntryResponse>(response);
-    }
 
-    private async _handleStoreAddressBookEntry(request : StoreAddressBookEntryRequest) : Promise<StoreAddressBookEntryResponse> {
-        const entry = request.addressBookEntry;
-        const maybeEntryWithSameName = this.addressBookEntryTracker.getByName(entry.name)
-        if (maybeEntryWithSameName != null) {
-            return {
-                success: false,
-                friendlyMessage: `An address book entry with that name already exists: <code>(${maybeEntryWithSameName.address})</code>`
-            }
-        }
-        const maybeEntrySameAddress = this.addressBookEntryTracker.getByAddress(entry.address);
-        if (maybeEntrySameAddress != null) {
-            return {
-                success: false,
-                friendlyMessage: `An address book entry with that address already exists: (${maybeEntrySameAddress.name})`
-            }
-        }
-        this.addressBookEntryTracker.set(entry.addressBookEntryID,entry);
-        return {
-            success: true
-        }
-    }
 
-    handleListAddressBookEntries(request : ListAddressBookEntriesRequest) : Response {
-        const response = this._handleListAddressBookEntries(request);
-        return makeJSONResponse<ListAddressBookEntriesResponse>(response);
-    }
-
-    private _handleListAddressBookEntries(request : ListAddressBookEntriesRequest) : ListAddressBookEntriesResponse {
-        const addressBookEntries = [...this.addressBookEntryTracker.values()];
-        const response : ListAddressBookEntriesResponse = { addressBookEntries: addressBookEntries };
-        return response;
-    }
 
     handleGetSessionValuesWithPrefix(request : GetSessionValuesWithPrefixRequest) : Response {
         const messageID = request.messageID;

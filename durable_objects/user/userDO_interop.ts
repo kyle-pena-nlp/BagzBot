@@ -6,7 +6,6 @@ import { AutomaticallyClosePositionsRequest, AutomaticallyClosePositionsResponse
 import { PositionAndMaybePNL } from "../token_pair_position_tracker/model/position_and_PNL";
 import { DeleteSessionRequest } from "./actions/delete_session";
 import { EditTriggerPercentOnOpenPositionRequest, EditTriggerPercentOnOpenPositionResponse } from "./actions/edit_trigger_percent_on_open_position";
-import { GetAddressBookEntryRequest, GetAddressBookEntryResponse } from "./actions/get_address_book_entry";
 import { GetImpersonatedUserIDRequest, GetImpersonatedUserIDResponse } from "./actions/get_impersonated_user_id";
 import { GetLegalAgreementStatusRequest, GetLegalAgreementStatusResponse } from "./actions/get_legal_agreement_status";
 import { GetPositionFromUserDORequest, GetPositionFromUserDOResponse } from "./actions/get_position_from_user_do";
@@ -14,18 +13,15 @@ import { GetSessionValuesRequest, GetSessionValuesWithPrefixRequest, GetSessionV
 import { GetUserDataRequest } from "./actions/get_user_data";
 import { GetWalletDataRequest, GetWalletDataResponse } from "./actions/get_wallet_data";
 import { ImpersonateUserRequest, ImpersonateUserResponse } from "./actions/impersonate_user";
-import { ListAddressBookEntriesRequest, ListAddressBookEntriesResponse } from "./actions/list_address_book_entries";
 import { ListPositionsFromUserDORequest, ListPositionsFromUserDOResponse } from "./actions/list_positions_from_user_do";
 import { ManuallyClosePositionRequest, ManuallyClosePositionResponse } from "./actions/manually_close_position";
 import { OpenPositionRequest, OpenPositionResponse } from "./actions/open_new_position";
 import { RemoveAddressBookEntryRequest, RemoveAddressBookEntryResponse } from "./actions/remove_address_book_entry";
 import { DefaultTrailingStopLossRequestRequest, DefaultTrailingStopLossRequestResponse } from "./actions/request_default_position_request";
 import { SendMessageToUserRequest, SendMessageToUserResponse } from "./actions/send_message_to_user";
-import { StoreAddressBookEntryRequest, StoreAddressBookEntryResponse } from "./actions/store_address_book_entry";
 import { StoreLegalAgreementStatusRequest, StoreLegalAgreementStatusResponse } from "./actions/store_legal_agreement_status";
 import { StoreSessionValuesRequest, StoreSessionValuesResponse } from "./actions/store_session_values";
 import { UnimpersonateUserRequest, UnimpersonateUserResponse } from "./actions/unimpersonate_user";
-import { CompletedAddressBookEntry } from "./model/address_book_entry";
 import { SessionKey } from "./model/session";
 import { UserData } from "./model/user_data";
 
@@ -41,10 +37,6 @@ export enum UserDOFetchMethod {
 	manuallyClosePosition = "manuallyClosePosition", // user initiated close position
 	automaticallyClosePositions = "automaticallyClosePositions", // system-initiated close position
 	getDefaultTrailingStopLossRequest = "getDefaultTrailingStopLossRequest",
-	storeAddressBookEntry = "storeAddressBookEntry",
-	listAddressBookEntries = "listAddressBookEntries",
-	removeAddressBookEntry = "removeAddressBookEntry",
-	getAddressBookEntry = "getAddressBookEntry",
 	storeLegalAgreementStatus = "storeLegalAgreementStatus",
 	getLegalAgreementStatus = "getLegalAgreementStatus",
 	getImpersonatedUserID = "getImpersonatedUserID",
@@ -98,28 +90,6 @@ export async function storeLegalAgreementStatus(telegramUserID : number, chatID 
 export async function getLegalAgreementStatus(telegramUserID : number, chatID : number, env : Env) : Promise<GetLegalAgreementStatusResponse> {
 	const request : GetLegalAgreementStatusRequest = { telegramUserID, chatID };
 	return await sendJSONRequestToUserDO<GetLegalAgreementStatusRequest,GetLegalAgreementStatusResponse>(telegramUserID, UserDOFetchMethod.getLegalAgreementStatus, request, env);
-}
-
-export async function storeAddressBookEntry(telegramUserID : number, chatID : number, addressBookEntry : CompletedAddressBookEntry, env : Env) {
-	const storeAddressBookEntryRequest : StoreAddressBookEntryRequest = { telegramUserID, chatID, addressBookEntry };
-	return await sendJSONRequestToUserDO<StoreAddressBookEntryRequest,StoreAddressBookEntryResponse>(telegramUserID, UserDOFetchMethod.storeAddressBookEntry, storeAddressBookEntryRequest, env);
-}
-
-export async function listAddressBookEntries(telegramUserID : number, chatID: number, env : Env) {
-	const request : ListAddressBookEntriesRequest = { telegramUserID, chatID };
-	return await sendJSONRequestToUserDO<ListAddressBookEntriesRequest,ListAddressBookEntriesResponse>(telegramUserID, UserDOFetchMethod.listAddressBookEntries, request, env);
-}
-
-export async function getAddressBookEntry(telegramUserID : number, chatID : number, addressBookEntryID : string, env : Env) : Promise<CompletedAddressBookEntry|undefined> {
-	const request : GetAddressBookEntryRequest = { telegramUserID, chatID, addressBookEntryID };
-	const response = await sendJSONRequestToUserDO<GetAddressBookEntryRequest,GetAddressBookEntryResponse>(telegramUserID, UserDOFetchMethod.getAddressBookEntry, request, env);
-	return response.addressBookEntry;
-}
-
-export async function removeAddressBookEntry(telegramUserID : number, chatID : number, addressBookEntryID : string, env : Env) : Promise<void> {
-	const request : RemoveAddressBookEntryRequest = { telegramUserID, chatID, addressBookEntryID };
-	const response = await sendJSONRequestToUserDO<RemoveAddressBookEntryRequest,RemoveAddressBookEntryResponse>(telegramUserID, UserDOFetchMethod.removeAddressBookEntry, request, env);
-	return;
 }
 
 export async function getWalletData(telegramUserID : number, chatID : number, env: Env) : Promise<GetWalletDataResponse> {
