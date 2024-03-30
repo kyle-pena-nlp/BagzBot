@@ -20,7 +20,8 @@
             "cwd": "/",
             "resolveSourceMapLocations": null,
             "attachExistingChildren": false,
-            "autoAttachChildProcesses": false
+            "autoAttachChildProcesses": false,
+            "trace": true
         },
 
         {

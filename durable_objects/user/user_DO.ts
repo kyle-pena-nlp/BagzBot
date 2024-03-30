@@ -599,7 +599,7 @@ export class UserDO {
         const notificationChannels : UpdateableNotification[] = [];
         for (const positionBatch of positionBatches) {
             // fire off a bunch of promises per batch (4)
-            let sellPositionPromises = positionBatch.map(positionID => {
+            let sellPositionPromises = positionBatch.map(async positionID => {
                 const tokenPair = this.tokenPairsForPositionIDsTracker.getPositionPair(positionID);
                 if (tokenPair == null) {
                     logError(`Could not find token pair for position ID ${positionID}`, this.telegramUserID);
@@ -609,7 +609,7 @@ export class UserDO {
                 const vsTokenAddress = tokenPair.vsToken.address;
                 const notificationChannel = TGStatusMessage.createAndSend(`Initiating auto-sell`, false, this.chatID.value||0, this.env);
                 notificationChannels.push(notificationChannel);
-                return sell(positionID, tokenAddress, vsTokenAddress, this.wallet.value!!, this.env);
+                return await sell(positionID, tokenAddress, vsTokenAddress, this.wallet.value!!, this.env);
             }).filter(sellPromise => sellPromise != null);
             // but wait for the entire batch to settle before doing the next batch
             await Promise.allSettled(sellPositionPromises);

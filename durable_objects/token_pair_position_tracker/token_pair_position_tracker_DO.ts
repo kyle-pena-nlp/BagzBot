@@ -410,6 +410,7 @@ export class TokenPairPositionTrackerDO {
         const newPrice = request.price;
         const actionsToTake = this.updatePositionTracker(newPrice);
         actionsToTake.positionsToClose.sort(p => -toNumber(p.vsTokenAmt)); // biggest first, roughly speaking
+        // fire and forget.
         sendClosePositionOrdersToUserDOs(actionsToTake.positionsToClose, this.env);
         const responseBody : UpdatePriceResponse = {};
         return makeJSONResponse(responseBody);

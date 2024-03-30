@@ -40,7 +40,7 @@ This locks in your gains.
 You can trade any token that is supported by Jupiter.  
 There may be a few minutes lag between Jupiter listing a coin and it becoming available on the bot.
 
-<b>Why does ${botName} not allow swapping to/from $USDT/$USDC, or tokens from other chains?</b>
+<b>Why are all prices in terms of SOL, and why does ${botName} not allow swapping to/from $USDT/$USDC, or tokens from other chains?</b>
 1 SOL = 1 SOL.
 
 <b>Why don't I have to connect to a Wallet?</b>
