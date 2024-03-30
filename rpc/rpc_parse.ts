@@ -1,6 +1,6 @@
 import { Connection, ParsedTransactionWithMeta, TokenBalance } from "@solana/web3.js";
 import { UserAddress } from "../crypto";
-import { DecimalizedAmount, MATH_DECIMAL_PLACES, dAdd, dDiv, dNegate, dSub, fromTokenAmount } from "../decimalized";
+import { DecimalizedAmount, MATH_DECIMAL_PLACES, dDiv, dNegate, dSub, fromTokenAmount } from "../decimalized";
 import { dZero } from "../decimalized/decimalized_amount";
 import { Env } from "../env";
 import { logDebug, logError } from "../logging";
@@ -94,8 +94,11 @@ export async function parseSwapTransaction(
         };
     }    
 
-    const swapOutTokenDiff = calculateTokenBalanceChange(parsedTransaction, outTokenAddress, userAddress);
-    const swapInTokenDiff = safe(dNegate)(calculateTokenBalanceChange(parsedTransaction, inTokenAddress, userAddress));
+    // another horrible hack.
+    const positionTokenAddress = inTokenAddress == SOL_ADDRESS ? outTokenAddress : inTokenAddress;
+
+    const swapInTokenDiff = safe(dNegate)(calculateTokenBalanceChange(parsedTransaction, inTokenAddress, positionTokenAddress, userAddress));
+    const swapOutTokenDiff = calculateTokenBalanceChange(parsedTransaction, outTokenAddress, positionTokenAddress, userAddress);
 
     if (swapInTokenDiff == null || swapOutTokenDiff == null) {
         throw new Error("Programmer error.");
@@ -129,60 +132,65 @@ export async function parseSwapTransaction(
 
 function calculateTokenBalanceChange(parsedTransaction : ParsedTransactionWithMeta, 
     tokenAddress : string, 
+    positionTokenAddress : string,
     userAddress : UserAddress) : DecimalizedAmount|null {
-    const preTokenBalances = parsedTransaction.meta?.preTokenBalances||[];
-    const postTokenBalances = parsedTransaction.meta?.postTokenBalances||[];
-    const accountKeys = parsedTransaction.transaction.message.accountKeys.map(a => a.pubkey.toBase58());
-    // depending on whether we are dealing with SOL, we look in different places.
     if (tokenAddress === SOL_ADDRESS) {
-        const ownerAccountIdx = accountKeys.indexOf(userAddress.address);
-        const preSOLBalances = parsedTransaction.meta?.preBalances;
-        const postSOLBalances = parsedTransaction.meta?.postBalances;
-        const rawPreSolAmount = preSOLBalances?.[ownerAccountIdx];
-        const rawPostSolAmount = postSOLBalances?.[ownerAccountIdx];
-        if (rawPreSolAmount == null || rawPostSolAmount == null) {
-            logError("Could not find pre/post SOL balances", userAddress, parsedTransaction.transaction.signatures[0]);
-            return null;
-        }
-        const solDecimals = getVsTokenInfo('SOL').decimals;
-        const preSOLDecimalized : DecimalizedAmount = { 
-            tokenAmount: rawPreSolAmount.toString(),
-            decimals : solDecimals 
-        };
-        const postSOLDecimalized : DecimalizedAmount = {
-            tokenAmount : rawPostSolAmount.toString(),
-            decimals: solDecimals
-        };
-        const solBalanceDiff = dSub(postSOLDecimalized,preSOLDecimalized);
-
-        // sadly, the pre/post amount for SOL doesn't seem to exclude fees, so we do that here.
-        const solFees = parsedTransaction.meta?.fee||0;
-        const solFeeDecimalized : DecimalizedAmount = {
-            tokenAmount: solFees.toString(),
-            decimals : solDecimals
-        }
-        return dAdd(solBalanceDiff, solFeeDecimalized);
+        return calculateNetSOLBalanceChange(parsedTransaction, positionTokenAddress, userAddress);
     }
     else {
-
-        // TODO: check that innerInstructions are loaded, per: 
-        // https://www.quicknode.com/docs/solana/getParsedTransaction
-        // indicates that pre/post token balances only populated if inner instructions loaded
-
-        let preTokenBalance = findWithMintAndPubKey(preTokenBalances, accountKeys, tokenAddress, userAddress);
-        let postTokenBalance = findWithMintAndPubKey(postTokenBalances, accountKeys, tokenAddress, userAddress);
-
-        // no balances in pre- or post-... something fishy is going on
-        if (preTokenBalance == null && postTokenBalance == null) {
-            logError(`No balance for token ${tokenAddress} in either pre or postTokenBalances for ${parsedTransaction.transaction.signatures[0]} by ${userAddress}`);
-            return null;
-        }
-    
-        const preAmount = convertToTokenAmount(preTokenBalance);
-        const postAmount = convertToTokenAmount(postTokenBalance);
-    
-        return dSub(postAmount,preAmount);
+        return calculateNetTokenBalanceChange(parsedTransaction, tokenAddress, userAddress)
     }
+}
+
+function calculateNetTokenBalanceChange(parsedTransaction : ParsedTransactionWithMeta,
+    tokenAddress : string,
+    userAddress : UserAddress) : DecimalizedAmount|null {
+    // TODO: check that innerInstructions are loaded, per: 
+    // https://www.quicknode.com/docs/solana/getParsedTransaction
+    // indicates that pre/post token balances only populated if inner instructions loaded
+
+    const accountKeys = parsedTransaction.transaction.message.accountKeys.map(a => a.pubkey.toBase58());
+
+    const preTokenBalances = parsedTransaction.meta?.preTokenBalances||[];
+    const postTokenBalances = parsedTransaction.meta?.postTokenBalances||[];
+
+    let preTokenBalance = findWithMintAndPubKey(preTokenBalances, accountKeys, tokenAddress, userAddress);
+    let postTokenBalance = findWithMintAndPubKey(postTokenBalances, accountKeys, tokenAddress, userAddress);
+
+    // no balances in pre- or post-... something fishy is going on
+    if (preTokenBalance == null && postTokenBalance == null) {
+        logError(`No balance for token ${tokenAddress} in either pre or postTokenBalances for ${parsedTransaction.transaction.signatures[0]} by ${userAddress}`);
+        return null;
+    }
+
+    const preAmount = convertToTokenAmount(preTokenBalance);
+    const postAmount = convertToTokenAmount(postTokenBalance);
+
+    return dSub(postAmount,preAmount);    
+}
+
+function calculateNetSOLBalanceChange(parsedTransaction : ParsedTransactionWithMeta, tokenAddress : string, userAddress : UserAddress) : DecimalizedAmount|null {
+    /* Here's the issue --- rent paid on new token accounts potentially needs to be taken into account,
+    as well as fees.  So we need the position's token address to properly account for SOL balances diffs */
+    const tokenAccountAddress = deriveTokenAccount(tokenAddress, userAddress).toBase58();
+    const mainAccountSOLBalanceDiff = calculateSolTokenBalanceDiff(parsedTransaction, userAddress.address);
+    const tokenAccountSOLBalanceDiff = calculateSolTokenBalanceDiff(parsedTransaction, tokenAccountAddress); 
+    const solFees = parsedTransaction.meta?.fee||0;
+    const netSOLDifference = mainAccountSOLBalanceDiff + tokenAccountSOLBalanceDiff + solFees;
+    return {
+        tokenAmount: netSOLDifference.toString(),
+        decimals: getVsTokenInfo('SOL').decimals 
+    };
+}
+
+function calculateSolTokenBalanceDiff(parsedTransaction : ParsedTransactionWithMeta, address : string) : number {
+    const accountKeys = parsedTransaction.transaction.message.accountKeys.map(a => a.pubkey.toBase58());
+    const addressAccountIdx = accountKeys.indexOf(address);
+    const preSOLBalances = parsedTransaction.meta?.preBalances;
+    const postSOLBalances = parsedTransaction.meta?.postBalances;    
+    const preBalance = preSOLBalances?.[addressAccountIdx]||0.0;
+    const postBalance = postSOLBalances?.[addressAccountIdx]||0.0;
+    return postBalance - preBalance;
 }
 
 function convertToTokenAmount(tokenBalance : (TokenBalance & {accountAddress : string })|undefined) {

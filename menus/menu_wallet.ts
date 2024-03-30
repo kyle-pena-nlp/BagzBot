@@ -27,6 +27,7 @@ export class MenuWallet extends Menu<UserData> implements MenuCapabilities {
         const options = this.emptyMenu();
         this.insertButton(options, ":dollars: Transfer Funds :dollars:", this.menuCallback(MenuCode.TransferFunds), 1);
         this.insertButton(options, ":key: View Private Key :key:",  this.menuCallback(MenuCode.ViewDecryptedWallet),  3);
+        this.insertButtonNextLine(options, ":refresh: Refresh", this.menuCallback(MenuCode.Wallet));
         this.insertBackToMainButtonOnNewLine(options);
         return options;
     }

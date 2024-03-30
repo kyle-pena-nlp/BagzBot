@@ -143,7 +143,7 @@ export async function executeAndConfirmSignedTx(s: Swappable,
     if (isSuccessfullyParsedSwapSummary(parsedSwapSummary)) {
         logInfo('Swap successful', s, parsedSwapSummary);
         const msg = `${SwapOfX} was successful.`;
-        TGStatusMessage.queue(notificationChannel, msg, false);
+        TGStatusMessage.queue(notificationChannel, msg, true);
     }
 
     // if we couldn't confirm.
