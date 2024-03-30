@@ -75,6 +75,7 @@ export class MenuMain extends Menu<UserData & Stuff> implements MenuCapabilities
             }            
             this.createHelpMenuLine(options);
         }
+        this.insertButtonNextLine(options, ":refresh: Refresh", this.menuCallback(MenuCode.Main));
         this.insertCloseButtonNextLine(options);
         return options;
     }
