@@ -13,7 +13,9 @@
       "types": ["@cloudflare/workers-types/2023-07-01", "node", "jest"]
     },
     "include": [
+      
+      "./**/*.ts",
       "./*.ts",
       "./node_modules/@cloudflare/workers-types/*.ts"
-, "menus/menu_edit_position_request.ts", "menus/menu_error.ts", "menus/menu_faq.ts", "menus/menu_help.ts", "menus/menu_list_positions.ts", "menus/menu_main.ts", "menus/menu_please_enter_token.ts", "menus/menu_trailing_stop_loss_auto_retry_sell.ts", "menus/menu_trailing_stop_loss_entry_buy_quantity.ts", "menus/menu_trailing_stop_loss_pick_vs_token.ts", "menus/menu_trailing_stop_loss_slippage_percent.ts", "menus/menu_trailing_stop_loss_trigger_percent.ts", "menus/menu_view_open_position.ts", "menus/menu_view_wallet.ts", "menus/menu_wallet.ts", "menus/menu.ts", "menus/menu_buy_token.ts", "menus/menu_confirm_trailing_stop_loss_position_request.ts", "durable_objects/polled_token_pair_list/polled_token_pair_list_DO_interop.ts", "durable_objects/polled_token_pair_list/polled_token_pair_list_DO.ts", "durable_objects/user/userDO_interop.ts", "durable_objects/user/user_DO.ts", "durable_objects/token_pair_position_tracker/token_pair_position_tracker_do.ts", "durable_objects/token_pair_position_tracker/token_pair_position_tracker_do_interop.ts", "rpc/rpc_interop.ts", "durable_objects/polled_token_pair_list/trackers/polled_token_pair_tracker.ts", "durable_objects/user/trackers/session_tracker.ts", "util/map_with_storage.ts", "durable_objects/user/trackers/token_pairs_for_position_ids_tracker.ts", "menus/callback_data.ts", "tokens/vs_tokens.ts", "crypto/ed25519.ts", "crypto/wallet.ts", "durable_objects/token_pair_position_tracker/trackers/token_pair_position_tracker.ts", "telegram/telegram_helpers.ts", "telegram/telegram_webhook_info.ts", "util/http_helpers.ts", "durable_objects/token_pair_position_tracker/trackers/peak_price_tracker.ts", "durable_objects/polled_token_pair_list/trackers/token_tracker.ts", "menus/trailing_stop_loss_helpers.ts", "menus/positive_decimal_keypad.ts", "menus/positive_integer_keypad.ts", "util/set_operations.ts", "menus/todo_menu.ts"    ]
+   ]
 }

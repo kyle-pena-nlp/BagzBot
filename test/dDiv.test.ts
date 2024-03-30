@@ -1,4 +1,5 @@
 import { DecimalizedAmount, dDiv, toFriendlyString } from "../decimalized";
+import { dZero } from "../decimalized/decimalized_amount";
 
 test("div_same_number_eq_1", () => {
     divTest(d(5,2), d(5,2), 1);
@@ -53,7 +54,7 @@ test("div_by_reallyBig", () => {
 
 
 function divTest(a : DecimalizedAmount, b : DecimalizedAmount, expectation : number, places : number = 9) {
-    const dResult = dDiv(a,b,places);
+    const dResult = dDiv(a,b,places)||dZero();
     const dNumber = _toNumber(dResult);
     expect(dNumber).toBeCloseTo(expectation, 6);
 }
@@ -67,6 +68,6 @@ function d(s : string|number, d : number) : DecimalizedAmount {
 
 export function _toNumber(d : DecimalizedAmount) : number {
     // this method isn't safe and is used for testing help
-    const s = toFriendlyString(d,6,false,false);
+    const s = toFriendlyString(d,6,{ useSubscripts: false, addCommas: false });
     return parseFloat(s);
 }

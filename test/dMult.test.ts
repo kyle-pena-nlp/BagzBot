@@ -44,6 +44,6 @@ function d(s : string|number, d : number) : DecimalizedAmount {
 
 export function _toNumber(d : DecimalizedAmount) : number {
     // this method isn't safe and is used for testing help
-    const s = toFriendlyString(d,6,false,false);
+    const s = toFriendlyString(d,6, { useSubscripts: false });
     return parseFloat(s);
 }
