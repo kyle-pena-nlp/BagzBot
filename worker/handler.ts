@@ -510,8 +510,25 @@ export class Worker {
                     return this.sorryError();
                 }
                 else {
-                    await storeSessionObjProperty(params.getTelegramUserID(), params.chatID, params.messageID, "sellAutoDoubleSlippage", opAutoDoubleSlippage, POSITION_REQUEST_STORAGE_KEY, this.env);
-                    const pr = await readSessionObj<PositionRequest>(params.getTelegramUserID(), params.chatID, params.messageID, POSITION_REQUEST_STORAGE_KEY, this.env);
+                    const x = await readSessionObj<PositionRequest>(
+                        params.getTelegramUserID(), 
+                        params.chatID, 
+                        params.messageID, 
+                        POSITION_REQUEST_STORAGE_KEY, 
+                        this.env);                    
+                    await storeSessionObjProperty(params.getTelegramUserID(), 
+                        params.chatID, 
+                        params.messageID, 
+                        "sellAutoDoubleSlippage", 
+                        opAutoDoubleSlippage, 
+                        POSITION_REQUEST_STORAGE_KEY, 
+                        this.env);
+                    const pr = await readSessionObj<PositionRequest>(
+                        params.getTelegramUserID(), 
+                        params.chatID, 
+                        params.messageID, 
+                        POSITION_REQUEST_STORAGE_KEY, 
+                        this.env);
                     return new MenuEditPositionRequest(pr);
                 }
             default:
@@ -755,7 +772,13 @@ export class Worker {
 
                 // now that we have a quote and tokenInfo, convert the pre-request to a request
                 const positionRequest = convertPreRequestToRequest(prerequest, quote, tokenInfo);
-                return ['...', new MenuEditTrailingStopLossPositionRequest(positionRequest)];
+
+                const storeObjectRequest = {
+                    prefix: POSITION_REQUEST_STORAGE_KEY,
+                    obj: positionRequest
+                };
+
+                return ['...', new MenuEditTrailingStopLossPositionRequest(positionRequest), storeObjectRequest];
             default:
                 throw new Error(`Unrecognized command: ${command}`);
         }

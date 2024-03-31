@@ -8,6 +8,7 @@ const emojis = {
     ':dollars:': '💵',
     ':wallet:': '💰',
     ':eyes:': '👀',
+    ':brain:': '🧠',
 
     ':notify:': '🔔',
     ':mountain:': '🏔️',
