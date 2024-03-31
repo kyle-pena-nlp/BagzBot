@@ -46,7 +46,7 @@ export interface Position {
 
     /* Relevant if TLS position */
     triggerPercent : number
-	retrySellIfSlippageExceeded : boolean
+	sellAutoDoubleSlippage : boolean|null
 };
 
 interface BasePositionRequest {
@@ -63,7 +63,7 @@ interface BasePositionRequest {
 
     /* Relevant if TLS position */
 	triggerPercent : number
-	retrySellIfSlippageExceeded : boolean
+	sellAutoDoubleSlippage : boolean|null
 }
 
 // Pre-request before full info is retrieved (like TokenInfo and BuyQuote)
@@ -106,7 +106,7 @@ export function convertPreRequestToRequest(r : PositionPreRequest, quote : Quote
 		quote : quote,
 		slippagePercent: r.slippagePercent,
 		triggerPercent: r.triggerPercent,
-		retrySellIfSlippageExceeded: r.retrySellIfSlippageExceeded,
+		sellAutoDoubleSlippage: r.sellAutoDoubleSlippage,
 		token: token,
 		vsToken: r.vsToken
 	};

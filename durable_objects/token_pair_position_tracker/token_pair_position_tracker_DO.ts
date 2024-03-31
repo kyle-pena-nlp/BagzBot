@@ -6,6 +6,7 @@ import { PositionStatus } from "../../positions";
 import { ChangeTrackedValue, assertNever, makeJSONResponse, makeSuccessResponse, strictParseBoolean, strictParseInt } from "../../util";
 import { ensureTokenPairIsRegistered } from "../heartbeat/heartbeat_do_interop";
 import { EditTriggerPercentOnOpenPositionResponse } from "../user/actions/edit_trigger_percent_on_open_position";
+import { SetSellAutoDoubleOnOpenPositionResponse } from "../user/actions/set_sell_auto_double_on_open_position";
 import { sendClosePositionOrdersToUserDOs, tryToConfirmBuysWithUserDOs, tryToConfirmSellsWithUserDOs } from "../user/userDO_interop";
 import { EditTriggerPercentOnOpenPositionInTrackerRequest } from "./actions/edit_trigger_percent_on_open_position_in_tracker";
 import { GetPositionFromPriceTrackerRequest, GetPositionFromPriceTrackerResponse } from "./actions/get_position";
@@ -18,6 +19,7 @@ import { MarkPositionAsClosedRequest, MarkPositionAsClosedResponse } from "./act
 import { MarkPositionAsClosingRequest, MarkPositionAsClosingResponse } from "./actions/mark_position_as_closing";
 import { MarkPositionAsOpenRequest, MarkPositionAsOpenResponse } from "./actions/mark_position_as_open";
 import { RemovePositionRequest, RemovePositionResponse } from "./actions/remove_position";
+import { SetSellAutoDoubleOnOpenPositionInTrackerRequest } from "./actions/set_sell_auto_double_on_open_position_in_tracker";
 import { UpdateBuyConfirmationStatusRequest, UpdateBuyConfirmationStatusResponse } from "./actions/update_buy_confirmation_status";
 import { UpdatePriceRequest, UpdatePriceResponse } from "./actions/update_price";
 import { UpdateSellConfirmationStatusRequest, UpdateSellConfirmationStatusResponse } from "./actions/update_sell_confirmation_status";
@@ -267,9 +269,29 @@ export class TokenPairPositionTrackerDO {
                 return await this.handleUpdateBuyConfirmationStatus(body);
             case TokenPairPositionTrackerDOFetchMethod.updateSellConfirmationStatus:
                 return await this.handleUpdateSellConfirmationStatus(body);
+            case TokenPairPositionTrackerDOFetchMethod.setSellAutoDoubleOnOpenPosition:
+                return await this.handleSetSellAutoDoubleOnOpenPosition(body);
             default:
                 assertNever(method);
         }
+    }
+
+    async handleSetSellAutoDoubleOnOpenPosition(body : SetSellAutoDoubleOnOpenPositionInTrackerRequest) : Promise<Response> {
+        const response = this.handleSetSellAutoDoubleOnOpenPositionInternal(body);
+        return makeJSONResponse<SetSellAutoDoubleOnOpenPositionResponse>(response);
+    }
+
+    private async handleSetSellAutoDoubleOnOpenPositionInternal(body : SetSellAutoDoubleOnOpenPositionInTrackerRequest) : Promise<SetSellAutoDoubleOnOpenPositionResponse> {
+        const positionID = body.positionID;
+        const position = this.tokenPairPositionTracker.getPosition(positionID);
+        if (position == null) {
+            return {};
+        }
+        if (position.status !== PositionStatus.Open) {
+            return {}; // TODO: status
+        }
+        position.sellAutoDoubleSlippage = body.choice;
+        return {};
     }
 
     async handleUpdateBuyConfirmationStatus(body : UpdateBuyConfirmationStatusRequest) : Promise<Response> {
@@ -284,8 +306,14 @@ export class TokenPairPositionTrackerDO {
             return {};
         }
         position.isConfirmingBuy = false;
-        if (body.successfullyConfirmed) {
+        if (body.status === 'confirmed') {
             position.confirmed = true;
+        }
+        else if (body.status === 'unconfirmed') {
+            // no-op
+        }
+        else if (body.status === 'failed') {
+            this.tokenPairPositionTracker.removePosition(positionID);
         }
         return {};
     }
@@ -302,8 +330,24 @@ export class TokenPairPositionTrackerDO {
             return {};
         }
         position.isConfirmingSell = false;
-        if (body.successfullyConfirmed) {
+        if (body.status === 'confirmed') {
             this.tokenPairPositionTracker.closePosition(positionID);
+        }
+        else if (body.status === 'unconfirmed') {
+            // no-op
+        }
+        else if (body.status === 'slippage-failed') {
+            position.status = PositionStatus.Open;
+            if (position.autoDoubleSlippageOnFailSellSlippage) {
+                position.sellSlippagePercent = position.sellSlippagePercent * 2.0;
+            }
+        }
+        else if (body.status === 'failed') {
+            // re-open the position if we were able to confirm the sell failed
+            position.status = PositionStatus.Open;
+        }
+        else {
+            assertNever(body.status);
         }
         return {};
     }

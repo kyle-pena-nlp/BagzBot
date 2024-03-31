@@ -6,7 +6,7 @@ import { Menu, MenuCapabilities } from "./menu";
 import { MenuCode } from "./menu_code";
 import { renderTrailingStopLossRequestMarkdown } from "./trailing_stop_loss_helpers";
 
-export class MenuEditTrailingStopLossPositionRequest extends Menu<PositionRequest> implements MenuCapabilities {
+export class MenuEditPositionRequest extends Menu<PositionRequest> implements MenuCapabilities {
     renderText(): string {
         return [
             `<b>:sparkle: Create Position</b>`,
@@ -25,7 +25,7 @@ export class MenuEditTrailingStopLossPositionRequest extends Menu<PositionReques
         this.insertButtonNextLine(options, `:dollars: ${positionRequest.vsTokenAmt} ${positionRequest.vsToken.symbol}`, new CallbackData(MenuCode.TrailingStopLossEntryBuyQuantityMenu, positionRequest.vsTokenAmt.toString()));
         this.insertButtonSameLine(options, `:chart_down: ${positionRequest.triggerPercent}% Trigger`, new CallbackData(MenuCode.TrailingStopLossTriggerPercentMenu, positionRequest.triggerPercent.toString()));
         this.insertButtonSameLine(options, `:twisted_arrows: ${positionRequest.slippagePercent}% Slippage`, new CallbackData(MenuCode.TrailingStopLossSlippagePctMenu, positionRequest.slippagePercent.toString()));
-        //this.insertButtonNextLine(options, `${positionRequest.retrySellIfSlippageExceeded ? 'Auto Retry Sell': 'Do Not Auto Retry Sell'}`, new CallbackData(MenuCode.TrailingStopLossChooseAutoRetrySellMenu, positionRequest.retrySellIfSlippageExceeded.toString()));
+        this.insertButtonNextLine(options, `${positionRequest.sellAutoDoubleSlippage ? 'Sell: Auto-Double Slippage': 'Sell: No Auto-Double Slippage'}`, new CallbackData(MenuCode.PosRequestChooseAutoDoubleSlippageOptions));
         this.insertButtonNextLine(options, `:refresh: Refresh Quote`, new CallbackData(MenuCode.TrailingStopLossRequestReturnToEditorMenu));
         this.insertButtonSameLine(options, `Cancel`, new CallbackData(MenuCode.Main));
         this.insertButtonSameLine(options, ':help: Help', new CallbackData(MenuCode.EditPositionHelp));

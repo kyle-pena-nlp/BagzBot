@@ -3,6 +3,7 @@ import { Env } from "../../env";
 import { Position } from "../../positions";
 import { makeJSONRequest, makeRequest, strictParseInt } from "../../util";
 import { EditTriggerPercentOnOpenPositionResponse } from "../user/actions/edit_trigger_percent_on_open_position";
+import { SetSellAutoDoubleOnOpenPositionResponse } from "../user/actions/set_sell_auto_double_on_open_position";
 import { EditTriggerPercentOnOpenPositionInTrackerRequest } from "./actions/edit_trigger_percent_on_open_position_in_tracker";
 import { GetPositionFromPriceTrackerRequest, GetPositionFromPriceTrackerResponse } from "./actions/get_position";
 import { GetPositionAndMaybePNLFromPriceTrackerRequest, GetPositionAndMaybePNLFromPriceTrackerResponse } from "./actions/get_position_and_maybe_pnl";
@@ -12,6 +13,7 @@ import { MarkPositionAsClosedRequest, MarkPositionAsClosedResponse } from "./act
 import { MarkPositionAsClosingRequest, MarkPositionAsClosingResponse } from "./actions/mark_position_as_closing";
 import { MarkPositionAsOpenRequest, MarkPositionAsOpenResponse } from "./actions/mark_position_as_open";
 import { RemovePositionRequest, RemovePositionResponse } from "./actions/remove_position";
+import { SetSellAutoDoubleOnOpenPositionInTrackerRequest } from "./actions/set_sell_auto_double_on_open_position_in_tracker";
 import { UpdateBuyConfirmationStatusRequest, UpdateBuyConfirmationStatusResponse } from "./actions/update_buy_confirmation_status";
 import { UpdatePriceRequest, UpdatePriceResponse } from "./actions/update_price";
 import { UpdateSellConfirmationStatusRequest, UpdateSellConfirmationStatusResponse } from "./actions/update_sell_confirmation_status";
@@ -34,7 +36,8 @@ export enum TokenPairPositionTrackerDOFetchMethod {
 	listPositionsByUser = "listPositionsByUser",
 	editTriggerPercentOnOpenPosition = "editTriggerPercentOnOpenPosition",
 	updateBuyConfirmationStatus = "updateBuyConfirmationStatus",
-	updateSellConfirmationStatus = "updateSellConfirmationStatus"
+	updateSellConfirmationStatus = "updateSellConfirmationStatus",
+	setSellAutoDoubleOnOpenPosition = "setSellAutoDoubleOnOpenPosition"
 }
 
 
@@ -59,6 +62,13 @@ export async function editTriggerPercentOnOpenPositionInTracker(positionID : str
 	const method = TokenPairPositionTrackerDOFetchMethod.editTriggerPercentOnOpenPosition;
 	const request : EditTriggerPercentOnOpenPositionInTrackerRequest = { positionID, tokenAddress, vsTokenAddress, percent };
 	const response = await sendJSONRequestToTokenPairPositionTracker<EditTriggerPercentOnOpenPositionInTrackerRequest,EditTriggerPercentOnOpenPositionResponse>(method, request, tokenAddress, vsTokenAddress, env);
+	return response;
+}
+
+export async function setSellAutoDoubleOnOpenPositionInPositionTracker(positionID : string, tokenAddress : string, vsTokenAddress : string, choice : boolean, env : Env) : Promise<SetSellAutoDoubleOnOpenPositionResponse> {
+	const method = TokenPairPositionTrackerDOFetchMethod.setSellAutoDoubleOnOpenPosition;
+	const request : SetSellAutoDoubleOnOpenPositionInTrackerRequest =  { positionID, tokenAddress, vsTokenAddress, choice };
+	const response = await sendJSONRequestToTokenPairPositionTracker<SetSellAutoDoubleOnOpenPositionInTrackerRequest,SetSellAutoDoubleOnOpenPositionResponse>(method, request, tokenAddress, vsTokenAddress, env);
 	return response;
 }
 
@@ -117,15 +127,15 @@ export async function wakeUpTokenPairPositionTracker(tokenAddress : string, vsTo
 	return response;
 }
 
-export async function updateBuyConfirmationStatus(positionID : string, tokenAddress : string, vsTokenAddress : string, successfullyConfirmed : boolean, env : Env) : Promise<UpdateBuyConfirmationStatusResponse> {
+export async function updateBuyConfirmationStatus(positionID : string, tokenAddress : string, vsTokenAddress : string, status : 'confirmed'|'unconfirmed'|'failed', env : Env) : Promise<UpdateBuyConfirmationStatusResponse> {
 	const method = TokenPairPositionTrackerDOFetchMethod.updateBuyConfirmationStatus;
-	const request : UpdateBuyConfirmationStatusRequest = { positionID, tokenAddress, vsTokenAddress, successfullyConfirmed };
+	const request : UpdateBuyConfirmationStatusRequest = { positionID, tokenAddress, vsTokenAddress, status: status };
 	return await sendJSONRequestToTokenPairPositionTracker<UpdateBuyConfirmationStatusRequest,UpdateBuyConfirmationStatusResponse>(method,request,tokenAddress,vsTokenAddress,env);
 }
 
-export async function updateSellConfirmationStatus(positionID : string, tokenAddress : string, vsTokenAddress : string, successfullyConfirmed : boolean, env : Env) : Promise<UpdateSellConfirmationStatusResponse> {
+export async function updateSellConfirmationStatus(positionID : string, tokenAddress : string, vsTokenAddress : string, status : 'confirmed'|'unconfirmed'|'failed', env : Env) : Promise<UpdateSellConfirmationStatusResponse> {
 	const method = TokenPairPositionTrackerDOFetchMethod.updateSellConfirmationStatus;
-	const request : UpdateSellConfirmationStatusRequest = { positionID, tokenAddress, vsTokenAddress, successfullyConfirmed };
+	const request : UpdateSellConfirmationStatusRequest = { positionID, tokenAddress, vsTokenAddress, status: status };
 	return await sendJSONRequestToTokenPairPositionTracker<UpdateSellConfirmationStatusRequest,UpdateSellConfirmationStatusResponse>(method,request,tokenAddress,vsTokenAddress,env);
 }
 

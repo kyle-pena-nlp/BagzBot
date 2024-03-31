@@ -13,6 +13,12 @@ export enum MenuCode {
 	EditPositionHelp = "EditPositionHelp",
 	TransferFunds = "TransferFunds",
 
+	PosRequestChooseAutoDoubleSlippageOptions = "EPR.AutoDoubleSlip",
+	SubmitPosRequestAutoDoubleSlippageOptions = "SPR.AutoDoubleSlip",
+
+	EditOpenPositionAutoDoubleSlippage = "EOP.AutoDoubleSlip",
+	SubmitOpenPositionAutoDoubleSlippage = "SOP.AutoDoubleSlip",
+
 	EditOpenPositionTriggerPercent = "EOP.Trigger",
 	SubmitOpenPositionTriggerPct = "SEOP.Trigger",
 
@@ -61,10 +67,6 @@ export enum MenuCode {
 	TrailingStopLossTriggerPercentMenu = "TSL.TriggerPercentMenu",
 	CustomTriggerPct = "TSL.TriggerPercentKeypad", 
 	SubmitTriggerPct = "TSL.TriggerPercentKeypadSubmit", 
-
-	// Trailing Stop Loss: auto-retry sell if slippage tolerance exceeded?
-	TrailingStopLossChooseAutoRetrySellMenu = "TSL.AutoRetrySellMenu",
-	TrailingStopLossChooseAutoRetrySellSubmit = "TSL.AutoRetrySellSubmit",
 
 	TrailingStopLossEditorFinalSubmit = "TSL.EditorFinalSubmit",
 

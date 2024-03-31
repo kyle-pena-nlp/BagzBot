@@ -10,10 +10,11 @@ import { _devOnlyFeatureUpdatePrice } from "../durable_objects/token_pair_positi
 import { OpenPositionRequest } from "../durable_objects/user/actions/open_new_position";
 import { QuantityAndToken } from "../durable_objects/user/model/quantity_and_token";
 import { TokenSymbolAndAddress } from "../durable_objects/user/model/token_name_and_address";
-import { editTriggerPercentOnOpenPositionFromUserDO, getDefaultTrailingStopLoss, getPositionFromUserDO, getUserData, getWalletData, impersonateUser, listPositionsFromUserDO, manuallyClosePosition, maybeReadSessionObj, readSessionObj, requestNewPosition, sendMessageToUser, storeLegalAgreementStatus, storeSessionObj, storeSessionObjProperty, storeSessionValues, unimpersonateUser } from "../durable_objects/user/userDO_interop";
+import { editTriggerPercentOnOpenPositionFromUserDO, getDefaultTrailingStopLoss, getPositionFromUserDO, getUserData, getWalletData, impersonateUser, listPositionsFromUserDO, manuallyClosePosition, maybeReadSessionObj, readSessionObj, requestNewPosition, sendMessageToUser, setSellAutoDoubleOnOpenPosition, storeLegalAgreementStatus, storeSessionObj, storeSessionObjProperty, storeSessionValues, unimpersonateUser } from "../durable_objects/user/userDO_interop";
 import { Env } from "../env";
 import { logDebug, logError } from "../logging";
-import { BaseMenu, LegalAgreement, MenuBetaInviteFriends, MenuCode, MenuContinueMessage, MenuEditOpenPositionTriggerPercent, MenuEditPositionHelp, MenuEditTrailingStopLossPositionRequest, MenuError, MenuFAQ, MenuListPositions, MenuMain, MenuOKClose, MenuPleaseEnterToken, MenuTODO, MenuTrailingStopLossAutoRetrySell, MenuTrailingStopLossEntryBuyQuantity, MenuTrailingStopLossPickVsToken, MenuTrailingStopLossSlippagePercent, MenuTrailingStopLossTriggerPercent, MenuViewDecryptedWallet, MenuViewOpenPosition, MenuWallet, SubmittedTriggerPctKey, WelcomeScreenPart1, WelcomeScreenPart2 } from "../menus";
+import { BaseMenu, LegalAgreement, MenuBetaInviteFriends, MenuCode, MenuContinueMessage, MenuEditOpenPositionSellAutoDoubleSlippage, MenuEditOpenPositionTriggerPercent, MenuEditPositionHelp, MenuEditPositionRequestSellAutoDoubleSlippage, MenuEditTrailingStopLossPositionRequest, MenuError, MenuFAQ, MenuListPositions, MenuMain, MenuOKClose, MenuPleaseEnterToken, MenuTODO, MenuTrailingStopLossEntryBuyQuantity, MenuTrailingStopLossPickVsToken, MenuTrailingStopLossSlippagePercent, MenuTrailingStopLossTriggerPercent, MenuViewDecryptedWallet, MenuViewOpenPosition, MenuWallet, PositionIDAndChoice, SubmittedTriggerPctKey, WelcomeScreenPart1, WelcomeScreenPart2 } from "../menus";
+import { MenuEditPositionRequest } from "../menus/menu_edit_position_request";
 import { PositionPreRequest, PositionRequest, convertPreRequestToRequest } from "../positions";
 import { ReplyQuestion, ReplyQuestionCode } from "../reply_question";
 import { ReplyQuestionData, replyQuestionHasNextSteps } from "../reply_question/reply_question_data";
@@ -22,7 +23,7 @@ import { isGetQuoteFailure } from "../rpc/rpc_types";
 import { POSITION_REQUEST_STORAGE_KEY } from "../storage_keys";
 import { TelegramWebhookInfo, deleteTGMessage, sendMessageToTG, sendRequestToTG, updateTGMessage } from "../telegram";
 import { TokenInfo, WEN_ADDRESS, getVsTokenInfo } from "../tokens";
-import { Structural, assertNever, makeFakeFailedRequestResponse, makeSuccessResponse, strictParseBoolean, strictParseInt, tryParseFloat, tryParseInt } from "../util";
+import { Structural, assertNever, makeFakeFailedRequestResponse, makeSuccessResponse, strictParseBoolean, strictParseInt, tryParseBoolean, tryParseFloat, tryParseInt } from "../util";
 import { assertIs } from "../util/enums";
 import { CallbackHandlerParams } from "./model/callback_handler_params";
 import { TokenAddressExtractor } from "./token_address_extractor";
@@ -100,7 +101,7 @@ export class Worker {
             positionType : defaultTSL.positionType,
             vsTokenAmt: defaultTSL.vsTokenAmt,
             slippagePercent: defaultTSL.slippagePercent,
-            retrySellIfSlippageExceeded: defaultTSL.retrySellIfSlippageExceeded,
+            sellAutoDoubleSlippage: defaultTSL.sellAutoDoubleSlippage,
             triggerPercent: defaultTSL.triggerPercent
         };
 
@@ -258,12 +259,6 @@ export class Worker {
                 await storeSessionObjProperty(params.getTelegramUserID(), params.chatID, messageID, "vsTokenAmt", submittedBuyQuantity, POSITION_REQUEST_STORAGE_KEY, this.env);
                 const trailingStopLossRequestStateAfterBuyQuantityEdited = await readSessionObj<PositionRequest>(params.getTelegramUserID(), params.chatID, messageID, POSITION_REQUEST_STORAGE_KEY, this.env);
                 return await this.makeStopLossRequestEditorMenu(trailingStopLossRequestStateAfterBuyQuantityEdited, this.env);
-            case MenuCode.TrailingStopLossChooseAutoRetrySellMenu:
-                return new MenuTrailingStopLossAutoRetrySell(undefined);
-            case MenuCode.TrailingStopLossChooseAutoRetrySellSubmit:
-                await storeSessionObjProperty(params.getTelegramUserID(), params.chatID, messageID, "retrySellIfSlippageExceeded", callbackData.menuArg === "true", POSITION_REQUEST_STORAGE_KEY, this.env);
-                const trailingStopLossRequestStateAfterAutoRetrySellEdited = await readSessionObj<PositionRequest>(params.getTelegramUserID(), params.chatID, messageID, POSITION_REQUEST_STORAGE_KEY, this.env);
-                return await this.makeStopLossRequestEditorMenu(trailingStopLossRequestStateAfterAutoRetrySellEdited, this.env);
             case MenuCode.CustomTriggerPct:
                 const triggerPctQuestion = new ReplyQuestion(
                     "Enter a custom trigger percent",
@@ -496,9 +491,44 @@ export class Worker {
                 else {
                     return new MenuViewOpenPosition(editTriggerPercentResult);
                 }
+            case MenuCode.EditOpenPositionAutoDoubleSlippage:
+                return new MenuEditOpenPositionSellAutoDoubleSlippage(callbackData.menuArg||'');
+            case MenuCode.SubmitOpenPositionAutoDoubleSlippage:
+                const posIDAndChoice = PositionIDAndChoice.parse(callbackData.menuArg||'');
+                if (posIDAndChoice == null) {
+                    return this.sorryError();
+                }
+                const posID = posIDAndChoice.positionID;
+                const choice = posIDAndChoice.choice;
+                await setSellAutoDoubleOnOpenPosition(params.getTelegramUserID(), params.chatID, posID, choice, this.env);
+                return this.makeOpenPositionMenu(params,posID);
+            case MenuCode.PosRequestChooseAutoDoubleSlippageOptions:
+                return new MenuEditPositionRequestSellAutoDoubleSlippage(undefined);
+            case MenuCode.SubmitPosRequestAutoDoubleSlippageOptions:
+                const opAutoDoubleSlippage = tryParseBoolean((callbackData.menuArg||'').trim());
+                if (opAutoDoubleSlippage == null) {
+                    return this.sorryError();
+                }
+                else {
+                    await storeSessionObjProperty(params.getTelegramUserID(), params.chatID, params.messageID, "sellAutoDoubleSlippage", opAutoDoubleSlippage, POSITION_REQUEST_STORAGE_KEY, this.env);
+                    const pr = await readSessionObj<PositionRequest>(params.getTelegramUserID(), params.chatID, params.messageID, POSITION_REQUEST_STORAGE_KEY, this.env);
+                    return new MenuEditPositionRequest(pr);
+                }
             default:
                 assertNever(callbackData.menuCode);
         }
+    }
+
+    private sorryError() : MenuContinueMessage {
+        return new MenuContinueMessage(`We're sorry - an error has occurred`, MenuCode.Main);
+    }
+
+    private async makeOpenPositionMenu(params : CallbackHandlerParams, positionID : string) : Promise<BaseMenu> {
+        const positionAndMaybePNL = await getPositionFromUserDO(params.getTelegramUserID(), params.chatID, positionID, this.env);
+        if (positionAndMaybePNL == null) {
+            return this.sorryError();
+        }
+        return new MenuViewOpenPosition(positionAndMaybePNL);
     }
 
     private async sendBetaFeedbackToSuperAdmin(feedback : string, myUserName : string) : Promise<void> {

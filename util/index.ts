@@ -1,4 +1,4 @@
-import { strictParseBoolean } from "./booleans";
+import { strictParseBoolean, tryParseBoolean } from "./booleans";
 import { ChangeTrackedValue } from "./change_tracked_value";
 import { groupIntoBatches, groupIntoMap, groupIntoRecord } from "./collections";
 import { assertNever, isEnumValue } from "./enums";
@@ -33,7 +33,7 @@ export {
     setDifference,
     setIntersection,
     setUnion,
-    sleep, strictParseBoolean, strictParseFloat, strictParseInt, structuralEquals, tryParseFloat,
+    sleep, strictParseBoolean, strictParseFloat, strictParseInt, structuralEquals, tryParseBoolean, tryParseFloat,
     tryParseInt, tryReadResponseBody
 };
 

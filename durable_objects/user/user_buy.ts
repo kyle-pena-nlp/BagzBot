@@ -111,6 +111,9 @@ function convertToUnconfirmedPosition(positionRequest : PositionRequest, quote :
         type: positionRequest.positionType,
         status: PositionStatus.Open,
         confirmed: false, // <----------
+        isConfirmingBuy: false,
+        sellConfirmed: null,
+        isConfirmingSell: false,
         txSignature: txSignature,
         token: positionRequest.token,
         vsToken: positionRequest.vsToken,
@@ -118,7 +121,7 @@ function convertToUnconfirmedPosition(positionRequest : PositionRequest, quote :
         tokenAmt: quote.outTokenAmt,
         sellSlippagePercent: positionRequest.slippagePercent,
         triggerPercent : positionRequest.triggerPercent,
-        retrySellIfSlippageExceeded : positionRequest.retrySellIfSlippageExceeded,
+        sellAutoDoubleSlippage : positionRequest.sellAutoDoubleSlippage,
         fillPrice: quote.fillPrice // this may not be the final quote on buy, but it is likely close
     };
     return position;
@@ -133,11 +136,14 @@ function convertConfirmedRequestToPosition(positionRequest: PositionRequest, swa
         type: positionRequest.positionType,
         status: PositionStatus.Open,
         confirmed: true, // <-------------
+        isConfirmingBuy: false,
+        sellConfirmed: null,
+        isConfirmingSell: false,
         token: positionRequest.token,
         vsToken: positionRequest.vsToken,
         sellSlippagePercent: positionRequest.slippagePercent,
         triggerPercent : positionRequest.triggerPercent,
-        retrySellIfSlippageExceeded : positionRequest.retrySellIfSlippageExceeded,
+        sellAutoDoubleSlippage : positionRequest.sellAutoDoubleSlippage,
         txSignature: swapSummary.txSignature,      
         vsTokenAmt : swapSummary.inTokenAmt,
         tokenAmt: swapSummary.outTokenAmt,        

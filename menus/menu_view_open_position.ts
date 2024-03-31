@@ -124,6 +124,7 @@ export class MenuViewOpenPosition extends Menu<PositionAndMaybePNL|{ brandNewPos
             this.insertButtonNextLine(options, ":stop: Stop Monitoring And Sell", closePositionCallbackData);
             
             this.insertButtonNextLine(options, "Change Trigger Percent", new CallbackData(MenuCode.EditOpenPositionTriggerPercent, this.menuData.position.positionID));
+            this.insertButtonNextLine(options, "Double Slippage If Sell Fails?", new CallbackData(MenuCode.EditOpenPositionAutoDoubleSlippage, this.menuData.position.positionID));
 
             const refreshPositionCallbackData = new CallbackData(MenuCode.ViewOpenPosition, this.menuData.position.positionID);
             this.insertButtonNextLine(options, ":refresh: Refresh", refreshPositionCallbackData);

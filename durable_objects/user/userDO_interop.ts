@@ -20,6 +20,7 @@ import { ManuallyClosePositionRequest, ManuallyClosePositionResponse } from "./a
 import { OpenPositionRequest, OpenPositionResponse } from "./actions/open_new_position";
 import { DefaultTrailingStopLossRequestRequest, DefaultTrailingStopLossRequestResponse } from "./actions/request_default_position_request";
 import { SendMessageToUserRequest, SendMessageToUserResponse } from "./actions/send_message_to_user";
+import { SetSellAutoDoubleOnOpenPositionRequest, SetSellAutoDoubleOnOpenPositionResponse } from "./actions/set_sell_auto_double_on_open_position";
 import { StoreLegalAgreementStatusRequest, StoreLegalAgreementStatusResponse } from "./actions/store_legal_agreement_status";
 import { StoreSessionValuesRequest, StoreSessionValuesResponse } from "./actions/store_session_values";
 import { UnimpersonateUserRequest, UnimpersonateUserResponse } from "./actions/unimpersonate_user";
@@ -48,7 +49,8 @@ export enum UserDOFetchMethod {
 	sendMessageToUser = "sendMessageToUser",
 	editTriggerPercentOnOpenPosition = "editTriggerPercentOnOpenPosition",
 	confirmSells = "confirmSells",
-	confirmBuys = "confirmBuys"
+	confirmBuys = "confirmBuys",
+	setSellAutoDoubleOnOpenPositionRequest = "setSellAutoDoubleOnOpenPositionRequest"
 }
 
 export async function sendMessageToUser(toTelegramUserID : number, fromTelegramUserName : string, message : string, env : Env) : Promise<SendMessageToUserResponse> {
@@ -321,4 +323,10 @@ export async function unimpersonateUser(telegramUserID : number, chatID : number
 	const request : UnimpersonateUserRequest = { telegramUserID, chatID };
 	await sendJSONRequestToUserDO<UnimpersonateUserRequest,UnimpersonateUserResponse>(telegramUserID, UserDOFetchMethod.unimpersonateUser, request, env);
 	return;
+}
+
+export async function setSellAutoDoubleOnOpenPosition(telegramUserID : number, chatID : number, positionID : string, choice : boolean, env : Env) : Promise<SetSellAutoDoubleOnOpenPositionResponse> {
+	const request : SetSellAutoDoubleOnOpenPositionRequest = { telegramUserID, chatID, positionID, choice };
+	const method = UserDOFetchMethod.setSellAutoDoubleOnOpenPositionRequest;
+	return await sendJSONRequestToUserDO<SetSellAutoDoubleOnOpenPositionRequest,SetSellAutoDoubleOnOpenPositionResponse>(telegramUserID, method, request, env);
 }

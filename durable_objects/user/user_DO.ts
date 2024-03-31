@@ -10,9 +10,11 @@ import { WEN_ADDRESS, getVsTokenInfo } from "../../tokens";
 import { ChangeTrackedValue, Structural, assertNever, groupIntoBatches, makeFailureResponse, makeJSONResponse, makeSuccessResponse, maybeGetJson, sleep, strictParseBoolean } from "../../util";
 import { listUnclaimedBetaInviteCodes } from "../beta_invite_codes/beta_invite_code_interop";
 import { PositionAndMaybePNL } from "../token_pair_position_tracker/model/position_and_PNL";
-import { editTriggerPercentOnOpenPositionInTracker, getPositionAndMaybePNL, listPositionsByUser } from "../token_pair_position_tracker/token_pair_position_tracker_do_interop";
+import { editTriggerPercentOnOpenPositionInTracker, getPositionAndMaybePNL, listPositionsByUser, setSellAutoDoubleOnOpenPositionInPositionTracker } from "../token_pair_position_tracker/token_pair_position_tracker_do_interop";
 import { AutomaticallyClosePositionsRequest, AutomaticallyClosePositionsResponse } from "./actions/automatically_close_positions";
 import { BaseUserDORequest, isBaseUserDORequest } from "./actions/base_user_do_request";
+import { ConfirmBuysRequest } from "./actions/confirm_buys";
+import { ConfirmSellsRequest } from "./actions/confirm_sells";
 import { DeleteSessionRequest, DeleteSessionResponse } from "./actions/delete_session";
 import { EditTriggerPercentOnOpenPositionRequest, EditTriggerPercentOnOpenPositionResponse } from "./actions/edit_trigger_percent_on_open_position";
 import { GetImpersonatedUserIDRequest, GetImpersonatedUserIDResponse } from "./actions/get_impersonated_user_id";
@@ -27,6 +29,7 @@ import { ManuallyClosePositionRequest, ManuallyClosePositionResponse } from "./a
 import { OpenPositionRequest, OpenPositionResponse } from "./actions/open_new_position";
 import { DefaultTrailingStopLossRequestRequest, DefaultTrailingStopLossRequestResponse } from "./actions/request_default_position_request";
 import { SendMessageToUserRequest, SendMessageToUserResponse, isSendMessageToUserRequest } from "./actions/send_message_to_user";
+import { SetSellAutoDoubleOnOpenPositionRequest, SetSellAutoDoubleOnOpenPositionResponse } from "./actions/set_sell_auto_double_on_open_position";
 import { StoreLegalAgreementStatusRequest, StoreLegalAgreementStatusResponse } from "./actions/store_legal_agreement_status";
 import { StoreSessionValuesRequest, StoreSessionValuesResponse } from "./actions/store_session_values";
 import { UnimpersonateUserRequest, UnimpersonateUserResponse } from "./actions/unimpersonate_user";
@@ -55,7 +58,7 @@ const DEFAULT_POSITION_PREREQUEST : PositionPreRequest = {
     vsTokenAmt : 1.0,
     slippagePercent : 5.0,
     triggerPercent : 5,
-    retrySellIfSlippageExceeded : true            
+    sellAutoDoubleSlippage : true            
 };
 
 /* Durable Object storing state of user */
@@ -247,11 +250,45 @@ export class UserDO {
             case UserDOFetchMethod.editTriggerPercentOnOpenPosition:
                 response = await this.handleEditTriggerPercentOnOpenPosition(userAction);
                 break;
+            case UserDOFetchMethod.confirmBuys:
+                response = await this.handleConfirmBuys(userAction);
+                break;
+            case UserDOFetchMethod.confirmSells:
+                response = await this.handleConfirmSells(userAction);
+                break;
+            case UserDOFetchMethod.setSellAutoDoubleOnOpenPositionRequest:
+                response = await this.handleSetSellAutoDoubleOnOpenPositionRequest(userAction);
+                break;
             default:
                 assertNever(method);
         }
 
         return [method,userAction,response];
+    }
+
+    async handleConfirmBuys(userAction : ConfirmBuysRequest) : Promise<Response> {
+        throw new Error("");
+    }
+
+    async handleConfirmSells(userAction : ConfirmSellsRequest) : Promise<Response> {
+        throw new Error("");
+    }
+
+    private async handleSetSellAutoDoubleOnOpenPositionRequest(userAction : SetSellAutoDoubleOnOpenPositionRequest) : Promise<Response> {
+        const response = this.handleSetSellAutoDoubleOnOpenPositionRequestInternal(userAction);
+        return makeJSONResponse<SetSellAutoDoubleOnOpenPositionResponse>(response);
+    }
+
+    private async handleSetSellAutoDoubleOnOpenPositionRequestInternal(userAction: SetSellAutoDoubleOnOpenPositionRequest) : Promise<SetSellAutoDoubleOnOpenPositionResponse> {
+        const positionID = userAction.positionID;
+        const tokenPair = this.tokenPairsForPositionIDsTracker.getPositionPair(positionID);
+        if (tokenPair == null) {
+            return {};
+        }
+        const tokenAddress = tokenPair.token.address;
+        const vsTokenAddress = tokenPair.vsToken.address;
+        const choice = userAction.choice;
+        return await setSellAutoDoubleOnOpenPositionInPositionTracker(positionID, tokenAddress, vsTokenAddress, choice, this.env);
     }
 
     async handleEditTriggerPercentOnOpenPosition(request: EditTriggerPercentOnOpenPositionRequest) : Promise<Response> {

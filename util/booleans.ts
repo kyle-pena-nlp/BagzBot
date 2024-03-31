@@ -7,3 +7,13 @@ export function strictParseBoolean(s : string) : boolean {
     }
     throw new Error(`${s} not a valid boolean value`);
 }
+
+export function tryParseBoolean(s : string) : boolean | undefined {
+    if (s === 'true') {
+        return true;
+    }
+    else if (s === 'false') {
+        return false;
+    }
+    return;
+}
