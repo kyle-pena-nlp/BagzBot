@@ -70,7 +70,7 @@ export class PeakPricePositionTracker {
     remove(positionID : string) : Position|undefined {
         return this.itemsByPeakPrice.removePosition(positionID);
     }
-    update(newPrice : DecimalizedAmount) : Position[] {
+    update(newPrice : DecimalizedAmount) : void {
         this.currentPrice.value = newPrice;
         const peaks = [...this.itemsByPeakPrice.keys()];
         const mergedPeaks : DecimalizedAmount[] = [];
@@ -100,7 +100,6 @@ export class PeakPricePositionTracker {
         if (mergedPositions.length) {
             this.itemsByPeakPrice.set(newPrice, mergedPositions);
         }
-        return this.collectTrailingStopLossesToClose(newPrice);
     }
     getPeakPrice(positionID : string) : DecimalizedAmount|undefined {
         return this.itemsByPeakPrice.getPeakPrice(positionID);
@@ -111,7 +110,9 @@ export class PeakPricePositionTracker {
     getPosition(positionID : string) : Position|undefined {
         return this.itemsByPeakPrice.getPosition(positionID);
     }
-    private collectTrailingStopLossesToClose(newPrice : DecimalizedAmount) : Position[] {
+    // NEVER MARK THIS METHOD AS ASYNC!!!! (and subsequently do anything async in it)
+    // We don't want double-firing of sells, so we need this method to be atomic in execution.
+    collectPositionsToClose(newPrice : DecimalizedAmount) : Position[] {
         
         // collect TSL positions to be closed
         const positionsToClose : Position[] = [];
@@ -138,9 +139,13 @@ export class PeakPricePositionTracker {
                     return;
                 }
 
-                // If it is not an open position, skip.
-                // (if the sell fails, we mark it as open again, but keep tracking anyway)
+                // Very important so as to prevent double firing of sells
                 if (position.status !== PositionStatus.Open) {
+                    return;
+                }
+
+                // Rule for sanity: Can't sell until the buy is confirmed.
+                if (!position.confirmed) {
                     return;
                 }
 
@@ -166,7 +171,19 @@ export class PeakPricePositionTracker {
                 
             });
         }
+
+        // very important so as to prevent double-firing of sells
+        for (const position of positionsToClose) {
+            position.status = PositionStatus.Closing;
+        }
+
         return positionsToClose;
+    }
+    getUnconfirmedBuys() : Position[] {
+        return this.itemsByPeakPrice.getUnconfirmedBuys();
+    }
+    getUnconfirmedSells() : Position[] {
+        return this.itemsByPeakPrice.getUnconfirmedSells();
     }
     initialize(entries : Map<string,any>) {
         // find storage itemsByPeakPrice prefixed with proper prefix, get price key, get array index, and set on this.itemsByPeakPrice at that index.

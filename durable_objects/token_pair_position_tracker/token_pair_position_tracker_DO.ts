@@ -6,7 +6,7 @@ import { PositionStatus } from "../../positions";
 import { ChangeTrackedValue, assertNever, makeJSONResponse, makeSuccessResponse, strictParseBoolean, strictParseInt } from "../../util";
 import { ensureTokenPairIsRegistered } from "../heartbeat/heartbeat_do_interop";
 import { EditTriggerPercentOnOpenPositionResponse } from "../user/actions/edit_trigger_percent_on_open_position";
-import { sendClosePositionOrdersToUserDOs } from "../user/userDO_interop";
+import { sendClosePositionOrdersToUserDOs, tryToConfirmBuysWithUserDOs, tryToConfirmSellsWithUserDOs } from "../user/userDO_interop";
 import { EditTriggerPercentOnOpenPositionInTrackerRequest } from "./actions/edit_trigger_percent_on_open_position_in_tracker";
 import { GetPositionFromPriceTrackerRequest, GetPositionFromPriceTrackerResponse } from "./actions/get_position";
 import { GetPositionAndMaybePNLFromPriceTrackerRequest, GetPositionAndMaybePNLFromPriceTrackerResponse } from "./actions/get_position_and_maybe_pnl";
@@ -18,12 +18,14 @@ import { MarkPositionAsClosedRequest, MarkPositionAsClosedResponse } from "./act
 import { MarkPositionAsClosingRequest, MarkPositionAsClosingResponse } from "./actions/mark_position_as_closing";
 import { MarkPositionAsOpenRequest, MarkPositionAsOpenResponse } from "./actions/mark_position_as_open";
 import { RemovePositionRequest, RemovePositionResponse } from "./actions/remove_position";
+import { UpdateBuyConfirmationStatusRequest, UpdateBuyConfirmationStatusResponse } from "./actions/update_buy_confirmation_status";
 import { UpdatePriceRequest, UpdatePriceResponse } from "./actions/update_price";
+import { UpdateSellConfirmationStatusRequest, UpdateSellConfirmationStatusResponse } from "./actions/update_sell_confirmation_status";
 import { UpsertPositionsRequest, UpsertPositionsResponse } from "./actions/upsert_positions";
 import { WakeupTokenPairPositionTrackerRequest, WakeupTokenPairPositionTrackerResponse } from "./actions/wake_up";
 import { TokenPairPositionTrackerDOFetchMethod, parseTokenPairPositionTrackerDOFetchMethod } from "./token_pair_position_tracker_do_interop";
 import { CurrentPriceTracker } from "./trackers/current_price_tracker";
-import { TokenPairPositionTracker } from "./trackers/token_pair_position_tracker";
+import { ActionsToTake, TokenPairPositionTracker } from "./trackers/token_pair_position_tracker";
 /*
     Big TODO: How do we limit concurrent outgoing requests when a dip happens?
     This is a big burst and may trip limits.
@@ -261,9 +263,49 @@ export class TokenPairPositionTrackerDO {
                 return await this.handleGetPosition(body);
             case TokenPairPositionTrackerDOFetchMethod.editTriggerPercentOnOpenPosition:
                 return await this.handleEditTriggerPercentOnOpenPosition(body);
+            case TokenPairPositionTrackerDOFetchMethod.updateBuyConfirmationStatus:
+                return await this.handleUpdateBuyConfirmationStatus(body);
+            case TokenPairPositionTrackerDOFetchMethod.updateSellConfirmationStatus:
+                return await this.handleUpdateSellConfirmationStatus(body);
             default:
                 assertNever(method);
         }
+    }
+
+    async handleUpdateBuyConfirmationStatus(body : UpdateBuyConfirmationStatusRequest) : Promise<Response> {
+        const result = await this.handleUpdateBuyConfirmationStatusInternal(body);
+        return makeJSONResponse<UpdateBuyConfirmationStatusResponse>(result);
+    }
+
+    async handleUpdateBuyConfirmationStatusInternal(body: UpdateBuyConfirmationStatusRequest) : Promise<UpdateBuyConfirmationStatusResponse> {
+        const positionID = body.positionID;
+        const position = this.tokenPairPositionTracker.getPosition(positionID);
+        if (position == null) {
+            return {};
+        }
+        position.isConfirmingBuy = false;
+        if (body.successfullyConfirmed) {
+            position.confirmed = true;
+        }
+        return {};
+    }
+
+    async handleUpdateSellConfirmationStatus(body: UpdateSellConfirmationStatusRequest) : Promise<Response> {
+        const result = await this.handleUpdateSellConfirmationStatusInternal(body);
+        return makeJSONResponse<UpdateSellConfirmationStatusResponse>(result);
+    }
+
+    async handleUpdateSellConfirmationStatusInternal(body : UpdateSellConfirmationStatusRequest) : Promise<UpdateSellConfirmationStatusResponse> {
+        const positionID = body.positionID;
+        const position = this.tokenPairPositionTracker.getPosition(positionID);
+        if (position == null) {
+            return {};
+        }
+        position.isConfirmingSell = false;
+        if (body.successfullyConfirmed) {
+            this.tokenPairPositionTracker.closePosition(positionID);
+        }
+        return {};
     }
 
     async handleEditTriggerPercentOnOpenPosition(body : EditTriggerPercentOnOpenPositionInTrackerRequest) : Promise<Response> {
@@ -406,21 +448,44 @@ export class TokenPairPositionTrackerDO {
 
     async handleUpdatePrice(request : UpdatePriceRequest) : Promise<Response> {
         this.ensureIsInitialized(request);
+        
         const newPrice = request.price;
+        
         const actionsToTake = this.updatePositionTracker(newPrice);
-        actionsToTake.positionsToClose.sort(p => -toNumber(p.vsTokenAmt)); // biggest first, roughly speaking
-        // fire and forget.
+        
+        // biggest SOL purchase first (highest priority)
+        actionsToTake.positionsToClose.sort(p => -toNumber(p.vsTokenAmt));
         if (actionsToTake.positionsToClose.length > 0) {
             sendClosePositionOrdersToUserDOs(actionsToTake.positionsToClose, this.env);
         }
+        
+        // biggest SOL purchase first (highest priority)
+        actionsToTake.buysToConfirm.sort(p => -toNumber(p.vsTokenAmt));
+        if (actionsToTake.buysToConfirm.length > 0) {
+            tryToConfirmBuysWithUserDOs(actionsToTake.buysToConfirm, this.env);
+        }
+
+        // biggest SOL purchase first (highest priority)
+        actionsToTake.sellsToConfirm.sort(p => -toNumber(p.vsTokenAmt));
+        if (actionsToTake.sellsToConfirm.length > 0) {
+            tryToConfirmSellsWithUserDOs(actionsToTake.sellsToConfirm, this.env);
+        }
+
         const responseBody : UpdatePriceResponse = {};
         return makeJSONResponse(responseBody);
     }
 
-    updatePositionTracker(newPrice : DecimalizedAmount) {
-        // fire and forget so we don't block subsequent update-price ticks
-        const positionsToClose = this.tokenPairPositionTracker.updatePrice(newPrice);
-        return positionsToClose;
+    updatePositionTracker(newPrice : DecimalizedAmount) : ActionsToTake {
+        this.tokenPairPositionTracker.updatePrice(newPrice);
+        const positionsToClose = this.tokenPairPositionTracker.collectPositionsToClose(newPrice);
+        const unconfirmedBuys = this.tokenPairPositionTracker.getUnconfirmedBuys();
+        const unconfirmedSells = this.tokenPairPositionTracker.getUnconfirmedSells();
+        const actionsToTake = {
+            positionsToClose: positionsToClose,
+            buysToConfirm: unconfirmedBuys,
+            sellsToConfirm : unconfirmedSells
+        };
+        return actionsToTake;
     }
     
     ensureIsInitialized(x : HasPairAddresses) {

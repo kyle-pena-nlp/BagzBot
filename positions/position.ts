@@ -24,8 +24,18 @@ export interface Position {
 	messageID : number
 	positionID : string
 	type: PositionType
+
+	// status of 'Closing' indicates we are attempting to sell
 	status : PositionStatus
+
+	// whether or not the buy has been confirmed (cannot rename to buyConfirmed for backwards compat)
 	confirmed : boolean
+	isConfirmingBuy : boolean|null // null for backwards compat.  should be considered 'false'.
+
+	// whether or not the sell has been confirmed (null if never got to send sell tx)
+	sellConfirmed : boolean|null
+	isConfirmingSell : boolean|null // null for backwards compat. should be considered 'false'.
+
 	txSignature : string
 	token: TokenInfo
 	vsToken: TokenInfo

@@ -5,8 +5,10 @@ import { MapWithStorage } from "../../../util";
 import { PositionAndMaybePNL } from "../model/position_and_PNL";
 import { PeakPricePositionTracker } from "./peak_price_tracker";
 
-export interface PositionsToClose {
+export interface ActionsToTake {
     positionsToClose : Position[]
+    buysToConfirm : Position[]
+    sellsToConfirm : Position[]
 }
 
 export class TokenPairPositionTracker {
@@ -44,11 +46,11 @@ export class TokenPairPositionTracker {
         }
     }
 
-    updatePrice(newPrice : DecimalizedAmount) : PositionsToClose {
+    updatePrice(newPrice : DecimalizedAmount) : void {
 
         // update the peak prices
-        const positionsToClose = this.pricePeaks.update(newPrice);
-
+        
+        this.pricePeaks.update(newPrice);
         // Note: mark them as closing, keeping them in the tracker!!!
         // SUPER CRITICAL to mark as closing to prevent them from;
         // 1. Being double-sold
@@ -56,10 +58,19 @@ export class TokenPairPositionTracker {
         /*for (const positionToClose of positionsToClose) {
             positionToClose.status = PositionStatus.Closing;
         }*/
+    }
 
-        return {
-            positionsToClose: positionsToClose
-        };
+    collectPositionsToClose(newPrice : DecimalizedAmount) : Position[] {
+        const positionsToClose = this.pricePeaks.collectPositionsToClose(newPrice);
+        return positionsToClose;
+    }
+
+    getUnconfirmedBuys() : Position[] {
+        return this.pricePeaks.getUnconfirmedBuys();
+    }
+
+    getUnconfirmedSells() : Position[] {
+        return this.pricePeaks.getUnconfirmedSells();
     }
 
     markPositionAsOpen(positionID : string) {

@@ -119,6 +119,45 @@ export class PositionsAssociatedWithPeakPrices extends DecimalizedAmountMap<Read
         };
     }
 
+    // NEVER ASYNC THIS METHOD! This must execute atomically to avoid double-confirm attempts.
+    getUnconfirmedSells() {
+        const result : Position[] = [];
+        for (const positionID of this.positionIDMap.keys()) {
+            const result = this.getPositionInternal(positionID);
+            if (result == null) {
+                continue;
+            }
+            const [position,price] = result;
+            const isClosing = (position.status === PositionStatus.Closing);
+            const sellUnconfirmed = !position.sellConfirmed;
+            const notConfirmingSell = (position.isConfirmingSell !== true);
+            if (isClosing && sellUnconfirmed && notConfirmingSell) {
+                position.isConfirmingSell = true;
+                result.push(position);
+            }
+        }
+        return result;
+    }
+    // NEVER ASYNC THIS METHOD! This must execute atomically to avoid double-confirm attempts.
+    getUnconfirmedBuys() {
+        const result : Position[] = [];
+        for (const positionID of this.positionIDMap.keys()) {
+            const result = this.getPositionInternal(positionID);
+            if (result == null) {
+                continue;
+            }
+            const [position,price] = result;
+            const isOpen = position.status === PositionStatus.Open;
+            const buyUnconfirmed = !position.confirmed;
+            const notConfirmingBuy = position.isConfirmingBuy !== true;
+            if (isOpen && buyUnconfirmed && notConfirmingBuy) {
+                position.isConfirmingBuy = true;
+                result.push(position);
+            }
+        }
+        return result;
+    }
+
     // *idempotentally* add a new position to this peak price
     add(price : DecimalizedAmount, position : Position) {
         if (this.positionIDMap.has(position.positionID)) {

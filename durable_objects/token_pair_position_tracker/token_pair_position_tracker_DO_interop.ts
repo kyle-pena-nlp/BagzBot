@@ -12,7 +12,9 @@ import { MarkPositionAsClosedRequest, MarkPositionAsClosedResponse } from "./act
 import { MarkPositionAsClosingRequest, MarkPositionAsClosingResponse } from "./actions/mark_position_as_closing";
 import { MarkPositionAsOpenRequest, MarkPositionAsOpenResponse } from "./actions/mark_position_as_open";
 import { RemovePositionRequest, RemovePositionResponse } from "./actions/remove_position";
+import { UpdateBuyConfirmationStatusRequest, UpdateBuyConfirmationStatusResponse } from "./actions/update_buy_confirmation_status";
 import { UpdatePriceRequest, UpdatePriceResponse } from "./actions/update_price";
+import { UpdateSellConfirmationStatusRequest, UpdateSellConfirmationStatusResponse } from "./actions/update_sell_confirmation_status";
 import { UpsertPositionsRequest, UpsertPositionsResponse } from "./actions/upsert_positions";
 import { WakeupTokenPairPositionTrackerRequest, WakeupTokenPairPositionTrackerResponse } from "./actions/wake_up";
 import { PositionAndMaybePNL } from "./model/position_and_PNL";
@@ -30,7 +32,9 @@ export enum TokenPairPositionTrackerDOFetchMethod {
 	getPositionAndMaybePNL = "getPositionAndMaybePNL",
 	getPosition = "getPosition",
 	listPositionsByUser = "listPositionsByUser",
-	editTriggerPercentOnOpenPosition = "editTriggerPercentOnOpenPosition"
+	editTriggerPercentOnOpenPosition = "editTriggerPercentOnOpenPosition",
+	updateBuyConfirmationStatus = "updateBuyConfirmationStatus",
+	updateSellConfirmationStatus = "updateSellConfirmationStatus"
 }
 
 
@@ -113,7 +117,17 @@ export async function wakeUpTokenPairPositionTracker(tokenAddress : string, vsTo
 	return response;
 }
 
+export async function updateBuyConfirmationStatus(positionID : string, tokenAddress : string, vsTokenAddress : string, successfullyConfirmed : boolean, env : Env) : Promise<UpdateBuyConfirmationStatusResponse> {
+	const method = TokenPairPositionTrackerDOFetchMethod.updateBuyConfirmationStatus;
+	const request : UpdateBuyConfirmationStatusRequest = { positionID, tokenAddress, vsTokenAddress, successfullyConfirmed };
+	return await sendJSONRequestToTokenPairPositionTracker<UpdateBuyConfirmationStatusRequest,UpdateBuyConfirmationStatusResponse>(method,request,tokenAddress,vsTokenAddress,env);
+}
 
+export async function updateSellConfirmationStatus(positionID : string, tokenAddress : string, vsTokenAddress : string, successfullyConfirmed : boolean, env : Env) : Promise<UpdateSellConfirmationStatusResponse> {
+	const method = TokenPairPositionTrackerDOFetchMethod.updateSellConfirmationStatus;
+	const request : UpdateSellConfirmationStatusRequest = { positionID, tokenAddress, vsTokenAddress, successfullyConfirmed };
+	return await sendJSONRequestToTokenPairPositionTracker<UpdateSellConfirmationStatusRequest,UpdateSellConfirmationStatusResponse>(method,request,tokenAddress,vsTokenAddress,env);
+}
 
 export async function markAsClosed(positionID : string, tokenAddress : string, vsTokenAddress : string, env : Env) : Promise<MarkPositionAsClosedResponse> {
 	const method = TokenPairPositionTrackerDOFetchMethod.markPositionAsClosed;
