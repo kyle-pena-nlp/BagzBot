@@ -50,5 +50,4 @@ export class DecimalizedAmountSet {
             yield fromKey(value);
         }
     }
-
 }

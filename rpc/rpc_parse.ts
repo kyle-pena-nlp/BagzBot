@@ -7,8 +7,9 @@ import { logDebug, logError } from "../logging";
 import { Position, PositionRequest } from "../positions";
 import { SOL_ADDRESS, deriveTokenAccount, getVsTokenInfo } from "../tokens";
 import { safe, sleep } from "../util";
+import { assertIs } from "../util/enums";
 import { parseInstructionError } from "./rpc_parse_instruction_error";
-import { ParsedSwapSummary, PreparseConfirmedSwapResult, PreparseSwapResult, SwapSummary } from "./rpc_types";
+import { ParsedSuccessfulSwapSummary, ParsedSwapSummary, PreparseConfirmedSwapResult, PreparseSwapResult, SwapExecutionErrorParseSummary, SwapSummary } from "./rpc_types";
 
 // This may come in handy at some point: https://github.com/cocrafts/walless/blob/a05d20f8275c8167a26de976a3b6701d64472765/apps/wallet/src/engine/runners/solana/history/swapHistory.ts#L85
 
@@ -85,6 +86,23 @@ export async function parseSwapTransaction(
             status : 'unknown-transaction'
         }
     }
+
+    assertIs<ParsedTransactionWithMeta,typeof parsedTransaction>();
+
+    return parseParsedTransactionWithMeta(parsedTransaction, inTokenAddress, outTokenAddress, signature, userAddress, env);
+}
+
+export function parseSwappableParsedTransactionWithMeta(position : Position, parsedTransaction : ParsedTransactionWithMeta, type : 'buy'|'sell', userAddress : UserAddress, env : Env) {
+    const inTokenAddress = { 'buy': position.vsToken.address, 'sell': position.token.address }[type];
+    const outTokenAddress = { 'buy': position.token.address, 'sell': position.vsToken.address }[type];
+    const signature = { 'buy': position.txBuySignature, 'sell': position.txSellSignature }[type];
+    if (signature == null) {
+        return null;
+    }
+    return parseParsedTransactionWithMeta(parsedTransaction, inTokenAddress, outTokenAddress, signature, userAddress, env);
+}
+
+function parseParsedTransactionWithMeta(parsedTransaction : ParsedTransactionWithMeta, inTokenAddress : string, outTokenAddress : string, signature : string, userAddress : UserAddress, env : Env) : ParsedSuccessfulSwapSummary|SwapExecutionErrorParseSummary {
 
     const err = parsedTransaction.meta?.err;
     if (err) {

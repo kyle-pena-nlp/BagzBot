@@ -118,9 +118,8 @@ export async function tryToConfirmBuysWithUserDOs(unconfirmedBuys : Position[], 
 
 export async function tryToConfirmBuys(userID : number, positions : Position[], env : Env) {
 	const method = UserDOFetchMethod.confirmBuys;
-	const positionIDs = positions.map(p => p.positionID);
 	const chatID = positions[0].chatID;
-	const individualRequestForUserDO : ConfirmBuysRequest = { telegramUserID: userID, chatID: chatID, positionIDs: positionIDs };
+	const individualRequestForUserDO : ConfirmBuysRequest = { telegramUserID: userID, chatID: chatID, positions: positions };
 	await sendJSONRequestToUserDO<ConfirmBuysRequest,ConfirmBuysResponse>(userID, method, individualRequestForUserDO, env);
 }
 
@@ -140,9 +139,8 @@ export async function tryToConfirmSellsWithUserDOs(unconfirmedSells : Position[]
 
 export async function tryToConfirmSells(userID : number, positions : Position[], env : Env) {
 	const method = UserDOFetchMethod.confirmSells;
-	const positionIDs = positions.map(p => p.positionID);
 	const chatID = positions[0].chatID;
-	const individualRequestForUserDO : ConfirmSellsRequest = { telegramUserID: userID, chatID: chatID, positionIDs: positionIDs };
+	const individualRequestForUserDO : ConfirmSellsRequest = { telegramUserID: userID, chatID: chatID, positions: positions };
 	await sendJSONRequestToUserDO<ConfirmSellsRequest,ConfirmSellsResponse>(userID, method, individualRequestForUserDO, env);
 }
 

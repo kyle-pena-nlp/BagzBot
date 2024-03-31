@@ -108,5 +108,3 @@ function dAsNumber(a : DecimalizedAmount) : number {
     const stringAmount = moveDecimalInString(a.tokenAmount, -a.decimals);
     return parseFloat(stringAmount);
 }
-
-export const ZERO : DecimalizedAmount = { tokenAmount: "0", decimals: 0 }; 

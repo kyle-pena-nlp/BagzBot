@@ -11,11 +11,11 @@ import { ChangeTrackedValue, Structural, assertNever, groupIntoBatches, makeFail
 import { assertIs } from "../../util/enums";
 import { listUnclaimedBetaInviteCodes } from "../beta_invite_codes/beta_invite_code_interop";
 import { PositionAndMaybePNL } from "../token_pair_position_tracker/model/position_and_PNL";
-import { editTriggerPercentOnOpenPositionInTracker, getPositionAndMaybePNL, listPositionsByUser, setSellAutoDoubleOnOpenPositionInPositionTracker } from "../token_pair_position_tracker/token_pair_position_tracker_do_interop";
+import { editTriggerPercentOnOpenPositionInTracker, getPositionAndMaybePNL, listPositionsByUser, setSellAutoDoubleOnOpenPositionInPositionTracker, updateSellConfirmationStatus } from "../token_pair_position_tracker/token_pair_position_tracker_do_interop";
 import { AutomaticallyClosePositionsRequest, AutomaticallyClosePositionsResponse } from "./actions/automatically_close_positions";
 import { BaseUserDORequest, isBaseUserDORequest } from "./actions/base_user_do_request";
-import { ConfirmBuysRequest } from "./actions/confirm_buys";
-import { ConfirmSellsRequest } from "./actions/confirm_sells";
+import { ConfirmBuysRequest, ConfirmBuysResponse } from "./actions/confirm_buys";
+import { ConfirmSellsRequest, ConfirmSellsResponse } from "./actions/confirm_sells";
 import { DeleteSessionRequest, DeleteSessionResponse } from "./actions/delete_session";
 import { EditTriggerPercentOnOpenPositionRequest, EditTriggerPercentOnOpenPositionResponse } from "./actions/edit_trigger_percent_on_open_position";
 import { GetImpersonatedUserIDRequest, GetImpersonatedUserIDResponse } from "./actions/get_impersonated_user_id";
@@ -38,6 +38,7 @@ import { UserInitializeRequest, UserInitializeResponse } from "./actions/user_in
 import { TokenPair } from "./model/token_pair";
 import { UserData } from "./model/user_data";
 import { PositionBuyer } from "./position_buyer";
+import { SwapConfirmer } from "./swap_confirmer";
 import { SessionTracker } from "./trackers/session_tracker";
 import { SOLBalanceTracker } from "./trackers/sol_balance_tracker";
 import { TokenPairsForPositionIDsTracker } from "./trackers/token_pairs_for_position_ids_tracker";
@@ -267,12 +268,31 @@ export class UserDO {
         return [method,userAction,response];
     }
 
+    /* When we are tracking a position whose buy has not been confirmed, we periodically send it here */
     async handleConfirmBuys(userAction : ConfirmBuysRequest) : Promise<Response> {
-        throw new Error("");
+        const startTimeMS = Date.now();
+        for (const position of userAction.positions) {
+            const swapConfirmer = new SwapConfirmer(this.wallet.value!!, this.env, startTimeMS);
+            const buyStatus = await swapConfirmer.confirmSwap(position, 'buy');
+        }
+        return makeJSONResponse<ConfirmBuysResponse>({});
     }
 
+    /* When a sell couldn't be confirmed, we periodically send it here */
     async handleConfirmSells(userAction : ConfirmSellsRequest) : Promise<Response> {
-        throw new Error("");
+        const startTimeMS = Date.now();
+        for (const position of userAction.positions) {
+            const swapConfirmer = new SwapConfirmer(this.wallet.value!!, this.env, startTimeMS);
+            const sellStatus = await swapConfirmer.confirmSwap(position, 'sell');
+            await updateSellConfirmationStatus(position.positionID, 
+                position.txSellSignature,
+                position.sellLastValidBlockheight,
+                position.token.address, 
+                position.vsToken.address, 
+                sellStatus, 
+                this.env);
+        }
+        return makeJSONResponse<ConfirmSellsResponse>({});
     }
 
     private async handleSetSellAutoDoubleOnOpenPositionRequest(userAction : SetSellAutoDoubleOnOpenPositionRequest) : Promise<Response> {
@@ -572,6 +592,7 @@ export class UserDO {
     }
 
     async handleAutomaticallyClosePositionsRequest(closePositionsRequest : AutomaticallyClosePositionsRequest) : Promise<Response> {
+        const startTimeMS = Date.now();
         const positionsToClose = closePositionsRequest.positions;
         if (positionsToClose.length == 0) {
             return makeJSONResponse<AutomaticallyClosePositionsResponse>({});
@@ -580,18 +601,11 @@ export class UserDO {
         const notificationChannels : UpdateableNotification[] = [];
         for (const positionBatch of positionBatches) {
             // fire off a bunch of promises per batch (4)
-            let sellPositionPromises = positionBatch.map(async positionID => {
-                const tokenPair = this.tokenPairsForPositionIDsTracker.getPositionPair(positionID);
-                if (tokenPair == null) {
-                    logError(`Could not find token pair for position ID ${positionID}`, this.telegramUserID);
-                    return;
-                }
-                const tokenAddress = tokenPair.token.address;
-                const vsTokenAddress = tokenPair.vsToken.address;
+            let sellPositionPromises = positionBatch.map(async position => {
                 const notificationChannel = TGStatusMessage.createAndSend(`Initiating auto-sell`, false, this.chatID.value||0, this.env);
                 notificationChannels.push(notificationChannel);
-                return await sell(positionID, tokenAddress, vsTokenAddress, this.wallet.value!!, this.env);
-            }).filter(sellPromise => sellPromise != null);
+                return await sell(position, this.wallet.value!!, this.env, startTimeMS);
+            });
             // but wait for the entire batch to settle before doing the next batch
             await Promise.allSettled(sellPositionPromises);
         }

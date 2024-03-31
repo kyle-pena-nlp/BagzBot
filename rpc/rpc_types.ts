@@ -76,6 +76,10 @@ export interface SwapExecutionErrorParseSummary {
     status : SwapExecutionError
 }
 
+export interface SlippageSwapExecutionErrorParseSummary {
+    status: SwapExecutionError.SlippageToleranceExceeded
+}
+
 export interface ParsedSuccessfulSwapSummary {
     status : 'swap-successful'
     swapSummary : SwapSummary
@@ -136,8 +140,12 @@ export function isSwapExecutionErrorParseSummary(obj : ParsedSwapSummary) : obj 
     return isEnumValue(obj.status, SwapExecutionError);
 }
 
-export function isSuccessfullyParsedSwapSummary(obj : ParsedSwapSummary) : obj is ParsedSuccessfulSwapSummary {
-    return obj.status === 'swap-successful';
+export function isSlippageSwapExecutionErrorParseSummary(obj : ParsedSwapSummary) : obj is SlippageSwapExecutionErrorParseSummary {
+    return isSwapExecutionErrorParseSummary(obj) && obj.status === SwapExecutionError.SlippageToleranceExceeded;
+}
+
+export function isSuccessfullyParsedSwapSummary(obj : ParsedSwapSummary|string) : obj is ParsedSuccessfulSwapSummary {
+    return typeof obj === 'object' && obj.status === 'swap-successful';
 }
 
 export function isSwapExecutionError<T>(obj: T | SwapExecutionError): obj is SwapExecutionError {

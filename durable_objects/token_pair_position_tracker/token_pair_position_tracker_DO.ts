@@ -307,7 +307,7 @@ export class TokenPairPositionTrackerDO {
         }
         position.isConfirmingBuy = false;
         if (body.status === 'confirmed') {
-            position.confirmed = true;
+            position.buyConfirmed = true;
         }
         else if (body.status === 'unconfirmed') {
             // no-op
@@ -324,26 +324,38 @@ export class TokenPairPositionTrackerDO {
     }
 
     async handleUpdateSellConfirmationStatusInternal(body : UpdateSellConfirmationStatusRequest) : Promise<UpdateSellConfirmationStatusResponse> {
+        
         const positionID = body.positionID;
         const position = this.tokenPairPositionTracker.getPosition(positionID);
+        
         if (position == null) {
             return {};
         }
+
         position.isConfirmingSell = false;
+
+        if (body.sellTxSignature != null) {
+            position.txSellSignature = body.sellTxSignature;
+        }
+        if (body.sellLastValidBlockheight != null) {
+            position.sellLastValidBlockheight = body.sellLastValidBlockheight;
+        }
+        
         if (body.status === 'confirmed') {
             this.tokenPairPositionTracker.closePosition(positionID);
         }
         else if (body.status === 'unconfirmed') {
-            // no-op
+            position.sellConfirmed = false;
         }
         else if (body.status === 'slippage-failed') {
+            position.sellConfirmed = null;
             position.status = PositionStatus.Open;
-            if (position.autoDoubleSlippageOnFailSellSlippage) {
-                position.sellSlippagePercent = position.sellSlippagePercent * 2.0;
-            }
+            const autoDoubleSlippage = position.sellAutoDoubleSlippage;
+            position.sellSlippagePercent = autoDoubleSlippage ? (2.0 * position.sellSlippagePercent) : position.sellSlippagePercent;
         }
         else if (body.status === 'failed') {
             // re-open the position if we were able to confirm the sell failed
+            position.sellConfirmed = null;
             position.status = PositionStatus.Open;
         }
         else {

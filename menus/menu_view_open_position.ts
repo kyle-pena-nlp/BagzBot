@@ -25,7 +25,7 @@ export class MenuViewOpenPosition extends Menu<PositionAndMaybePNL|{ brandNewPos
             lines.push(`${toNumber(this.menuData.position.fillPrice)}`)
             lines.push(`${toNumber(this.menuData.position.tokenAmt)}`)
             lines.push(`${toNumber(this.menuData.position.vsTokenAmt)}`)
-            lines.push(`${(this.menuData.position.confirmed)}`)
+            lines.push(`${(this.menuData.position.buyConfirmed)}`)
         }
 
 

@@ -6,16 +6,58 @@ import { logDebug, logError, logInfo } from "../../logging";
 import { Swappable, getSwapOfXDescription, isPosition, isPositionRequest } from "../../positions";
 import { executeAndMaybeConfirmTx } from "../../rpc/rpc_execute_signed_transaction";
 import { parseBuySwapTransaction, parseSellSwapTransaction } from "../../rpc/rpc_parse";
-import { ParsedSuccessfulSwapSummary, ParsedSwapSummary, PreparseConfirmedSwapResult, PreparseSwapResult, SwapExecutionError, TransactionExecutionError, TransactionExecutionErrorCouldntConfirm, UnknownTransactionParseSummary, isConfirmed as isConfirmedTxExecution, isFailedSwapSlippageTxExecution, isFailedSwapTxExecution, isFailedTxExecution, isSuccessfullyParsedSwapSummary, isSwapExecutionErrorParseSwapSummary, isUnknownTransactionParseSummary } from "../../rpc/rpc_types";
+import { ParsedSuccessfulSwapSummary, ParsedSwapSummary, PreparseConfirmedSwapResult, SwapExecutionError, TransactionExecutionError, TransactionExecutionErrorCouldntConfirm, UnknownTransactionParseSummary, isConfirmed as isConfirmedTxExecution, isFailedSwapSlippageTxExecution, isFailedSwapTxExecution, isFailedTxExecution, isSuccessfullyParsedSwapSummary, isSwapExecutionErrorParseSwapSummary, isUnknownTransactionParseSummary } from "../../rpc/rpc_types";
 import { TGStatusMessage, UpdateableNotification } from "../../telegram";
 import { assertNever } from "../../util";
-/* markPositionAsOpen, renegeOpenPosition */
 
-/* 
-    This method should not throw any exceptions and should be absolutely bullet proof to exceptional circumstances
-*/
+export type TransactionExecutionResult = 'tx-failed'|
+SwapFailedTxResultAndInfo|
+    CouldNotConfirmTxResultAndInfo|
+    SuccessfulTxResultAndInfo;
 
-export class TransactionExecutor {
+export interface CouldNotConfirmTxResultAndInfo {
+    result:  'could-not-confirm'
+    signature : string
+    lastValidBH : number
+}
+
+export function isCouldNotConfirmTxResultAndInfo(x : TransactionExecutionResult) : x is CouldNotConfirmTxResultAndInfo {
+    return typeof x !== 'string' && x.result === 'could-not-confirm';
+}
+
+export interface SwapFailedTxResultAndInfo {
+    result:  'swap-failed'|'swap-failed-slippage'
+    signature : string
+    lastValidBH : number
+}
+
+export function isSwapFailedTxResultAndInfo(x : TransactionExecutionResult) : x is SwapFailedTxResultAndInfo {
+    return typeof x !== 'string' && x.result === 'swap-failed';
+}
+
+export interface SwapFailedSlippageTxResultAndInfo {
+    result:  'swap-failed-slippage'
+    signature : string
+    lastValidBH : number  
+}
+
+export function isSwapFailedSlippageTxResultAndInfo(x : TransactionExecutionResult) : x is SwapFailedSlippageTxResultAndInfo {
+    return typeof x !== 'string' && x.result === 'swap-failed-slippage';
+}
+
+export interface SuccessfulTxResultAndInfo { 
+    result : ParsedSuccessfulSwapSummary, 
+    signature: string, 
+    lastValidBH : number
+}
+
+export function isSuccessfulTxExecutionResult(x : TransactionExecutionResult) : x is SuccessfulTxResultAndInfo {
+    return typeof x !== 'string' && 
+        typeof x.result !== 'string' && 
+        isSuccessfullyParsedSwapSummary(x.result);
+}
+
+export class SwapExecutor {
     wallet : Wallet
     env : Env
     notificationChannel: UpdateableNotification
@@ -33,12 +75,7 @@ export class TransactionExecutor {
         this.startTimeMS = startTimeMS;
     }
 
-    async executeAndConfirmSignedTx(s : Swappable, signedTx : VersionedTransaction) : Promise<
-        ParsedSuccessfulSwapSummary|
-        'could-not-confirm'|
-        'tx-failed'|
-        'swap-failed'|
-        'swap-failed-slippage'> {
+    async executeAndConfirmSignedTx(s : Swappable, signedTx : VersionedTransaction) : Promise<TransactionExecutionResult> {
           
         // get a friendly description of what we are doing
         const SwapOfX = getSwapOfXDescription(s, true);
@@ -47,9 +84,21 @@ export class TransactionExecutor {
         const signature = bs58.encode(signedTx.signatures[0]);
         const userAddress = toUserAddress(this.wallet);
 
+        // TODO: RPC node health check, per: https://solana.com/docs/core/transactions/confirmation#use-healthy-rpc-nodes-when-fetching-blockhashes 
+        let lastValidBH = await this.connection.getLatestBlockhash('confirmed')
+            .then(x => x.lastValidBlockHeight)
+            .catch(r => {
+                logError(`Could not get latestBlockhash`, r);
+                return null;
+            });
+
+        if (lastValidBH == null) {
+            return 'tx-failed';
+        }
+        
         // attempt to execute and confirm tx
         TGStatusMessage.queue(this.notificationChannel, `Executing transaction... (this could take a moment)`, false);
-        let maybeExecutedTx = await executeAndMaybeConfirmTx(s.positionID, signedTx, this.connection, this.env, this.startTimeMS);
+        let maybeExecutedTx = await executeAndMaybeConfirmTx(s.positionID, signedTx, lastValidBH, this.connection, this.env, this.startTimeMS);
 
         // transaction didn't go through
         if (isFailedTxExecution(maybeExecutedTx)) {
@@ -63,7 +112,7 @@ export class TransactionExecutor {
             logInfo("Swap failed due to slippage", s, maybeExecutedTx);
             const msg = makeSwapSummaryFailedMessage(maybeExecutedTx.status, s);
             TGStatusMessage.queue(this.notificationChannel, msg, false);
-            return 'swap-failed-slippage';
+            return { result: 'swap-failed-slippage', signature : signature, lastValidBH: lastValidBH };
         }
 
         // transaction went through, but swap failed for some other reason. early out.
@@ -71,8 +120,8 @@ export class TransactionExecutor {
             logError('Swap failed', s, maybeExecutedTx);
             const msg = makeSwapSummaryFailedMessage(maybeExecutedTx.status, s);
             TGStatusMessage.queue(this.notificationChannel, msg, false);
-            return 'swap-failed';
-        }    
+            return { result: 'swap-failed', signature : signature, lastValidBH: lastValidBH };
+        }
 
         let parsedSwapSummary : ParsedSwapSummary|null = null;
 
@@ -90,7 +139,7 @@ export class TransactionExecutor {
             logError('Unexpected error retrieving transaction', s, { signature : signature });
             const msg = `There was a problem retrieving information about your transaction.`;
             TGStatusMessage.queue(this.notificationChannel, msg, false);
-            return 'could-not-confirm';
+            return { result: 'could-not-confirm', signature: signature, lastValidBH: lastValidBH };
         }
 
         // if parsing the confirmed tx shows there was a problem with the swap, early out.
@@ -98,7 +147,7 @@ export class TransactionExecutor {
             logError('Swap execution error', s, parsedSwapSummary);
             const failedMsg = makeSwapSummaryFailedMessage(parsedSwapSummary.status, s);
             TGStatusMessage.queue(this.notificationChannel, failedMsg, false);
-            return 'swap-failed';
+            return { result: 'swap-failed', signature : signature, lastValidBH: lastValidBH };
         }
 
         // if everything went ok
@@ -113,10 +162,10 @@ export class TransactionExecutor {
             logInfo('Tx did not exist', s, parsedSwapSummary);
             const msg = `Could not confirm ${SwapOfX}.`;
             TGStatusMessage.queue(this.notificationChannel, msg, false);
-            return 'could-not-confirm';
+            return { result: 'could-not-confirm', signature: signature, lastValidBH : lastValidBH };
         }
 
-        return parsedSwapSummary;
+        return { result: parsedSwapSummary, signature: signature, lastValidBH: lastValidBH };
     }
 }
 

@@ -17,6 +17,7 @@ import {
 export async function executeAndMaybeConfirmTx(
     positionID : string,
     rawSignedTx : VersionedTransaction, 
+    lastValidBlockHeight : number,
     connection : Connection,
     env : Env,
     startTimeMS : number) : Promise<PreparseSwapResult> {
@@ -43,20 +44,6 @@ export async function executeAndMaybeConfirmTx(
     let stopSendingTx = false;
     let stopConfirming = false;
     let anyTxSent = false;
-
-    // TODO: RPC node heath check, per: https://solana.com/docs/core/transactions/confirmation#use-healthy-rpc-nodes-when-fetching-blockhashes 
-    let latestBlockhash = await connection.getLatestBlockhash('confirmed').catch(r => {
-        logError(`Could not get latestBlockhash`, r);
-        return null;
-    });
-
-    if (latestBlockhash == null) {
-        return {
-            positionID : positionID,
-            status: TransactionExecutionError.CouldNotPollBlockheightNoTxSent,
-            signature : signature
-        };
-    }
 
     const resendTxTask = (async () => {
 
@@ -97,7 +84,7 @@ export async function executeAndMaybeConfirmTx(
                 rpcExceptions += 1;
             }
 
-            if (blockheight != null && blockheight > latestBlockhash.lastValidBlockHeight) {
+            if (blockheight != null && blockheight > lastValidBlockHeight) {
                 logDebug("send loop - blockhash expired - stopping send tx");
                 returnStatus = TransactionExecutionError.BlockheightExceeded;
                 break;
@@ -196,10 +183,10 @@ export async function executeAndMaybeConfirmTx(
                     logError("confirm loop - could not determine blockheight");
                     rpcExceptions += 1;
                 }
-                else if (blockheight != null && blockheight <= latestBlockhash.lastValidBlockHeight) {
+                else if (blockheight != null && blockheight <= lastValidBlockHeight) {
                     logDebug("tx not found yet blockhash still valid");
                 }
-                else if (blockheight != null && blockheight > latestBlockhash.lastValidBlockHeight) {
+                else if (blockheight != null && blockheight > lastValidBlockHeight) {
                     logError("tx not found and blockhash expired - considered dropped", signature);
                     returnStatus = TransactionExecutionError.TransactionDropped;
                     break;

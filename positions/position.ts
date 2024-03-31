@@ -19,34 +19,44 @@ export enum PositionStatus {
 
 export interface Position {
 	readonly [ key : string ] : Structural
+
+	// metadata
 	userID : number
 	chatID : number
 	messageID : number
 	positionID : string
-	type: PositionType
 
-	// status of 'Closing' indicates we are attempting to sell
-	status : PositionStatus
-
-	// whether or not the buy has been confirmed (cannot rename to buyConfirmed for backwards compat)
-	confirmed : boolean
-	isConfirmingBuy : boolean|null // null for backwards compat.  should be considered 'false'.
-
-	// whether or not the sell has been confirmed (null if never got to send sell tx)
-	sellConfirmed : boolean|null
-	isConfirmingSell : boolean|null // null for backwards compat. should be considered 'false'.
-
-	txSignature : string
+	// position data
+	type: PositionType	
 	token: TokenInfo
 	vsToken: TokenInfo
 	vsTokenAmt: DecimalizedAmount
 	tokenAmt : DecimalizedAmount
 	fillPrice : DecimalizedAmount
-	sellSlippagePercent : number
 
-    /* Relevant if TLS position */
+
+	// user sell settings
     triggerPercent : number
 	sellAutoDoubleSlippage : boolean|null
+	sellSlippagePercent : number // also used for buy
+
+	// Position State Management
+
+	// Open, Closing, Closed.
+	// When in Closing, prevents sell or auto-sell
+	status : PositionStatus
+
+	// TODO: set this & lastvalidBH on buy
+	txBuySignature : string
+	buyLastValidBlockheight : number
+	buyConfirmed : boolean
+	isConfirmingBuy : boolean
+
+	// TODO: set this & lastvalidBH on buy
+	txSellSignature : string|null
+	sellLastValidBlockheight : number|null
+	sellConfirmed : boolean|null
+	isConfirmingSell : boolean	
 };
 
 interface BasePositionRequest {

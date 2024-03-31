@@ -145,7 +145,7 @@ export class PeakPricePositionTracker {
                 }
 
                 // Rule for sanity: Can't sell until the buy is confirmed.
-                if (!position.confirmed) {
+                if (!position.buyConfirmed) {
                     return;
                 }
 
