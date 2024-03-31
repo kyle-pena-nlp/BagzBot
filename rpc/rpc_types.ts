@@ -54,6 +54,10 @@ export interface PreparseSwapExecutionError extends BasePreparseResult {
     status: SwapExecutionError
 }
 
+export interface PreparseSwapExcecutionSlippageError extends BasePreparseResult {
+    status: SwapExecutionError.SlippageToleranceExceeded
+}
+
 export enum SwapExecutionError {
     InsufficientSOLBalance = "InsufficientSOLBalance",
     InsufficientTokenBalance = "InsufficientTokenBalance",
@@ -160,6 +164,10 @@ export function isConfirmed(maybeExecutedTx : PreparseSwapResult) : maybeExecute
 
 export function isFailedSwapTxExecution(maybeExecutedTx : PreparseSwapResult) : maybeExecutedTx is PreparseSwapExecutionError {
     return isEnumValue(maybeExecutedTx.status, SwapExecutionError);
+}
+
+export function isFailedSwapSlippageTxExecution(maybeExecutedTx : PreparseSwapResult) : maybeExecutedTx is PreparseSwapExcecutionSlippageError {
+    return maybeExecutedTx.status === SwapExecutionError.SlippageToleranceExceeded;
 }
 
 export function isFailedTxExecution(maybeExecutedTx : PreparseSwapResult) : maybeExecutedTx is PreparseFailedSwapResult {

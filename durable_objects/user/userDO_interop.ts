@@ -154,6 +154,7 @@ export async function sendClosePositionOrdersToUserDOs(positionsToClose: Positio
 	const batchesOfUsers = groupIntoBatches(pairs,4);
 	for (const userBatch of batchesOfUsers) {
 		const promises = []
+		// let 4 subrequests go out at once, each containing a batch of positions
 		for (const [userID, group] of userBatch) {
 			promises.push(tryToClosePositions(userID,group,env));
 		}
@@ -163,9 +164,8 @@ export async function sendClosePositionOrdersToUserDOs(positionsToClose: Positio
 
 export async function tryToClosePositions(userID : number, positions : Position[], env : Env) {
 	const method = UserDOFetchMethod.automaticallyClosePositions;
-	const positionIDs = positions.map(p => p.positionID);
 	const chatID = positions[0].chatID;
-	const individualRequestForUserDO : AutomaticallyClosePositionsRequest = { telegramUserID: userID, chatID: chatID, positionIDs: positionIDs };
+	const individualRequestForUserDO : AutomaticallyClosePositionsRequest = { telegramUserID: userID, chatID: chatID, positions: positions };
 	await sendJSONRequestToUserDO<AutomaticallyClosePositionsRequest,AutomaticallyClosePositionsResponse>(userID, method, individualRequestForUserDO, env);
 }
 

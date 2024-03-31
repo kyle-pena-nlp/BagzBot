@@ -3,7 +3,8 @@ import * as bs58 from "bs58";
 import { Buffer } from "node:buffer";
 import { Env } from "../env";
 import { logDebug, logError } from "../logging";
-import { assertNever, sleep } from "../util";
+import { assertNever, sleep, strictParseInt } from "../util";
+import { assertIs } from "../util/enums";
 import { parseInstructionError } from "./rpc_parse_instruction_error";
 import {
     PreparseSwapResult,
@@ -12,18 +13,22 @@ import {
     TransactionExecutionErrorCouldntConfirm
 } from "./rpc_types";
 
-
+// this method is unholy and needs to be split up.
 export async function executeAndMaybeConfirmTx(
     positionID : string,
     rawSignedTx : VersionedTransaction, 
     connection : Connection,
-    env : Env) : Promise<PreparseSwapResult> {
+    env : Env,
+    startTimeMS : number) : Promise<PreparseSwapResult> {
+
+    const isTimedOut : () => boolean = () => {
+        return (Date.now() - startTimeMS) > 25000;
+    }
 
     // Define some settings
     const maxConfirmRpcExceptions = parseInt(env.RPC_MAX_CONFIRM_EXCEPTIONS,10);
     const REBROADCAST_DELAY_MS = parseInt(env.RPC_REBROADCAST_DELAY_MS, 10);
     const REATTEMPT_CONFIRM_DELAY = parseInt(env.RPC_REATTEMPT_CONFIRM_DELAY, 10);
-    const confirmTimeoutMS = parseInt(env.RPC_CONFIRM_TIMEOUT_MS, 10);
 
     // transform tx to buffer, extract signature yo damn self
     const txBuffer = Buffer.from(rawSignedTx.serialize());
@@ -35,11 +40,8 @@ export async function executeAndMaybeConfirmTx(
             One for confirming until timeout or (signature not found AND blockheight exceeded)
     */
 
-    // The loops can signal eachother to stop by setting these flags.
     let stopSendingTx = false;
     let stopConfirming = false;
-
-    // whether at least 1 tx has been sent (irregardless of if it actually executed)
     let anyTxSent = false;
 
     // TODO: RPC node heath check, per: https://solana.com/docs/core/transactions/confirmation#use-healthy-rpc-nodes-when-fetching-blockhashes 
@@ -64,7 +66,7 @@ export async function executeAndMaybeConfirmTx(
         // TODO: make it a setting
         const maxRPCSendExceptions = 10;
 
-        let returnStatus : TransactionExecutionError|undefined = undefined;
+        let returnStatus : TransactionExecutionError|'timed-out'|undefined = undefined;
         
         // Until this loop is signalled to stop
         while(!stopSendingTx) {
@@ -73,7 +75,7 @@ export async function executeAndMaybeConfirmTx(
             logDebug("Attempting to send tx")
             await connection.sendRawTransaction(txBuffer, {
                 skipPreflight : true,
-                maxRetries: 0, 
+                maxRetries: strictParseInt(env.RPC_SEND_RAW_TRANSACTION_MAX_RETRIES), 
                 // per: https://solana.com/docs/core/transactions/confirmation#use-an-appropriate-preflight-commitment-level
                 preflightCommitment: 'confirmed'
             }).then(async _ => {
@@ -131,12 +133,18 @@ export async function executeAndMaybeConfirmTx(
         let returnStatus : TransactionExecutionError | 
             TransactionExecutionErrorCouldntConfirm | 
             SwapExecutionError | 
+            'timed-out'|
             'transaction-confirmed' | 
             undefined = undefined;
         
         while(!stopConfirming) {
 
-            // don't bother confirming if at least 1 tx hasn't been sent. check again real soon.
+            if (isTimedOut()) {
+                returnStatus = 'timed-out';
+                break;
+            }
+
+            // don't bother running confirmation if at least 1 tx hasn't been sent. check again real soon.
             if (!anyTxSent) {
                 await sleep(100);
                 continue;
@@ -215,7 +223,7 @@ export async function executeAndMaybeConfirmTx(
 
             await sleep(REATTEMPT_CONFIRM_DELAY);
         }
-        logDebug('confirm loop - stopping send of tx')
+        logDebug('confirm loop ended - stopping send of tx')
         stopSendingTx = true;
         return returnStatus;
     })();
@@ -251,12 +259,21 @@ function parseSwapExecutionError(err : any, rawSignedTx : VersionedTransaction, 
 function determineTxConfirmationFinalStatus(
     anyTxSent : boolean,
     sendStatus : TransactionExecutionError|undefined, 
-    confirmStatus : TransactionExecutionError|TransactionExecutionErrorCouldntConfirm|SwapExecutionError|'transaction-confirmed'|undefined) : SwapExecutionError | TransactionExecutionError | TransactionExecutionErrorCouldntConfirm | 'transaction-confirmed' {
+    confirmStatus : TransactionExecutionError|'timed-out'|TransactionExecutionErrorCouldntConfirm|SwapExecutionError|'transaction-confirmed'|undefined) : 
+    SwapExecutionError | TransactionExecutionError | TransactionExecutionErrorCouldntConfirm | 'transaction-confirmed' {
     
+    // no tx sent whatsoever... a severe form of failure
     if (!anyTxSent) {
         return TransactionExecutionError.TransactionFailedOtherReason
     }
-    else if (confirmStatus != null) {
+
+    assertIs<true, typeof anyTxSent>();
+
+    if (confirmStatus == 'timed-out') {
+        return TransactionExecutionErrorCouldntConfirm.TimeoutCouldNotConfirm;
+    }
+
+    if (confirmStatus != null) {
         return confirmStatus;
     }
     else if (sendStatus != null) {
@@ -266,20 +283,6 @@ function determineTxConfirmationFinalStatus(
         return TransactionExecutionErrorCouldntConfirm.UnknownCouldNotConfirm;
     }
 }
-
-/*
-// this method is unreliable - would say 'false' sometimes even when blockhash just produced.
-async function getIsBlockhashValid(txRecentBlockhash : string, connection : Connection) {
-    return await connection.isBlockhashValid(txRecentBlockhash, { commitment: 'processed' })
-        .then(result => {
-            return result.value;
-        })
-        .catch(e => {
-            logError("Unable to determine if blockhash is valid", e);
-            return null;
-        });
-}
-*/
 
 function interpretTxSignatureStatus(status : SignatureStatus) : 'failed'|'unconfirmed'|'succeeded' {
                 

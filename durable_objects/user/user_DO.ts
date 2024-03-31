@@ -2,12 +2,13 @@ import { Wallet, encryptPrivateKey, generateEd25519Keypair } from "../../crypto"
 import { DecimalizedAmount } from "../../decimalized";
 import { Env } from "../../env";
 import { logError, logInfo } from "../../logging";
-import { PositionPreRequest, PositionType } from "../../positions";
+import { PositionPreRequest, PositionStatus, PositionType } from "../../positions";
 import { getSOLBalance } from "../../rpc/rpc_wallet";
 import { POSITION_REQUEST_STORAGE_KEY } from "../../storage_keys";
 import { TGStatusMessage, UpdateableNotification, sendMessageToTG } from "../../telegram";
 import { WEN_ADDRESS, getVsTokenInfo } from "../../tokens";
 import { ChangeTrackedValue, Structural, assertNever, groupIntoBatches, makeFailureResponse, makeJSONResponse, makeSuccessResponse, maybeGetJson, sleep, strictParseBoolean } from "../../util";
+import { assertIs } from "../../util/enums";
 import { listUnclaimedBetaInviteCodes } from "../beta_invite_codes/beta_invite_code_interop";
 import { PositionAndMaybePNL } from "../token_pair_position_tracker/model/position_and_PNL";
 import { editTriggerPercentOnOpenPositionInTracker, getPositionAndMaybePNL, listPositionsByUser, setSellAutoDoubleOnOpenPositionInPositionTracker } from "../token_pair_position_tracker/token_pair_position_tracker_do_interop";
@@ -36,12 +37,12 @@ import { UnimpersonateUserRequest, UnimpersonateUserResponse } from "./actions/u
 import { UserInitializeRequest, UserInitializeResponse } from "./actions/user_initialize";
 import { TokenPair } from "./model/token_pair";
 import { UserData } from "./model/user_data";
+import { PositionBuyer } from "./position_buyer";
 import { SessionTracker } from "./trackers/session_tracker";
 import { SOLBalanceTracker } from "./trackers/sol_balance_tracker";
 import { TokenPairsForPositionIDsTracker } from "./trackers/token_pairs_for_position_ids_tracker";
 import { UserPNLTracker } from "./trackers/user_pnl_tracker";
 import { UserDOFetchMethod, parseUserDOFetchMethod } from "./userDO_interop";
-import { buy } from "./user_buy";
 import { sell } from "./user_sell";
 
 // TODO: all requests to UserDo include telegramUserID and telegramUserName
@@ -526,7 +527,7 @@ export class UserDO {
     }
 
     async handleOpenNewPosition(openPositionRequest : OpenPositionRequest) : Promise<Response> {
-        // fire and forget (async callback will handle success and failure cases for swap)
+        const startTimeMS = Date.now();
         const positionRequest = openPositionRequest.positionRequest;       
         this.tokenPairsForPositionIDsTracker.storePosition({
             positionID: openPositionRequest.positionRequest.positionID,
@@ -536,29 +537,46 @@ export class UserDO {
         /*
             This is deliberately not awaited.
             Durable Objects will continue processing requests for up to 30 seconds
-            (Which means the buy has to happen in 30 secs!!!)
-        */        
-        buy(positionRequest, this.wallet.value!!, this.env);
+            (Which means the buy has to happen in 30 secs, or it is considered unconfirmed!!!)
+        */
+        const positionBuyer = new PositionBuyer(this.wallet.value!!, this.env, startTimeMS);    
+        positionBuyer.buy(positionRequest);
         return makeJSONResponse<OpenPositionResponse>({});
     }
     
     async handleManuallyClosePositionRequest(manuallyClosePositionRequest : ManuallyClosePositionRequest) : Promise<Response> {
+        const startTimeMS = Date.now();
         const positionID = manuallyClosePositionRequest.positionID;
         const tokenPair = this.tokenPairsForPositionIDsTracker.getPositionPair(positionID);
         if (tokenPair == null) {
             logError(`Could not find tokenPair for position ID ${positionID}`, this.telegramUserID);
             return makeJSONResponse<ManuallyClosePositionResponse>({ message: 'Could not find token pair for position' });
         }
-        sell(positionID, tokenPair.token.address, tokenPair.vsToken.address, this.wallet.value!!, this.env);
+        const tokenAddress = tokenPair.token.address;
+        const vsTokenAddress = tokenPair.vsToken.address;
+        const positionAndMaybePNL = await getPositionAndMaybePNL(positionID, tokenAddress, vsTokenAddress, this.env);
+        if (positionAndMaybePNL == null) {
+            return makeJSONResponse<ManuallyClosePositionResponse>({ message: "Position did not exist" });
+        }
+        const position = positionAndMaybePNL.position;
+        if (position.status == PositionStatus.Closing) {
+            return makeJSONResponse<ManuallyClosePositionResponse>({ message: "Position is already being sold." });
+        }
+        else if (position.status === PositionStatus.Closed) {
+            return makeJSONResponse<ManuallyClosePositionResponse>({ message: "Position has already been sold." });
+        }
+        assertIs<PositionStatus.Open,typeof position.status>();
+        // deliberate lack of await here (fire-and-forget). Must complete in 30s.
+        sell(position, this.wallet.value!!, this.env, startTimeMS);
         return makeJSONResponse<ManuallyClosePositionResponse>({ message: 'Position will now be closed. '});
     }
 
     async handleAutomaticallyClosePositionsRequest(closePositionsRequest : AutomaticallyClosePositionsRequest) : Promise<Response> {
-        const positionIDsToClose = closePositionsRequest.positionIDs;
-        if (positionIDsToClose.length == 0) {
+        const positionsToClose = closePositionsRequest.positions;
+        if (positionsToClose.length == 0) {
             return makeJSONResponse<AutomaticallyClosePositionsResponse>({});
         }
-        const positionBatches = groupIntoBatches(positionIDsToClose,4);
+        const positionBatches = groupIntoBatches(positionsToClose,4);
         const notificationChannels : UpdateableNotification[] = [];
         for (const positionBatch of positionBatches) {
             // fire off a bunch of promises per batch (4)

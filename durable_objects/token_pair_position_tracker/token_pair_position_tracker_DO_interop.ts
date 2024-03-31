@@ -133,7 +133,7 @@ export async function updateBuyConfirmationStatus(positionID : string, tokenAddr
 	return await sendJSONRequestToTokenPairPositionTracker<UpdateBuyConfirmationStatusRequest,UpdateBuyConfirmationStatusResponse>(method,request,tokenAddress,vsTokenAddress,env);
 }
 
-export async function updateSellConfirmationStatus(positionID : string, tokenAddress : string, vsTokenAddress : string, status : 'confirmed'|'unconfirmed'|'failed', env : Env) : Promise<UpdateSellConfirmationStatusResponse> {
+export async function updateSellConfirmationStatus(positionID : string, tokenAddress : string, vsTokenAddress : string, status : 'confirmed'|'unconfirmed'|'failed'|'slippage-failed', env : Env) : Promise<UpdateSellConfirmationStatusResponse> {
 	const method = TokenPairPositionTrackerDOFetchMethod.updateSellConfirmationStatus;
 	const request : UpdateSellConfirmationStatusRequest = { positionID, tokenAddress, vsTokenAddress, status: status };
 	return await sendJSONRequestToTokenPairPositionTracker<UpdateSellConfirmationStatusRequest,UpdateSellConfirmationStatusResponse>(method,request,tokenAddress,vsTokenAddress,env);
