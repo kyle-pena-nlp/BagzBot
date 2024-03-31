@@ -198,6 +198,14 @@ export class TokenPairPositionTrackerDO {
         return makeSuccessResponse();
     }
 
+    // This has been useful during dev
+    /*__DELETE_ALL_POSITIONS() {
+        const positionIDs = [...this.tokenPairPositionTracker.pricePeaks.itemsByPeakPrice.positionIDMap.keys()];
+        for (const positionID of positionIDs) {
+            this.tokenPairPositionTracker.removePosition(positionID);
+        }
+    }*/
+
     async ensureIsPollingPrice() {
         const shouldBePolling = this.shouldBePolling();
         if (shouldBePolling && !this.isPolling) {

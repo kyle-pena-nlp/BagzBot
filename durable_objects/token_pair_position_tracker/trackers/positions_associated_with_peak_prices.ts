@@ -149,9 +149,8 @@ export class PositionsAssociatedWithPeakPrices extends DecimalizedAmountMap<Read
             const [position,price] = result;
             const isOpen = position.status === PositionStatus.Open;
             const buyUnconfirmed = !position.buyConfirmed;
-            const notConfirmingBuy = position.isConfirmingBuy !== true;
-            if (isOpen && buyUnconfirmed && notConfirmingBuy) {
-                position.isConfirmingBuy = true;
+            if (isOpen && buyUnconfirmed && !position.isConfirmingBuy) {
+                position.isConfirmingBuy = true; // <- important to avoid double-confirm attempts
                 result.push(position);
             }
         }
