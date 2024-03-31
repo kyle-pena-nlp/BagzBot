@@ -13,8 +13,6 @@ import { MenuFAQ } from "./menu_faq";
 import { MenuListPositions } from "./menu_list_positions";
 import { MenuMain } from "./menu_main";
 import { MenuOKClose } from "./menu_ok_close";
-import { MenuPleaseEnterToken } from "./menu_please_enter_token";
-import { MenuPleaseWait } from "./menu_please_wait";
 import { MenuRetryBuy } from "./menu_retry_buy";
 import { MenuTrailingStopLossEntryBuyQuantity } from "./menu_trailing_stop_loss_entry_buy_quantity";
 import { MenuTrailingStopLossPickVsToken } from "./menu_trailing_stop_loss_pick_vs_token";
@@ -30,7 +28,7 @@ import { WelcomeScreenPart2 } from "./welcome_screen_part_2";
 
 export {
     BaseMenu, LegalAgreement, MenuBetaInviteFriends, MenuCode, MenuContinueMessage, MenuEditOpenPositionSellAutoDoubleSlippage, MenuEditOpenPositionTriggerPercent, MenuEditPositionHelp, MenuEditPositionRequestSellAutoDoubleSlippage, MenuEditPositionRequest as MenuEditTrailingStopLossPositionRequest, MenuError, MenuFAQ,
-    MenuListPositions, MenuMain, MenuOKClose, MenuPleaseEnterToken, MenuPleaseWait, MenuRetryBuy, MenuTODO,
+    MenuListPositions, MenuMain, MenuOKClose, MenuRetryBuy, MenuTODO,
     MenuTrailingStopLossEntryBuyQuantity,
     MenuTrailingStopLossPickVsToken,
     MenuTrailingStopLossSlippagePercent,

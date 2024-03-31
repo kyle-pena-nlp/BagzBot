@@ -39,7 +39,6 @@ export enum MenuCode {
 	UnimpersonateUser = "UnimpersonateUser",
 	SubmitImpersonateUser = "SubmitImpersonateUser",
 
-	PleaseEnterToken = "PleaseEnterToken",
 	ViewOpenPosition = "ViewOpenPosition",
 	ClosePositionManuallyAction = "Pos.Close.Manually",
 

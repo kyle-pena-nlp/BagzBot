@@ -2,7 +2,6 @@ import { strictParseBoolean, tryParseBoolean } from "./booleans";
 import { ChangeTrackedValue } from "./change_tracked_value";
 import { groupIntoBatches, groupIntoMap, groupIntoRecord } from "./collections";
 import { assertNever, isEnumValue } from "./enums";
-import { expBackoff } from "./exp_backoff";
 import {
     makeFailureResponse,
     makeFakeFailedRequestResponse,
@@ -22,7 +21,7 @@ import { pause, sleep } from "./sleep";
 import { Structural, structuralEquals } from "./structural";
 
 export {
-    ChangeTrackedValue, MapWithStorage, Result, Structural, assertNever, expBackoff, groupIntoBatches, groupIntoMap,
+    ChangeTrackedValue, MapWithStorage, Result, Structural, assertNever, groupIntoBatches, groupIntoMap,
     groupIntoRecord, isEnumValue, makeFailureResponse,
     makeFakeFailedRequestResponse,
     makeJSONRequest,
