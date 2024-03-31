@@ -1,5 +1,5 @@
 
-import { DecimalizedAmount, MATH_DECIMAL_PLACES, dDiv } from "../decimalized";
+import { DecimalizedAmount, MATH_DECIMAL_PLACES, dDiv, dSub } from "../decimalized";
 import { dZero } from "../decimalized/decimalized_amount";
 import { Env } from "../env";
 import { Position, PositionPreRequest, PositionRequest, Quote } from "../positions";
@@ -26,7 +26,7 @@ async function makeQuote(swapRoute : GetQuoteFailure|SwapRoute, inTokenInfo : To
         return swapRoute;
     }
     const route = swapRoute.route;
-    const inTokenAmount = route.inAmount as string;
+    const inTokenAmount = route.inAmount as string; // if IN == SOL, this also includes rent, fees, etc.
     const outTokenAmount = route.outAmount as string;
     const solTokenInfo = getVsTokenInfo('SOL');
     const priceImpactPct = parseFloat(route.priceImpactPct||'0' as string);
@@ -34,15 +34,13 @@ async function makeQuote(swapRoute : GetQuoteFailure|SwapRoute, inTokenInfo : To
     const botFeeToken = outTokenInfo; // fees are charged in units of what token you are buying
     const slippageBps = route.slippageBps as number;
     const platformFeeBps = route.platformFee?.feeBps || 0;
-    const estimatedFee : DecimalizedAmount = {
-        tokenAmount: "5000000",
-        decimals: solTokenInfo.decimals
-    };
     const inTokenAmt = { tokenAmount : inTokenAmount, decimals : inTokenInfo.decimals };
     const outTokenAmt = { tokenAmount : outTokenAmount, decimals : outTokenInfo.decimals };
+    const exactInAmt = { tokenAmount : swapRoute.decimalizedExactInAmt, decimals : inTokenInfo.decimals };
+    const estimatedFee = dSub(inTokenAmt, exactInAmt);
     // For the buy:
     // in / out <-> SOL / chonky <-> $$ / taco <-> a taco cost $1.50
-    const fillPrice = dDiv(inTokenAmt, outTokenAmt, MATH_DECIMAL_PLACES) || dZero();
+    const fillPrice = dDiv(exactInAmt, outTokenAmt, MATH_DECIMAL_PLACES) || dZero();
     const quote : Quote = {
         inToken: inTokenInfo,
         inTokenAmt: inTokenAmt,
@@ -115,7 +113,8 @@ async function getSwapRoute(quoteAPIParams : JupiterQuoteAPIParams, env: Env) : 
             return GetQuoteFailure.FailedToDetermineSwapRoute;
         }
         const quoteResponseJSON = await quoteResponse.json();
-        return { 
+        return {
+            decimalizedExactInAmt: quoteAPIParams.decimalizedAmount, 
             inTokenAddress: quoteAPIParams.inputTokenAddress,
             outTokenAddress: quoteAPIParams.outputTokenAddress,
             swapMode: quoteAPIParams.swapMode,

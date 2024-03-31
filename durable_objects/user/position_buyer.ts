@@ -1,6 +1,7 @@
 
 import { Connection, VersionedTransaction } from "@solana/web3.js";
 import { Wallet } from "../../crypto";
+import { fromNumber } from "../../decimalized";
 import { Env } from "../../env";
 import { logError, logInfo } from "../../logging";
 import { MenuRetryBuy, MenuViewOpenPosition } from "../../menus";
@@ -160,13 +161,13 @@ function convertToUnconfirmedPosition(positionRequest : PositionRequest, quote :
 
         token: positionRequest.token,
         vsToken: positionRequest.vsToken,
-        vsTokenAmt : quote.inTokenAmt,
+        vsTokenAmt : fromNumber(positionRequest.vsTokenAmt), // don't use the quote, it includes fees.
         tokenAmt: quote.outTokenAmt,
 
         sellSlippagePercent: positionRequest.slippagePercent,
         triggerPercent : positionRequest.triggerPercent,
         sellAutoDoubleSlippage : positionRequest.sellAutoDoubleSlippage,
-        fillPrice: quote.fillPrice
+        fillPrice: quote.fillPrice // don't use the quote calculation.  it includes fees in the inTokenAmt.
     };
     return position;
 }
@@ -196,7 +197,7 @@ function convertConfirmedRequestToPosition(positionRequest: PositionRequest, txE
         triggerPercent : positionRequest.triggerPercent,
         sellAutoDoubleSlippage : positionRequest.sellAutoDoubleSlippage,
     
-        vsTokenAmt : txExecutionResult.result.swapSummary.inTokenAmt,
+        vsTokenAmt : fromNumber(positionRequest.vsTokenAmt),
         tokenAmt: txExecutionResult.result.swapSummary.outTokenAmt,        
         fillPrice: txExecutionResult.result.swapSummary.fillPrice
     };

@@ -25,6 +25,7 @@ import { UpdatePriceRequest, UpdatePriceResponse } from "./actions/update_price"
 import { UpdateSellConfirmationStatusRequest, UpdateSellConfirmationStatusResponse } from "./actions/update_sell_confirmation_status";
 import { UpsertPositionsRequest, UpsertPositionsResponse } from "./actions/upsert_positions";
 import { WakeupTokenPairPositionTrackerRequest, WakeupTokenPairPositionTrackerResponse } from "./actions/wake_up";
+import { PositionAndMaybePNL } from "./model/position_and_PNL";
 import { TokenPairPositionTrackerDOFetchMethod, parseTokenPairPositionTrackerDOFetchMethod } from "./token_pair_position_tracker_do_interop";
 import { CurrentPriceTracker } from "./trackers/current_price_tracker";
 import { ActionsToTake, TokenPairPositionTracker } from "./trackers/token_pair_position_tracker";
@@ -81,11 +82,6 @@ export class TokenPairPositionTrackerDO {
         this.vsTokenAddress.initialize(entries);
         this.tokenPairPositionTracker.initialize(entries);
         this.currentPriceTracker.initialize(entries);
-
-        // these should be in-sync but just in case.
-        if (this.tokenPairPositionTracker.pricePeaks.currentPrice.value == null) {
-            this.tokenPairPositionTracker.pricePeaks.currentPrice.value = this.currentPriceTracker.currentPrice.value;
-        }
     }
 
     async flushToStorage() {
@@ -114,7 +110,7 @@ export class TokenPairPositionTrackerDO {
         return true;
     }
 
-    initialized() : boolean {
+    initialized() : this is { vsTokenAddress : { value : string }, tokenAddress : { value : string } } {
         return  this.vsTokenAddress.value != null && 
                 this.tokenAddress.value != null;
     }
@@ -383,7 +379,11 @@ export class TokenPairPositionTrackerDO {
         if (percent <= 0 || percent >= 100) {
             return 'invalid-percent';
         }
-        const positionAndMaybePNL = this.tokenPairPositionTracker.getPositionAndMaybePNL(positionID);
+        if (!this.initialized()) {
+            throw new Error("Not initialized");
+        }
+        const currentPrice = await this.currentPriceTracker.getPrice(this.tokenAddress.value, this.vsTokenAddress.value);
+        const positionAndMaybePNL = this.tokenPairPositionTracker.getPositionAndMaybePNL(positionID, currentPrice);
         if (positionAndMaybePNL == null) {
             return 'position-DNE';
         }
@@ -410,10 +410,19 @@ export class TokenPairPositionTrackerDO {
     }
 
     async handleGetPositionAndMaybePNL(body : GetPositionAndMaybePNLFromPriceTrackerRequest) : Promise<Response> {
-        const positionID = body.positionID;
-        const maybePosition = this.tokenPairPositionTracker.getPositionAndMaybePNL(positionID);
-        const response : GetPositionAndMaybePNLFromPriceTrackerResponse = { maybePosition : maybePosition };
+        const maybePosition = await this.handleGetPositionAndMaybePNLInternal(body);
+        const response : GetPositionAndMaybePNLFromPriceTrackerResponse = { maybePosition };
         return makeJSONResponse(response);
+    }
+
+    async handleGetPositionAndMaybePNLInternal(body: GetPositionAndMaybePNLFromPriceTrackerRequest) : Promise<PositionAndMaybePNL|undefined> {
+        if (!this.initialized()) {
+            return undefined;
+        }
+        const positionID = body.positionID;
+        const currentPrice = await this.currentPriceTracker.getPrice(this.tokenAddress.value, this.vsTokenAddress.value);
+        const maybePosition = this.tokenPairPositionTracker.getPositionAndMaybePNL(positionID, currentPrice);
+        return maybePosition;
     }
 
     async handleRemovePosition(body: RemovePositionRequest) : Promise<Response> {
@@ -424,12 +433,22 @@ export class TokenPairPositionTrackerDO {
     }
 
     async handleListPositionsByUser(body: ListPositionsByUserRequest) : Promise<Response> {
-        const userID = body.telegramUserID;
-        const positions = this.tokenPairPositionTracker.listByUser(userID);
+        const positions = await this.handleListPositionsByUserInternal(body);
         const response : ListPositionsByUserResponse = {
             positions: positions
         }
         return makeJSONResponse<ListPositionsByUserResponse>(response);
+    }
+
+    async handleListPositionsByUserInternal(body: ListPositionsByUserRequest) : Promise<PositionAndMaybePNL[]> {
+        if (!this.initialized()) {
+            logError("Tried to list positions yet tokenPairPositionTracker wasn't initialized", this);
+            return [];
+        }
+        const currentPrice = await this.currentPriceTracker.getPrice(this.tokenAddress.value, this.vsTokenAddress.value);
+        const userID = body.telegramUserID;
+        const positions = this.tokenPairPositionTracker.listByUser(userID, currentPrice);
+        return positions;
     }
 
     async handleGetTokenPrice(body : GetTokenPriceRequest) : Promise<Response> {
@@ -511,6 +530,7 @@ export class TokenPairPositionTrackerDO {
     }
 
     async handleUpdatePrice(request : UpdatePriceRequest) : Promise<Response> {
+
         this.ensureIsInitialized(request);
         
         const newPrice = request.price;

@@ -26,8 +26,8 @@ export class TokenPairPositionTracker {
         return  this.pricePeaks.any();
     }
 
-    getPositionAndMaybePNL(positionID : string) : PositionAndMaybePNL|undefined {
-        return this.pricePeaks.getPositionAndMaybePNL(positionID);
+    getPositionAndMaybePNL(positionID : string, currentPrice : DecimalizedAmount|null) : PositionAndMaybePNL|undefined {
+        return this.pricePeaks.getPositionAndMaybePNL(positionID, currentPrice);
     }
 
     getPosition(positionID : string) : Position|undefined {
@@ -35,8 +35,8 @@ export class TokenPairPositionTracker {
         return result;
     }
 
-    listByUser(userID : number) : PositionAndMaybePNL[] {
-        return this.pricePeaks.listByUser(userID);
+    listByUser(userID : number, currentPrice : DecimalizedAmount|null) : PositionAndMaybePNL[] {
+        return this.pricePeaks.listByUser(userID, currentPrice);
     }
 
     upsertPositions(positions : Position[]) {

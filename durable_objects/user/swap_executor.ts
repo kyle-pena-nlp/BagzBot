@@ -192,7 +192,7 @@ function makeSwapSummaryFailedMessage(status : SwapExecutionError, s: Swappable)
     }
 }
 
-function parseSwapTransaction(s : Swappable, confirmedTx : PreparseConfirmedSwapResult, userAddress : UserAddress, connection : Connection, env : Env) {
+function parseSwapTransaction(s : Swappable, confirmedTx : PreparseConfirmedSwapResult, userAddress : UserAddress, connection : Connection, env : Env) : Promise<ParsedSwapSummary> {
     if (isPositionRequest(s)) {
         return parseBuySwapTransaction(s, confirmedTx, userAddress, connection, env);
     }

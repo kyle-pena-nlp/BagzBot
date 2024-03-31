@@ -124,7 +124,7 @@ async function transformToTGMessageSentInfo(response : Promise<Response>) : Prom
         }
         else {
             const responseDescription = (await response.json().catch(r => null));
-            logError("Failed to send TG message: " + responseDescription);
+            logError("Failed to send TG message: ", responseDescription);
             const failure : FailedTgMessageSentInfo = { success: false };
             return failure;
         }

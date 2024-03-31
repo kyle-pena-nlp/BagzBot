@@ -1,9 +1,9 @@
 import * as dMath from "../../../decimalized";
 import { DecimalizedAmount, DecimalizedAmountSet, MATH_DECIMAL_PLACES, dAdd, fromKey, fromNumber, toKey } from "../../../decimalized";
 import { dZero } from "../../../decimalized/decimalized_amount";
-import { logError, logInfo } from "../../../logging";
+import { logError } from "../../../logging";
 import { Position, PositionStatus, PositionType } from "../../../positions";
-import { ChangeTrackedValue, setDifference, setIntersection, setUnion, structuralEquals } from "../../../util";
+import { setDifference, setIntersection, setUnion, structuralEquals } from "../../../util";
 import { PositionAndMaybePNL } from "../model/position_and_PNL";
 import { PositionsAssociatedWithPeakPrices } from "./positions_associated_with_peak_prices";
 
@@ -29,7 +29,6 @@ export class PeakPricePositionTracker {
     _buffer : PositionsAssociatedWithPeakPrices = new PositionsAssociatedWithPeakPrices();
     itemsByPeakPrice : PositionsAssociatedWithPeakPrices = new PositionsAssociatedWithPeakPrices();
     pricePeakSessionKeyPrefix : string;
-    currentPrice : ChangeTrackedValue<DecimalizedAmount|null> = new ChangeTrackedValue<DecimalizedAmount|null>("peakPriceTrackerCurrentPrice", null);
 
     constructor(pricePeakSessionKeyPrefix : string) {
         this.pricePeakSessionKeyPrefix = pricePeakSessionKeyPrefix;
@@ -40,17 +39,12 @@ export class PeakPricePositionTracker {
     add(price : DecimalizedAmount, position : Position) {
         this.itemsByPeakPrice.add(price, position);
     }
-    listByUser(userID : number) : PositionAndMaybePNL[] {
-        const result : PositionAndMaybePNL[] = [];
-        const positionsAndMaybePNLs = this.itemsByPeakPrice.listByUser(userID, this.currentPrice.value);
+    listByUser(userID : number, currentPrice : DecimalizedAmount|null) : PositionAndMaybePNL[] {
+        const positionsAndMaybePNLs = this.itemsByPeakPrice.listByUser(userID, currentPrice);
         return positionsAndMaybePNLs;
     }
-    measurePNLForUser(userID : number) : DecimalizedAmount|undefined {
-        if (this.currentPrice.value == null) {
-            logInfo(`Couldn't calculate total PNL because currentPrice is null: ${userID}`);
-            return;
-        }
-        const positionsWithMaybePNL = this.listByUser(userID);
+    measurePNLForUser(userID : number, currentPrice : DecimalizedAmount) : DecimalizedAmount|undefined {
+        const positionsWithMaybePNL = this.listByUser(userID, currentPrice);
         let totalPNL = dZero();
         for (const pos of positionsWithMaybePNL) {
             if (pos.PNL == null) {
@@ -71,7 +65,6 @@ export class PeakPricePositionTracker {
         return this.itemsByPeakPrice.removePosition(positionID);
     }
     update(newPrice : DecimalizedAmount) : void {
-        this.currentPrice.value = newPrice;
         const peaks = [...this.itemsByPeakPrice.keys()];
         const mergedPeaks : DecimalizedAmount[] = [];
         const mergedPositions : (Position|undefined)[] = [];
@@ -104,8 +97,8 @@ export class PeakPricePositionTracker {
     getPeakPrice(positionID : string) : DecimalizedAmount|undefined {
         return this.itemsByPeakPrice.getPeakPrice(positionID);
     }
-    getPositionAndMaybePNL(positionID : string) : PositionAndMaybePNL|undefined {
-        return this.itemsByPeakPrice.getPositionAndMaybePNL(positionID, this.currentPrice.value);
+    getPositionAndMaybePNL(positionID : string, currentPrice : DecimalizedAmount|null) : PositionAndMaybePNL|undefined {
+        return this.itemsByPeakPrice.getPositionAndMaybePNL(positionID, currentPrice);
     }
     getPosition(positionID : string) : Position|undefined {
         return this.itemsByPeakPrice.getPosition(positionID);

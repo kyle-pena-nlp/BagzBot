@@ -4,12 +4,15 @@ export interface JupiterQuoteAPIParams {
     decimalizedAmount : string,
     slippageBps: number,
     platformFeeBps : number,
-    swapMode : 'ExactIn'|'ExactOut'
+    // I am forbidding ExactOut b/c it makes other calculations incorrect, particularly fillprice in quote
+    swapMode : 'ExactIn'
 }
 
 export interface SwapRoute {
+    decimalizedExactInAmt : string,
     inTokenAddress : string,
     outTokenAddress : string,
-    swapMode : 'ExactIn'|'ExactOut'
+    // I am forbidding ExactOut b/c it makes other calculations incorrect, particularly fillprice in quote
+    swapMode : 'ExactIn' 
     route : any
 };
