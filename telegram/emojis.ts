@@ -32,17 +32,11 @@ const emojis = {
     ':shrimp:': '🦐',
     ':microbe:' : '🦠',
 
-    ':folder:': '📁', // positions
-    ':open_folder:': '📂',
     ':lock:': '🔒', // closing position
 
     ':key:': '🔑',
 
     ':sparkle:' : '✨',
-    ':ledger:': '📒',
-    ':money_bag:': '💰',
-    ':credit_card:': '💳',
-    ':gem:': '💎',
     
     ':briefcase:': '💼',
     ':envelope:': '✉️',
@@ -57,9 +51,6 @@ const emojis = {
     ':happy:': '😊',
     ':beaming:': '😁',
     ':money_face:': '🤑',
-    ':thumbs_up:': '👍', 
-    ':thumbs_down:': '👎',
-    ':sign:': '✍',
     ':help:': '🤔',
     ':stop:': '🛑',
     ':none:': ''
