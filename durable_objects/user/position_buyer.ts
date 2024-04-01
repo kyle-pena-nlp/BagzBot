@@ -4,7 +4,7 @@ import { Wallet } from "../../crypto";
 import { fromNumber } from "../../decimalized";
 import { Env } from "../../env";
 import { logError, logInfo } from "../../logging";
-import { MenuRetryBuy, MenuViewOpenPosition } from "../../menus";
+import { MenuRetryBuy, MenuRetryBuySlippageError, MenuViewOpenPosition } from "../../menus";
 import { Position, PositionRequest, PositionStatus, Quote, getSwapOfXDescription } from "../../positions";
 import { TGStatusMessage, UpdateableNotification } from "../../telegram";
 import { assertNever } from "../../util";
@@ -57,6 +57,10 @@ export class PositionBuyer {
             const retryBuyMenuRequest = new MenuRetryBuy(positionRequest).getUpdateExistingMenuRequest(positionRequest.chatID, positionRequest.messageID, this.env);
             await fetch(retryBuyMenuRequest);
         }
+        else if (result === 'can-retry-slippage-error') {
+            const retryBuyMenuRequest = new MenuRetryBuySlippageError(positionRequest).getUpdateExistingMenuRequest(positionRequest.chatID, positionRequest.messageID, this.env);
+            await fetch(retryBuyMenuRequest);
+        }
         else {
             // take straight to position view
             const newPosition = result.newPosition;
@@ -71,7 +75,7 @@ export class PositionBuyer {
         return signedTx;
     }
 
-    private async buyInternal(positionRequest: PositionRequest, signedTx : VersionedTransaction, connection : Connection, notificationChannel : UpdateableNotification) : Promise<'can-retry'|{ newPosition: Position }> {
+    private async buyInternal(positionRequest: PositionRequest, signedTx : VersionedTransaction, connection : Connection, notificationChannel : UpdateableNotification) : Promise<'can-retry'|'can-retry-slippage-error'|{ newPosition: Position }> {
         
         // create a time-limited tx executor and confirmer
         const txExecute = new SwapExecutor(this.wallet, this.env, notificationChannel, connection, this.startTimeMS);
@@ -84,7 +88,10 @@ export class PositionBuyer {
 
         // newPosition is null indicates no pos created (confirmed OR unconfirmed)
         // and therefore, user can retry.
-        if (newPosition == null) {
+        if (isSwapFailedSlippageTxResultAndInfo(txExecutionResult)) {
+            return 'can-retry-slippage-error';
+        }
+        else if (newPosition == null) {
             return 'can-retry';
         }
         else if (newPosition != null) {

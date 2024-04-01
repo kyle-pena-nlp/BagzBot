@@ -43,11 +43,27 @@ interface DefaultedOpts {
 }
 
 function optDefaults(x : toFriendlyStringOpts) : DefaultedOpts {
-    const useSubscripts = x.useSubscripts == null ? true : false;
-    const addCommas = x.addCommas == null ? true : false;
-    const includePlusSign = x.includePlusSign == null ? false : true;
+    const useSubscripts = x.useSubscripts == null ? true : x.useSubscripts;
+    const addCommas = x.addCommas == null ? true : x.addCommas;
+    const includePlusSign = x.includePlusSign == null ? false : x.includePlusSign;
     const maxDecimalPlaces  = x.maxDecimalPlaces;
     return { useSubscripts, addCommas, includePlusSign, maxDecimalPlaces };
+}
+
+export function asPercentDeltaString(x : DecimalizedAmount) : string {
+    return toFriendlyString(x, 4, { useSubscripts: false, maxDecimalPlaces: 1, includePlusSign: true }) + "%";
+}
+
+export function asPercentString(x : DecimalizedAmount) : string {
+    return toFriendlyString(x, 4, { useSubscripts: false, maxDecimalPlaces: 1, includePlusSign: false }) + "%";
+}
+
+export function asTokenPrice(x : DecimalizedAmount) : string {
+    return toFriendlyString(x, 4, { useSubscripts : true });
+}
+
+export function asTokenPriceDelta(x : DecimalizedAmount) : string {
+    return toFriendlyString(x , 4, { useSubscripts : true, includePlusSign : true });
 }
 
 export function toFriendlyString(x : DecimalizedAmount, maxSigFigs : number, 

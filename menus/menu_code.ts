@@ -11,6 +11,7 @@ export enum MenuCode {
 	NewPosition = "NewPosition",
 	EditPositionHelp = "EditPositionHelp",
 	TransferFunds = "TransferFunds",
+	ManuallyConfirmBuy = "ManuallyConfirmBuy",
 
 	PosRequestChooseAutoDoubleSlippageOptions = "EPR.AutoDoubleSlip",
 	SubmitPosRequestAutoDoubleSlippageOptions = "SPR.AutoDoubleSlip",

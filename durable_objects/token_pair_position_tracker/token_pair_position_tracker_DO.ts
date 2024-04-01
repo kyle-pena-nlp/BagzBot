@@ -327,7 +327,7 @@ export class TokenPairPositionTrackerDO {
         }
         else if (body.status === 'failed') {
             this.tokenPairPositionTracker.removePosition(positionID);
-     }
+        }
         else if (body.status === 'slippage-failed') {
             this.tokenPairPositionTracker.removePosition(positionID);
         }

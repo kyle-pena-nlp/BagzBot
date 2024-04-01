@@ -1,5 +1,22 @@
 import { assertNever } from "../util";
 
+type HasProperties = { [ key: string] : any }
+
+type Loggable = null|undefined|boolean|string|number|symbol|bigint|HasProperties;
+
+type WeakmapCompatible = HasProperties|symbol;
+
+function isLoggable(x : any) : x is Loggable {
+    return x === null ||
+        x === undefined ||
+        typeof x === 'string' || 
+        typeof x == 'number' || 
+        typeof x === 'boolean' || 
+        typeof x === 'symbol' ||
+        typeof x === 'bigint' ||
+        (x != null && typeof x === 'object' && Object.keys(x).length > 0);
+}
+
 const keysToLookFor = [
     'message',
     'telegramUserID',
@@ -35,12 +52,16 @@ const fnsToLookFor = [
 
 const FORBIDDEN_LOG_KEYS = ['wallet','privateKey','encryptedPrivateKey','bytesAsHexString'];
 
-function digest(x : any, memo : WeakMap<object,string>) : string {
-    if (x == null || 
-        typeof x === 'string' || 
+function digest(x : Loggable, memo : WeakMap<WeakmapCompatible,string>) : string {
+    if (x === null) {
+        return 'null';
+    }
+    else if (x === undefined) {
+        return 'undefined';
+    }
+    else if (typeof x === 'string' || 
         typeof x == 'number' || 
         typeof x === 'boolean' || 
-        typeof x === 'undefined' ||
         typeof x === 'symbol' ||
         typeof x === 'bigint') {
         return x.toString();
@@ -54,13 +75,15 @@ function digest(x : any, memo : WeakMap<object,string>) : string {
         if (!(key in x)) {
             continue;
         }
-        const value = x[key];
-        const isWeakmapCompatible = value !== null && (typeof value === 'object' || typeof value === 'symbol');
-        const valueDigest = (isWeakmapCompatible && memo.has(value)) ? memo.get(value)!! : digest(value, memo);
-        if (isWeakmapCompatible) {
-            memo.set(value,valueDigest);
+        const value : any = x[key];
+        if (isLoggable(value)) {
+            const isWeakmapCompatible = value !== null && (typeof value === 'object' || typeof value === 'symbol');
+            const valueDigest = (isWeakmapCompatible && memo.has(value)) ? memo.get(value)!! : digest(value, memo);
+            if (isWeakmapCompatible) {
+                memo.set(value,valueDigest);
+            }
+            digestParts.push(`[${key}]: [${valueDigest}]`);
         }
-        digestParts.push(`[${key}]: [${valueDigest}]`);
     }   
     for (const key of fnsToLookFor) {
         if (!(key in x)) {
@@ -81,9 +104,12 @@ function digest(x : any, memo : WeakMap<object,string>) : string {
 }
 
 function logIt(xs : any[], level : 'error'|'info'|'debug') {
-    const memo = new WeakMap<object,string>();
+    const memo = new WeakMap<WeakmapCompatible,string>();
     const digestStrings : string[] = [];
     for (const x of xs) {
+        if (!isLoggable(x)) {
+            continue;
+        }
         digestStrings.push(digest(x, memo));
     }
     const digestString = digestStrings.join(" // ");
@@ -103,14 +129,23 @@ function logIt(xs : any[], level : 'error'|'info'|'debug') {
     }
 }
 
+function logItSafe(xs : any[], type : 'error'|'info'|'debug') {
+    try {
+        logIt(xs,type);
+    }
+    catch {
+        console.error("There was trying to generate a log message.");
+    }
+}
+
 export function logError(...xs : any[]) {
-    logIt(xs, 'error');
+    logItSafe(xs, 'error');
 }
 
 export function logInfo(...xs : any[]) {
-    logIt(xs, 'info');
+    logItSafe(xs, 'info');
 }
 
 export function logDebug(...xs : any[]) {
-    logIt(xs, 'debug');
+    logItSafe(xs, 'debug');
 }

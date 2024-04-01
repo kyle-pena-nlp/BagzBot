@@ -115,11 +115,11 @@ export async function tryToConfirmBuysWithUserDOs(unconfirmedBuys : Position[], 
 	}
 }
 
-export async function tryToConfirmBuys(userID : number, positions : Position[], env : Env) {
+export async function tryToConfirmBuys(userID : number, positions : Position[], env : Env) : Promise<ConfirmBuysResponse> {
 	const method = UserDOFetchMethod.confirmBuys;
 	const chatID = positions[0].chatID;
 	const individualRequestForUserDO : ConfirmBuysRequest = { telegramUserID: userID, chatID: chatID, positions: positions };
-	await sendJSONRequestToUserDO<ConfirmBuysRequest,ConfirmBuysResponse>(userID, method, individualRequestForUserDO, env);
+	return await sendJSONRequestToUserDO<ConfirmBuysRequest,ConfirmBuysResponse>(userID, method, individualRequestForUserDO, env);
 }
 
 // care taken here not to exceed simultaneous subrequest limit

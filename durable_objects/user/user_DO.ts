@@ -32,6 +32,7 @@ import { SetSellAutoDoubleOnOpenPositionRequest, SetSellAutoDoubleOnOpenPosition
 import { StoreLegalAgreementStatusRequest, StoreLegalAgreementStatusResponse } from "./actions/store_legal_agreement_status";
 import { StoreSessionValuesRequest, StoreSessionValuesResponse } from "./actions/store_session_values";
 import { UnimpersonateUserRequest, UnimpersonateUserResponse } from "./actions/unimpersonate_user";
+import { SwapStatus } from "./model/swap_status";
 import { TokenPair } from "./model/token_pair";
 import { UserData } from "./model/user_data";
 import { PositionBuyer } from "./position_buyer";
@@ -265,12 +266,14 @@ export class UserDO {
     /* When we are tracking a position whose buy has not been confirmed, we periodically send it here */
     async handleConfirmBuys(userAction : ConfirmBuysRequest) : Promise<Response> {
         const startTimeMS = Date.now();
+        const results : Record<string,SwapStatus> = {};
         for (const position of userAction.positions) {
             const swapConfirmer = new SwapConfirmer(this.wallet.value!!, this.env, startTimeMS);
             const buyStatus = await swapConfirmer.confirmSwap(position, 'buy');
+            results[position.positionID] = buyStatus;
             await updateBuyConfirmationStatus(position.positionID, position.token.address, position.vsToken.address, buyStatus, this.env);
         }
-        return makeJSONResponse<ConfirmBuysResponse>({});
+        return makeJSONResponse<ConfirmBuysResponse>({ results: results });
     }
 
     /* When a sell couldn't be confirmed, we periodically send it here */

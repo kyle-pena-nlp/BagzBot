@@ -1,4 +1,5 @@
 import { Position } from "../../../positions";
+import { SwapStatus } from "../model/swap_status";
 import { BaseUserDORequest } from "./base_user_do_request";
 
 export interface ConfirmBuysRequest extends BaseUserDORequest {
@@ -6,5 +7,5 @@ export interface ConfirmBuysRequest extends BaseUserDORequest {
 }
 
 export interface ConfirmBuysResponse {
-
+    results : Record<string,SwapStatus>
 }

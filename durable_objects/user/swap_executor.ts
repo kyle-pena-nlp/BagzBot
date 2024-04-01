@@ -11,7 +11,8 @@ import { TGStatusMessage, UpdateableNotification } from "../../telegram";
 import { assertNever } from "../../util";
 
 export type TransactionExecutionResult = 'tx-failed'|
-SwapFailedTxResultAndInfo|
+    SwapFailedTxResultAndInfo|
+    SwapFailedSlippageTxResultAndInfo|
     CouldNotConfirmTxResultAndInfo|
     SuccessfulTxResultAndInfo;
 
@@ -26,7 +27,7 @@ export function isCouldNotConfirmTxResultAndInfo(x : TransactionExecutionResult)
 }
 
 export interface SwapFailedTxResultAndInfo {
-    result:  'swap-failed'|'swap-failed-slippage'
+    result:  'swap-failed'
     signature : string
     lastValidBH : number
 }

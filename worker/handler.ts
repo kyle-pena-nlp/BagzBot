@@ -10,18 +10,18 @@ import { _devOnlyFeatureUpdatePrice, adminInvokeAlarm } from "../durable_objects
 import { OpenPositionRequest } from "../durable_objects/user/actions/open_new_position";
 import { QuantityAndToken } from "../durable_objects/user/model/quantity_and_token";
 import { TokenSymbolAndAddress } from "../durable_objects/user/model/token_name_and_address";
-import { editTriggerPercentOnOpenPositionFromUserDO, getDefaultTrailingStopLoss, getPositionFromUserDO, getUserData, getWalletData, impersonateUser, listPositionsFromUserDO, manuallyClosePosition, maybeReadSessionObj, readSessionObj, requestNewPosition, sendMessageToUser, setSellAutoDoubleOnOpenPosition, storeLegalAgreementStatus, storeSessionObj, storeSessionObjProperty, storeSessionValues, unimpersonateUser } from "../durable_objects/user/userDO_interop";
+import { editTriggerPercentOnOpenPositionFromUserDO, getDefaultTrailingStopLoss, getPositionFromUserDO, getUserData, getWalletData, impersonateUser, listPositionsFromUserDO, manuallyClosePosition, maybeReadSessionObj, readSessionObj, requestNewPosition, sendMessageToUser, setSellAutoDoubleOnOpenPosition, storeLegalAgreementStatus, storeSessionObj, storeSessionObjProperty, storeSessionValues, tryToConfirmBuys, unimpersonateUser } from "../durable_objects/user/userDO_interop";
 import { Env } from "../env";
 import { logDebug, logError } from "../logging";
 import { BaseMenu, LegalAgreement, MenuBetaInviteFriends, MenuCode, MenuContinueMessage, MenuEditOpenPositionSellAutoDoubleSlippage, MenuEditOpenPositionTriggerPercent, MenuEditPositionHelp, MenuEditPositionRequestSellAutoDoubleSlippage, MenuEditTrailingStopLossPositionRequest, MenuError, MenuFAQ, MenuListPositions, MenuMain, MenuOKClose, MenuTODO, MenuTrailingStopLossEntryBuyQuantity, MenuTrailingStopLossPickVsToken, MenuTrailingStopLossSlippagePercent, MenuTrailingStopLossTriggerPercent, MenuViewDecryptedWallet, MenuViewOpenPosition, MenuWallet, PositionIDAndChoice, SubmittedTriggerPctKey, WelcomeScreenPart1 } from "../menus";
 import { MenuEditPositionRequest } from "../menus/menu_edit_position_request";
-import { PositionPreRequest, PositionRequest, convertPreRequestToRequest } from "../positions";
+import { Position, PositionPreRequest, PositionRequest, convertPreRequestToRequest } from "../positions";
 import { ReplyQuestion, ReplyQuestionCode } from "../reply_question";
 import { ReplyQuestionData, replyQuestionHasNextSteps } from "../reply_question/reply_question_data";
 import { quoteBuy } from "../rpc/jupiter_quotes";
 import { isGetQuoteFailure } from "../rpc/rpc_types";
 import { POSITION_REQUEST_STORAGE_KEY } from "../storage_keys";
-import { TelegramWebhookInfo, deleteTGMessage, sendMessageToTG, sendRequestToTG, updateTGMessage } from "../telegram";
+import { TGStatusMessage, TelegramWebhookInfo, deleteTGMessage, sendMessageToTG, sendRequestToTG, updateTGMessage } from "../telegram";
 import { TokenInfo, WEN_ADDRESS, getVsTokenInfo } from "../tokens";
 import { Structural, assertNever, makeFakeFailedRequestResponse, makeSuccessResponse, strictParseBoolean, strictParseInt, tryParseBoolean, tryParseFloat, tryParseInt } from "../util";
 import { assertIs } from "../util/enums";
@@ -536,9 +536,47 @@ export class Worker {
                 else {
                     return new MenuContinueMessage('Not a token', MenuCode.Main);
                 }
+            case MenuCode.ManuallyConfirmBuy:
+                const pID = callbackData.menuArg||'';
+                const maybePositionToConfirm = await getPositionFromUserDO(params.getTelegramUserID(), params.chatID, pID, this.env);
+                if (maybePositionToConfirm != null && 
+                    !maybePositionToConfirm.position.buyConfirmed &&
+                    !maybePositionToConfirm.position.isConfirmingBuy) {
+                    // todo: some way to set as being confirmed. fire-and-forget.
+                    this.context.waitUntil(this.manuallyConfirmBuys(params, maybePositionToConfirm.position));
+                }
+                return;
             default:
                 assertNever(callbackData.menuCode);
         }
+    }
+
+    private async manuallyConfirmBuys(params : CallbackHandlerParams, position : Position) {
+        const channel = TGStatusMessage.createAndSend('We are attempting to confirm your position... please wait.', false, params.chatID, this.env);
+        const result = await tryToConfirmBuys(params.getTelegramUserID(), [position], this.env).catch(r => {
+            logError("Error attempting to confirm buys manually", r);
+            return null;
+        });
+        const thisResult = result?.results?.[position.positionID];
+        if (thisResult == null) {
+            TGStatusMessage.queue(channel, "We had trouble confirming this position. Try again soon!", true);
+        }
+        else if (thisResult === 'failed') {
+            TGStatusMessage.queue(channel, "After checking Solana, we found the transaction failed, and the position will be removed.", true);
+        }
+        else if (thisResult === 'slippage-failed') {
+            TGStatusMessage.queue(channel, "After checking Solana, we found the transaction failed due to slippage tolerance being exceeded, and the position will be removed.", true);
+        }
+        else if (thisResult === 'unconfirmed') {
+            TGStatusMessage.queue(channel, "We were unable to confirm the position due to network congestion - please try again soon", true);
+        }
+        else if (thisResult === 'confirmed') {
+            TGStatusMessage.queue(channel, "The purchase was confirmed! Refresh your position for the latest information.", true);
+        }
+        else {
+            assertNever(thisResult);
+        }
+        await TGStatusMessage.finalize(channel);
     }
 
     private sorryError() : MenuContinueMessage {

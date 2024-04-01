@@ -56,6 +56,16 @@ export function dDiv(a : DecimalizedAmount, b : DecimalizedAmount, decimalPlaces
     };
 }
 
+export function dClamp(a : DecimalizedAmount, min : DecimalizedAmount|undefined, max : DecimalizedAmount|undefined) : DecimalizedAmount {
+    if (min != null) {
+        a = dCompare(a,min) < 0 ? min : a;
+    }
+    if (max != null) {
+        a = dCompare(a,max) > 0 ? max : a;
+    }
+    return a;
+}
+
 export function percentOf(price : DecimalizedAmount, peakPrice : DecimalizedAmount) : number {
     const fraction = dDiv(price, peakPrice, 6);
     if (fraction == null) {

@@ -61,7 +61,8 @@ export class SwapConfirmer {
 
             // try to get the tx from the rpc
             const maybeParsedTransaction : 'failed-api-call'|'missing'|ParsedTransactionWithMeta = await connection.getParsedTransaction(signature, {
-                commitment: 'confirmed',
+                maxSupportedTransactionVersion: 0,
+                commitment: 'confirmed'
             }).then(t => {
                 return t == null ? 'missing' : t;
             }).catch(r => {

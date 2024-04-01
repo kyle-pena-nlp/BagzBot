@@ -53,6 +53,7 @@ const emojis = {
     ':money_face:': '🤑',
     ':help:': '🤔',
     ':stop:': '🛑',
+    ':caution:': '🟡',
     ':none:': ''
 }
 
