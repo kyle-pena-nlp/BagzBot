@@ -191,8 +191,6 @@ export class Worker {
                     botInstance : this.env.TELEGRAM_BOT_INSTANCE,
                     botTagline: this.env.TELEGRAM_BOT_TAGLINE
                 });
-            case MenuCode.Invite:
-                return this.TODOstubbedMenu(this.env);
             case MenuCode.ListPositions:
                 const positions = await listPositionsFromUserDO(params.getTelegramUserID(), params.chatID, this.env);
                 return new MenuListPositions(positions);
@@ -308,7 +306,7 @@ export class Worker {
                 return await this.makeStopLossRequestEditorMenu(trailingStopLossPositionRequestAfterSubmittingVsToken, this.env);
             case MenuCode.TransferFunds:
                 // TODO
-                return this.TODOstubbedMenu(this.env);
+                return new MenuTODO(MenuCode.Wallet);
             case MenuCode.Wallet:
                 const userData = await getUserData(params.getTelegramUserID(), params.chatID, messageID, true, this.env);
                 return new MenuWallet(userData);
@@ -599,10 +597,6 @@ export class Worker {
         return new MenuEditTrailingStopLossPositionRequest(positionRequest);
     }
 
-    private TODOstubbedMenu(env : Env) : BaseMenu {
-        return new MenuTODO(undefined);
-    }
-
     private async handleManuallyClosePosition(telegramUserID : number, chatID : number, positionID : string, env : Env) : Promise<Response> {
         const result = await manuallyClosePosition(telegramUserID, chatID, positionID, env);
         return makeSuccessResponse();
@@ -746,7 +740,7 @@ export class Worker {
             case '/faq':
                 return ['...', new MenuFAQ({ botName : env.TELEGRAM_BOT_INSTANCE, botInstance: env.TELEGRAM_BOT_INSTANCE, botTagline: env.TELEGRAM_BOT_INSTANCE })]
             case '/new_position':
-                const defaultPr = await getDefaultTrailingStopLoss(info.getTelegramUserID(), info.chatID, info.messageID, env);
+                const defaultPr = await getDefaultTrailingStopLoss(info.getTelegramUserID(), info.chatID, messageID, env);
                 const prerequest = defaultPr.prerequest;
                 let tokenInfo : TokenInfo|null|'failed' = await getTokenInfo(prerequest.tokenAddress, env).then(r => r.tokenInfo).catch(r => 'failed');
                 if (tokenInfo === 'failed') {

@@ -40,7 +40,8 @@ export class MenuEditPositionRequest extends Menu<PositionRequest> implements Me
         lines.push(`<b>Your Position Setup</b>`);
         lines.push(`:bullet: The bot will convert the specified amount of ${this.vsTokenSymbol()} into ${this.tokenSymbol()}`);
         lines.push(`:bullet: The bot will monitor the value of your ${this.tokenSymbol()} position`);
-        lines.push(`:bullet: When the value of your position dips ${this.menuData.triggerPercent}% below its highest recorded value (Trigger), the ${this.tokenSymbol()} will be automatically converted back to ${this.vsTokenSymbol()}`)
+        lines.push(`:bullet: When the value of your position dips <b>${this.menuData.triggerPercent}%</b> below its highest recorded value, the ${this.tokenSymbol()} will be automatically converted back to ${this.vsTokenSymbol()}`)
+        lines.push(`:bullet: <i>(That's how you lock in your gains)</i>`)
         lines.push(`:bullet: You can edit the Trigger Percent by using the menu below.`)
         return lines;
     }

@@ -17,8 +17,17 @@ export class MenuViewOpenPosition extends Menu<PositionAndMaybePNL|{ brandNewPos
         const invisibleLink = ``;//`<a href="${this.menuData.position.token.logoURI}">\u200B</a>`
         const lines = [
             `<b>${toFriendlyString(position.tokenAmt,4)} $${position.token.symbol}</b> ${invisibleLink}`,
-            ``
+            `<code>${position.token.address}</code>`
         ];
+
+        const buyIsConfirmed = this.menuData.position.buyConfirmed;
+
+        if (!buyIsConfirmed) {
+            lines.push(`:stop: <b>THIS PURCHASE HAS NOT BEEN CONFIRMED!</b>`);
+            lines.push(`:bullet: We will retry confirming your purchase with Solana soon`)
+        }            
+
+        lines.push("");
 
         if ('brandNewPosition' in this.menuData) {
             lines.push("This position is brand new! Refresh in a few moments to get more detailed information.");
@@ -28,6 +37,11 @@ export class MenuViewOpenPosition extends Menu<PositionAndMaybePNL|{ brandNewPos
         if (position.status === PositionStatus.Closed) {
             lines.push("This position has been closed.");
             return lines.join("\r\n");
+        }
+    
+        if (position.status === PositionStatus.Closing) {
+            lines.push("THE TRIGGER CONDITION HAS BEEN MET! The position is being sold.");
+            return lines.join('\r\n');
         }
 
         if (this.menuData.PNL != null) {
@@ -45,21 +59,25 @@ export class MenuViewOpenPosition extends Menu<PositionAndMaybePNL|{ brandNewPos
                 lines.push(`:bullet: <b>% Below Peak Price</b>: ${pctBelowPeakString}% :chart_down:`);
             }
             else {
-                lines.push(`:bullet: Currently at peak price! :sparkle:`);
+                lines.push(`:bullet: Currently at peak price! :mountain: :sparkle:`);
             }
 
             lines.push("");
             
             // describe trigger percent
             const triggerPercent = this.menuData.position.triggerPercent;
-            lines.push(`:bullet: <b>Trigger Percent</b>: ${triggerPercent.toFixed(1)}%`);
+            lines.push("<b>Percent-Below-Peak Trigger</b>")
+            lines.push(`:bullet: <b>Your Trigger Percent</b>: ${triggerPercent.toFixed(1)}%`);
             const isTriggered = toNumber(pctBelowPeak) > triggerPercent;
             const willTriggerSoon = (triggerPercent - toNumber(pctBelowPeak)) < 1.0;
-            if (isTriggered) {
-                lines.push(`This position's trigger condition has been met, and is about to be sold!`);
+            if (isTriggered && buyIsConfirmed) {
+                lines.push(`:bullet: This position's trigger condition has been met, and is about to be sold!`);
             }
             else if (willTriggerSoon) {
-                lines.push(`:eyes: This position is close to being triggered :eyes:`);
+                lines.push(`:bullet: :eyes: This position is close to being triggered :eyes:`);
+            }
+            else {
+                lines.push(`:bullet: <b>Current Percent Below Peak</b>: ${toFriendlyString(pctBelowPeak, 4, { useSubscripts: false, maxDecimalPlaces: 1})}%`)
             }
 
             lines.push("");
@@ -91,12 +109,6 @@ export class MenuViewOpenPosition extends Menu<PositionAndMaybePNL|{ brandNewPos
             lines.push(`:bullet: <b>Fill Value</b>: ${fillValueString} SOL ${fillValueEmoji}`);
             lines.push(`:bullet: <b>Current Value</b>: ${currentValueString} SOL ${currentValueEmoji}`);
             lines.push(`:bullet: <b>Change In Value</b>: ${valueDeltaString} SOL ${valueDeltaEmoji} (${valuePercentChangeString}%) ${valuePercentChangeEmoji}`)
-
-            
-        }
-
-        if (position.status === PositionStatus.Closing) {
-            lines.push("THE TRIGGER CONDITION HAS BEEN MET! The position is being sold.");
         }
 
         return lines.join("\r\n");
@@ -111,11 +123,15 @@ export class MenuViewOpenPosition extends Menu<PositionAndMaybePNL|{ brandNewPos
             // no-op
         }
         else if (this.menuData.position.status === PositionStatus.Open) {
+
             const closePositionCallbackData = new CallbackData(MenuCode.ClosePositionManuallyAction, this.menuData.position.positionID);
-            this.insertButtonNextLine(options, ":stop: Stop Monitoring And Sell", closePositionCallbackData);
+            
+            if (this.menuData.position.buyConfirmed) {
+                this.insertButtonNextLine(options, ":stop: Stop Monitoring And Sell Now", closePositionCallbackData);
+            }
             
             this.insertButtonNextLine(options, "Change Trigger Percent", new CallbackData(MenuCode.EditOpenPositionTriggerPercent, this.menuData.position.positionID));
-            this.insertButtonNextLine(options, "Double Slippage If Sell Fails?", new CallbackData(MenuCode.EditOpenPositionAutoDoubleSlippage, this.menuData.position.positionID));
+            this.insertButtonNextLine(options, `:brain: ${this.menuData.position.sellAutoDoubleSlippage ? '': 'Do Not'} Auto-Double Slippage If Sell Fails :brain:`, new CallbackData(MenuCode.EditOpenPositionAutoDoubleSlippage, this.menuData.position.positionID));
 
             const refreshPositionCallbackData = new CallbackData(MenuCode.ViewOpenPosition, this.menuData.position.positionID);
             this.insertButtonNextLine(options, ":refresh: Refresh", refreshPositionCallbackData);

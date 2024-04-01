@@ -6,7 +6,6 @@ export enum MenuCode {
 	Wallet = "Wallet",
 	ViewDecryptedWallet = "View.PK",
 	ListPositions = "List.POS",
-	Invite = "Invite",
 	FAQ = "FAQ",
 	Error = "Error",
 	NewPosition = "NewPosition",
