@@ -108,6 +108,10 @@ def configure_bot_commands(bot_token, bot_secret_token):
                 'command': 'start',
                 'description': 'Starts a conversation with this bot'
             },
+            { 
+                'command': 'new_position',
+                'description': 'Creates a new position'
+            },
             {
                 'command': 'menu',
                 'description': 'Displays the main menu'
@@ -117,17 +121,13 @@ def configure_bot_commands(bot_token, bot_secret_token):
                 'description': 'Displays the welcome screen for this bot'
             },
             {
-                'command': 'legal_agreement',
-                'description': 'Displays the legal agreement'
-            },            
-            {
                 'command': 'faq',
                 'description': 'Shows the FAQ'
             },
-            { 
-                'command': 'new_position',
-                'description': 'Creates a new position'
-            }           
+            {
+                'command': 'legal_agreement',
+                'description': 'Displays the legal agreement'
+            },         
         ],
         'scope': {
             'type': 'all_private_chats'
