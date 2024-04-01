@@ -13,11 +13,4 @@ export class MenuRetryBuy extends Menu<PositionRequest> implements MenuCapabilit
         this.insertButtonNextLine(options, "No", this.menuCallback(MenuCode.Main));
         return options;
     }
-    parseMode(): "MarkdownV2" | "HTML" {
-        return 'HTML';
-    }
-    renderURLPreviewNormally(): boolean {
-        return true;
-    }
-
 }

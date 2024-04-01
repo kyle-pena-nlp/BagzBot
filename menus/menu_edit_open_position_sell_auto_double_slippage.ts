@@ -28,8 +28,4 @@ export class MenuEditOpenPositionSellAutoDoubleSlippage extends Menu<string> imp
     parseMode(): "HTML" | "MarkdownV2" {
         return 'HTML';
     }
-    renderURLPreviewNormally(): boolean {
-        return true;
-    }
-
 }

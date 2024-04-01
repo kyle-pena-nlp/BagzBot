@@ -51,8 +51,4 @@ export class MenuEditOpenPositionTriggerPercent extends Menu<string> implements 
     parseMode(): "MarkdownV2" | "HTML" {
         return 'HTML';
     }
-    renderURLPreviewNormally(): boolean {
-        return true;
-    }
-
 }

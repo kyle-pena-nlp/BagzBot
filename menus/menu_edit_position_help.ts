@@ -15,8 +15,4 @@ export class MenuEditPositionHelp extends Menu<undefined> implements MenuCapabil
     parseMode(): "MarkdownV2" | "HTML" {
         return 'HTML';
     }
-    renderURLPreviewNormally(): boolean {
-        return true;
-    }
-
 }

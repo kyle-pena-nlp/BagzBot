@@ -18,11 +18,4 @@ export class MenuTrailingStopLossTriggerPercent extends Menu<number> implements 
         this.insertButtonNextLine(options, "Back", new CallbackData(MenuCode.TrailingStopLossRequestReturnToEditorMenu));
         return options;
     }
-    parseMode(): "HTML" | "MarkdownV2" {
-        return "HTML";
-    }
-    renderURLPreviewNormally(): boolean {
-        return true;
-    }
-    
 }

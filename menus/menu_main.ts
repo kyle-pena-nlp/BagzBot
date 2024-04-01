@@ -85,10 +85,4 @@ export class MenuMain extends Menu<UserData & Stuff> implements MenuCapabilities
         this.insertCloseButtonNextLine(options);
         return options;
     }
-    parseMode(): "MarkdownV2" | "HTML" {
-        return 'HTML';
-    }    
-    renderURLPreviewNormally() : boolean {
-        return true;
-    }
 }

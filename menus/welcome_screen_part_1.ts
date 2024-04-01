@@ -12,11 +12,4 @@ export class WelcomeScreenPart1 extends Menu<undefined> implements MenuCapabilit
         this.insertButtonNextLine(options, "Next", new CallbackData(MenuCode.WelcomeScreenPart2));
         return options;
     }
-    parseMode(): "MarkdownV2" | "HTML" {
-        return 'HTML';
-    }
-    renderURLPreviewNormally(): boolean {
-        return true;
-    }
-
 }

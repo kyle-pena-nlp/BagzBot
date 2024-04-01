@@ -18,10 +18,4 @@ export class MenuViewDecryptedWallet extends Menu<DecryptedWalletData> implement
         this.insertButtonNextLine(options, "Back", new CallbackData(MenuCode.Wallet));
         return options;
     }
-    parseMode(): "MarkdownV2" | "HTML" {
-        return 'HTML';
-    }
-    renderURLPreviewNormally(): boolean {
-        return true;
-    }
 }

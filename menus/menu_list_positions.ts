@@ -38,12 +38,6 @@ export class MenuListPositions extends Menu<PositionAndMaybePNL[]> implements Me
         this.insertBackToMainButtonOnNewLine(options);
         return options;
     }
-    parseMode(): "HTML" | "MarkdownV2" {
-        return 'HTML';
-    }
-    renderURLPreviewNormally(): boolean {
-        return true;
-    }
     maybeCalcTotalPNL() : DecimalizedAmount|undefined {
         let totalPNL = dZero();
         for (const p of this.menuData) {

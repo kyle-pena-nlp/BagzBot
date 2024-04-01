@@ -13,9 +13,6 @@ export class MenuFAQ extends Menu<{ botName : string, botInstance : string, botT
     parseMode(): "MarkdownV2" | "HTML" {
         return 'HTML';
     }    
-    renderURLPreviewNormally() : boolean {
-        return true;
-    }
     renderFAQ() : string {
         const botName = this.menuData.botName;
         const botInstance = this.menuData.botInstance;

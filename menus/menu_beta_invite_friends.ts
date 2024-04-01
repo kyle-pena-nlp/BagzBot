@@ -19,8 +19,4 @@ export class MenuBetaInviteFriends extends Menu<{ betaInviteCodes: string[], bot
     parseMode(): "MarkdownV2" | "HTML" {
         return 'HTML';
     }
-    renderURLPreviewNormally(): boolean {
-        return true;
-    }
-
 }

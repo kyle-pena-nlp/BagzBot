@@ -20,8 +20,4 @@ export class MenuOpenPosition extends Menu<TokenInfo> implements MenuCapabilitie
     parseMode(): "HTML" | "MarkdownV2" {
         return 'HTML';
     }
-    renderURLPreviewNormally(): boolean {
-        return true;
-    }
-    
 }

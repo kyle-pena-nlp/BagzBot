@@ -32,9 +32,6 @@ export class MenuEditPositionRequest extends Menu<PositionRequest> implements Me
         this.insertButtonNextLine(options, `:sparkle: Submit :sparkle:`, new CallbackData(MenuCode.TrailingStopLossEditorFinalSubmit));
         return options;
     }
-    parseMode(): "HTML" | "MarkdownV2" {
-        return 'HTML';
-    }
     renderURLPreviewNormally(): boolean {
         return false;
     }

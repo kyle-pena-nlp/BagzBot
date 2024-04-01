@@ -84,10 +84,6 @@ export abstract class BaseMenu {
         };
         return menuSpec;
     }
-
-    renderURLPreviewNormally() {
-        return true;
-    }
 }
 
 export abstract class Menu<T> extends BaseMenu {
@@ -97,6 +93,14 @@ export abstract class Menu<T> extends BaseMenu {
     constructor(miscData : T) {
         super();
         this.menuData = miscData;
+    }
+
+    parseMode(): "HTML" | "MarkdownV2" {
+        return 'HTML';
+    }
+    
+    renderURLPreviewNormally(): boolean {
+        return true;
     }
 
     protected insertButton(options : CallbackButton[][], text : string, callbackData : CallbackData, lineNumber : number) {

@@ -20,7 +20,4 @@ export class MenuEditPositionRequestSellAutoDoubleSlippage extends Menu<undefine
     parseMode(): "HTML" | "MarkdownV2" {
         return 'HTML';
     }
-    renderURLPreviewNormally(): boolean {
-        return true;
-    }
 }

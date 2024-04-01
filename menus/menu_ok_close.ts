@@ -11,11 +11,4 @@ export class MenuOKClose extends Menu<string> implements MenuCapabilities {
         this.insertButtonNextLine(options, "OK", this.menuCallback(MenuCode.Close));
         return options;
     }
-    parseMode(): "MarkdownV2" | "HTML" {
-        return 'HTML';
-    }
-    renderURLPreviewNormally(): boolean {
-        return true;
-    }
-
 }

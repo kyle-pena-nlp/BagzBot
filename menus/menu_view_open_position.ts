@@ -128,11 +128,4 @@ export class MenuViewOpenPosition extends Menu<PositionAndMaybePNL|{ brandNewPos
 
         return options;
     }
-    parseMode(): "HTML" | "MarkdownV2" {
-        return 'HTML';
-    }
-    renderURLPreviewNormally(): boolean {
-        return true;
-    }
-    
 }

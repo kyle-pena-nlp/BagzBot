@@ -31,10 +31,4 @@ export class MenuWallet extends Menu<UserData> implements MenuCapabilities {
         this.insertBackToMainButtonOnNewLine(options);
         return options;
     }
-    parseMode(): "MarkdownV2" | "HTML" {
-        return 'HTML';
-    }    
-    renderURLPreviewNormally() : boolean {
-        return true;
-    }
 }
