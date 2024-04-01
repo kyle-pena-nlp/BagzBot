@@ -11,7 +11,7 @@ import { ChangeTrackedValue, Structural, assertNever, groupIntoBatches, makeFail
 import { assertIs } from "../../util/enums";
 import { listUnclaimedBetaInviteCodes } from "../beta_invite_codes/beta_invite_code_interop";
 import { PositionAndMaybePNL } from "../token_pair_position_tracker/model/position_and_PNL";
-import { editTriggerPercentOnOpenPositionInTracker, getPositionAndMaybePNL, listPositionsByUser, setSellAutoDoubleOnOpenPositionInPositionTracker, updateSellConfirmationStatus } from "../token_pair_position_tracker/token_pair_position_tracker_do_interop";
+import { editTriggerPercentOnOpenPositionInTracker, getPositionAndMaybePNL, listPositionsByUser, setSellAutoDoubleOnOpenPositionInPositionTracker, updateBuyConfirmationStatus, updateSellConfirmationStatus } from "../token_pair_position_tracker/token_pair_position_tracker_do_interop";
 import { AutomaticallyClosePositionsRequest, AutomaticallyClosePositionsResponse } from "./actions/automatically_close_positions";
 import { BaseUserDORequest, isBaseUserDORequest } from "./actions/base_user_do_request";
 import { ConfirmBuysRequest, ConfirmBuysResponse } from "./actions/confirm_buys";
@@ -274,6 +274,7 @@ export class UserDO {
         for (const position of userAction.positions) {
             const swapConfirmer = new SwapConfirmer(this.wallet.value!!, this.env, startTimeMS);
             const buyStatus = await swapConfirmer.confirmSwap(position, 'buy');
+            await updateBuyConfirmationStatus(position.positionID, position.token.address, position.vsToken.address, buyStatus, this.env);
         }
         return makeJSONResponse<ConfirmBuysResponse>({});
     }

@@ -134,7 +134,7 @@ export async function wakeUpTokenPairPositionTracker(tokenAddress : string, vsTo
 	return response;
 }
 
-export async function updateBuyConfirmationStatus(positionID : string, tokenAddress : string, vsTokenAddress : string, status : 'confirmed'|'unconfirmed'|'failed', env : Env) : Promise<UpdateBuyConfirmationStatusResponse> {
+export async function updateBuyConfirmationStatus(positionID : string, tokenAddress : string, vsTokenAddress : string, status : 'confirmed'|'unconfirmed'|'failed'|'slippage-failed', env : Env) : Promise<UpdateBuyConfirmationStatusResponse> {
 	const method = TokenPairPositionTrackerDOFetchMethod.updateBuyConfirmationStatus;
 	const request : UpdateBuyConfirmationStatusRequest = { positionID, tokenAddress, vsTokenAddress, status: status };
 	return await sendJSONRequestToTokenPairPositionTracker<UpdateBuyConfirmationStatusRequest,UpdateBuyConfirmationStatusResponse>(method,request,tokenAddress,vsTokenAddress,env);

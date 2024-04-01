@@ -133,7 +133,7 @@ export class PositionsAssociatedWithPeakPrices extends DecimalizedAmountMap<Read
             const notCurrentlyConfirmingSell = !position.isConfirmingSell;
             if (isClosing && sellUnconfirmed && notCurrentlyConfirmingSell) {
                 position.isConfirmingSell = true;
-                result.push(position);
+                sellsToConfirm.push(position);
             }
         }
         return sellsToConfirm;
@@ -152,7 +152,7 @@ export class PositionsAssociatedWithPeakPrices extends DecimalizedAmountMap<Read
             const notCurrentlyBeingConfirmed = !position.isConfirmingBuy;
             if (isOpen && buyUnconfirmed && notCurrentlyBeingConfirmed) {
                 position.isConfirmingBuy = true; // <- important to avoid double-confirm attempts
-                result.push(position);
+                buysToConfirm.push(position);
             }
         }
         return buysToConfirm;

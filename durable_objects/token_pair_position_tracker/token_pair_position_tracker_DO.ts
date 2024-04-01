@@ -327,6 +327,12 @@ export class TokenPairPositionTrackerDO {
         }
         else if (body.status === 'failed') {
             this.tokenPairPositionTracker.removePosition(positionID);
+     }
+        else if (body.status === 'slippage-failed') {
+            this.tokenPairPositionTracker.removePosition(positionID);
+        }
+        else {
+            assertNever(body.status);
         }
         return {};
     }
@@ -543,7 +549,7 @@ export class TokenPairPositionTrackerDO {
             this.tokenAddress.value = tokenAddress;
             this.vsTokenAddress.value = vsTokenAddress;
         }
-        logDebug(`TokenPairPositionTrackerDO ${this.tokenPairID()} - executing ${method}`);
+        logDebug(`TokenPairPositionTrackerDO ${this.tokenPairID()} - executing ${method}: ${jsonBody}`);
         return [method,jsonBody];
     }
 
