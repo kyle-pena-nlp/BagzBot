@@ -44,7 +44,7 @@ export interface Env {
 	POLLING_ON : string
 	USER_PNL_CALCULATION_REFRESH_MS : string
 	TOKEN_LIST_REFRESH_TIMEOUT : string
-	BETA_SOL_BUY_LIMIT : string
+	SOL_BUY_LIMIT : string
 	PRICE_POLL_INTERVAL_MS : string
 	FORBIDDEN_TOKENS : string
 	TX_TIMEOUT_MS : string

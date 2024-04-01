@@ -11,6 +11,7 @@ export class MenuTrailingStopLossEntryBuyQuantity extends Menu<QuantityAndToken>
     renderOptions(): CallbackButton[][] {
         const symbol = this.menuData.thisTokenSymbol;
         const options = this.emptyMenu();
+        // todo: refer to configured buy limit
         this.insertButtonNextLine(options, `0.1 ${symbol}`, new CallbackData(MenuCode.SubmitBuyQuantity, "0.1"));
         this.insertButtonSameLine(options, `1 ${symbol}`, new CallbackData(MenuCode.SubmitBuyQuantity, "1"));
         this.insertButtonSameLine(options, `5 ${symbol}`, new CallbackData(MenuCode.SubmitBuyQuantity, "5"));

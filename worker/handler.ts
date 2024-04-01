@@ -23,7 +23,7 @@ import { isGetQuoteFailure } from "../rpc/rpc_types";
 import { POSITION_REQUEST_STORAGE_KEY } from "../storage_keys";
 import { TGStatusMessage, TelegramWebhookInfo, deleteTGMessage, sendMessageToTG, sendRequestToTG, updateTGMessage } from "../telegram";
 import { TokenInfo, WEN_ADDRESS, getVsTokenInfo } from "../tokens";
-import { Structural, assertNever, makeFakeFailedRequestResponse, makeSuccessResponse, strictParseBoolean, strictParseInt, tryParseBoolean, tryParseFloat, tryParseInt } from "../util";
+import { Structural, assertNever, makeFakeFailedRequestResponse, makeSuccessResponse, strictParseBoolean, strictParseFloat, strictParseInt, tryParseBoolean, tryParseFloat, tryParseInt } from "../util";
 import { assertIs } from "../util/enums";
 import { CallbackHandlerParams } from "./model/callback_handler_params";
 import { TokenAddressExtractor } from "./token_address_extractor";
@@ -249,8 +249,8 @@ export class Worker {
                 if (!submittedBuyQuantity || submittedBuyQuantity <= 0.0) {
                     return new MenuContinueMessage(`Sorry - '${callbackData.menuArg||''}' is not a valid quantity of SOL to buy.`, MenuCode.TrailingStopLossSlippagePctMenu);
                 }
-                if (submittedBuyQuantity > 5.0 && strictParseBoolean(this.env.IS_BETA_CODE_GATED)) {
-                    return new MenuContinueMessage(`Sorry - ${this.env.TELEGRAM_BOT_NAME} is in BETA and does not allow purchases of over 5.0 SOL`, MenuCode.TrailingStopLossSlippagePctMenu); 
+                if (submittedBuyQuantity > strictParseFloat(this.env.SOL_BUY_LIMIT)) {
+                    return new MenuContinueMessage(`Sorry - ${this.env.TELEGRAM_BOT_NAME} does not currently allow purchases of over ${strictParseFloat(this.env.SOL_BUY_LIMIT)} SOL`, MenuCode.TrailingStopLossSlippagePctMenu); 
                 }
                 await storeSessionObjProperty(params.getTelegramUserID(), params.chatID, messageID, "vsTokenAmt", submittedBuyQuantity, POSITION_REQUEST_STORAGE_KEY, this.env);
                 const trailingStopLossRequestStateAfterBuyQuantityEdited = await readSessionObj<PositionRequest>(params.getTelegramUserID(), params.chatID, messageID, POSITION_REQUEST_STORAGE_KEY, this.env);
