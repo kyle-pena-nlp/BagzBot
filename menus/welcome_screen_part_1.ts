@@ -9,7 +9,7 @@ export class WelcomeScreenPart1 extends Menu<undefined> implements MenuCapabilit
     }
     renderOptions(): CallbackButton[][] {
         const options = this.emptyMenu();
-        this.insertButtonNextLine(options, "Next", new CallbackData(MenuCode.WelcomeScreenPart2));
+        this.insertButtonNextLine(options, "Get Started!", new CallbackData(MenuCode.Main));
         return options;
     }
 }

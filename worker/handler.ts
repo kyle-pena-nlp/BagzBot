@@ -13,7 +13,7 @@ import { TokenSymbolAndAddress } from "../durable_objects/user/model/token_name_
 import { editTriggerPercentOnOpenPositionFromUserDO, getDefaultTrailingStopLoss, getPositionFromUserDO, getUserData, getWalletData, impersonateUser, listPositionsFromUserDO, manuallyClosePosition, maybeReadSessionObj, readSessionObj, requestNewPosition, sendMessageToUser, setSellAutoDoubleOnOpenPosition, storeLegalAgreementStatus, storeSessionObj, storeSessionObjProperty, storeSessionValues, unimpersonateUser } from "../durable_objects/user/userDO_interop";
 import { Env } from "../env";
 import { logDebug, logError } from "../logging";
-import { BaseMenu, LegalAgreement, MenuBetaInviteFriends, MenuCode, MenuContinueMessage, MenuEditOpenPositionSellAutoDoubleSlippage, MenuEditOpenPositionTriggerPercent, MenuEditPositionHelp, MenuEditPositionRequestSellAutoDoubleSlippage, MenuEditTrailingStopLossPositionRequest, MenuError, MenuFAQ, MenuListPositions, MenuMain, MenuOKClose, MenuTODO, MenuTrailingStopLossEntryBuyQuantity, MenuTrailingStopLossPickVsToken, MenuTrailingStopLossSlippagePercent, MenuTrailingStopLossTriggerPercent, MenuViewDecryptedWallet, MenuViewOpenPosition, MenuWallet, PositionIDAndChoice, SubmittedTriggerPctKey, WelcomeScreenPart1, WelcomeScreenPart2 } from "../menus";
+import { BaseMenu, LegalAgreement, MenuBetaInviteFriends, MenuCode, MenuContinueMessage, MenuEditOpenPositionSellAutoDoubleSlippage, MenuEditOpenPositionTriggerPercent, MenuEditPositionHelp, MenuEditPositionRequestSellAutoDoubleSlippage, MenuEditTrailingStopLossPositionRequest, MenuError, MenuFAQ, MenuListPositions, MenuMain, MenuOKClose, MenuTODO, MenuTrailingStopLossEntryBuyQuantity, MenuTrailingStopLossPickVsToken, MenuTrailingStopLossSlippagePercent, MenuTrailingStopLossTriggerPercent, MenuViewDecryptedWallet, MenuViewOpenPosition, MenuWallet, PositionIDAndChoice, SubmittedTriggerPctKey, WelcomeScreenPart1 } from "../menus";
 import { MenuEditPositionRequest } from "../menus/menu_edit_position_request";
 import { PositionPreRequest, PositionRequest, convertPreRequestToRequest } from "../positions";
 import { ReplyQuestion, ReplyQuestionCode } from "../reply_question";
@@ -368,8 +368,6 @@ export class Worker {
                 return new MenuEditTrailingStopLossPositionRequest(positionRequest);
             case MenuCode.WelcomeScreenPart1:
                 return new WelcomeScreenPart1(undefined);
-            case MenuCode.WelcomeScreenPart2:
-                return new WelcomeScreenPart2(undefined);
             case MenuCode.LegalAgreement:
                 return new LegalAgreement(undefined);
             case MenuCode.LegalAgreementAgree:

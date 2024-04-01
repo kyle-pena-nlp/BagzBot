@@ -23,7 +23,6 @@ export enum MenuCode {
 
 	// welcome screen
 	WelcomeScreenPart1 = "WelcomeScreenPart1",
-	WelcomeScreenPart2 = "WelcomeScreenPart2",
 
 	// beta invite
 	BetaGateInviteFriends = "BetaGateInviteFriends",

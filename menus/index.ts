@@ -24,7 +24,6 @@ import { MenuWallet } from "./menu_wallet";
 import { PositionIDAndChoice } from "./position_id_and_choice";
 import { MenuTODO } from "./todo_menu";
 import { WelcomeScreenPart1 } from "./welcome_screen_part_1";
-import { WelcomeScreenPart2 } from "./welcome_screen_part_2";
 
 export {
     BaseMenu, LegalAgreement, MenuBetaInviteFriends, MenuCode, MenuContinueMessage, MenuEditOpenPositionSellAutoDoubleSlippage, MenuEditOpenPositionTriggerPercent, MenuEditPositionHelp, MenuEditPositionRequestSellAutoDoubleSlippage, MenuEditPositionRequest as MenuEditTrailingStopLossPositionRequest, MenuError, MenuFAQ,
@@ -33,6 +32,6 @@ export {
     MenuTrailingStopLossPickVsToken,
     MenuTrailingStopLossSlippagePercent,
     MenuTrailingStopLossTriggerPercent, MenuViewDecryptedWallet, MenuViewOpenPosition,
-    MenuWallet, PositionIDAndChoice, SubmittedTriggerPctKey, WelcomeScreenPart1, WelcomeScreenPart2
+    MenuWallet, PositionIDAndChoice, SubmittedTriggerPctKey, WelcomeScreenPart1
 };
 
