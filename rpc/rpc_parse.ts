@@ -129,6 +129,8 @@ function parseParsedTransactionWithMeta(parsedTransaction : ParsedTransactionWit
 
     const txSlot = parsedTransaction.slot;
 
+    const swapTimeMS = parsedTransaction.blockTime||0;
+
     const swapSummary : SwapSummary = {
         inTokenAddress: inTokenAddress,
         inTokenAmt: swapInTokenDiff,
@@ -136,6 +138,7 @@ function parseParsedTransactionWithMeta(parsedTransaction : ParsedTransactionWit
         outTokenAmt: swapOutTokenDiff,
         fees: fees,
         fillPrice: fillPrice,
+        swapTimeMS: swapTimeMS,
         txSignature: signature,
         txSlot: txSlot
     };

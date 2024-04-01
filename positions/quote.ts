@@ -16,4 +16,5 @@ export interface Quote {
     priceImpactPct : number
     slippageBps : number
     platformFeeBps: number
+    quoteTimeMS : number
 }

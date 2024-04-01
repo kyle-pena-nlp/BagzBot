@@ -167,7 +167,8 @@ function convertToUnconfirmedPosition(positionRequest : PositionRequest, quote :
         sellSlippagePercent: positionRequest.slippagePercent,
         triggerPercent : positionRequest.triggerPercent,
         sellAutoDoubleSlippage : positionRequest.sellAutoDoubleSlippage,
-        fillPrice: quote.fillPrice // don't use the quote calculation.  it includes fees in the inTokenAmt.
+        fillPrice: quote.fillPrice,
+        fillPriceMS : quote.quoteTimeMS
     };
     return position;
 }
@@ -199,7 +200,8 @@ function convertConfirmedRequestToPosition(positionRequest: PositionRequest, txE
     
         vsTokenAmt : fromNumber(positionRequest.vsTokenAmt),
         tokenAmt: txExecutionResult.result.swapSummary.outTokenAmt,        
-        fillPrice: txExecutionResult.result.swapSummary.fillPrice
+        fillPrice: txExecutionResult.result.swapSummary.fillPrice,
+        fillPriceMS : txExecutionResult.result.swapSummary.swapTimeMS
     };
     return position;
 }

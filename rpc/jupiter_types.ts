@@ -14,5 +14,6 @@ export interface SwapRoute {
     outTokenAddress : string,
     // I am forbidding ExactOut b/c it makes other calculations incorrect, particularly fillprice in quote
     swapMode : 'ExactIn' 
+    swapTimeMS : number
     route : any
 };

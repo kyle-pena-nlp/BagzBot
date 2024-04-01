@@ -4,8 +4,8 @@ import { logError } from "../../../logging";
 import { ChangeTrackedValue } from "../../../util";
 
 export class CurrentPriceTracker {
-    currentPrice : ChangeTrackedValue<DecimalizedAmount|null> = new ChangeTrackedValue<DecimalizedAmount|null>("currentPrice", null);
-    priceLastRefreshed : ChangeTrackedValue<number> = new ChangeTrackedValue<number>("priceLastRefreshed", 0);
+    private currentPrice : ChangeTrackedValue<DecimalizedAmount|null> = new ChangeTrackedValue<DecimalizedAmount|null>("currentPrice", null);
+    private priceLastRefreshed : ChangeTrackedValue<number> = new ChangeTrackedValue<number>("priceLastRefreshed", 0);
     initialize(entries : Map<string,any>) {
         this.currentPrice.initialize(entries);
         this.priceLastRefreshed.initialize(entries);
@@ -15,6 +15,15 @@ export class CurrentPriceTracker {
         const p2 = this.priceLastRefreshed.flushToStorage(storage);
         // deliberately not flushing tokenAddress or vsTokenAddress.
         return await Promise.allSettled([p1,p2]);
+    }
+    // Update price from an external source. Returns updated price is price was updated.  Otherwise null.
+    maybeAcceptPrice(maybeNewerPrice : DecimalizedAmount, priceDateMS : number) : DecimalizedAmount|null {
+        if (this.priceLastRefreshed.value < priceDateMS) {
+            this.currentPrice.value = maybeNewerPrice;
+            this.priceLastRefreshed.value = priceDateMS;
+            return maybeNewerPrice;
+        }
+        return null;
     }
     async getPrice(tokenAddress : string, vsTokenAddress : string) : Promise<DecimalizedAmount|null> {
         if (this.priceIsStale()) {
@@ -28,7 +37,7 @@ export class CurrentPriceTracker {
         return this.currentPrice.value;
     }
     private priceIsStale() {
-        return (Date.now() - this.priceLastRefreshed.value) > 500;
+        return (Date.now() - this.priceLastRefreshed.value) > 1000;
     }
     private async getPriceFromJupiter(tokenAddress : string, vsTokenAddress : string) : Promise<DecimalizedAmount|undefined> {
         const url = `https://price.jup.ag/v4/price?ids=${tokenAddress}&vsToken=${vsTokenAddress}`;

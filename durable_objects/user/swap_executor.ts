@@ -79,6 +79,7 @@ export class SwapExecutor {
           
         // get a friendly description of what we are doing
         const SwapOfX = getSwapOfXDescription(s, true);
+        const swapOfX = getSwapOfXDescription(s);
 
         // get some stuff we'll need
         const signature = bs58.encode(signedTx.signatures[0]);
@@ -136,8 +137,8 @@ export class SwapExecutor {
         
         // if the act of retrieving the parsed transaction failed... early out.
         if (parsedSwapSummary == null) {
-            logError('Unexpected error retrieving transaction', s, { signature : signature });
-            const msg = `There was a problem retrieving information about your transaction.`;
+            logInfo('Could not retrieve transaction', s, { signature : signature });
+            const msg = `Your ${swapOfX} could not be confirmed, but we will retry soon!`;
             TGStatusMessage.queue(this.notificationChannel, msg, false);
             return { result: 'could-not-confirm', signature: signature, lastValidBH: lastValidBH };
         }

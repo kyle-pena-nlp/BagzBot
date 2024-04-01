@@ -181,6 +181,7 @@ export class TokenPairPositionTrackerDO {
             if (!isHeartbeatRequest(body)) {
                 this.tryToEnsureTokenPairIsRegistered();
             }
+            // ONLY DEV! this.__xDELETE_ALL_POSITIONSx(); // ONLY DEV!
             const response = await this._fetch(method,body);
             this.ensureIsPollingPrice();
             return response;
@@ -196,6 +197,11 @@ export class TokenPairPositionTrackerDO {
 
     // This has been useful during dev
     /*__DELETE_ALL_POSITIONS() {
+        throw new Error("");
+        if (this.env.ENVIRONMENT !== 'dev') {
+            return;
+        }
+        logError("Deleting all positions", this);
         const positionIDs = [...this.tokenPairPositionTracker.pricePeaks.itemsByPeakPrice.positionIDMap.keys()];
         for (const positionID of positionIDs) {
             this.tokenPairPositionTracker.removePosition(positionID);
@@ -472,8 +478,23 @@ export class TokenPairPositionTrackerDO {
 
     async handleUpsertPositions(body : UpsertPositionsRequest) {
         this.ensureIsInitialized(body);
+
         const responseBody : UpsertPositionsResponse = {};
+        
+        // update the positions in the tracker.
         this.tokenPairPositionTracker.upsertPositions(body.positions);
+
+        // update the price tracker if any of the new positions have more recent quoted prices
+        let updatedPrice : DecimalizedAmount|null = null;
+        for (const position of body.positions) {
+            updatedPrice = this.currentPriceTracker.maybeAcceptPrice(position.fillPrice, position.fillPriceMS);
+        }
+
+        // if there was a more recent price in the batch, update the position tracker with the latest
+        if (updatedPrice != null) {
+            this.tokenPairPositionTracker.updatePrice(updatedPrice);
+        }
+
         return makeJSONResponse(responseBody);
     }
 

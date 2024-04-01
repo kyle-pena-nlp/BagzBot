@@ -33,6 +33,7 @@ export interface Position {
 	vsTokenAmt: DecimalizedAmount
 	tokenAmt : DecimalizedAmount
 	fillPrice : DecimalizedAmount
+	fillPriceMS : number
 
 
 	// user sell settings

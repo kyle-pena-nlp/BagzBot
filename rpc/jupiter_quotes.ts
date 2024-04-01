@@ -53,7 +53,8 @@ async function makeQuote(swapRoute : GetQuoteFailure|SwapRoute, inTokenInfo : To
         botFeeToken: botFeeToken,
         priceImpactPct: priceImpactPct,
         slippageBps: slippageBps,
-        platformFeeBps: platformFeeBps
+        platformFeeBps: platformFeeBps,
+        quoteTimeMS: swapRoute.swapTimeMS
     };
     return quote;
 }
@@ -118,6 +119,7 @@ async function getSwapRoute(quoteAPIParams : JupiterQuoteAPIParams, env: Env) : 
             inTokenAddress: quoteAPIParams.inputTokenAddress,
             outTokenAddress: quoteAPIParams.outputTokenAddress,
             swapMode: quoteAPIParams.swapMode,
+            swapTimeMS : Date.now(), // not absolutely precise but gonna be pretty close. API response didn't have timestamp
             route: quoteResponseJSON as object
         };
     }

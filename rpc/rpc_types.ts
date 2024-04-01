@@ -92,6 +92,7 @@ export interface SwapSummary {
     outTokenAmt: DecimalizedAmount,
     fees: number
     fillPrice : DecimalizedAmount
+    swapTimeMS : number
     txSignature : string
     txSlot: number
 };
