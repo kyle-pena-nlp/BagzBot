@@ -1,31 +1,36 @@
 import { Connection } from "@solana/web3.js";
 import { Wallet } from "../../crypto";
+import { asTokenPrice } from "../../decimalized/decimalized_amount";
 import { Env } from "../../env";
 import { logError } from "../../logging";
 import { Position } from "../../positions";
 import { ParsedSuccessfulSwapSummary, isSuccessfullyParsedSwapSummary } from "../../rpc/rpc_types";
 import { TGStatusMessage, UpdateableNotification } from "../../telegram";
+import { assertNever } from "../../util";
 import { markAsOpen, updateSellConfirmationStatus } from "../token_pair_position_tracker/token_pair_position_tracker_do_interop";
 import { SwapExecutor, TransactionExecutionResult } from "./swap_executor";
 import { SwapTransactionSigner } from "./swap_transaction_signer";
-import { assertNever } from "../../util";
 
+
+export type SellResult = 'tx-failed'|'failed'|'slippage-failed'|'unconfirmed'|'confirmed'
 
 export async function sell(position: Position, 
     wallet : Wallet, 
     env : Env,
-    startTimeMS : number) : Promise<void> {
-
-    const notificationChannel = TGStatusMessage.createAndSend('Initiating sell', false, position.chatID, env);
+    notificationChannel : UpdateableNotification,
+    startTimeMS : number) : Promise<SellResult> {
 
     const swapExecutionResult = await sellPosition(position, wallet, env, notificationChannel, startTimeMS);
 
     if (swapExecutionResult === 'tx-failed') {
+
         // if we couldn't even create a tx, then mark the position as open again
         // (price tracking will fire it off again if need be)
         await markAsOpen(position.positionID, 
             position.token.address, 
             position.vsToken.address, env);
+
+        return swapExecutionResult;
     }
     else {
 
@@ -45,7 +50,41 @@ export async function sell(position: Position,
             position.vsToken.address, 
             updatedStatusOfSell, 
             env);
+
+        return updatedStatusOfSell;
     }
+}
+
+export async function publishFinalSellMessage(position : Position, type : 'Sell'|'Auto-sell', status : SellResult, channel : UpdateableNotification) {
+    const finalSellMessage = getFinalSellMessage(position, type, status);
+    TGStatusMessage.queue(channel, finalSellMessage, true);
+    await TGStatusMessage.finalize(channel);
+}
+
+function getFinalSellMessage(position : Position, type : 'Sell'|'Auto-sell', status : SellResult) : string {
+    const Sale = type;
+    const symbol = `$${position.token.symbol}`;
+    const amount = asTokenPrice(position.tokenAmt);
+    const maybeRetry = type === 'Auto-sell' ? 'Sale will be retried automatically.' : '';
+    const maybeRetrySlippage = type === 'Auto-sell' ? getAutoSellSlippageRetryMessage(position) : '';
+    switch(status) {
+        case 'tx-failed':
+            return `${Sale} of ${amount} ${symbol} failed. ${maybeRetry}`;
+        case 'confirmed':
+            return `${Sale} of ${amount} ${symbol} successful!`;;
+        case 'failed':
+            return `${Sale} of ${amount} ${symbol} failed. ${maybeRetry}`;
+        case 'slippage-failed':
+            return `${Sale} of ${amount} ${symbol} failed due to slippage. ${maybeRetrySlippage}`;
+        case 'unconfirmed':
+            return `${Sale} of ${amount} ${symbol} could not be confirmed due to network congestion.  We will retry confirmation soon.`;
+        default:
+            assertNever(status);
+    }
+}
+
+function getAutoSellSlippageRetryMessage(position : Position) {
+
 }
 
 function determineStatus(result : ParsedSuccessfulSwapSummary|'could-not-confirm'|'swap-failed'|'swap-failed-slippage') {

@@ -13,7 +13,7 @@ import { TokenSymbolAndAddress } from "../durable_objects/user/model/token_name_
 import { editTriggerPercentOnOpenPositionFromUserDO, getDefaultTrailingStopLoss, getPositionFromUserDO, getUserData, getWalletData, impersonateUser, listPositionsFromUserDO, manuallyClosePosition, maybeReadSessionObj, readSessionObj, requestNewPosition, sendMessageToUser, setSellAutoDoubleOnOpenPosition, storeLegalAgreementStatus, storeSessionObj, storeSessionObjProperty, storeSessionValues, tryToConfirmBuys, unimpersonateUser } from "../durable_objects/user/userDO_interop";
 import { Env } from "../env";
 import { logDebug, logError } from "../logging";
-import { BaseMenu, LegalAgreement, MenuBetaInviteFriends, MenuCode, MenuContinueMessage, MenuEditOpenPositionSellAutoDoubleSlippage, MenuEditOpenPositionTriggerPercent, MenuEditPositionHelp, MenuEditPositionRequestSellAutoDoubleSlippage, MenuEditTrailingStopLossPositionRequest, MenuError, MenuFAQ, MenuListPositions, MenuMain, MenuOKClose, MenuTODO, MenuTrailingStopLossEntryBuyQuantity, MenuTrailingStopLossPickVsToken, MenuTrailingStopLossSlippagePercent, MenuTrailingStopLossTriggerPercent, MenuViewDecryptedWallet, MenuViewOpenPosition, MenuWallet, PositionIDAndChoice, SubmittedTriggerPctKey, WelcomeScreenPart1 } from "../menus";
+import { BaseMenu, LegalAgreement, MenuBetaInviteFriends, MenuCode, MenuContinueMessage, MenuEditOpenPositionSellAutoDoubleSlippage, MenuEditOpenPositionTriggerPercent, MenuEditPositionHelp, MenuEditPositionRequestSellAutoDoubleSlippage, MenuError, MenuFAQ, MenuListPositions, MenuMain, MenuOKClose, MenuTODO, MenuTrailingStopLossEntryBuyQuantity, MenuTrailingStopLossPickVsToken, MenuTrailingStopLossSlippagePercent, MenuTrailingStopLossTriggerPercent, MenuViewDecryptedWallet, MenuViewOpenPosition, MenuWallet, PositionIDAndChoice, SubmittedTriggerPctKey, WelcomeScreenPart1 } from "../menus";
 import { MenuEditPositionRequest } from "../menus/menu_edit_position_request";
 import { Position, PositionPreRequest, PositionRequest, convertPreRequestToRequest } from "../positions";
 import { ReplyQuestion, ReplyQuestionCode } from "../reply_question";
@@ -175,7 +175,7 @@ export class Worker {
                 }
                 const request = convertPreRequestToRequest(newPrerequest, quote, tokenInfoResponse.tokenInfo);
                 await storeSessionObj<PositionRequest>(params.getTelegramUserID(), params.chatID, messageID, request, POSITION_REQUEST_STORAGE_KEY, this.env);
-                return new MenuEditTrailingStopLossPositionRequest(request);
+                return new MenuEditPositionRequest(request);
             case MenuCode.Error:
                 return new MenuError(undefined);
             case MenuCode.ViewDecryptedWallet:
@@ -351,7 +351,7 @@ export class Worker {
                 }
                 const positionRequest = await readSessionObj<PositionRequest>(params.getTelegramUserID(), params.chatID, messageID, POSITION_REQUEST_STORAGE_KEY, this.env);
                 if (positionRequest.token.address === newTokenAddress) {
-                    return new MenuEditTrailingStopLossPositionRequest(positionRequest);
+                    return new MenuEditPositionRequest(positionRequest);
                 }                
                 const tokenValidationInfo = await getTokenInfo(newTokenAddress, this.env);
                 if (isInvalidTokenInfoResponse(tokenValidationInfo)) {
@@ -365,7 +365,7 @@ export class Worker {
                 }
                 positionRequest.quote = maybeQuote;
                 await storeSessionObj<PositionRequest>(params.getTelegramUserID(), params.chatID, messageID, positionRequest, POSITION_REQUEST_STORAGE_KEY, this.env);
-                return new MenuEditTrailingStopLossPositionRequest(positionRequest);
+                return new MenuEditPositionRequest(positionRequest);
             case MenuCode.WelcomeScreenPart1:
                 return new WelcomeScreenPart1(undefined);
             case MenuCode.LegalAgreement:
@@ -641,7 +641,7 @@ export class Worker {
 
     private async makeStopLossRequestEditorMenu(positionRequest : PositionRequest, env : Env) : Promise<BaseMenu> {
         await this.refreshQuote(positionRequest, env);
-        return new MenuEditTrailingStopLossPositionRequest(positionRequest);
+        return new MenuEditPositionRequest(positionRequest);
     }
 
     private async handleManuallyClosePosition(telegramUserID : number, chatID : number, positionID : string, env : Env) : Promise<Response> {
@@ -799,7 +799,7 @@ export class Worker {
                     obj: positionRequest
                 };
 
-                return ['...', new MenuEditTrailingStopLossPositionRequest(positionRequest), storeObjectRequest];
+                return ['...', new MenuEditPositionRequest(positionRequest), storeObjectRequest];
             default:
                 throw new Error(`Unrecognized command: ${command}`);
         }

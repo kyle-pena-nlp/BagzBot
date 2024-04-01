@@ -1,4 +1,5 @@
 import { Wallet, encryptPrivateKey, generateEd25519Keypair } from "../../crypto";
+import { asTokenPrice } from "../../decimalized/decimalized_amount";
 import { Env } from "../../env";
 import { logError, logInfo } from "../../logging";
 import { PositionPreRequest, PositionStatus, PositionType } from "../../positions";
@@ -42,7 +43,7 @@ import { SOLBalanceTracker } from "./trackers/sol_balance_tracker";
 import { TokenPairsForPositionIDsTracker } from "./trackers/token_pairs_for_position_ids_tracker";
 import { UserPNLTracker } from "./trackers/user_pnl_tracker";
 import { UserDOFetchMethod, parseUserDOFetchMethod } from "./userDO_interop";
-import { sell } from "./user_sell";
+import { publishFinalSellMessage, sell } from "./user_sell";
 
 // TODO: all requests to UserDo include telegramUserID and telegramUserName
 // and ensure initialization.  That way, no purpose-specific initialization call is required
@@ -569,8 +570,9 @@ export class UserDO {
             return makeJSONResponse<ManuallyClosePositionResponse>({ message: "Position has already been sold." });
         }
         assertIs<PositionStatus.Open,typeof position.status>();
+        const channel = TGStatusMessage.createAndSend(`Initiating sale of ${asTokenPrice(position.tokenAmt)} ${position.token.symbol}`, false, position.chatID, this.env);
         // deliberate lack of await here (fire-and-forget). Must complete in 30s.
-        sell(position, this.wallet.value!!, this.env, startTimeMS);
+        sell(position, this.wallet.value!!, this.env, channel, startTimeMS).then(sellStatus => publishFinalSellMessage(position, 'Sell', sellStatus, channel));
         return makeJSONResponse<ManuallyClosePositionResponse>({ message: 'Position will now be closed. '});
     }
 
@@ -587,7 +589,9 @@ export class UserDO {
             let sellPositionPromises = positionBatch.map(async position => {
                 const notificationChannel = TGStatusMessage.createAndSend(`Initiating auto-sell`, false, this.chatID.value||0, this.env);
                 notificationChannels.push(notificationChannel);
-                return await sell(position, this.wallet.value!!, this.env, startTimeMS);
+                const sellPromise = sell(position, this.wallet.value!!, this.env, notificationChannel, startTimeMS)
+                sellPromise.then(sellStatus => publishFinalSellMessage(position, 'Auto-sell', sellStatus, notificationChannel));
+                return await sellPromise;
             });
             // but wait for the entire batch to settle before doing the next batch
             await Promise.allSettled(sellPositionPromises);

@@ -27,7 +27,7 @@ import { MenuTODO } from "./todo_menu";
 import { WelcomeScreenPart1 } from "./welcome_screen_part_1";
 
 export {
-    BaseMenu, LegalAgreement, MenuBetaInviteFriends, MenuCode, MenuContinueMessage, MenuEditOpenPositionSellAutoDoubleSlippage, MenuEditOpenPositionTriggerPercent, MenuEditPositionHelp, MenuEditPositionRequestSellAutoDoubleSlippage, MenuEditPositionRequest as MenuEditTrailingStopLossPositionRequest, MenuError, MenuFAQ,
+    BaseMenu, LegalAgreement, MenuBetaInviteFriends, MenuCode, MenuContinueMessage, MenuEditOpenPositionSellAutoDoubleSlippage, MenuEditOpenPositionTriggerPercent, MenuEditPositionHelp, MenuEditPositionRequest, MenuEditPositionRequestSellAutoDoubleSlippage, MenuError, MenuFAQ,
     MenuListPositions, MenuMain, MenuOKClose, MenuRetryBuy, MenuRetryBuySlippageError, MenuTODO,
     MenuTrailingStopLossEntryBuyQuantity,
     MenuTrailingStopLossPickVsToken,

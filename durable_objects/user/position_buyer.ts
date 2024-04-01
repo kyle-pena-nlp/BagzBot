@@ -28,7 +28,7 @@ export class PositionBuyer {
         // non-blocking notification channel to push update messages to TG
         const notificationChannel = TGStatusMessage.replaceWithNotification(
             positionRequest.messageID, 
-            `Initiating.`, 
+            `Initiating swap...`, 
             false, 
             positionRequest.chatID, 
             this.env);
