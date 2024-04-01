@@ -5,7 +5,6 @@ import {
     PositionStatus,
     PositionType,
     Swappable,
-    SwappableError,
     convertPreRequestToRequest,
     getInAndOutTokens,
     getSwapOfXDescription,
@@ -24,7 +23,7 @@ import { Quote } from "./quote";
 
 export {
     Position, PositionPreRequest,
-    PositionRequest, PositionRequestAndMaybeQuote, PositionRequestAndQuote, PositionStatus, PositionType, Quote, Swappable, SwappableError, convertPreRequestToRequest,
+    PositionRequest, PositionRequestAndMaybeQuote, PositionRequestAndQuote, PositionStatus, PositionType, Quote, Swappable, convertPreRequestToRequest,
     getInAndOutTokens,
     getSwapOfXDescription, isPosition,
     isPositionRequest, isPositionRequestAndQuote,

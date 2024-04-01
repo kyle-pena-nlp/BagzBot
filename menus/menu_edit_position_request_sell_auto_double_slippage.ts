@@ -17,7 +17,4 @@ export class MenuEditPositionRequestSellAutoDoubleSlippage extends Menu<undefine
         this.insertButtonNextLine(options, 'Back', new CallbackData(MenuCode.TrailingStopLossRequestReturnToEditorMenu));
         return options;
     }
-    parseMode(): "HTML" | "MarkdownV2" {
-        return 'HTML';
-    }
 }

@@ -7,7 +7,7 @@ export enum PositionType {
 	LongTrailingStopLoss = "Auto-Sell"
 };
 
-export function isPositionType(x : any) {
+export function isPositionType(x : any) : x is PositionType {
 	return isEnumValue(x, PositionType);
 }
 
@@ -152,22 +152,4 @@ export function getSwapOfXDescription(s : Swappable, caps : boolean = false) : s
     else {
         throw new Error("Programmer error.");
     }
-}
-
-export class SwappableError {
-	userID : number;
-	chatID : number;
-	messageID : number;
-	message : string;
-	inToken : TokenInfo;
-	outToken : TokenInfo;
-	constructor(s : Swappable, message : string) {
-		this.userID = s.userID;
-		this.chatID = s.chatID;
-		this.messageID = s.messageID;
-		this.message = message;
-		const { inToken, outToken } = getInAndOutTokens(s);
-		this.inToken = inToken;
-		this.outToken = outToken;
-	}
 }

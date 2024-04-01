@@ -13,9 +13,6 @@ export class LegalAgreement extends Menu<undefined> implements MenuCapabilities 
         this.insertButtonNextLine(options, "Refuse", new CallbackData(MenuCode.LegalAgreementRefuse));
         return options;
     }
-    parseMode(): "MarkdownV2" | "HTML" {
-        return 'HTML';
-    }
 }
 
 const LEGAL_AGREEMENT_TEXT = `You use this bot at your own risk.  

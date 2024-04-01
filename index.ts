@@ -275,8 +275,6 @@ export default {
 			await replyQuestion.sendReplyQuestion(info.getTelegramUserID('real'), chatID, env);
 			return 'beta-restricted';
 		}
-
-
 		return 'proceed';
 	}
 };

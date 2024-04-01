@@ -23,11 +23,4 @@ export function renderTrailingStopLossRequestMarkdown(positionRequest : Position
         ];
         return lines.join("\r\n");
     }
-    
-    /*
-    return `<b>Token</b>: ${positionRequest.token.symbol}
-    <b>Buying With</b>: ${positionRequest.vsToken.symbol}
-    <b>Quantity</b>: ${positionRequest.vsTokenAmt} ${positionRequest.vsToken.symbol}
-    <b>Auto-Sell Trigger Percent</b>: ${positionRequest.triggerPercent}%
-    <b>Auto-Retry Sell If Slippage Tolerance Exceeded</b>: ${positionRequest.retrySellIfSlippageExceeded ? 'Yes' : 'No'}`*/
 }

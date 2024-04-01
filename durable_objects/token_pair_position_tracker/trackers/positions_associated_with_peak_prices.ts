@@ -121,40 +121,41 @@ export class PositionsAssociatedWithPeakPrices extends DecimalizedAmountMap<Read
 
     // NEVER ASYNC THIS METHOD! This must execute atomically to avoid double-confirm attempts.
     getUnconfirmedSells() {
-        const result : Position[] = [];
+        const sellsToConfirm : Position[] = [];
         for (const positionID of this.positionIDMap.keys()) {
             const result = this.getPositionInternal(positionID);
             if (result == null) {
                 continue;
             }
-            const [position,price] = result;
+            const [position,_] = result;
             const isClosing = (position.status === PositionStatus.Closing);
             const sellUnconfirmed = !position.sellConfirmed;
-            const notConfirmingSell = (position.isConfirmingSell !== true);
-            if (isClosing && sellUnconfirmed && notConfirmingSell) {
+            const notCurrentlyConfirmingSell = !position.isConfirmingSell;
+            if (isClosing && sellUnconfirmed && notCurrentlyConfirmingSell) {
                 position.isConfirmingSell = true;
                 result.push(position);
             }
         }
-        return result;
+        return sellsToConfirm;
     }
     // NEVER ASYNC THIS METHOD! This must execute atomically to avoid double-confirm attempts.
     getUnconfirmedBuys() {
-        const result : Position[] = [];
+        const buysToConfirm : Position[] = [];
         for (const positionID of this.positionIDMap.keys()) {
             const result = this.getPositionInternal(positionID);
             if (result == null) {
                 continue;
             }
-            const [position,price] = result;
+            const [position,_] = result;
             const isOpen = position.status === PositionStatus.Open;
             const buyUnconfirmed = !position.buyConfirmed;
-            if (isOpen && buyUnconfirmed && !position.isConfirmingBuy) {
+            const notCurrentlyBeingConfirmed = !position.isConfirmingBuy;
+            if (isOpen && buyUnconfirmed && notCurrentlyBeingConfirmed) {
                 position.isConfirmingBuy = true; // <- important to avoid double-confirm attempts
                 result.push(position);
             }
         }
-        return result;
+        return buysToConfirm;
     }
 
     // *idempotentally* add a new position to this peak price

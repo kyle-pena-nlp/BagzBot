@@ -9,10 +9,7 @@ export class MenuFAQ extends Menu<{ botName : string, botInstance : string, botT
         const options = this.emptyMenu();
         this.insertBackToMainButtonOnNewLine(options);
         return options;
-    }
-    parseMode(): "MarkdownV2" | "HTML" {
-        return 'HTML';
-    }    
+    }   
     renderFAQ() : string {
         const botName = this.menuData.botName;
         const botInstance = this.menuData.botInstance;

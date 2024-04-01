@@ -48,7 +48,4 @@ export class MenuEditOpenPositionTriggerPercent extends Menu<string> implements 
         this.insertButtonNextLine(options, "Back", new CallbackData(MenuCode.ViewOpenPosition, positionID));
         return options;
     }
-    parseMode(): "MarkdownV2" | "HTML" {
-        return 'HTML';
-    }
 }

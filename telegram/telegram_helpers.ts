@@ -10,26 +10,6 @@ export interface DeleteTGMessageResponse {
 }
 
 // https://core.telegram.org/bots/api#messageentity
-/*
-Currently, can be “mention” (@username), 
-“hashtag” (#hashtag), 
-“cashtag” ($USD), 
-“bot_command” (/start@jobs_bot), 
-“url” (https://telegram.org), 
-“email” (do-not-reply@telegram.org), 
-“phone_number” (+1-212-555-0123), 
-“bold” (bold text), 
-“italic” (italic text), 
-“underline” (underlined text), 
-“strikethrough” (strikethrough text), 
-“spoiler” (spoiler message), 
-“blockquote” (block quotation), 
-“code” (monowidth string), 
-“pre” (monowidth block), 
-“text_link” (for clickable text URLs), 
-“text_mention” (for users without usernames), 
-“custom_emoji” (for inline custom emoji stickers)
-*/
 export interface TGTextEntity {
     type : TGTextEntityType
     text : string

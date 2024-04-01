@@ -12,7 +12,4 @@ export class MenuEditPositionHelp extends Menu<undefined> implements MenuCapabil
         this.insertButtonNextLine(options, "Back", new CallbackData(MenuCode.TrailingStopLossRequestReturnToEditorMenu));
         return options;
     }
-    parseMode(): "MarkdownV2" | "HTML" {
-        return 'HTML';
-    }
 }

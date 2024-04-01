@@ -45,14 +45,8 @@ export class MenuEditPositionRequest extends Menu<PositionRequest> implements Me
         lines.push(`:bullet: You can edit the Trigger Percent by using the menu below.`)
         return lines;
     }
-    private tokenAmountString() {
-        return toFriendlyString(this.menuData.quote.outTokenAmt,4, { addCommas: false });
-    }
     private tokenSymbol() {
         return this.menuData.token.symbol;
-    }
-    private vsTokenAmountString() {
-        return toFriendlyString(this.menuData.quote.inTokenAmt,4, { addCommas: false });
     }
     private vsTokenSymbol() {
         return this.menuData.vsToken.symbol;

@@ -10,7 +10,4 @@ export class MenuError extends Menu<undefined> implements MenuCapabilities {
         this.insertBackToMainButtonOnNewLine(options);
         return options;
     }
-    parseMode(): "MarkdownV2" | "HTML" {
-        return 'HTML';
-    }    
 }

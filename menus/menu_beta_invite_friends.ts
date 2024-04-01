@@ -16,7 +16,4 @@ export class MenuBetaInviteFriends extends Menu<{ betaInviteCodes: string[], bot
         this.insertBackToMainButtonOnNewLine(options);
         return options;
     }
-    parseMode(): "MarkdownV2" | "HTML" {
-        return 'HTML';
-    }
 }
