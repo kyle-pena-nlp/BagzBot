@@ -1,9 +1,7 @@
 import { Wallet, encryptPrivateKey, generateEd25519Keypair } from "../../crypto";
-import { DecimalizedAmount } from "../../decimalized";
 import { Env } from "../../env";
 import { logError, logInfo } from "../../logging";
 import { PositionPreRequest, PositionStatus, PositionType } from "../../positions";
-import { getSOLBalance } from "../../rpc/rpc_wallet";
 import { POSITION_REQUEST_STORAGE_KEY } from "../../storage_keys";
 import { TGStatusMessage, UpdateableNotification, sendMessageToTG } from "../../telegram";
 import { WEN_ADDRESS, getVsTokenInfo } from "../../tokens";
@@ -34,7 +32,6 @@ import { SetSellAutoDoubleOnOpenPositionRequest, SetSellAutoDoubleOnOpenPosition
 import { StoreLegalAgreementStatusRequest, StoreLegalAgreementStatusResponse } from "./actions/store_legal_agreement_status";
 import { StoreSessionValuesRequest, StoreSessionValuesResponse } from "./actions/store_session_values";
 import { UnimpersonateUserRequest, UnimpersonateUserResponse } from "./actions/unimpersonate_user";
-import { UserInitializeRequest, UserInitializeResponse } from "./actions/user_initialize";
 import { TokenPair } from "./model/token_pair";
 import { UserData } from "./model/user_data";
 import { PositionBuyer } from "./position_buyer";
@@ -190,9 +187,6 @@ export class UserDO {
         switch(method) {
             case UserDOFetchMethod.get:
                 response = await this.handleGet(userAction);            
-                break;
-            case UserDOFetchMethod.initialize:
-                response = await this.handleInitialize(userAction);            
                 break;
             case UserDOFetchMethod.storeSessionValues:
                 response = await this.handleStoreSessionValues(userAction);
@@ -426,13 +420,6 @@ export class UserDO {
         return makeJSONResponse(responseBody);
     }
 
-
-
-
-
-
-
-
     handleGetSessionValuesWithPrefix(request : GetSessionValuesWithPrefixRequest) : Response {
         const messageID = request.messageID;
         const prefix = request.prefix;
@@ -522,14 +509,6 @@ export class UserDO {
             sessionValues: sessionValues
         });
         return response;
-    }
-
-    async handleInitialize(userInitializeRequest : UserInitializeRequest) : Promise<Response> {
-        if (this.initialized()) {
-            return makeSuccessResponse("User already initialized");
-        }
-        this.telegramUserID.value = userInitializeRequest.telegramUserID;
-        return makeJSONResponse<UserInitializeResponse>({});
     }
 
     async generateWallet() : Promise<Wallet> {
@@ -644,30 +623,11 @@ export class UserDO {
         return [method,jsonBody];
     }
 
-    assertUserIsNotInitialized() {
-        if (this.initialized()) {
-            throw new Error("User is already initialized");
-        }
-    }
-
-    assertUserIsInitialized() {
-        if (!this.initialized()) {
-            throw new Error("User is not initialized");
-        }
-    }
-
-    assertUserHasNoWallet() {
-        if (this.wallet.value) {
-            throw new Error("User already has wallet");
-        }
-    }
-
     assertUserHasWallet() {
         if (!this.wallet.value) {
             throw new Error("User has no wallet");
         }
     }
-
 
     async makeUserData(telegramUserID : number, forceRefreshBalance : boolean) : Promise<UserData> {
         const hasInviteBetaCodes = await this.getHasBetaCodes();
@@ -683,21 +643,6 @@ export class UserDO {
             hasInviteBetaCodes: hasInviteBetaCodes,
             maybeSOLBalance : maybeSOLBalance,
             maybePNL: maybePNL
-        };
-    }
-
-    private async maybeGetSOLBalance(forceRefreshSOLBalance : boolean) : Promise<DecimalizedAmount|undefined> {
-        const wallet = this.wallet.value;
-        if (wallet == null) {
-            return;
-        }
-        const solLamportsBalance = await getSOLBalance(wallet.publicKey, this.env).catch(r => undefined);
-        if (solLamportsBalance == null) {
-            return;
-        }
-        return {
-            tokenAmount : solLamportsBalance.toString(),
-            decimals: getVsTokenInfo('SOL').decimals
         };
     }
 

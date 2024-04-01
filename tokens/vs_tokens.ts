@@ -4,10 +4,6 @@ export const SOL_ADDRESS = "So11111111111111111111111111111111111111112";
 const SOL_SYMBOL = "SOL";
 const SOL_NAME = "Wrapped SOL";
 
-const USDC_ADDRESS = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
-const USDC_SYMBOL = "USDC";
-const USDC_NAME = "USD Coin";
-
 export function getVsTokenInfo(vsToken : string) : TokenInfo {
     const address = getVsTokenAddress(vsToken);
     const name = getVsTokenName(vsToken);
@@ -27,9 +23,6 @@ function getVsTokenLogoURI(vsToken : string) : string {
     if (vsToken === SOL_ADDRESS || vsToken === SOL_SYMBOL || vsToken === SOL_NAME) {
         return "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/So11111111111111111111111111111111111111112/logo.png";
     }
-    else if (vsToken === USDC_ADDRESS || vsToken === USDC_SYMBOL || vsToken === USDC_NAME) {
-        return "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v/logo.png";
-    }
     else {
         throw new Error();
     }
@@ -38,9 +31,6 @@ function getVsTokenLogoURI(vsToken : string) : string {
 function getVsTokenDecimals(vsToken : string) : number {
     if (vsToken === SOL_ADDRESS || vsToken === SOL_SYMBOL || vsToken === SOL_NAME) {
         return 9;
-    }
-    else if (vsToken === USDC_ADDRESS || vsToken === USDC_SYMBOL || vsToken === USDC_NAME) {
-        return 6;
     }
     else {
         throw new Error();
@@ -51,9 +41,6 @@ function getVsTokenAddress(vsToken : string) : string {
     if (vsToken === SOL_ADDRESS || vsToken === SOL_SYMBOL || vsToken === SOL_NAME) {
         return SOL_ADDRESS;
     }
-    else if (vsToken === USDC_ADDRESS || vsToken === USDC_SYMBOL || vsToken === USDC_NAME) {
-        return USDC_ADDRESS;
-    }
     else {
         throw new Error();
     }
@@ -62,9 +49,6 @@ function getVsTokenAddress(vsToken : string) : string {
 function getVsTokenSymbol(vsToken : string) : string {
     if (vsToken === SOL_ADDRESS || vsToken === SOL_SYMBOL || vsToken === SOL_NAME) {
         return SOL_SYMBOL;
-    }
-    else if (vsToken === USDC_ADDRESS || vsToken === USDC_SYMBOL || vsToken === USDC_NAME) {
-        return USDC_SYMBOL;
     }
     else {
         throw new Error();
@@ -75,9 +59,6 @@ function getVsTokenName(vsToken : string) : string {
     if (vsToken === SOL_ADDRESS || vsToken === SOL_SYMBOL || vsToken === SOL_NAME) {
         return SOL_NAME;
     }
-    else if (vsToken === USDC_ADDRESS || vsToken === USDC_SYMBOL || vsToken === USDC_NAME) {
-        return USDC_NAME;
-    }
     else {
         throw new Error();
     }
@@ -86,9 +67,6 @@ function getVsTokenName(vsToken : string) : string {
 export function getVsTokenDecimalsMultiplier(vsToken : string) : number {
     if (vsToken === SOL_ADDRESS || vsToken === SOL_SYMBOL || vsToken === SOL_NAME) {
         return 1000000000;
-    }
-    else if (vsToken === USDC_ADDRESS || vsToken === USDC_SYMBOL || vsToken === USDC_NAME) {
-        return 1000000;
     }
     else {
         throw new Error();

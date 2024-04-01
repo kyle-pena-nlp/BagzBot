@@ -29,7 +29,6 @@ import { UserData } from "./model/user_data";
 
 export enum UserDOFetchMethod {
 	get = "get",
-	initialize = "initialize",
 	storeSessionValues = "storeSessionValues",
 	getSessionValues = "getSessionValues",
 	getSessionValuesWithPrefix = "getSessionValuesWithPrefix",
