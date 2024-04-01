@@ -84,6 +84,10 @@ export abstract class BaseMenu {
         };
         return menuSpec;
     }
+
+    renderURLPreviewNormally() {
+        return true;
+    }
 }
 
 export abstract class Menu<T> extends BaseMenu {

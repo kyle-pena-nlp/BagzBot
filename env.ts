@@ -47,6 +47,7 @@ export interface Env {
 	BETA_SOL_BUY_LIMIT : string
 	PRICE_POLL_INTERVAL_MS : string
 	FORBIDDEN_TOKENS : string
+	TX_TIMEOUT_MS : string
 
 	UserDO : any // i'd like to strongly type this as DurableObjectNamespace, but can't for technical reasons
 	TokenPairPositionTrackerDO : any // ditto

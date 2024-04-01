@@ -16,9 +16,6 @@ export class LegalAgreement extends Menu<undefined> implements MenuCapabilities 
     parseMode(): "MarkdownV2" | "HTML" {
         return 'HTML';
     }
-    renderURLPreviewNormally(): boolean {
-        return true;
-    }
 }
 
 const LEGAL_AGREEMENT_TEXT = `You use this bot at your own risk.  

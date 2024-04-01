@@ -20,15 +20,6 @@ export class MenuViewOpenPosition extends Menu<PositionAndMaybePNL|{ brandNewPos
             ``
         ];
 
-        // DEBUGGING
-        if (DEBUGGING) {
-            lines.push(`${toNumber(this.menuData.position.fillPrice)}`)
-            lines.push(`${toNumber(this.menuData.position.tokenAmt)}`)
-            lines.push(`${toNumber(this.menuData.position.vsTokenAmt)}`)
-            lines.push(`${(this.menuData.position.buyConfirmed)}`)
-        }
-
-
         if ('brandNewPosition' in this.menuData) {
             lines.push("This position is brand new! Refresh in a few moments to get more detailed information.");
             return lines.join("\r\n");

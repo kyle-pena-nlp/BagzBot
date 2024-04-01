@@ -23,7 +23,7 @@ export async function executeAndMaybeConfirmTx(
     startTimeMS : number) : Promise<PreparseSwapResult> {
 
     const isTimedOut : () => boolean = () => {
-        return (Date.now() - startTimeMS) > 25000;
+        return (Date.now() - startTimeMS) > strictParseInt(env.TX_TIMEOUT_MS);
     }
 
     // Define some settings

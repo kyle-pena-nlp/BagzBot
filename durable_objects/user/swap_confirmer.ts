@@ -5,7 +5,7 @@ import { logError, logInfo } from "../../logging";
 import { Position } from "../../positions";
 import { parseSwappableParsedTransactionWithMeta } from "../../rpc/rpc_parse";
 import { isSlippageSwapExecutionErrorParseSummary, isSwapExecutionErrorParseSummary } from "../../rpc/rpc_types";
-import { sleep } from "../../util";
+import { sleep, strictParseInt } from "../../util";
 import { SwapStatus } from "./model/swap_status";
 
 export class SwapConfirmer {
@@ -20,7 +20,7 @@ export class SwapConfirmer {
         this.reattemptConfirmDelay = parseInt(env.RPC_REATTEMPT_CONFIRM_DELAY, 10);
     }
     private isTimedOut() : boolean {
-        return (Date.now() - this.startTimeMS) > 25000;
+        return (Date.now() - this.startTimeMS) > strictParseInt(this.env.TX_TIMEOUT_MS);
     }
     async confirmSwap(s : Position, type : 'buy'|'sell') : Promise<SwapStatus> {
         
