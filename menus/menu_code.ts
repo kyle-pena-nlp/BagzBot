@@ -73,5 +73,8 @@ export enum MenuCode {
 	AdminDevSetPrice = "AdminDevSetPrice",
 	SubmitAdminDevSetPrice = "SubmitAdminDevSetPrice",
 
+	AdminInvokeAlarm = "AdminInvokeAlarm",
+	SubmitAdminInvokeAlarm = "SubmitAdminInvokeAlarm",
+
 	Close = "Close"
 };

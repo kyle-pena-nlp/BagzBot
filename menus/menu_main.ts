@@ -69,6 +69,9 @@ export class MenuMain extends Menu<UserData & Stuff> implements MenuCapabilities
             if (this.menuData.isImpersonatingUser) {
                 this.insertButtonNextLine(options, 'ADMIN: End User Support', this.menuCallback(MenuCode.UnimpersonateUser));
             }
+            if (this.menuData.isAdminOrSuperAdmin) {
+                this.insertButtonNextLine(options, 'ADMIN: Invoke Alarm', this.menuCallback(MenuCode.AdminInvokeAlarm));
+            }
             if (this.menuData.isAdminOrSuperAdmin && !this.menuData.isImpersonatingUser) {
                 this.insertButtonNextLine(options, 'ADMIN: Begin User Support', this.menuCallback(MenuCode.ImpersonateUser));
             }

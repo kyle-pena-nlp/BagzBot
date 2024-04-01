@@ -281,6 +281,9 @@ export class TokenPairPositionTrackerDO {
                 return await this.handleUpdateSellConfirmationStatus(body);
             case TokenPairPositionTrackerDOFetchMethod.setSellAutoDoubleOnOpenPosition:
                 return await this.handleSetSellAutoDoubleOnOpenPosition(body);
+            case TokenPairPositionTrackerDOFetchMethod.adminInvokeAlarm:
+                await this.alarm();
+                return makeJSONResponse<{}>({});
             default:
                 assertNever(method);
         }

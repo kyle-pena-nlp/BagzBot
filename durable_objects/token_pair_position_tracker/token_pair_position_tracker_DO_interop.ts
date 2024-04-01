@@ -8,6 +8,7 @@ import { EditTriggerPercentOnOpenPositionInTrackerRequest } from "./actions/edit
 import { GetPositionFromPriceTrackerRequest, GetPositionFromPriceTrackerResponse } from "./actions/get_position";
 import { GetPositionAndMaybePNLFromPriceTrackerRequest, GetPositionAndMaybePNLFromPriceTrackerResponse } from "./actions/get_position_and_maybe_pnl";
 import { GetTokenPriceRequest, GetTokenPriceResponse } from "./actions/get_token_price";
+import { HasPairAddresses } from "./actions/has_pair_addresses";
 import { ListPositionsByUserRequest, ListPositionsByUserResponse } from "./actions/list_positions_by_user";
 import { MarkPositionAsClosedRequest, MarkPositionAsClosedResponse } from "./actions/mark_position_as_closed";
 import { MarkPositionAsClosingRequest, MarkPositionAsClosingResponse } from "./actions/mark_position_as_closing";
@@ -37,9 +38,15 @@ export enum TokenPairPositionTrackerDOFetchMethod {
 	editTriggerPercentOnOpenPosition = "editTriggerPercentOnOpenPosition",
 	updateBuyConfirmationStatus = "updateBuyConfirmationStatus",
 	updateSellConfirmationStatus = "updateSellConfirmationStatus",
-	setSellAutoDoubleOnOpenPosition = "setSellAutoDoubleOnOpenPosition"
+	setSellAutoDoubleOnOpenPosition = "setSellAutoDoubleOnOpenPosition",
+	adminInvokeAlarm = "adminInvokeAlarm"
 }
 
+export async function adminInvokeAlarm(tokenAddress : string, vsTokenAddress : string, env : Env) {
+	const request : HasPairAddresses = { tokenAddress, vsTokenAddress };
+	const method = TokenPairPositionTrackerDOFetchMethod.adminInvokeAlarm;
+	return await sendJSONRequestToTokenPairPositionTracker<HasPairAddresses,{}>(method,request,tokenAddress,vsTokenAddress,env);
+}
 
 export async function _devOnlyFeatureUpdatePrice(telegramUserID : number, tokenAddress : string, vsTokenAddress : string, price : DecimalizedAmount, env : Env) {
 	if (telegramUserID != strictParseInt(env.SUPER_ADMIN_USER_ID)) {

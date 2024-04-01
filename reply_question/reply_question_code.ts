@@ -10,6 +10,7 @@ export enum ReplyQuestionCode {
     ImpersonateUser = "ImpersonateUser",
 
     SendBetaFeedback = "SendBetaFeedback",
-    AdminDevSetPrice = "AdminDevSetPrice"
+    AdminDevSetPrice = "AdminDevSetPrice",
+    AdminInvokeAlarm = "AdminInvokeAlarm"
     
 }

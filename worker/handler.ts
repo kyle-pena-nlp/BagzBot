@@ -6,7 +6,7 @@ import { claimInviteCode, listUnclaimedBetaInviteCodes } from "../durable_object
 import { doHeartbeatWakeup } from "../durable_objects/heartbeat/heartbeat_do_interop";
 import { GetTokenInfoResponse, isInvalidTokenInfoResponse, isValidTokenInfoResponse } from "../durable_objects/polled_token_pair_list/actions/get_token_info";
 import { getTokenInfo } from "../durable_objects/polled_token_pair_list/polled_token_pair_list_DO_interop";
-import { _devOnlyFeatureUpdatePrice } from "../durable_objects/token_pair_position_tracker/token_pair_position_tracker_do_interop";
+import { _devOnlyFeatureUpdatePrice, adminInvokeAlarm } from "../durable_objects/token_pair_position_tracker/token_pair_position_tracker_do_interop";
 import { OpenPositionRequest } from "../durable_objects/user/actions/open_new_position";
 import { QuantityAndToken } from "../durable_objects/user/model/quantity_and_token";
 import { TokenSymbolAndAddress } from "../durable_objects/user/model/token_name_and_address";
@@ -527,6 +527,17 @@ export class Worker {
                         this.env);
                     return new MenuEditPositionRequest(pr);
                 }
+            case MenuCode.AdminInvokeAlarm:
+                return new ReplyQuestion('Enter token address', ReplyQuestionCode.AdminInvokeAlarm, this.context, { callback: { linkedMessageID: params.messageID, nextMenuCode: MenuCode.SubmitAdminInvokeAlarm }});
+            case MenuCode.SubmitAdminInvokeAlarm:
+                const ti = await getTokenInfo(callbackData.menuArg||'',this.env);
+                if (isValidTokenInfoResponse(ti)) {
+                    await adminInvokeAlarm(callbackData.menuArg||'', getVsTokenInfo('SOL').address, this.env);
+                    return new MenuContinueMessage('Alarm invoked', MenuCode.Main);
+                }
+                else {
+                    return new MenuContinueMessage('Not a token', MenuCode.Main);
+                }
             default:
                 assertNever(callbackData.menuCode);
         }
@@ -648,26 +659,8 @@ export class Worker {
             case ReplyQuestionCode.EnterBetaInviteCode:
                 await this.handleEnterBetaInviteCode(info, userAnswer||'', this.env);
                 break;
-            case ReplyQuestionCode.EnterTransferFundsRecipient:
-                break;
-            case ReplyQuestionCode.EnterAddressBookEntryName:
-                break;
-            case ReplyQuestionCode.EnterSlippagePercent:
-                break;
-            case ReplyQuestionCode.EnterBuyQuantity:
-                break;
-            case ReplyQuestionCode.EnterTriggerPercent:
-                break;
-            case ReplyQuestionCode.EditPositionChangeToken:
-                break;
-            case ReplyQuestionCode.ImpersonateUser:
-                break;
-            case ReplyQuestionCode.SendBetaFeedback:
-                break;
-            case ReplyQuestionCode.AdminDevSetPrice:
-                break;
             default:
-                assertNever(replyQuestionCode);
+                break;
         }
         // If the reply question has callback data, delegate to the handleCallback method
         if (replyQuestionHasNextSteps(replyQuestionData)) {
