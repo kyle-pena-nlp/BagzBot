@@ -335,9 +335,12 @@ export class UserDO {
         const startTimeMS = Date.now();
         const results : Record<string,SwapStatus> = {};
         for (const position of userAction.positions) {
-            const swapConfirmer = new SwapConfirmer(this.wallet.value!!, this.env, startTimeMS);
+            const channelPrefix = `<b>Confirming purchase of ${asTokenPrice(position.tokenAmt)} $${position.token.symbol}`;
+            const channel = TGStatusMessage.createAndSend('Attempting confirmation.', false, position.chatID, this.env, 'HTML', channelPrefix)
+            const swapConfirmer = new SwapConfirmer(this.wallet.value!!, this.env, startTimeMS, channel);
             const buyStatus = await swapConfirmer.confirmSwap(position, 'buy');
             results[position.positionID] = buyStatus;
+            TGStatusMessage.finalize(channel);
             await updateBuyConfirmationStatus(position.positionID, position.token.address, position.vsToken.address, buyStatus, this.env);
         }
         return makeJSONResponse<ConfirmBuysResponse>({ results: results });
@@ -347,7 +350,9 @@ export class UserDO {
     async handleConfirmSells(userAction : ConfirmSellsRequest) : Promise<Response> {
         const startTimeMS = Date.now();
         for (const position of userAction.positions) {
-            const swapConfirmer = new SwapConfirmer(this.wallet.value!!, this.env, startTimeMS);
+            const channelPrefix = `Attempting to confirm sale of ${asTokenPrice(position.tokenAmt)} $${position.token.symbol}`;
+            const channel = TGStatusMessage.createAndSend('Attempting confirmation', false, position.chatID, this.env, 'HTML', channelPrefix);
+            const swapConfirmer = new SwapConfirmer(this.wallet.value!!, this.env, startTimeMS, channel);
             const sellStatus = await swapConfirmer.confirmSwap(position, 'sell');
             await updateSellConfirmationStatus(position.positionID, 
                 position.txSellSignature,
@@ -356,6 +361,7 @@ export class UserDO {
                 position.vsToken.address, 
                 sellStatus, 
                 this.env);
+            TGStatusMessage.finalize(channel);
         }
         return makeJSONResponse<ConfirmSellsResponse>({});
     }
