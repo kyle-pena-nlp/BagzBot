@@ -1,3 +1,4 @@
+import { isAdminOrSuperAdmin } from "../../admins";
 import { Wallet, encryptPrivateKey, generateEd25519Keypair } from "../../crypto";
 import { asTokenPrice } from "../../decimalized/decimalized_amount";
 import { Env } from "../../env";
@@ -6,11 +7,12 @@ import { PositionPreRequest, PositionStatus, PositionType } from "../../position
 import { POSITION_REQUEST_STORAGE_KEY } from "../../storage_keys";
 import { TGStatusMessage, UpdateableNotification, sendMessageToTG } from "../../telegram";
 import { WEN_ADDRESS, getVsTokenInfo } from "../../tokens";
-import { ChangeTrackedValue, Structural, assertNever, groupIntoBatches, makeFailureResponse, makeJSONResponse, makeSuccessResponse, maybeGetJson, sleep, strictParseBoolean } from "../../util";
+import { ChangeTrackedValue, Structural, assertNever, groupIntoBatches, makeFailureResponse, makeJSONResponse, makeSuccessResponse, maybeGetJson, setDifference, sleep, strictParseBoolean } from "../../util";
 import { assertIs } from "../../util/enums";
 import { listUnclaimedBetaInviteCodes } from "../beta_invite_codes/beta_invite_code_interop";
 import { PositionAndMaybePNL } from "../token_pair_position_tracker/model/position_and_PNL";
-import { editTriggerPercentOnOpenPositionInTracker, getPositionAndMaybePNL, listPositionsByUser, setSellAutoDoubleOnOpenPositionInPositionTracker, updateBuyConfirmationStatus, updateSellConfirmationStatus } from "../token_pair_position_tracker/token_pair_position_tracker_do_interop";
+import { editTriggerPercentOnOpenPositionInTracker, getPositionAndMaybePNL, listPositionsByUser, removePosition, setSellAutoDoubleOnOpenPositionInPositionTracker, updateBuyConfirmationStatus, updateSellConfirmationStatus } from "../token_pair_position_tracker/token_pair_position_tracker_do_interop";
+import { AdminDeleteAllPositionsRequest, AdminDeleteAllPositionsResponse } from "./actions/admin_delete_all_positions";
 import { AutomaticallyClosePositionsRequest, AutomaticallyClosePositionsResponse } from "./actions/automatically_close_positions";
 import { BaseUserDORequest, isBaseUserDORequest } from "./actions/base_user_do_request";
 import { ConfirmBuysRequest, ConfirmBuysResponse } from "./actions/confirm_buys";
@@ -257,11 +259,35 @@ export class UserDO {
             case UserDOFetchMethod.setSellAutoDoubleOnOpenPositionRequest:
                 response = await this.handleSetSellAutoDoubleOnOpenPositionRequest(userAction);
                 break;
+            case UserDOFetchMethod.adminDeleteAllPositions:
+                response = await this.handleAdminDeleteAllPositions(userAction);
+                break;
             default:
                 assertNever(method);
         }
 
         return [method,userAction,response];
+    }
+
+    async handleAdminDeleteAllPositions(userAction : AdminDeleteAllPositionsRequest) : Promise<Response> {
+        const result = this.handleAdminDeleteAllPositionsInternal(userAction);
+        return makeJSONResponse<AdminDeleteAllPositionsResponse>(result);
+    }
+
+    async handleAdminDeleteAllPositionsInternal(userAction : AdminDeleteAllPositionsRequest) : Promise<AdminDeleteAllPositionsResponse> {
+        const realUserID = userAction.realTelegramUserID;
+        const userID = userAction.telegramUserID;
+        if (!isAdminOrSuperAdmin(realUserID, this.env)) {
+            logError(`Only admin user can delete all positions - was ${realUserID}`);
+            return {};
+        }
+        const positions = await this.listPositionsFromUserDO(userID);
+        for (const posAndMaybePNL of positions) {
+            const position = posAndMaybePNL.position;
+            logInfo(`Removing position with ID ${position.positionID}`);
+            await removePosition(position.positionID, position.token.address, position.vsToken.address, this.env);
+        }
+        return {};
     }
 
     /* When we are tracking a position whose buy has not been confirmed, we periodically send it here */
@@ -378,13 +404,29 @@ export class UserDO {
     }
 
     async handleListPositionsFromUserDO(request : ListPositionsFromUserDORequest) : Promise<Response> {
+        const userID = request.telegramUserID;
+        const positions = await this.listPositionsFromUserDO(userID);
+        const response : ListPositionsFromUserDOResponse = { positions: positions };
+        return makeJSONResponse(response);
+    }
+
+    async listPositionsFromUserDO(userID : number) : Promise<PositionAndMaybePNL[]> {
+
+        // fetch positions from all relevant trackers
         const uniqueTokenPairs : TokenPair[] = this.tokenPairsForPositionIDsTracker.listUniqueTokenPairs();
         const positions : PositionAndMaybePNL[]  = [];
         for (const tokenPair of uniqueTokenPairs) {
-            const positionsForTokenPair = await listPositionsByUser(request.telegramUserID, tokenPair.tokenAddress, tokenPair.vsTokenAddress, this.env);
+            const positionsForTokenPair = await listPositionsByUser(userID, tokenPair.tokenAddress, tokenPair.vsTokenAddress, this.env);
             positions.push(...positionsForTokenPair);
         }
-        // if for whatever reason the pair for this position is missing, this would rectify it
+
+        // the tracker is the source of truth.  if the userDO has a token pair for a position that doesn't exist in the tracker, remove it
+        const currentPositionIDs = new Set<string>(positions.map(p => p.position.positionID));
+        const positionIDsInTracker = new Set<string>(this.tokenPairsForPositionIDsTracker.listPositionIDs());
+        const deletedPositionIDs = setDifference(positionIDsInTracker, currentPositionIDs, Set<string>);
+        this.tokenPairsForPositionIDsTracker.removePositions([...deletedPositionIDs]);
+
+        // likewise, if for whatever reason the pair for this position is missing, this would rectify it
         for (const position of positions) {
             this.tokenPairsForPositionIDsTracker.storePosition({
                 positionID: position.position.positionID,
@@ -392,8 +434,9 @@ export class UserDO {
                 vsToken : { address : position.position.vsToken.address }
             });
         }
-        const response : ListPositionsFromUserDOResponse = { positions: positions };
-        return makeJSONResponse(response);
+        // if on the other hand, a position has disappeared from the tracker, remove it.
+
+        return positions;
     }
 
     async handleImpersonateUser(request : ImpersonateUserRequest) : Promise<Response> {

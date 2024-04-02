@@ -13,3 +13,7 @@ export function isTheSuperAdminUserID(userID : number, env : Env) : boolean {
     const superAdminUserID = strictParseInt(env.SUPER_ADMIN_USER_ID);
     return userID === superAdminUserID;
 }
+
+export function isAdminOrSuperAdmin(userID : number, env : Env) {
+	return isAnAdminUserID(userID, env) || isTheSuperAdminUserID(userID, env);
+}

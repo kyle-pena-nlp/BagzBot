@@ -68,6 +68,17 @@ export class TokenPairsForPositionIDsTracker {
             this.markAsDeleted(positionIDKey);
         }
     }
+    listPositionIDs() : string[] {
+        const results : string[] = [];
+        for (const key of Object.keys(this.tokenPairsForPositionIDs)) {
+            const positionIDKey = PositionIDKey.parse(key);
+            if (positionIDKey == null) {
+                continue;
+            }
+            results.push(positionIDKey.positionID)
+        }
+        return results;
+    }
     getPositionPair(positionID : string) : TokenPairForAPosition|null {
         const positionIDKey = new PositionIDKey(positionID);
         return this.tokenPairsForPositionIDs[positionIDKey.toString()]||null;

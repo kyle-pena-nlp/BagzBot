@@ -3,6 +3,7 @@ import { Position } from "../../positions";
 import { TokenInfo } from "../../tokens";
 import { Structural, groupIntoBatches, groupIntoMap, makeJSONRequest, makeRequest } from "../../util";
 import { PositionAndMaybePNL } from "../token_pair_position_tracker/model/position_and_PNL";
+import { AdminDeleteAllPositionsRequest, AdminDeleteAllPositionsResponse } from "./actions/admin_delete_all_positions";
 import { AutomaticallyClosePositionsRequest, AutomaticallyClosePositionsResponse } from "./actions/automatically_close_positions";
 import { ConfirmBuysRequest, ConfirmBuysResponse } from "./actions/confirm_buys";
 import { ConfirmSellsRequest, ConfirmSellsResponse } from "./actions/confirm_sells";
@@ -49,7 +50,8 @@ export enum UserDOFetchMethod {
 	editTriggerPercentOnOpenPosition = "editTriggerPercentOnOpenPosition",
 	confirmSells = "confirmSells",
 	confirmBuys = "confirmBuys",
-	setSellAutoDoubleOnOpenPositionRequest = "setSellAutoDoubleOnOpenPositionRequest"
+	setSellAutoDoubleOnOpenPositionRequest = "setSellAutoDoubleOnOpenPositionRequest",
+	adminDeleteAllPositions = "adminDeleteAllPositions"
 }
 
 export async function sendMessageToUser(toTelegramUserID : number, fromTelegramUserName : string, message : string, env : Env) : Promise<SendMessageToUserResponse> {
@@ -134,6 +136,12 @@ export async function tryToConfirmSellsWithUserDOs(unconfirmedSells : Position[]
 		}
 		await Promise.allSettled(promises);
 	}
+}
+
+export async function adminDeleteAllPositions(telegramUserID : number, chatID : number, realTelegramUserID : number, env : Env) : Promise<AdminDeleteAllPositionsResponse> {
+	const method = UserDOFetchMethod.adminDeleteAllPositions;
+	const request : AdminDeleteAllPositionsRequest = { telegramUserID, chatID, realTelegramUserID };
+	return await sendJSONRequestToUserDO<AdminDeleteAllPositionsRequest,AdminDeleteAllPositionsResponse>(telegramUserID, method, request, env);
 }
 
 export async function tryToConfirmSells(userID : number, positions : Position[], env : Env) {
