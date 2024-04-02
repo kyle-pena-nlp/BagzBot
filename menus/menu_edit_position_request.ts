@@ -1,4 +1,3 @@
-import { toFriendlyString } from "../decimalized";
 import { PositionRequest } from "../positions";
 import { CallbackButton } from "../telegram";
 import { CallbackData } from "./callback_data";
@@ -27,7 +26,7 @@ export class MenuEditPositionRequest extends Menu<PositionRequest> implements Me
         this.insertButtonSameLine(options, `:twisted_arrows: ${positionRequest.slippagePercent}% Slippage`, new CallbackData(MenuCode.TrailingStopLossSlippagePctMenu, positionRequest.slippagePercent.toString()));
         this.insertButtonNextLine(options, `:brain: ${positionRequest.sellAutoDoubleSlippage ? 'Sell: Auto-Double Slippage': 'Sell: No Auto-Double Slippage'} :brain:`, new CallbackData(MenuCode.PosRequestChooseAutoDoubleSlippageOptions));
         this.insertButtonNextLine(options, `:refresh: Refresh Quote`, new CallbackData(MenuCode.TrailingStopLossRequestReturnToEditorMenu));
-        this.insertButtonSameLine(options, `Cancel`, new CallbackData(MenuCode.Main));
+        this.insertButtonSameLine(options, `:cancel: Cancel`, new CallbackData(MenuCode.Main));
         this.insertButtonSameLine(options, ':help: Help', new CallbackData(MenuCode.EditPositionHelp));
         this.insertButtonNextLine(options, `:sparkle: Submit :sparkle:`, new CallbackData(MenuCode.TrailingStopLossEditorFinalSubmit));
         return options;

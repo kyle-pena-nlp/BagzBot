@@ -16,6 +16,7 @@ import { SwapTransactionSigner } from "./swap_transaction_signer";
 export type SellResult = 'tx-failed'|'failed'|'slippage-failed'|'unconfirmed'|'confirmed'
 
 export async function sell(position: Position, 
+    type : 'Sell'|'Auto-sell',
     wallet : Wallet, 
     env : Env,
     notificationChannel : UpdateableNotification,

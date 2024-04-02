@@ -1,5 +1,5 @@
 import { dClamp, dDiv, dMult, dSub, fromNumber } from "../decimalized";
-import { DecimalizedAmount, MATH_DECIMAL_PLACES, asPercentString, asTokenPrice, asTokenPriceDelta, dZero, toNumber } from "../decimalized/decimalized_amount";
+import { DecimalizedAmount, MATH_DECIMAL_PLACES, asPercentDeltaString, asPercentString, asTokenPrice, asTokenPriceDelta, dZero, toNumber } from "../decimalized/decimalized_amount";
 import { PNL, PositionAndMaybePNL } from "../durable_objects/token_pair_position_tracker/model/position_and_PNL";
 import { Position, PositionStatus } from "../positions";
 import { CallbackButton } from "../telegram";
@@ -38,7 +38,7 @@ export class MenuViewOpenPosition extends Menu<PositionAndMaybePNL|BrandNewPosit
                 this.insertButtonNextLine(options, "Try confirming now...", new CallbackData(MenuCode.ManuallyConfirmBuy, this.menuData.position.positionID));
             }
             
-            this.insertButtonNextLine(options, "Change Trigger Percent", new CallbackData(MenuCode.EditOpenPositionTriggerPercent, this.menuData.position.positionID));
+            this.insertButtonNextLine(options, `:chart_down: ${this.menuData.position.triggerPercent}% Trigger`, new CallbackData(MenuCode.EditOpenPositionTriggerPercent, this.menuData.position.positionID));
             this.insertButtonNextLine(options, `:brain: ${this.menuData.position.sellAutoDoubleSlippage ? '': 'Do Not'} Auto-Double Slippage If Sell Fails :brain:`, new CallbackData(MenuCode.EditOpenPositionAutoDoubleSlippage, this.menuData.position.positionID));
 
             const refreshPositionCallbackData = new CallbackData(MenuCode.ViewOpenPosition, this.menuData.position.positionID);
@@ -94,17 +94,22 @@ export class MenuViewOpenPosition extends Menu<PositionAndMaybePNL|BrandNewPosit
         // closing position.
         
         if (this.isPositionWithPNL() && !this.isClosingOrClosed()) {
-            lines.push(`:bullet: <b>Current Price</b>: ${asTokenPrice(this.currentPrice())} (${asPercentString(this.percentBelowPeak())} &lt; Peak Price)`);
+            const peakPriceComparison = this.lessThanPeakPrice() ? '&lt;' : '=';
+            lines.push(`:bullet: <b>Current Price</b>: ${asTokenPrice(this.currentPrice())} (${asPercentString(this.percentBelowPeak())} ${peakPriceComparison} Peak Price)`);
             lines.push(`:bullet: <b>Peak Price</b>: ${asTokenPrice(this.menuData.peakPrice)}`)
             lines.push(`:bullet: <b>Trigger Percent</b>: ${this.menuData.position.triggerPercent.toFixed(1)}%`)
-            lines.push(`:bullet: <b>PNL</b>: ${asTokenPriceDelta(this.calcPNL())}`);
+            lines.push(`:bullet: <b>PNL</b>: ${asTokenPriceDelta(this.calcPNL())} (${asPercentDeltaString(this.pnlDeltaPct())}))`);
         }
 
         if (this.isCloseToBeingTriggered()) {
-            lines.push(":eyes: This position is closed to being triggered! :eyes:");
+            lines.push(":eyes: This position is close to being triggered! :eyes:");
         }
 
         return lines;
+    }
+
+    private lessThanPeakPrice(this : { menuData : { PNL : PNL, position : Position }}) : boolean {
+        return toNumber(this.menuData.PNL.fracBelowPeak) >= 1e-4;
     }
 
     private position() : Position {
@@ -146,6 +151,10 @@ export class MenuViewOpenPosition extends Menu<PositionAndMaybePNL|BrandNewPosit
 
     private sellIsUnconfirmed() : boolean {
         return this.menuData.position.sellConfirmed === false; // triple eq deliberate
+    }
+
+    private pnlDeltaPct(this : { menuData : PositionAndMaybePNL & { PNL : PNL } }) : DecimalizedAmount {
+        return dMult(fromNumber(100), this.menuData.PNL.PNLfrac);
     }
 
     private sellIsConfirming(): boolean {

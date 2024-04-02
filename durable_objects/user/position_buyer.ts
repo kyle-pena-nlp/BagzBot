@@ -31,7 +31,9 @@ export class PositionBuyer {
             `Initiating swap...`, 
             false, 
             positionRequest.chatID, 
-            this.env);
+            this.env,
+            'HTML',
+            '<b>New Position</b>: ');
 
         // RPC connection
         const connection = new Connection(getRPCUrl(this.env));

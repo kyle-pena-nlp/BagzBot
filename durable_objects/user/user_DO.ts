@@ -653,9 +653,9 @@ export class UserDO {
             return makeJSONResponse<ManuallyClosePositionResponse>({ message: "Position has already been sold." });
         }
         assertIs<PositionStatus.Open,typeof position.status>();
-        const channel = TGStatusMessage.createAndSend(`Initiating sale of ${asTokenPrice(position.tokenAmt)} ${position.token.symbol}`, false, position.chatID, this.env);
+        const channel = TGStatusMessage.createAndSend(`Initiating sale of ${asTokenPrice(position.tokenAmt)} ${position.token.symbol}`, false, position.chatID, this.env, 'HTML', '<b>Manual Sell</b>: ');
         // deliberate lack of await here (fire-and-forget). Must complete in 30s.
-        sell(position, this.wallet.value!!, this.env, channel, startTimeMS).then(sellStatus => publishFinalSellMessage(position, 'Sell', sellStatus, position.chatID, channel, this.env));
+        sell(position, 'Sell', this.wallet.value!!, this.env, channel, startTimeMS).then(sellStatus => publishFinalSellMessage(position, 'Sell', sellStatus, position.chatID, channel, this.env));
         return makeJSONResponse<ManuallyClosePositionResponse>({ message: 'Position will now be closed. '});
     }
 
@@ -670,9 +670,9 @@ export class UserDO {
         for (const positionBatch of positionBatches) {
             // fire off a bunch of promises per batch (4)
             let sellPositionPromises = positionBatch.map(async position => {
-                const notificationChannel = TGStatusMessage.createAndSend(`Initiating auto-sell`, false, this.chatID.value||0, this.env);
+                const notificationChannel = TGStatusMessage.createAndSend(`Initiating.`, false, this.chatID.value||0, this.env, 'HTML', '<b>Auto-Sell</b>: ');
                 notificationChannels.push(notificationChannel);
-                const sellPromise = sell(position, this.wallet.value!!, this.env, notificationChannel, startTimeMS)
+                const sellPromise = sell(position, 'Auto-sell', this.wallet.value!!, this.env, notificationChannel, startTimeMS)
                 sellPromise.then(sellStatus => publishFinalSellMessage(position, 'Auto-sell', sellStatus, position.chatID, notificationChannel, this.env));
                 return await sellPromise;
             });

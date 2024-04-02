@@ -15,9 +15,9 @@ const emojis = {
 
     ':bullet:': '•',
     ':pencil:': '✏️',
-    ':refresh:': '🔄',
+    ':refresh:': '\u27F3',
     ':twisted_arrows:': '🔀',
-    ':cancel:': '🥜',
+    ':cancel:': '\u00D7',
 
 
     ':chart_up:': '📈',
@@ -51,7 +51,7 @@ const emojis = {
     ':happy:': '😊',
     ':beaming:': '😁',
     ':money_face:': '🤑',
-    ':help:': '🤔',
+    ':help:': '\u003F',
     ':stop:': '🛑',
     ':caution:': '🟡',
     ':none:': ''

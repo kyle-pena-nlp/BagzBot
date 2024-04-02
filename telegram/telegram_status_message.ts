@@ -5,19 +5,20 @@ import { subInEmojis } from "./emojis";
 import { deleteTGMessage, sendMessageToTG, updateTGMessage } from "./telegram_helpers";
 
 export interface UpdateableNotification { 
-    promiseChain: Promise<TGStatusMessage|{ chatID : number, env : Env }> 
+    promiseChain: Promise<TGStatusMessage|{ chatID : number, env : Env, parseMode : 'HTML'|'MarkdownV2', prefix: string|null }> 
 }
 
 export class TGStatusMessage {
     messageID : number;
     chatID : number;
     message : string;
+    prefix : string;
     parseMode : 'HTML'|'MarkdownV2';
     dismissable : boolean;
     lastSendSuccessful : boolean;
     env : Env;
     deleted : boolean = false;
-    private constructor(message : string, parseMode : 'HTML'|'MarkdownV2', dismissable : boolean, messageID : number, chatID : number, env : Env) {
+    private constructor(message : string, parseMode : 'HTML'|'MarkdownV2', dismissable : boolean, messageID : number, chatID : number, env : Env, prefix : string|null) {
         this.messageID = messageID;
         this.chatID = chatID;
         this.message = subInEmojis(message);        
@@ -25,19 +26,21 @@ export class TGStatusMessage {
         this.dismissable = dismissable;
         this.lastSendSuccessful = true;
         this.env = env;
+        this.prefix = prefix || '';
     }
     /* Create a status message that can be updated, in a non-blocking fashion, with minimum 500ms updates between updates */
     static createAndSend(message : string, 
         dismissable : boolean, 
         chatID : number, 
         env : Env, 
-        parseMode : 'HTML'|'MarkdownV2' = 'HTML') : UpdateableNotification {
-        const promiseChain = sendMessageToTG(chatID, message, env, parseMode, dismissable).then(sentMsgInfo => {
+        parseMode : 'HTML'|'MarkdownV2' = 'HTML',
+        prefix : string|null = null) : UpdateableNotification {
+        const promiseChain = sendMessageToTG(chatID, (prefix||'') + message, env, parseMode, dismissable).then(sentMsgInfo => {
             if (!sentMsgInfo.success) {
-                return { chatID: chatID, env : env };
+                return { chatID: chatID, env : env, parseMode: parseMode, prefix: prefix };
             }
             const messageID = sentMsgInfo.messageID!!;
-            return new TGStatusMessage(message, parseMode, dismissable, messageID, chatID, env);
+            return new TGStatusMessage(message, parseMode, dismissable, messageID, chatID, env, prefix);
         });
         return {
             promiseChain: promiseChain
@@ -49,8 +52,9 @@ export class TGStatusMessage {
         dismissable : boolean,
         chatID : number,
         env : Env,
-        parseMode : 'HTML'|'MarkdownV2' = 'HTML') : UpdateableNotification {
-            const statusMessage = new TGStatusMessage(message,parseMode,dismissable,messageID,chatID,env);
+        parseMode : 'HTML'|'MarkdownV2' = 'HTML',
+        prefix : string|null = null) : UpdateableNotification {
+            const statusMessage = new TGStatusMessage(message,parseMode,dismissable,messageID,chatID,env,prefix);
             return {
                 promiseChain: statusMessage.send()
             };
@@ -64,7 +68,7 @@ export class TGStatusMessage {
                 return m.updateAndSend(message, dismissable);
             }
             else {
-                return TGStatusMessage.createAndSend(message, dismissable, m.chatID, m.env).promiseChain;
+                return TGStatusMessage.createAndSend(message, dismissable, m.chatID, m.env, m.parseMode, m.prefix).promiseChain;
             }
         }).then(pause(500));
     }
@@ -95,7 +99,7 @@ export class TGStatusMessage {
     private async send() : Promise<TGStatusMessage> {
         const sentMsgInfo = await updateTGMessage(this.chatID, 
             this.messageID, 
-            this.message, 
+            (this.prefix||'') + this.message, 
             this.env, 
             this.parseMode, 
             this.dismissable);
