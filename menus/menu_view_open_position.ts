@@ -65,7 +65,19 @@ export class MenuViewOpenPosition extends Menu<PositionAndMaybePNL|BrandNewPosit
         else if (!this.buyIsConfirmed() && this.buyIsConfirming()) {
             lines.push(`:caution: <b>WE ARE CONFIRMING YOUR PURCHASE</b>`);
             lines.push(`:bullet: Refresh in a few moments for an update.`) 
-        }            
+        }
+        
+        if (this.isClosing()) {
+            lines.push(`:bullet: We are attempting to sell this position.`);
+        }
+
+        if (this.sellIsUnconfirmed()) {
+            lines.push(`:bullet: We had trouble confirming the last attempted sale of this position.`);
+        }
+
+        if (this.sellIsConfirming()) {
+            lines.push(`:bullet: We are currently re-attempting to sell the position`);
+        }
 
         // brand new position - refresh again, dear user!
         if ('brandNewPosition' in this.menuData) {
@@ -126,6 +138,18 @@ export class MenuViewOpenPosition extends Menu<PositionAndMaybePNL|BrandNewPosit
 
     private buyIsConfirming() : boolean {
         return this.menuData.position.isConfirmingBuy;
+    }
+
+    private isClosing() : boolean {
+        return this.menuData.position.status === PositionStatus.Closing;
+    }
+
+    private sellIsUnconfirmed() : boolean {
+        return this.menuData.position.sellConfirmed === false; // triple eq deliberate
+    }
+
+    private sellIsConfirming(): boolean {
+        return this.menuData.position.isConfirmingSell === true;
     }
 
     private isBrandNewPosition() : this is { menuData: BrandNewPosition } {
