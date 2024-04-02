@@ -13,6 +13,17 @@
         },
 
         {
+            "name": "Python Debugger: Deploy",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "args": [
+                "--env=${input:argValue}"
+              ]
+        },        
+
+        {
             "name": "Wrangler",
             "type": "node",
             "request": "attach",
@@ -36,5 +47,13 @@
               "program": "${workspaceFolder}/node_modules/jest/bin/jest"
             }
           }       
+    ],
+    "inputs": [
+        {
+          "id": "argValue",
+          "type": "promptString",
+          "description": "Enter the value:",
+          "default": "dev"
+        }
     ]
 }

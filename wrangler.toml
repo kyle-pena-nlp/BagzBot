@@ -12,9 +12,12 @@ name = "sol-sentry-bot-beta"
 
 [[migrations]]
 tag = "v1" # Should be unique for each entry
+new_classes = ["UserDO","TokenPairPositionTrackerDO","PolledTokenPairListDO","BetaInviteCodesDO","HeartbeatDO"]
 
 [env.dev.vars]
 # do not change this string EVER post launch
+MAX_BETA_INVITE_CODE_CHAIN_DEPTH = "1"
+INVITE_CODES_PER_USER = "5"
 ENVIRONMENT = "dev"
 CLOUDFLARE_ACCOUNT_ID = "kp1197"
 TELEGRAM_BOT_INSTANCE_DISPLAY_NAME = "DEV"
@@ -56,6 +59,8 @@ USER_PNL_CALCULATION_REFRESH_MS = "30000"
 
 [env.beta.vars]
 # do not change this string EVER post launch
+MAX_BETA_INVITE_CODE_CHAIN_DEPTH = "1"
+INVITE_CODES_PER_USER = "5"
 ENVIRONMENT = "beta"
 CLOUDFLARE_ACCOUNT_ID = "kp1197"
 TELEGRAM_BOT_INSTANCE_DISPLAY_NAME = "BETA"
@@ -69,7 +74,7 @@ FORBIDDEN_TOKENS = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v,Es9vMFrzaCERmJf
 SOL_BUY_LIMIT = "5"
 TELEGRAM_BOT_DISPLAY_NAME = "SolSentry"
 TELEGRAM_BOT_TAGLINE = "Keeps watching, so you don't have to."
-TELEGRAM_BOT_SERVER_URL = "https://api.telegram.org/"
+TELEGRAM_BOT_SERVER_URL = "https://api.telegram.org"
 TELEGRAM_BOT_ID = "6544753362"
 TELEGRAM_BOT_USERNAME = "sol_sentry_beta_bot"
 JUPITER_PRICE_API_URL = "https://price.jup.ag/v4/price"

@@ -1,7 +1,6 @@
 import json
-from argparse import ArgumentParser, Namespace
 import requests
-from ..wrangler_common import determine_workers_url, get_secret, make_telegram_api_method_url
+from wrangler_common import determine_workers_url, get_secret, make_telegram_api_method_url
 
 
 def configure_webhook(env : str):

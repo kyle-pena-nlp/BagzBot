@@ -1,5 +1,5 @@
 import requests
-from ..wrangler_common import get_environment_variable, make_telegram_api_method_url
+from wrangler_common import get_environment_variable, make_telegram_api_method_url
 
 
 def configure_bot_info(env : str):

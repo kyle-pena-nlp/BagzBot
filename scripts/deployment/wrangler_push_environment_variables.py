@@ -1,6 +1,6 @@
 import json, subprocess, shlex
 from argparse import ArgumentParser
-from ..wrangler_common import get_secrets
+from wrangler_common import get_secrets
 
 def wrangler_push_environment_variables(env):
     toml_vars = get_secrets(env)

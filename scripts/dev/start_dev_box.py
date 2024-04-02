@@ -1,9 +1,9 @@
 from argparse import Namespace
 import subprocess, json, shlex, os, signal, shutil
 import requests, requests_toolbelt
-from ..wrangler_common import *
-from ..commands import COMMANDS
-from .local_dev_common import *
+from wrangler_common import *
+from commands import COMMANDS
+from dev.local_dev_common import *
 
 def run_cloudflare_worker():
     command = START_CLOUDFLARE_LOCAL_WORKER_COMMAND

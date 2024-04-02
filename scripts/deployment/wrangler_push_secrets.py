@@ -1,6 +1,6 @@
 import subprocess, shlex, json
 from argparse import ArgumentParser
-from ..wrangler_common import get_secrets
+from wrangler_common import get_secrets
 
 def parse_args():
     parser = ArgumentParser()
@@ -9,7 +9,7 @@ def parse_args():
 
 def push_secrets(env : str):
     toml_vars = get_secrets(env)
-    secrets = { key : value for (key,value) in toml_vars.items() if key.startsWith("SECRET__") }
+    secrets = { key : value for (key,value) in toml_vars.items() if key.startswith("SECRET__") }
     
     print("Here are the secrets for inspection:")
     print("")
@@ -21,23 +21,22 @@ def push_secrets(env : str):
     
     for (key,value) in secrets.items():
         print(f"(in: '{env}') '{key}': '{value}'")
-        response = input("Y/N").lower()
+        response = input("Y/N: ").lower()
         if response != 'y':
             raise Exception(f"User stopped setting of secret in {env}")
-        command = f"npm wrangler secret put {key} --env {env}"
-        preview_command = f'echo "{value}" | {command}'
-        print(f"Command Preview: {preview_command}")
-        response = input("Confirm? Y/N").lower()
-        if response != 'y':
-            raise Exception("User did not confirm setting secret")
+        command = f"npx wrangler secret put {key} --env {env}"
         output, errors = _pipe_to_command(command, value)
-        print("Output: " + output)
-        print("Errors: " + errors)
+        
+        if output.strip():
+            print("Output: " + output)
+        
+        if errors.strip():
+            print("Errors: " + errors)
 
 def _pipe_to_command(command, input_string):
     # Start the subprocess with stdin and stdout as PIPE
     # Ensure universal_newlines=True for text mode
-    process = subprocess.Popen(shlex.split(command), stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, shell=True)
+    process = subprocess.Popen(shlex.split(command), stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding='utf-8', text=True, shell=True)
     # Send the input_string to the subprocess and get the output
     output, errors = process.communicate(input=input_string)
     return output, errors

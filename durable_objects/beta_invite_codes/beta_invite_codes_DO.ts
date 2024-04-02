@@ -1,13 +1,10 @@
 import { DurableObjectState, DurableObjectStorage } from "@cloudflare/workers-types";
 import { Env } from "../../env";
-import { assertNever, makeJSONResponse, maybeGetJson } from "../../util";
+import { assertNever, makeJSONResponse, maybeGetJson, strictParseInt } from "../../util";
 import { ResponseOf } from "../../util/builder_types";
 import { BetaInviteCodesMethod, ClaimInviteCodeRequest, ClaimInviteCodeResponse, HasUserClaimedBetaInviteCodeRequest, HasUserClaimedBetaInviteCodeResponse, ListUnclaimedBetaCodesRequest as ListUnsentBetaCodesRequest, ListUnclaimedBetaCodesResponse as ListUnsentBetaCodesResponse, MarkBetaInviteCodeAsSentRequest, MarkBetaInviteCodeAsSentResponse, parseBetaInviteCodeMethod } from "./beta_invite_code_interop";
 import { BetaInviteCode } from "./model/beta_invite_code";
 import { BetaInviteCodesTracker } from "./trackers/beta_invite_code_tracker";
-
-const MAX_BETA_INVITE_CODE_CHAIN_DEPTH = 3;
-const INVITE_CODES_PER_USER = 5;
 
 export class BetaInviteCodesDO {
     /*
@@ -85,13 +82,13 @@ export class BetaInviteCodesDO {
         // get all codes issued by me
         let inviteCodes : BetaInviteCode[] = this.betaInviteCodesTracker.listByIssuer(me);
         // if there are less codes than allowed, generate new ones
-        if (inviteCodes.length < INVITE_CODES_PER_USER) {
+        if (inviteCodes.length < strictParseInt(this.env.INVITE_CODES_PER_USER)) {
             const myInviteCode = this.betaInviteCodesTracker.getByClaimer(me);
             const depth = (myInviteCode != null) ? myInviteCode.depth + 1 : 1;
-            if (depth > MAX_BETA_INVITE_CODE_CHAIN_DEPTH) {
+            if (depth > strictParseInt(this.env.MAX_BETA_INVITE_CODE_CHAIN_DEPTH)) {
                 return { success: true, data : { betaInviteCodes: [] } }
             }
-            const newCodes = this.betaInviteCodesTracker.generateAndStoreBetaInviteCodes(me, INVITE_CODES_PER_USER - inviteCodes.length, depth);
+            const newCodes = this.betaInviteCodesTracker.generateAndStoreBetaInviteCodes(me, strictParseInt(this.env.INVITE_CODES_PER_USER) - inviteCodes.length, depth);
             inviteCodes = [...inviteCodes, ...newCodes];
         }
         // filter to unclaimed, unsent

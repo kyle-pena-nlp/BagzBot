@@ -29,7 +29,7 @@ def is_empty_or_none(string : Union[str,None]):
     return string is None or string.strip() == ''
 
 def get_secrets(env : str) -> Dict[str,str]:
-    with open(f".dev.vars.{env}", "r+") as f:
+    with open(f".dev.vars.{env}", "rb") as f:
         return tomli.load(f)
     
 def get_secret(key : str, env : str):
@@ -44,12 +44,11 @@ def determine_workers_url(env : str):
     account_id = get_environment_variable("CLOUDFLARE_ACCOUNT_ID", env)
     name = get_wrangler_toml_property(f"env.{env}.name", env)
     worker_url = f"https://{name}.{account_id}.workers.dev"
-    _test_workers_url(env)
+    _test_workers_url(worker_url, env)
     return worker_url
 
-def _test_workers_url(env : str):
-    workers_url = determine_workers_url(env)
-    webhook_secret_token = get_secret("SECRET__TELEGRAM_BOT_WEBHOOK_SECRET_TOKEN")
+def _test_workers_url(workers_url : str, env : str):
+    webhook_secret_token = get_secret("SECRET__TELEGRAM_BOT_WEBHOOK_SECRET_TOKEN", env)
     headers = { 'X-Telegram-Bot-Api-Secret-Token': webhook_secret_token }
     response = requests.post(workers_url, headers = headers, json = { 'stuff': 'doesnt matter'})
     if not response.ok:
@@ -57,12 +56,12 @@ def _test_workers_url(env : str):
 
 def make_telegram_api_method_url(method : str, env : str):
     url = make_telegram_bot_url(env)
-    return urljoin(url, method)
+    return f"{url}/{method}"
 
 def make_telegram_bot_url(env : str):
     bot_token = get_secret("SECRET__TELEGRAM_BOT_TOKEN", env)
     telegram_url = get_environment_variable("TELEGRAM_BOT_SERVER_URL", env)
-    return urljoin(telegram_url, f"bot{bot_token}")
+    return f"{telegram_url}/bot{bot_token}"
 
 def get_wrangler_toml_property(property_path : str, env : str):
     path_tokens = property_path.split(".")

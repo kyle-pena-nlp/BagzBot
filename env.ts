@@ -5,6 +5,9 @@ export interface Env {
 	TELEGRAM_BOT_DISPLAY_NAME : string
 	TELEGRAM_BOT_INSTANCE_DISPLAY_NAME : string
 	TELEGRAM_BOT_TAGLINE : string
+
+	MAX_BETA_INVITE_CODE_CHAIN_DEPTH : string
+	INVITE_CODES_PER_USER : string	
 	
 	// do not change this string EVER post launch
 	ENVIRONMENT : string

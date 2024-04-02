@@ -1,13 +1,12 @@
 import requests
 from argparse import ArgumentParser
 
-from .bot_configure_info import configure_bot_info
-from .wrangler_push_secrets import push_secrets
-
-from .bot_configure_commands import configure_bot_commands
-from .bot_configure_webhook import configure_webhook
-from .wrangler_deploy_worker import wrangler_deploy
-from ..wrangler_common import determine_workers_url, get_environment_variable, get_secret, do_wrangler_login, get_wrangler_toml_property, make_telegram_api_method_url, wrangler_whoami
+from deployment.bot_configure_info import configure_bot_info
+from deployment.wrangler_push_secrets import push_secrets
+from deployment.bot_configure_commands import configure_bot_commands
+from deployment.bot_configure_webhook import configure_webhook
+from deployment.wrangler_deploy_worker import wrangler_deploy
+from wrangler_common import get_secret, do_wrangler_login, make_telegram_api_method_url, wrangler_whoami
 
 def do_you_want_to(question : str) -> bool:
     response = input(question + " Y/N: ").lower().strip()
@@ -37,7 +36,9 @@ def maybe_delete_webhook(env : str):
 
 def deploy(env : str):
 
-    do_wrangler_login()
+    if do_you_want_to("Wrangler login?"):
+        do_wrangler_login()
+
     ask_to_verify_login()
 
     if do_you_want_to("Deploy wrangler worker?"):
@@ -60,12 +61,11 @@ def deploy(env : str):
 
 def ask_to_verify_login():
     wrangler_whoami()
-    response = input("Inspect your current wrangler login.  Proceed? Y/N").lower().strip()
+    response = input("Here's your wrangler login.  Does it look correct? Y/N: ").lower().strip()
     if (response != 'y'):
         raise Exception(f"Did not proceed (Answered: '{response}')")    
 
 if __name__ == "__main__":
     args = parse_args()
     env = args.env.strip()
-    bot_token = args.bot_token.strip()
-    deploy(env,bot_token)
+    deploy(env)

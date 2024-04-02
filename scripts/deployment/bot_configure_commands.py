@@ -1,8 +1,8 @@
 
 import json, requests
-from ..wrangler_common import COMMANDS, make_telegram_api_method_url
 from argparse import ArgumentParser
-from ..commands import COMMANDS
+from wrangler_common import make_telegram_api_method_url
+from commands import COMMANDS
 
 def configure_bot_commands(env : str):
 
