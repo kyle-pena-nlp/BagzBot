@@ -1,8 +1,8 @@
 import { Connection, PublicKey } from "@solana/web3.js";
-import { Env } from "../env";
+import { Env, getRPCUrl } from "../env";
 
 export async function getSOLBalance(address : string, env: Env, connection ?: Connection) {
-    connection = new Connection(env.RPC_ENDPOINT_URL);
+    connection = new Connection(getRPCUrl(env));
     const balance = await connection.getBalance(new PublicKey(address));
     return balance;
 }

@@ -1,24 +1,98 @@
-name = "protecc-ur-bagz"
+
 compatibility_date = "2022-05-03"
 main = "index.ts"
 logpush = true
 compatibility_flags = [ "nodejs_compat" ]
 
+[env.dev]
+name = "protecc-ur-bagz"
+
+[env.beta]
+name = "sol-sentry-bot-beta"
 
 [[migrations]]
 tag = "v1" # Should be unique for each entry
 
-[env.dev]
-vars = { ENVIRONMENT = "dev" }
+[env.dev.vars]
+# do not change this string EVER post launch
+ENVIRONMENT = "dev"
+CLOUDFLARE_ACCOUNT_ID = "kp1197"
+TELEGRAM_BOT_INSTANCE_DISPLAY_NAME = "DEV"
+POLLING_ON = "false"
+PLATFORM_FEE_BPS = "50"
+IS_BETA_CODE_GATED = "true"
+BETA_CODE_GATE_EXCEPTIONS = "6434185018,1632540473"
+ADMIN_TELEGRAM_USER_IDS = "6434185018"
+SUPER_ADMIN_USER_ID = "6434185018"
+FORBIDDEN_TOKENS = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v,Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB"
+SOL_BUY_LIMIT = "5"
+TELEGRAM_BOT_DISPLAY_NAME = "SolSentry"
+TELEGRAM_BOT_TAGLINE = "Keeps watching, so you don't have to."
+TELEGRAM_BOT_SERVER_URL = "http://127.0.0.1:80"
+TELEGRAM_BOT_ID = "6764280746"
+TELEGRAM_BOT_USERNAME = "protecc_ur_bagz_bot"
+JUPITER_PRICE_API_URL = "https://price.jup.ag/v4/price"
+JUPITER_QUOTE_API_URL = "https://quote-api.jup.ag/v6/quote"
+JUPITER_SWAP_API_URL = "https://quote-api.jup.ag/v6/swap"
+RPC_ENDPOINT_URL = "https://mainnet.helius-rpc.com"
+DEFAULT_TLS_VS_TOKEN_FRACTION = "0.001"
+JUPITER_SWAP_PROGRAM_SLIPPAGE_ERROR_CODE = "6001"
+JUPITER_SWAP_PROGRAM_FEE_ACCOUNT_NOT_INITIALIZED_ERROR_CODE = "3012"
+JUPITER_SWAP_PROGRAM_INSUFFICIENT_LAMPORTS_ERROR_CODE = "1"
+JUPITER_USE_DYNAMIC_COMPUTE_UNIT_LIMIT = "false"
+JUPITER_SWAP_PROGRAM_ID = "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4"
+TX_TIMEOUT_MS = "30000"
+PRICE_POLL_INTERVAL_MS = "10000"
+RPC_SEND_RAW_TRANSACTION_MAX_RETRIES = "5"
+RPC_REBROADCAST_DELAY_MS = "500"
+RPC_REATTEMPT_CONFIRM_DELAY = "5000"
+RPC_MAX_CONFIRM_EXCEPTIONS = "10"
+RPC_CONFIRM_TIMEOUT_MS = "275000"
+MAX_BLOCK_FINALIZATION_TIME_MS = "60000"
+WALLET_BALANCE_REFRESH_INTERVAL_MS = "30000"
+TOKEN_LIST_REFRESH_TIMEOUT = "30000"
+USER_PNL_CALCULATION_REFRESH_MS = "30000"
 
-[env.beta]
-vars = { ENVIRONMENT = "beta" }
 
-[env.staging]
-vars = { ENVIRONMENT = "staging" }
-
-[env.prod]
-vars = { ENVIRONMENT = "prod" }
+[env.beta.vars]
+# do not change this string EVER post launch
+ENVIRONMENT = "beta"
+CLOUDFLARE_ACCOUNT_ID = "kp1197"
+TELEGRAM_BOT_INSTANCE_DISPLAY_NAME = "BETA"
+POLLING_ON = "true"
+PLATFORM_FEE_BPS = "50"
+IS_BETA_CODE_GATED = "true"
+BETA_CODE_GATE_EXCEPTIONS = "6434185018,1632540473"
+ADMIN_TELEGRAM_USER_IDS = "6434185018"
+SUPER_ADMIN_USER_ID = "6434185018"
+FORBIDDEN_TOKENS = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v,Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB"
+SOL_BUY_LIMIT = "5"
+TELEGRAM_BOT_DISPLAY_NAME = "SolSentry"
+TELEGRAM_BOT_TAGLINE = "Keeps watching, so you don't have to."
+TELEGRAM_BOT_SERVER_URL = "https://api.telegram.org/"
+TELEGRAM_BOT_ID = "6544753362"
+TELEGRAM_BOT_USERNAME = "sol_sentry_beta_bot"
+JUPITER_PRICE_API_URL = "https://price.jup.ag/v4/price"
+JUPITER_QUOTE_API_URL = "https://quote-api.jup.ag/v6/quote"
+JUPITER_SWAP_API_URL = "https://quote-api.jup.ag/v6/swap"
+RPC_ENDPOINT_URL = "https://mainnet.helius-rpc.com"
+DEFAULT_TLS_VS_TOKEN_FRACTION = "0.001"
+JUPITER_SWAP_PROGRAM_SLIPPAGE_ERROR_CODE = "6001"
+JUPITER_SWAP_PROGRAM_FEE_ACCOUNT_NOT_INITIALIZED_ERROR_CODE = "3012"
+JUPITER_SWAP_PROGRAM_INSUFFICIENT_LAMPORTS_ERROR_CODE = "1"
+JUPITER_USE_DYNAMIC_COMPUTE_UNIT_LIMIT = "false"
+JUPITER_SWAP_PROGRAM_ID = "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4"
+TX_TIMEOUT_MS = "30000"
+PRICE_POLL_INTERVAL_MS = "10000"
+RPC_SEND_RAW_TRANSACTION_MAX_RETRIES = "5"
+RPC_REBROADCAST_DELAY_MS = "500"
+RPC_REATTEMPT_CONFIRM_DELAY = "5000"
+RPC_MAX_CONFIRM_EXCEPTIONS = "10"
+RPC_CONFIRM_TIMEOUT_MS = "275000"
+MAX_BLOCK_FINALIZATION_TIME_MS = "60000"
+WALLET_BALANCE_REFRESH_INTERVAL_MS = "30000"
+TOKEN_LIST_REFRESH_TIMEOUT = "30000"
+USER_PNL_CALCULATION_REFRESH_MS = "30000"
 
 [env.dev.durable_objects]
 bindings = [
@@ -38,23 +112,6 @@ bindings = [
     {name = "HeartbeatDO", class_name = "HeartbeatDO" }
 ]
 
-[env.staging.durable_objects]
-bindings = [
-    {name = "UserDO", class_name = "UserDO" },
-    {name = "TokenPairPositionTrackerDO", class_name = "TokenPairPositionTrackerDO" },
-    {name = "PolledTokenPairListDO", class_name = "PolledTokenPairListDO" },
-    {name = "BetaInviteCodesDO", class_name = "BetaInviteCodesDO" },
-    {name = "HeartbeatDO", class_name = "HeartbeatDO" }
-]
-
-[env.prod.durable_objects]
-bindings = [
-    {name = "UserDO", class_name = "UserDO" },
-    {name = "TokenPairPositionTrackerDO", class_name = "TokenPairPositionTrackerDO" },
-    {name = "PolledTokenPairListDO", class_name = "PolledTokenPairListDO" },
-    {name = "BetaInviteCodesDO", class_name = "BetaInviteCodesDO" },
-    {name = "HeartbeatDO", class_name = "HeartbeatDO" }
-]
 
 
 # The 'wake up!' cron trigger - keeps the price tracker tracking the prices.

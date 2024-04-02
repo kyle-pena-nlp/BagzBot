@@ -1,20 +1,20 @@
 from argparse import Namespace
-import subprocess, json, socket, time, os, signal, shutil
+import subprocess, json, shlex, os, signal, shutil
 import requests, requests_toolbelt
-from wrangler_common import *
-from common import *
-from typing import List
+from ..wrangler_common import *
+from ..commands import COMMANDS
+from .local_dev_common import *
 
 def run_cloudflare_worker():
     command = START_CLOUDFLARE_LOCAL_WORKER_COMMAND
     print(command)
-    child_proc = subprocess.Popen(command, shell = True)
+    child_proc = subprocess.Popen(shlex.split(command), shell = True)
     poll_until_port_is_occupied(LOCAL_CLOUDFLARE_WORKER_PORT)
     return child_proc
 
 def start_CRON_poller():
     command = START_CRON_POLLER_COMMAND
-    child_proc = subprocess.Popen(command, shell = True)
+    child_proc = subprocess.Popen(shlex.split(command), shell = True)
     return child_proc
 
 def parse_args():
@@ -34,13 +34,13 @@ def do_it(args):
         #do_wrangler_login() #This ends up being a pain and most of the time we are already logged in anyway
         #Start a local telegram bot API
         print("Starting local telegram-bot-api server")
-        api_id   = get_var_from_dev_vars("TELEGRAM_API_ID")
-        api_hash = get_var_from_dev_vars("TELEGRAM_API_HASH")
+        api_id   = get_secret("TELEGRAM_API_ID", "dev")
+        api_hash = get_secret("TELEGRAM_API_HASH", "dev")
         child_procs.append(fork_shell_telegram_bot_api_local_server(api_id = api_id, api_hash = api_hash))
 
         print("Setting up bot locally")
-        bot_token = get_var_from_dev_vars("TELEGRAM_BOT_TOKEN")
-        bot_secret_token = get_var_from_dev_vars("TELEGRAM_BOT_WEBHOOK_SECRET_TOKEN")
+        bot_token = get_secret("TELEGRAM_BOT_TOKEN", "dev")
+        bot_secret_token = get_secret("TELEGRAM_BOT_WEBHOOK_SECRET_TOKEN", "dev")
         migrate_and_configure_bot_for_local_server(bot_token, bot_secret_token)
 
         child_procs.append(start_CRON_poller())
@@ -65,7 +65,7 @@ def fork_shell_telegram_bot_api_local_server(api_id, api_hash):
     os.makedirs(TELEGRAM_LOCAL_SERVER_WORKING_DIR, exist_ok=False)
     command = START_TELEGRAM_LOCAL_SERVER_COMMAND.format(api_id = api_id, api_hash = api_hash, working_dir=TELEGRAM_LOCAL_SERVER_WORKING_DIR)
     print(command)
-    child_proc = subprocess.Popen(command,shell = True)
+    child_proc = subprocess.Popen(shlex.split(command),shell = True)
     poll_until_port_is_occupied(LOCAL_TELEGRAM_BOT_API_SERVER_PORT)
     print("Local telegram-bot-api server process forked.")
     return child_proc
@@ -103,32 +103,7 @@ def configure_bot_commands(bot_token, bot_secret_token):
     local_telegram_bot_api_url = get_local_telegram_bot_api_url(bot_token)
 
     data = {
-        'commands': [
-            {
-                'command': 'start',
-                'description': 'Starts a conversation with this bot'
-            },
-            { 
-                'command': 'new_position',
-                'description': 'Creates a new position'
-            },
-            {
-                'command': 'menu',
-                'description': 'Displays the main menu'
-            },
-            {
-                'command': 'welcome_screen',
-                'description': 'Displays the welcome screen for this bot'
-            },
-            {
-                'command': 'faq',
-                'description': 'Shows the FAQ'
-            },
-            {
-                'command': 'legal_agreement',
-                'description': 'Displays the legal agreement'
-            },         
-        ],
+        'commands': COMMANDS,
         'scope': {
             'type': 'all_private_chats'
         }

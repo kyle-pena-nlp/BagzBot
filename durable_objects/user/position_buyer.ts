@@ -2,7 +2,7 @@
 import { Connection, VersionedTransaction } from "@solana/web3.js";
 import { Wallet } from "../../crypto";
 import { fromNumber } from "../../decimalized";
-import { Env } from "../../env";
+import { Env, getRPCUrl } from "../../env";
 import { logError, logInfo } from "../../logging";
 import { MenuRetryBuy, MenuRetryBuySlippageError, MenuViewOpenPosition } from "../../menus";
 import { Position, PositionRequest, PositionStatus, Quote, getSwapOfXDescription } from "../../positions";
@@ -34,7 +34,7 @@ export class PositionBuyer {
             this.env);
 
         // RPC connection
-        const connection = new Connection(this.env.RPC_ENDPOINT_URL);
+        const connection = new Connection(getRPCUrl(this.env));
 
         // get signed tx
         const signedTx = await this.createSignedTx(positionRequest, notificationChannel);

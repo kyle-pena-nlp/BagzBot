@@ -346,7 +346,7 @@ export class UserDO {
         const chatID = this.chatID.value;
         const sendSuccessIdxs : number[] = [];
         this.inbox.forEach(async (message,index) => {
-            const messageWithContext = `${this.env.TELEGRAM_BOT_INSTANCE} :: '${message.from}' says: "${message.message}"`;
+            const messageWithContext = `${this.env.TELEGRAM_BOT_INSTANCE_DISPLAY_NAME} :: '${message.from}' says: "${message.message}"`;
             const result = await sendMessageToTG(chatID, messageWithContext, this.env);
             if (result.success) {
                 sendSuccessIdxs.push(index);

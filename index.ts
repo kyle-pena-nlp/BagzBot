@@ -27,7 +27,8 @@ enum ERRORS {
    MISMATCHED_SECRET_TOKEN = 1000,
    COULDNT_PARSE_REQUEST_BODY_JSON = 1500,
    NO_RESPONSE = 2000,
-   NOT_A_PRIVATE_CHAT = 3000
+   NOT_A_PRIVATE_CHAT = 3000,
+   NOT_FROM_TELEGRAM = 4000
 }
 
 /**
@@ -147,7 +148,7 @@ export default {
 
     validateFetchRequest(req : Request, env : Env) : Result<boolean> {
         const requestSecretToken = req.headers.get('X-Telegram-Bot-Api-Secret-Token');
-        const secretTokensMatch = (requestSecretToken === env.TELEGRAM_BOT_WEBHOOK_SECRET_TOKEN);
+        const secretTokensMatch = (requestSecretToken === env.SECRET__TELEGRAM_BOT_WEBHOOK_SECRET_TOKEN);
         if (!secretTokensMatch) {
             return Result.failure(ERRORS.MISMATCHED_SECRET_TOKEN.toString());
         }

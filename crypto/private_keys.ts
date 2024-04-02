@@ -37,7 +37,7 @@ function getIVString(userID : number, env : Env) {
         return userID.toString();
     }
     else {
-        return `${userID.toString()}:${env.ENVIRONMENT}:${env.TELEGRAM_BOT_INSTANCE}`;
+        return `${userID.toString()}:${env.ENVIRONMENT}`;
     }
 }
 
@@ -54,7 +54,7 @@ export async function decryptPrivateKey(encryptedPrivateKey : EncryptedPrivateKe
 
 
 async function derive256BitPassphrase(userID :  number, env: Env) : Promise<CryptoKey> {
-    const hashBuffer = await get256BitHashBuffer(userID.toString() + env.PK_AES_SALT);
+    const hashBuffer = await get256BitHashBuffer(userID.toString() + env.SECRET__PK_AES_SALT);
     const key = await crypto.subtle.importKey(
         'raw', // format
         hashBuffer, // keyData

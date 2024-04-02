@@ -1,6 +1,6 @@
 import { Connection, ParsedTransactionWithMeta } from "@solana/web3.js";
 import { Wallet, toUserAddress } from "../../crypto";
-import { Env } from "../../env";
+import { Env, getRPCUrl } from "../../env";
 import { logError, logInfo } from "../../logging";
 import { Position } from "../../positions";
 import { parseSwappableParsedTransactionWithMeta } from "../../rpc/rpc_parse";
@@ -25,7 +25,7 @@ export class SwapConfirmer {
     async confirmSwap(s : Position, type : 'buy'|'sell') : Promise<SwapStatus> {
         
         let exceptionCount = 0;
-        const connection = new Connection(this.env.RPC_ENDPOINT_URL);
+        const connection = new Connection(getRPCUrl(this.env));
         
         while(true) {
 

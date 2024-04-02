@@ -42,7 +42,7 @@ export function isSuccessfulTgMessage(x : TgMessageSentInfo) : x is SuccessfulTg
 }
 
 export function makeTelegramBotUrl(methodName : string, env : Env) {
-    return `${env.TELEGRAM_BOT_SERVER_URL}/bot${env.TELEGRAM_BOT_TOKEN}/${methodName}`;
+    return `${env.TELEGRAM_BOT_SERVER_URL}/bot${env.SECRET__TELEGRAM_BOT_TOKEN}/${methodName}`;
 }
 
 export function escapeTGText(text : string, parseMode : 'MarkdownV2'|'HTML') : string {

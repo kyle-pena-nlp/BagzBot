@@ -1,7 +1,7 @@
 import { Connection } from "@solana/web3.js";
 import { Wallet } from "../../crypto";
 import { asTokenPrice } from "../../decimalized/decimalized_amount";
-import { Env } from "../../env";
+import { Env, getRPCUrl } from "../../env";
 import { logError } from "../../logging";
 import { Position } from "../../positions";
 import { ParsedSuccessfulSwapSummary, isSuccessfullyParsedSwapSummary } from "../../rpc/rpc_types";
@@ -116,7 +116,7 @@ export async function sellPosition(position : Position, wallet : Wallet, env : E
         return 'tx-failed';
     }
 
-    const connection = new Connection(env.RPC_ENDPOINT_URL);
+    const connection = new Connection(getRPCUrl(env));
     const txExecutor = new SwapExecutor(wallet, env, notificationChannel, connection, startTimeMS);
     const executionResult = await txExecutor.executeAndConfirmSignedTx(position, signedTx);
     return executionResult;

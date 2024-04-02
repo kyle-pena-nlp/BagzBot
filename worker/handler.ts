@@ -72,7 +72,7 @@ export class Worker {
         // if it's not valid, early-out
         if (isInvalidTokenInfoResponse(validateTokenResponse)) {
             const invalidTokenMsg = validateTokenResponse.isForbiddenToken ? 
-                `The token address ${maybeTokenAddress} is not permitted for trading on ${this.env.TELEGRAM_BOT_NAME}` : 
+                `The token address ${maybeTokenAddress} is not permitted for trading on ${this.env.TELEGRAM_BOT_DISPLAY_NAME}` : 
                 `The token address '${maybeTokenAddress}' is not a known token. Try again in a few minutes if the token is new.  See Jupiter's <a href="https://jup.ag">swap UI</a> for a list of supported tokens.`;
             await sendMessageToTG(chatID, invalidTokenMsg, this.env, 'HTML', true);
             return makeFakeFailedRequestResponse(404, "Token does not exist");
@@ -187,8 +187,8 @@ export class Worker {
                 return new MenuViewDecryptedWallet({ publicKey: walletDataResponse.wallet.publicKey, decryptedPrivateKey: decryptedPrivateKey })
             case MenuCode.FAQ:
                 return new MenuFAQ({ 
-                    botName : this.env.TELEGRAM_BOT_NAME,
-                    botInstance : this.env.TELEGRAM_BOT_INSTANCE,
+                    botName : this.env.TELEGRAM_BOT_DISPLAY_NAME,
+                    botInstance : this.env.TELEGRAM_BOT_INSTANCE_DISPLAY_NAME,
                     botTagline: this.env.TELEGRAM_BOT_TAGLINE
                 });
             case MenuCode.ListPositions:
@@ -250,7 +250,7 @@ export class Worker {
                     return new MenuContinueMessage(`Sorry - '${callbackData.menuArg||''}' is not a valid quantity of SOL to buy.`, MenuCode.TrailingStopLossSlippagePctMenu);
                 }
                 if (submittedBuyQuantity > strictParseFloat(this.env.SOL_BUY_LIMIT)) {
-                    return new MenuContinueMessage(`Sorry - ${this.env.TELEGRAM_BOT_NAME} does not currently allow purchases of over ${strictParseFloat(this.env.SOL_BUY_LIMIT)} SOL`, MenuCode.TrailingStopLossSlippagePctMenu); 
+                    return new MenuContinueMessage(`Sorry - ${this.env.TELEGRAM_BOT_DISPLAY_NAME} does not currently allow purchases of over ${strictParseFloat(this.env.SOL_BUY_LIMIT)} SOL`, MenuCode.TrailingStopLossSlippagePctMenu); 
                 }
                 await storeSessionObjProperty(params.getTelegramUserID(), params.chatID, messageID, "vsTokenAmt", submittedBuyQuantity, POSITION_REQUEST_STORAGE_KEY, this.env);
                 const trailingStopLossRequestStateAfterBuyQuantityEdited = await readSessionObj<PositionRequest>(params.getTelegramUserID(), params.chatID, messageID, POSITION_REQUEST_STORAGE_KEY, this.env);
@@ -609,7 +609,7 @@ export class Worker {
     }
 
     private getBotName(env : Env) {
-        return `${env.TELEGRAM_BOT_NAME} (${env.TELEGRAM_BOT_INSTANCE})`;
+        return `${env.TELEGRAM_BOT_DISPLAY_NAME} - (${env.TELEGRAM_BOT_INSTANCE_DISPLAY_NAME})`;
     }
 
     private async handleMenuClose(chatID : number, messageID : number, env : Env) : Promise<Response> {
@@ -767,7 +767,7 @@ export class Worker {
             case '/legal_agreement':
                 return ['...', new LegalAgreement(undefined)];
             case '/faq':
-                return ['...', new MenuFAQ({ botName : env.TELEGRAM_BOT_INSTANCE, botInstance: env.TELEGRAM_BOT_INSTANCE, botTagline: env.TELEGRAM_BOT_INSTANCE })]
+                return ['...', new MenuFAQ({ botName : env.TELEGRAM_BOT_DISPLAY_NAME, botInstance: env.TELEGRAM_BOT_INSTANCE_DISPLAY_NAME, botTagline: env.TELEGRAM_BOT_TAGLINE })]
             case '/new_position':
                 const defaultPr = await getDefaultTrailingStopLoss(info.getTelegramUserID(), info.chatID, messageID, env);
                 const prerequest = defaultPr.prerequest;

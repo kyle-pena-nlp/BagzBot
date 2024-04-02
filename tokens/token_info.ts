@@ -23,7 +23,7 @@ export interface TokenInfo extends StagedTokenInfo {
 }
 
 export async function deriveFeeAccount(tokenAddress : string, env : Env) : Promise<PublicKey> {
-    const referralAccountPubkey = new PublicKey(env.FEE_ACCOUNT_PUBLIC_KEY);
+    const referralAccountPubkey = new PublicKey(env.SECRET__FEE_ACCOUNT_PUBLIC_KEY);
     const outputToken = new PublicKey(tokenAddress);
     const [feeAccount] = PublicKey.findProgramAddressSync(
         [
