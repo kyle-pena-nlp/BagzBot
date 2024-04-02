@@ -5,7 +5,7 @@ logpush = true
 compatibility_flags = [ "nodejs_compat" ]
 
 [env.dev]
-name = "protecc-ur-bagz"
+name = "protecc-ur-bagz-dev"
 
 [env.beta]
 name = "sol-sentry-bot-beta"

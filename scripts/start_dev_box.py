@@ -34,13 +34,13 @@ def do_it(args):
         #do_wrangler_login() #This ends up being a pain and most of the time we are already logged in anyway
         #Start a local telegram bot API
         print("Starting local telegram-bot-api server")
-        api_id   = get_secret("TELEGRAM_API_ID", "dev")
-        api_hash = get_secret("TELEGRAM_API_HASH", "dev")
+        api_id   = get_secret("SECRET__TELEGRAM_API_ID", "dev")
+        api_hash = get_secret("SECRET__TELEGRAM_API_HASH", "dev")
         child_procs.append(fork_shell_telegram_bot_api_local_server(api_id = api_id, api_hash = api_hash))
 
         print("Setting up bot locally")
-        bot_token = get_secret("TELEGRAM_BOT_TOKEN", "dev")
-        bot_secret_token = get_secret("TELEGRAM_BOT_WEBHOOK_SECRET_TOKEN", "dev")
+        bot_token = get_secret("SECRET__TELEGRAM_BOT_TOKEN", "dev")
+        bot_secret_token = get_secret("SECRET__TELEGRAM_BOT_WEBHOOK_SECRET_TOKEN", "dev")
         migrate_and_configure_bot_for_local_server(bot_token, bot_secret_token)
 
         child_procs.append(start_CRON_poller())
@@ -65,7 +65,7 @@ def fork_shell_telegram_bot_api_local_server(api_id, api_hash):
     os.makedirs(TELEGRAM_LOCAL_SERVER_WORKING_DIR, exist_ok=False)
     command = START_TELEGRAM_LOCAL_SERVER_COMMAND.format(api_id = api_id, api_hash = api_hash, working_dir=TELEGRAM_LOCAL_SERVER_WORKING_DIR)
     print(command)
-    child_proc = subprocess.Popen(shlex.split(command),shell = True)
+    child_proc = subprocess.Popen(command,shell = True) # no shlex split here on purpose.  makes it parse the --local param weirdly.
     poll_until_port_is_occupied(LOCAL_TELEGRAM_BOT_API_SERVER_PORT)
     print("Local telegram-bot-api server process forked.")
     return child_proc
