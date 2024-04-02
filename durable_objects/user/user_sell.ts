@@ -3,6 +3,7 @@ import { Wallet } from "../../crypto";
 import { asTokenPrice } from "../../decimalized/decimalized_amount";
 import { Env, getRPCUrl } from "../../env";
 import { logError } from "../../logging";
+import { MenuRetryManualSell } from "../../menus";
 import { Position } from "../../positions";
 import { ParsedSuccessfulSwapSummary, isSuccessfullyParsedSwapSummary } from "../../rpc/rpc_types";
 import { TGStatusMessage, UpdateableNotification } from "../../telegram";
@@ -55,12 +56,12 @@ export async function sell(position: Position,
     }
 }
 
-export async function publishFinalSellMessage(position : Position, type : 'Sell'|'Auto-sell', status : SellResult, channel : UpdateableNotification) {
+export async function publishFinalSellMessage(position : Position, type : 'Sell'|'Auto-sell', status : SellResult, chatID : number, channel : UpdateableNotification, env : Env) {
     const finalSellMessage = getFinalSellMessage(position, type, status);
     TGStatusMessage.queue(channel, finalSellMessage, true);
     await TGStatusMessage.finalize(channel);
     if (type === 'Sell' && (status !== 'confirmed' && status !== 'unconfirmed')) {
-        const requestSellDialogueRequest = new MenuRetryManualSell(status).getCreateNewMenuRequest();
+        const requestSellDialogueRequest = new MenuRetryManualSell({ status: status, positionID : position.positionID }).getCreateNewMenuRequest(chatID, env);
         await fetch(requestSellDialogueRequest);
     }
 }

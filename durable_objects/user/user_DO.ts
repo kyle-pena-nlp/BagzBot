@@ -615,7 +615,7 @@ export class UserDO {
         assertIs<PositionStatus.Open,typeof position.status>();
         const channel = TGStatusMessage.createAndSend(`Initiating sale of ${asTokenPrice(position.tokenAmt)} ${position.token.symbol}`, false, position.chatID, this.env);
         // deliberate lack of await here (fire-and-forget). Must complete in 30s.
-        sell(position, this.wallet.value!!, this.env, channel, startTimeMS).then(sellStatus => publishFinalSellMessage(position, 'Sell', sellStatus, channel));
+        sell(position, this.wallet.value!!, this.env, channel, startTimeMS).then(sellStatus => publishFinalSellMessage(position, 'Sell', sellStatus, position.chatID, channel, this.env));
         return makeJSONResponse<ManuallyClosePositionResponse>({ message: 'Position will now be closed. '});
     }
 
@@ -633,7 +633,7 @@ export class UserDO {
                 const notificationChannel = TGStatusMessage.createAndSend(`Initiating auto-sell`, false, this.chatID.value||0, this.env);
                 notificationChannels.push(notificationChannel);
                 const sellPromise = sell(position, this.wallet.value!!, this.env, notificationChannel, startTimeMS)
-                sellPromise.then(sellStatus => publishFinalSellMessage(position, 'Auto-sell', sellStatus, notificationChannel));
+                sellPromise.then(sellStatus => publishFinalSellMessage(position, 'Auto-sell', sellStatus, position.chatID, notificationChannel, this.env));
                 return await sellPromise;
             });
             // but wait for the entire batch to settle before doing the next batch
