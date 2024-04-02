@@ -25,16 +25,22 @@ export class CurrentPriceTracker {
         }
         return null;
     }
-    async getPrice(tokenAddress : string, vsTokenAddress : string) : Promise<DecimalizedAmount|null> {
+    async getPrice(tokenAddress : string, vsTokenAddress : string) : Promise<[DecimalizedAmount,boolean]|null> {
         if (this.priceIsStale()) {
             const price = await this.getPriceFromJupiter(tokenAddress,vsTokenAddress);
             if (price != null) {
                 this.currentPrice.value = price;
                 this.priceLastRefreshed.value = Date.now();
+                return [price,true]
             }
-            return price||null;
+            return null;
         }
-        return this.currentPrice.value;
+        if (this.currentPrice.value == null) {
+            return null;
+        }
+        else {
+            return [this.currentPrice.value,false];
+        }
     }
     private priceIsStale() {
         return (Date.now() - this.priceLastRefreshed.value) > 1000;

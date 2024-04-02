@@ -135,7 +135,7 @@ export class TokenPairPositionTrackerDO {
         const beginExecutionTime = Date.now();
         await this.state.storage.deleteAlarm();
         try {
-            const price = await this.currentPriceTracker.getPrice(this.tokenAddress.value, this.vsTokenAddress.value);
+            const price = await this.getPrice();
             if (price != null) {
                 await this.handleUpdatePrice({ price, tokenAddress: this.tokenAddress.value, vsTokenAddress: this.vsTokenAddress.value });
             }
@@ -154,6 +154,20 @@ export class TokenPairPositionTrackerDO {
         else {
             await this.scheduleNextPoll(beginExecutionTime);
         }
+    }
+
+    async getPrice() : Promise<DecimalizedAmount|null> {
+        if (this.tokenAddress.value == null || this.vsTokenAddress.value == null) {
+            return null;
+        }
+        const result = await this.currentPriceTracker.getPrice(this.tokenAddress.value, this.vsTokenAddress.value)
+        if (result != null) {
+            const [price,isNew] = result;
+            if (isNew) {
+                this.tokenPairPositionTracker.updatePrice(price);
+            }
+        } 
+        return null;
     }
 
     tokenPairID() : string {
@@ -397,7 +411,7 @@ export class TokenPairPositionTrackerDO {
         if (!this.initialized()) {
             throw new Error("Not initialized");
         }
-        const currentPrice = await this.currentPriceTracker.getPrice(this.tokenAddress.value, this.vsTokenAddress.value);
+        const currentPrice = await this.getPrice();
         const positionAndMaybePNL = this.tokenPairPositionTracker.getPositionAndMaybePNL(positionID, currentPrice);
         if (positionAndMaybePNL == null) {
             return 'position-DNE';
@@ -435,7 +449,7 @@ export class TokenPairPositionTrackerDO {
             return undefined;
         }
         const positionID = body.positionID;
-        const currentPrice = await this.currentPriceTracker.getPrice(this.tokenAddress.value, this.vsTokenAddress.value);
+        const currentPrice = await this.getPrice();
         const maybePosition = this.tokenPairPositionTracker.getPositionAndMaybePNL(positionID, currentPrice);
         return maybePosition;
     }
@@ -460,7 +474,7 @@ export class TokenPairPositionTrackerDO {
             logError("Tried to list positions yet tokenPairPositionTracker wasn't initialized", this);
             return [];
         }
-        const currentPrice = await this.currentPriceTracker.getPrice(this.tokenAddress.value, this.vsTokenAddress.value);
+        const currentPrice = await this.getPrice();
         const userID = body.telegramUserID;
         const positions = this.tokenPairPositionTracker.listByUser(userID, currentPrice);
         return positions;
@@ -470,7 +484,7 @@ export class TokenPairPositionTrackerDO {
         if (this.tokenAddress.value == null || this.vsTokenAddress.value == null) {
             throw new Error("Couldn't get token price because token pair addresses not initialized");
         }
-        const price = await this.currentPriceTracker.getPrice(this.tokenAddress.value, this.vsTokenAddress.value);
+        const price = await this.getPrice();
         return makeJSONResponse<GetTokenPriceResponse>({ price : price });
     }
 
