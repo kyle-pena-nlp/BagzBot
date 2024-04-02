@@ -40,11 +40,12 @@ def get_secret(key : str, env : str):
     return secret
 
 
-def determine_workers_url(env : str):
+def determine_workers_url(env : str, test = True):
     account_id = get_environment_variable("CLOUDFLARE_ACCOUNT_ID", env)
     name = get_wrangler_toml_property(f"env.{env}.name", env)
     worker_url = f"https://{name}.{account_id}.workers.dev"
-    _test_workers_url(worker_url, env)
+    if test:
+        _test_workers_url(worker_url, env)
     return worker_url
 
 def _test_workers_url(workers_url : str, env : str):

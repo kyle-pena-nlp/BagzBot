@@ -62,7 +62,7 @@ export class Worker {
         const maybeTokenAddress = tokenAddressParser.maybeExtractTokenAddress(initiatingMessage);
         
         if (maybeTokenAddress == null) {
-            await sendMessageToTG(chatID, `'${initiatingMessage.trim()}' does not appear to be a valid token address`, this.env);
+            await sendMessageToTG(chatID, `'${initiatingMessage.trim()}' does not appear to be a valid token address.  You can paste in a token address or a birdeye.so link!  Also, see the "/new_position" command in the menu.`, this.env);
             return makeFakeFailedRequestResponse(404, "Token does not exist");
         }
 

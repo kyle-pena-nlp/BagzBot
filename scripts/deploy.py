@@ -6,6 +6,7 @@ from deployment.wrangler_push_secrets import push_secrets
 from deployment.bot_configure_commands import configure_bot_commands
 from deployment.bot_configure_webhook import configure_webhook
 from deployment.wrangler_deploy_worker import wrangler_deploy
+from deployment.bot_migrate_to_telegram_servers import migrate_telegram_bot_telegram_servers
 from wrangler_common import get_secret, do_wrangler_login, make_telegram_api_method_url, wrangler_whoami
 
 def do_you_want_to(question : str) -> bool:
@@ -46,6 +47,9 @@ def deploy(env : str):
 
     if do_you_want_to("Push secrets?"):
         push_secrets(env)
+
+    if do_you_want_to("Migrate bot to telegram servers?"):
+        migrate_telegram_bot_telegram_servers(env)
 
     # Environment variables should get pushed with the wrangler.toml
     
