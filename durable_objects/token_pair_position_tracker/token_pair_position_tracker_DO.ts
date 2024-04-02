@@ -166,6 +166,7 @@ export class TokenPairPositionTrackerDO {
             if (isNew) {
                 this.tokenPairPositionTracker.updatePrice(price);
             }
+            return price;
         } 
         return null;
     }

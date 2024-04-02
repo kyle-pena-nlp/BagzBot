@@ -13,6 +13,9 @@ export class TokenPairsForPositionIDsTracker {
     deletedKeys : Set<string> = new Set<string>();
     constructor() {
     }
+    any() : boolean {
+        return Object.keys(this.tokenPairsForPositionIDs).length > 0;
+    }
     initialize(entries : Map<string,any>) {
         const entryKeys = [...entries.keys()];
         for (const entryKey of (entryKeys)) {

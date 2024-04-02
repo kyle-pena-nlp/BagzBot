@@ -198,7 +198,7 @@ export class Worker {
                 const viewPositionID = callbackData.menuArg!!;
                 const positionAndMaybePNL = await getPositionFromUserDO(params.getTelegramUserID(), params.chatID, viewPositionID, this.env);
                 if (positionAndMaybePNL == null) {
-                    return new MenuContinueMessage('Sorry - this position was not found.', MenuCode.Main);
+                    return new MenuContinueMessage('Sorry - this position was not found - it was probably auto-sold!', MenuCode.Main);
                 }
                 return new MenuViewOpenPosition(positionAndMaybePNL);
             case MenuCode.ClosePositionManuallyAction:

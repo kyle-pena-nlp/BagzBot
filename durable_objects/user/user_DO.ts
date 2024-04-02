@@ -2,7 +2,7 @@ import { isAdminOrSuperAdmin } from "../../admins";
 import { Wallet, encryptPrivateKey, generateEd25519Keypair } from "../../crypto";
 import { asTokenPrice } from "../../decimalized/decimalized_amount";
 import { Env } from "../../env";
-import { logError, logInfo } from "../../logging";
+import { logDebug, logError, logInfo } from "../../logging";
 import { PositionPreRequest, PositionStatus, PositionType } from "../../positions";
 import { POSITION_REQUEST_STORAGE_KEY } from "../../storage_keys";
 import { TGStatusMessage, UpdateableNotification, sendMessageToTG } from "../../telegram";
@@ -107,6 +107,11 @@ export class UserDO {
     // TODO: way to make arrays compatible with ChangeTrackedValue?
     //inbox : ChangeTrackedValue<string[]> = new ChangeTrackedValue<string[]>("inbox", []);
 
+    // I'm using this to have UserDOs self-schedule alarms as long as they have any positions
+    // That way, an 'incoming request' happens every 10s, allowing the CPU limit to reset to 30s
+    // This allows for longer-running processes.
+    isAlarming : boolean = false;
+
     constructor(state : DurableObjectState, env : any) {
         this.env                = env;
         this.state              = state;
@@ -144,6 +149,37 @@ export class UserDO {
         ]);
     }
 
+    async alarm() {
+        logDebug(`Invoking alarm for ${this.telegramUserID.value}`);
+        try {
+            await this.state.storage.deleteAlarm();
+            await this.maybeScheduleAlarm();
+        }
+        catch {
+            logError(`Problem rescheduling alarm for ${this.telegramUserID.value}`);
+        }
+    }
+
+    async maybeStartAlarming() {
+        if (!this.isAlarming) {
+            await this.maybeScheduleAlarm();
+        }
+    }
+
+    async maybeScheduleAlarm() {
+        if (this.shouldScheduleNextAlarm()) {
+            this.isAlarming = true;
+            await this.state.storage.setAlarm(Date.now() + 10000);
+        }
+        else {
+            this.isAlarming = false;
+        }
+    }
+
+    shouldScheduleNextAlarm() {
+        return this.tokenPairsForPositionIDsTracker.any();
+    }
+
     initialized() : boolean {
         return (this.telegramUserID.value != null);
     }
@@ -151,6 +187,10 @@ export class UserDO {
     async fetch(request : Request) : Promise<Response> {
         try {
             const [method,jsonRequestBody,response] = await this._fetch(request);
+            await this.maybeStartAlarming().catch(r => {
+                logError(`Problem scheduling alarm for UserDO ${this.telegramUserID.value}`)
+                return null;
+            });
             return response;
         }
         catch(e) {
