@@ -127,7 +127,7 @@ export abstract class Menu<T> extends BaseMenu {
     protected insertBackToMainButtonOnNewLine(options : CallbackButton[][]) {
         const lineNumber = options.length + 1;
         const callbackData = new CallbackData(MenuCode.Main, undefined);
-        this.insertButton(options, 'Back', callbackData, lineNumber);
+        this.insertButton(options, ':back: Back', callbackData, lineNumber);
     }
 
     protected insertCloseButtonNextLine(options : CallbackButton[][]) {

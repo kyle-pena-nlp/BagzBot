@@ -21,7 +21,7 @@ export class MenuEditOpenPositionSellAutoDoubleSlippage extends Menu<string> imp
         const falseChoice = new PositionIDAndChoice(positionID, false);
         this.insertButtonNextLine(options, 'On Sell - Do Not Auto-Double Slippage', new CallbackData(MenuCode.SubmitOpenPositionAutoDoubleSlippage, falseChoice.asMenuArg()));
         
-        this.insertButtonNextLine(options, 'Back', new CallbackData(MenuCode.ViewOpenPosition, positionID));
+        this.insertButtonNextLine(options, ':back: Back', new CallbackData(MenuCode.ViewOpenPosition, positionID));
 
         return options;
     }

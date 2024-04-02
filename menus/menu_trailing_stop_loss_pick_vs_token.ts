@@ -15,7 +15,7 @@ export class MenuTrailingStopLossPickVsToken extends Menu<TokenSymbolAndAddress>
         const USDC = getVsTokenInfo('USDC');
         this.insertButtonNextLine(options, SOL.symbol,  new CallbackData(MenuCode.TrailingStopLossPickVsTokenMenuSubmit, SOL.symbol));
         this.insertButtonNextLine(options, USDC.symbol, new CallbackData(MenuCode.TrailingStopLossPickVsTokenMenuSubmit, USDC.symbol));
-        this.insertButtonNextLine(options, "Back", new CallbackData(MenuCode.TrailingStopLossRequestReturnToEditorMenu));
+        this.insertButtonNextLine(options, ":back: Back", new CallbackData(MenuCode.TrailingStopLossRequestReturnToEditorMenu));
         return options;
     }
 }

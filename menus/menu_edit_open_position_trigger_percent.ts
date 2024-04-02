@@ -45,7 +45,7 @@ export class MenuEditOpenPositionTriggerPercent extends Menu<string> implements 
             this.insertButtonNextLine(options, percent.toFixed(1), new CallbackData(submitValueCode, new SubmittedTriggerPctKey(positionID,percent).toCallbackData()));
         }
         //this.insertButtonSameLine(options, "X%", new CallbackData(MenuCode.CustomOpenPositionTriggerPct, `1.0|${positionID}`));
-        this.insertButtonNextLine(options, "Back", new CallbackData(MenuCode.ViewOpenPosition, positionID));
+        this.insertButtonNextLine(options, ":back: Back", new CallbackData(MenuCode.ViewOpenPosition, positionID));
         return options;
     }
 }

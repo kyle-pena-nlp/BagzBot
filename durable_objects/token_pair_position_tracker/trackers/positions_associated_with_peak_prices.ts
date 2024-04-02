@@ -129,7 +129,7 @@ export class PositionsAssociatedWithPeakPrices extends DecimalizedAmountMap<Read
             }
             const [position,_] = result;
             const isClosing = (position.status === PositionStatus.Closing);
-            const sellUnconfirmed = !position.sellConfirmed;
+            const sellUnconfirmed = position.sellConfirmed === false; // triple eq intentional.
             const notCurrentlyConfirmingSell = !position.isConfirmingSell;
             if (isClosing && sellUnconfirmed && notCurrentlyConfirmingSell) {
                 position.isConfirmingSell = true;

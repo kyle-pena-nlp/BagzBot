@@ -11,6 +11,7 @@ export class MenuContinueMessage extends Menu<string> implements MenuCapabilitie
         super(message);
         this.continueMenuCode = continueMenuCode;
         this.messageParseMode = messageParseMode;
+        this.menuArg = menuArg;
     }
     renderText(): string {
         return this.menuData;

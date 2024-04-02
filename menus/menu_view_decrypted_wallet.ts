@@ -15,7 +15,7 @@ export class MenuViewDecryptedWallet extends Menu<DecryptedWalletData> implement
     }
     renderOptions(): CallbackButton[][] {
         const options = this.emptyMenu();
-        this.insertButtonNextLine(options, "Back", new CallbackData(MenuCode.Wallet));
+        this.insertButtonNextLine(options, ":back: Back", new CallbackData(MenuCode.Wallet));
         return options;
     }
 }

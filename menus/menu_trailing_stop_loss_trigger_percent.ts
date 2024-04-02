@@ -15,7 +15,7 @@ export class MenuTrailingStopLossTriggerPercent extends Menu<number> implements 
         this.insertButtonSameLine(options, "5%", new CallbackData(submitCode,  "5"));
         this.insertButtonSameLine(options, "10%", new CallbackData(submitCode, "10"));
         this.insertButtonSameLine(options, "X%", new CallbackData(MenuCode.CustomTriggerPct, defaultCustomTriggerPercent.toString()));
-        this.insertButtonNextLine(options, "Back", new CallbackData(MenuCode.TrailingStopLossRequestReturnToEditorMenu));
+        this.insertButtonNextLine(options, ":back: Back", new CallbackData(MenuCode.TrailingStopLossRequestReturnToEditorMenu));
         return options;
     }
 }

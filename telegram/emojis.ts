@@ -24,6 +24,7 @@ const emojis = {
     ':refresh:': '\u27F3',
     ':twisted_arrows:': '🔀',
     ':cancel:': '\u00D7',
+    ':back:': '\u2190',
 
 
     ':chart_up:': '📈',
@@ -57,7 +58,7 @@ const emojis = {
     ':happy:': '😊',
     ':beaming:': '😁',
     ':money_face:': '🤑',
-    ':help:': '\u003F',
+    ':help:': '❔',
     ':stop:': '🛑',
     ':caution:': '🟡',
     ':none:': ''

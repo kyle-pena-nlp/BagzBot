@@ -14,7 +14,7 @@ export class MenuEditPositionRequestSellAutoDoubleSlippage extends Menu<undefine
         const options = this.emptyMenu();
         this.insertButtonNextLine(options, 'Yes - Auto-Double Slippage', new CallbackData(MenuCode.SubmitPosRequestAutoDoubleSlippageOptions, true.toString()));
         this.insertButtonNextLine(options, 'No - Do Not Auto-Double Slippage', new CallbackData(MenuCode.SubmitPosRequestAutoDoubleSlippageOptions, false.toString()));
-        this.insertButtonNextLine(options, 'Back', new CallbackData(MenuCode.TrailingStopLossRequestReturnToEditorMenu));
+        this.insertButtonNextLine(options, ':back: Back', new CallbackData(MenuCode.TrailingStopLossRequestReturnToEditorMenu));
         return options;
     }
 }

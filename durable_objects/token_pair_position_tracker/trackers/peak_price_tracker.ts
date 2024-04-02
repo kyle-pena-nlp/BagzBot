@@ -167,6 +167,7 @@ export class PeakPricePositionTracker {
 
         // very important so as to prevent double-firing of sells
         for (const position of positionsToClose) {
+            position.sellConfirmed = null; // neither confirmed nor failed to confirm.
             position.status = PositionStatus.Closing;
         }
 

@@ -31,7 +31,7 @@ export class MenuViewOpenPosition extends Menu<PositionAndMaybePNL|BrandNewPosit
             const closePositionCallbackData = new CallbackData(MenuCode.ClosePositionManuallyAction, this.menuData.position.positionID);
             
             if (this.buyIsConfirmed()) {
-                this.insertButtonNextLine(options, ":stop: Stop Monitoring And Sell Now", closePositionCallbackData);
+                this.insertButtonNextLine(options, ":cancel: Stop Monitoring And Sell Now", closePositionCallbackData);
             }
 
             if (!this.buyIsConfirmed() && !this.buyIsConfirming()) {
@@ -45,7 +45,7 @@ export class MenuViewOpenPosition extends Menu<PositionAndMaybePNL|BrandNewPosit
             this.insertButtonNextLine(options, ":refresh: Refresh", refreshPositionCallbackData);
         }
 
-        this.insertButtonNextLine(options, "Back", this.menuCallback(MenuCode.ListPositions));
+        this.insertButtonNextLine(options, ":back: Back", this.menuCallback(MenuCode.ListPositions));
 
         return options;
     }
@@ -54,7 +54,8 @@ export class MenuViewOpenPosition extends Menu<PositionAndMaybePNL|BrandNewPosit
 
         // name and amount of position, and token address
         const lines = [
-            `<b>$${this.position().token.symbol}</b> (<code>${this.position().token.address}</code>)`,
+            `<b>${asTokenPrice(this.position().tokenAmt)} of $${this.position().token.symbol}</b>`,
+            ` (<code>${this.position().token.address}</code>)`
         ];
 
         // whether or not is confirmed, or is confirming
@@ -101,10 +102,10 @@ export class MenuViewOpenPosition extends Menu<PositionAndMaybePNL|BrandNewPosit
             lines.push(`:bullet: <b>Current Price</b>: ${asTokenPrice(this.currentPrice())} (${peakPriceComparison} Peak Price)`);
             lines.push(`:bullet: <b>Peak Price</b>: ${asTokenPrice(this.menuData.peakPrice)}`)
             lines.push(`:bullet: <b>Trigger Percent</b>: ${this.menuData.position.triggerPercent.toFixed(1)}%`)
-            lines.push(`:bullet: <b>PNL</b>: ${asTokenPriceDelta(this.calcPNL())} (${asPercentDeltaString(this.pnlDeltaPct())}))`);
+            lines.push(`:bullet: <b>PNL</b>: ${asTokenPriceDelta(this.calcPNL())} (${asPercentDeltaString(this.pnlDeltaPct())})`);
         }
 
-        if (this.isCloseToBeingTriggered() && !this.isClosingOrClosed() && !this.triggerConditionMet()) {
+        if (this.isCloseToBeingTriggered() && !this.isClosingOrClosed() && !this.triggerConditionMet() && this.buyIsConfirmed()) {
             lines.push(":eyes: This position is close to being triggered! :eyes:");
         }
 

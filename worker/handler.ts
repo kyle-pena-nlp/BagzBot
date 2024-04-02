@@ -198,7 +198,7 @@ export class Worker {
                 const viewPositionID = callbackData.menuArg!!;
                 const positionAndMaybePNL = await getPositionFromUserDO(params.getTelegramUserID(), params.chatID, viewPositionID, this.env);
                 if (positionAndMaybePNL == null) {
-                    return new MenuContinueMessage('Sorry - this position was not found - it was probably auto-sold!', MenuCode.Main);
+                    return new MenuContinueMessage('Sorry - this position no longer exists!', MenuCode.Main);
                 }
                 return new MenuViewOpenPosition(positionAndMaybePNL);
             case MenuCode.ClosePositionManuallyAction:
@@ -206,7 +206,7 @@ export class Worker {
                 if (closePositionID != null) {
                     await this.handleManuallyClosePosition(params.getTelegramUserID(), params.chatID, closePositionID, this.env);
                 }
-                return new MenuContinueMessage(`We are closing this position.  You will receive updates in this cat.`, MenuCode.ViewOpenPosition, 'HTML', closePositionID);
+                return new MenuContinueMessage(`We are closing this position.  You will receive notifications below.`, MenuCode.ViewOpenPosition, 'HTML', closePositionID);
             case MenuCode.CustomSlippagePct:
                 const slippagePercentQuestion = new ReplyQuestion(
                     "Enter the desired slippage percent", 
