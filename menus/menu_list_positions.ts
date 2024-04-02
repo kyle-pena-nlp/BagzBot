@@ -1,6 +1,7 @@
 import { dAdd, dCompare, dDiv, dMult, fromNumber, toFriendlyString } from "../decimalized";
-import { DecimalizedAmount, MATH_DECIMAL_PLACES, dZero } from "../decimalized/decimalized_amount";
+import { DecimalizedAmount, MATH_DECIMAL_PLACES, asPercentDeltaString, asTokenPrice, dZero } from "../decimalized/decimalized_amount";
 import { PositionAndMaybePNL } from "../durable_objects/token_pair_position_tracker/model/position_and_PNL";
+import { PositionStatus } from "../positions";
 import { CallbackButton } from "../telegram";
 import { CallbackData } from "./callback_data";
 import { Menu, MenuCapabilities } from "./menu";
@@ -29,12 +30,11 @@ export class MenuListPositions extends Menu<PositionAndMaybePNL[]> implements Me
         
         for (const p of this.menuData) {
             const position = p.position;
-            const pnlPercent = p.PNL == null ? null : dMult(p.PNL.PNLfrac,fromNumber(100));
-            const pnlPercentString = pnlPercent == null ? `` : `(${toFriendlyString(pnlPercent, 2,  { useSubscripts: false, addCommas: false, includePlusSign: true })}%)`;
-            const positionLabel = `${toFriendlyString(position.tokenAmt,2)} $${position.token.symbol} ${pnlPercentString}`;
+            const positionLabel = this.makePositionLabel(p);
             const callbackData = new CallbackData(MenuCode.ViewOpenPosition, position.positionID);
             this.insertButtonNextLine(options, positionLabel, callbackData);
         }
+        this.insertButtonNextLine(options, ':refresh: Refresh', this.menuCallback(MenuCode.ListPositions))
         this.insertBackToMainButtonOnNewLine(options);
         return options;
     }
@@ -54,5 +54,66 @@ export class MenuListPositions extends Menu<PositionAndMaybePNL[]> implements Me
             totalOriginalValue = dAdd(totalOriginalValue, p.position.vsTokenAmt);
         }
         return totalOriginalValue;
+    }
+    makePositionLabel(p : PositionAndMaybePNL) : string {
+        const labelIcon = this.makePositionLabelIcon(p);
+        const name = this.makePositionLabelName(p);
+        const pnlIcon = this.makePositionLabelPNLIcon(p);
+        const footnote = this.makePositionLabelFootnote(p);
+        return [labelIcon,name,pnlIcon,footnote].filter(x => (x||'') != '').join(" ");
+    }
+
+    makePositionLabelIcon(p : PositionAndMaybePNL) {
+        if (p.PNL == null) {
+            return ':red:';
+        }
+        else {
+            const position = p.position;
+            if (!position.buyConfirmed) {
+                return ':hollow:';
+            }
+            else if (position.status === PositionStatus.Open) {
+                return ':green:';
+            }
+            else if (position.status === PositionStatus.Closing) {
+                return ':orange:';
+            }
+            else if (position.status === PositionStatus.Closed) {
+                return ':red:';
+            }
+        }
+    }
+
+    makePositionLabelName(p : PositionAndMaybePNL) : string {
+        const position = p.position;
+        return `${asTokenPrice(position.tokenAmt)} of $${position.token.symbol}`;
+    }
+
+    makePositionLabelPNLIcon(p : PositionAndMaybePNL) : string {
+        if (p.PNL == null) {
+            return '';
+        }
+        else {
+            const currentPrice = p.PNL.currentPrice;
+            const pricePctDelta = dMult(fromNumber(100),p.PNL.PNLfrac);
+            return `(${asPercentDeltaString(pricePctDelta)})`;
+        }
+    }
+
+    makePositionLabelFootnote(p : PositionAndMaybePNL) : string {
+        const position = p.position;
+        if (position.isConfirmingBuy) {
+            return '(Attempting buy confirmation)';
+        }
+        else if (position.isConfirmingSell) {
+            return '(Attempting sell confirmation)';
+        }
+        else if (position.status === PositionStatus.Closing) {
+            return '(Attempting sale)';
+        }
+        else if (position.status === PositionStatus.Closed) {
+            return '(Closed)';
+        }
+        return '';
     }
 }

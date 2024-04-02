@@ -1,4 +1,4 @@
-import { dClamp, dDiv, dMult, dSub, fromNumber } from "../decimalized";
+import { dClamp, dCompare, dDiv, dMult, dSub, fromNumber } from "../decimalized";
 import { DecimalizedAmount, MATH_DECIMAL_PLACES, asPercentDeltaString, asPercentString, asTokenPrice, asTokenPriceDelta, dZero, toNumber } from "../decimalized/decimalized_amount";
 import { PNL, PositionAndMaybePNL } from "../durable_objects/token_pair_position_tracker/model/position_and_PNL";
 import { Position, PositionStatus } from "../positions";
@@ -67,7 +67,10 @@ export class MenuViewOpenPosition extends Menu<PositionAndMaybePNL|BrandNewPosit
             lines.push(`:bullet: Refresh in a few moments for an update.`) 
         }
         
-        if (this.isClosing()) {
+        if (this.triggerConditionMet()) {
+            lines.push(`:bullet: The position's trigger condition has been met! Look for a notification if the price stays at or below this level.`);
+        }
+        else if (this.isClosing()) {
             lines.push(`:bullet: We are attempting to sell this position.`);
         }
 
@@ -93,15 +96,15 @@ export class MenuViewOpenPosition extends Menu<PositionAndMaybePNL|BrandNewPosit
     
         // closing position.
         
-        if (this.isPositionWithPNL() && !this.isClosingOrClosed()) {
-            const peakPriceComparison = this.lessThanPeakPrice() ? '&lt;' : '=';
-            lines.push(`:bullet: <b>Current Price</b>: ${asTokenPrice(this.currentPrice())} (${asPercentString(this.percentBelowPeak())} ${peakPriceComparison} Peak Price)`);
+        if (this.isPositionWithPNL() && !this.isClosingOrClosed() && !this.triggerConditionMet()) {
+            const peakPriceComparison = this.lessThanPeakPrice() ? `${asPercentString(this.percentBelowPeak())} &lt;` : '=';
+            lines.push(`:bullet: <b>Current Price</b>: ${asTokenPrice(this.currentPrice())} (${peakPriceComparison} Peak Price)`);
             lines.push(`:bullet: <b>Peak Price</b>: ${asTokenPrice(this.menuData.peakPrice)}`)
             lines.push(`:bullet: <b>Trigger Percent</b>: ${this.menuData.position.triggerPercent.toFixed(1)}%`)
             lines.push(`:bullet: <b>PNL</b>: ${asTokenPriceDelta(this.calcPNL())} (${asPercentDeltaString(this.pnlDeltaPct())}))`);
         }
 
-        if (this.isCloseToBeingTriggered()) {
+        if (this.isCloseToBeingTriggered() && !this.isClosingOrClosed() && !this.triggerConditionMet()) {
             lines.push(":eyes: This position is close to being triggered! :eyes:");
         }
 
@@ -171,6 +174,15 @@ export class MenuViewOpenPosition extends Menu<PositionAndMaybePNL|BrandNewPosit
 
     private isPositionWithNoPNL() : this is { menuData : PositionAndMaybePNL & { PNL : undefined } } {
         return this.isPositionAndMaybePNL() && this.menuData.PNL == null;
+    }
+
+    private triggerConditionMet() {
+        if (this.isPositionWithPNL()) {
+            return dCompare(this.menuData.PNL.fracBelowPeak, fromNumber(this.menuData.position.triggerPercent / 100)) >= 0;
+        }
+        else {
+            return false;
+        }
     }
 
     private isPositionWithPNL() : this is { menuData : PositionAndMaybePNL & { PNL : PNL } } {

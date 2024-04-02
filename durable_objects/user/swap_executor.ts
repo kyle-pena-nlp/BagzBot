@@ -102,6 +102,14 @@ export class SwapExecutor {
         TGStatusMessage.queue(this.notificationChannel, `Executing transaction... (this could take a moment)`, false);
         let maybeExecutedTx = await executeAndMaybeConfirmTx(s.positionID, signedTx, lastValidBH, this.connection, this.env, this.startTimeMS);
 
+
+        if (isFailedSwapSlippageTxExecution(maybeExecutedTx)) {
+            logInfo("Swap failed due to slippage", s, maybeExecutedTx);
+            const msg = makeSwapSummaryFailedMessage(maybeExecutedTx.status, s);
+            TGStatusMessage.queue(this.notificationChannel, msg, false);
+            return { result: 'swap-failed-slippage', signature : signature, lastValidBH: lastValidBH };
+        }
+
         // transaction didn't go through
         if (isFailedTxExecution(maybeExecutedTx)) {
             logError('Transaction execution failed', s, maybeExecutedTx);
@@ -110,12 +118,6 @@ export class SwapExecutor {
             return 'tx-failed';        
         }
 
-        if (isFailedSwapSlippageTxExecution(maybeExecutedTx)) {
-            logInfo("Swap failed due to slippage", s, maybeExecutedTx);
-            const msg = makeSwapSummaryFailedMessage(maybeExecutedTx.status, s);
-            TGStatusMessage.queue(this.notificationChannel, msg, false);
-            return { result: 'swap-failed-slippage', signature : signature, lastValidBH: lastValidBH };
-        }
 
         // transaction went through, but swap failed for some other reason. early out.
         if (isFailedSwapTxExecution(maybeExecutedTx)) {
