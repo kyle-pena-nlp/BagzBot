@@ -206,7 +206,7 @@ export class Worker {
                 if (closePositionID != null) {
                     await this.handleManuallyClosePosition(params.getTelegramUserID(), params.chatID, closePositionID, this.env);
                 }
-                return this.createMainMenu(params, this.env);
+                return new MenuContinueMessage(`We are closing this position.  You will receive updates in this cat.`, MenuCode.ViewOpenPosition, 'HTML', closePositionID);
             case MenuCode.CustomSlippagePct:
                 const slippagePercentQuestion = new ReplyQuestion(
                     "Enter the desired slippage percent", 

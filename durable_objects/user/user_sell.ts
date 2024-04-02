@@ -59,6 +59,10 @@ export async function publishFinalSellMessage(position : Position, type : 'Sell'
     const finalSellMessage = getFinalSellMessage(position, type, status);
     TGStatusMessage.queue(channel, finalSellMessage, true);
     await TGStatusMessage.finalize(channel);
+    if (type === 'Sell' && (status !== 'confirmed' && status !== 'unconfirmed')) {
+        const requestSellDialogueRequest = new MenuRetryManualSell(status).getCreateNewMenuRequest();
+        await fetch(requestSellDialogueRequest);
+    }
 }
 
 function getFinalSellMessage(position : Position, type : 'Sell'|'Auto-sell', status : SellResult) : string {
