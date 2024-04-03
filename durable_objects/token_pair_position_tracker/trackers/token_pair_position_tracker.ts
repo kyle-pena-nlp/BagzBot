@@ -69,11 +69,11 @@ export class TokenPairPositionTracker {
         return positionsToClose;
     }
 
-    getUnconfirmedBuys() : Position[] {
+    getUnconfirmedBuys() : (Position & { buyConfirmed : false })[] {
         return this.pricePeaks.getUnconfirmedBuys();
     }
 
-    getUnconfirmedSells() : Position[] {
+    getUnconfirmedSells() : (Position & { sellConfirmed : false })[] {
         return this.pricePeaks.getUnconfirmedSells();
     }
 

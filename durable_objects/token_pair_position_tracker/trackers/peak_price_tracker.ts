@@ -171,16 +171,16 @@ export class PeakPricePositionTracker {
 
         // very important so as to prevent double-firing of sells
         for (const position of positionsToClose) {
-            position.sellConfirmed = null; // neither confirmed nor failed to confirm.
+            position.sellConfirmed = false;
             position.status = PositionStatus.Closing;
         }
 
         return positionsToClose;
     }
-    getUnconfirmedBuys() : Position[] {
+    getUnconfirmedBuys() : (Position & { buyConfirmed : false })[] {
         return this.itemsByPeakPrice.getUnconfirmedBuys();
     }
-    getUnconfirmedSells() : Position[] {
+    getUnconfirmedSells() : (Position & { sellConfirmed : false })[] {
         return this.itemsByPeakPrice.getUnconfirmedSells();
     }
     initialize(entries : Map<string,any>) {

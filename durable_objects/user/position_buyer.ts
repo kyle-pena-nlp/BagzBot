@@ -1,7 +1,7 @@
 
 import { Connection, VersionedTransaction } from "@solana/web3.js";
 import * as bs58 from "bs58";
-import { Wallet } from "../../crypto";
+import { UserAddress, Wallet, toUserAddress } from "../../crypto";
 import { fromNumber } from "../../decimalized";
 import { Env, getRPCUrl } from "../../env";
 import { Position, PositionRequest, PositionStatus } from "../../positions";
@@ -102,13 +102,13 @@ export class PositionBuyer {
             positionID : positionRequest.positionID,
             type: positionRequest.positionType,
             status: PositionStatus.Open,
+            userAddress: toUserAddress(this.wallet),
     
             buyConfirmed: false, // <----------
             txBuySignature: signature,
             buyLastValidBlockheight: lastValidBH,
             
-            sellConfirmed: null,
-            isConfirmingSell: false,
+            sellConfirmed: false,
             txSellSignature: null,
             sellLastValidBlockheight: null,
     
@@ -172,19 +172,20 @@ export class PositionBuyer {
         lastValidBH: number,
         successfulSwapParsed : ParsedSuccessfulSwapSummary) : Promise<Position & { buyConfirmed : true }> {
         
-        const newPosition = convertToConfirmedPosition(positionRequest, signature, lastValidBH, successfulSwapParsed);
+        const newPosition = convertToConfirmedPosition(positionRequest, signature, lastValidBH, toUserAddress(this.wallet), successfulSwapParsed);
 
         // has or has not been set depending on above logic.
         return newPosition;
     }    
 }
 
-function convertToConfirmedPosition(positionRequest: PositionRequest, signature : string, lastValidBH : number, parsedSuccessfulSwap : ParsedSuccessfulSwapSummary) : Position & { buyConfirmed : true } {
+function convertToConfirmedPosition(positionRequest: PositionRequest, signature : string, lastValidBH : number, userAddress : UserAddress, parsedSuccessfulSwap : ParsedSuccessfulSwapSummary) : Position & { buyConfirmed : true } {
     const position : Position & { buyConfirmed : true } = {
         userID: positionRequest.userID,
         chatID : positionRequest.chatID,
         messageID : positionRequest.messageID,
         positionID : positionRequest.positionID,
+        userAddress: userAddress,
         type: positionRequest.positionType,
         status: PositionStatus.Open,
 
@@ -192,8 +193,7 @@ function convertToConfirmedPosition(positionRequest: PositionRequest, signature 
         txBuySignature: signature,  
         buyLastValidBlockheight: lastValidBH,        
 
-        sellConfirmed: null,
-        isConfirmingSell: false,
+        sellConfirmed: false,
         txSellSignature: null,
         sellLastValidBlockheight: null,
 

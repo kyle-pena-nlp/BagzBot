@@ -80,6 +80,10 @@ export interface SlippageSwapExecutionErrorParseSummary {
     status: SwapExecutionError.SlippageToleranceExceeded
 }
 
+export interface NonSlippageSwapExecutionErrorParseSummary {
+    status: Exclude<SwapExecutionError,SwapExecutionError.SlippageToleranceExceeded>
+}
+
 export interface ParsedSuccessfulSwapSummary {
     status : 'swap-successful'
     swapSummary : SwapSummary
@@ -143,6 +147,10 @@ export function isSwapExecutionErrorParseSummary(obj : ParsedSwapSummary) : obj 
 
 export function isSlippageSwapExecutionErrorParseSummary(obj : ParsedSwapSummary) : obj is SlippageSwapExecutionErrorParseSummary {
     return isSwapExecutionErrorParseSummary(obj) && obj.status === SwapExecutionError.SlippageToleranceExceeded;
+}
+
+export function isNonSlippageExecutionErrorParseSummary(obj : ParsedSwapSummary): obj is NonSlippageSwapExecutionErrorParseSummary {
+    return isSwapExecutionErrorParseSummary(obj) && obj.status !== SwapExecutionError.SlippageToleranceExceeded;
 }
 
 export function isSuccessfullyParsedSwapSummary(obj : ParsedSwapSummary|string) : obj is ParsedSuccessfulSwapSummary {

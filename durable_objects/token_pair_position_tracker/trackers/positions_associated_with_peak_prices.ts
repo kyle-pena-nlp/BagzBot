@@ -120,8 +120,8 @@ export class PositionsAssociatedWithPeakPrices extends DecimalizedAmountMap<Read
     }
 
     // NEVER ASYNC THIS METHOD! This must execute atomically to avoid double-confirm attempts.
-    getUnconfirmedSells() {
-        const sellsToConfirm : Position[] = [];
+    getUnconfirmedSells() : (Position & { sellConfirmed : false })[] {
+        const sellsToConfirm : (Position & { sellConfirmed : false })[] = [];
         for (const positionID of this.positionIDMap.keys()) {
             const result = this.getPositionInternal(positionID);
             if (result == null) {
@@ -129,18 +129,16 @@ export class PositionsAssociatedWithPeakPrices extends DecimalizedAmountMap<Read
             }
             const [position,_] = result;
             const isClosing = (position.status === PositionStatus.Closing);
-            const sellUnconfirmed = position.sellConfirmed === false; // triple eq intentional.
-            const notCurrentlyConfirmingSell = !position.isConfirmingSell;
-            if (isClosing && sellUnconfirmed && notCurrentlyConfirmingSell) {
-                position.isConfirmingSell = true;
-                sellsToConfirm.push(position);
+            if (position.sellConfirmed === false && isClosing) {
+                // TODO: why wasn't TS happy here? Why did I need this 'as'?
+                sellsToConfirm.push(position as Position & { sellConfirmed : false });
             }
         }
         return sellsToConfirm;
     }
     // NEVER ASYNC THIS METHOD! This must execute atomically to avoid double-confirm attempts.
-    getUnconfirmedBuys() {
-        const buysToConfirm : Position[] = [];
+    getUnconfirmedBuys() : (Position & { buyConfirmed : false })[] {
+        const buysToConfirm : (Position & { buyConfirmed : false })[] = [];
         for (const positionID of this.positionIDMap.keys()) {
             const result = this.getPositionInternal(positionID);
             if (result == null) {
@@ -148,9 +146,9 @@ export class PositionsAssociatedWithPeakPrices extends DecimalizedAmountMap<Read
             }
             const [position,_] = result;
             const isOpen = position.status === PositionStatus.Open;
-            const buyUnconfirmed = !position.buyConfirmed;
-            if (isOpen && buyUnconfirmed) {
-                buysToConfirm.push(position);
+            if (position.buyConfirmed === false && isOpen) {
+                // TODO: why wasn't TS happy here? Why did I need this 'as'?
+                buysToConfirm.push(position as (Position & { buyConfirmed : false }));
             }
         }
         return buysToConfirm;

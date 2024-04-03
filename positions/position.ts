@@ -1,3 +1,4 @@
+import { UserAddress } from "../crypto";
 import { DecimalizedAmount } from "../decimalized";
 import { TokenInfo } from "../tokens";
 import { Structural, isEnumValue } from "../util";
@@ -25,6 +26,7 @@ export interface Position {
 	chatID : number
 	messageID : number
 	positionID : string
+	userAddress : UserAddress	
 
 	// position data
 	type: PositionType	
@@ -45,9 +47,10 @@ export interface Position {
 
 	// Open, Closing, Closed.
 	// When in Closing, prevents sell or auto-sell
+	// When in Closing, sellConfirmed can be true or false
+	// When in Open, buyConfirmed can be true or false
 	status : PositionStatus
 
-	// TODO: set this & lastvalidBH on buy
 	txBuySignature : string
 	buyLastValidBlockheight : number
 	buyConfirmed : boolean
@@ -55,8 +58,7 @@ export interface Position {
 	// TODO: set this & lastvalidBH on buy
 	txSellSignature : string|null
 	sellLastValidBlockheight : number|null
-	sellConfirmed : boolean|null
-	isConfirmingSell : boolean	
+	sellConfirmed : boolean
 };
 
 interface BasePositionRequest {

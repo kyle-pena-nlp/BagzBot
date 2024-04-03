@@ -15,5 +15,6 @@ export function toUserAddress(wallet : Wallet) {
 }
 
 export interface UserAddress {
+	readonly [ key : string ] : Structural
 	address : string
 }

@@ -102,10 +102,7 @@ export class MenuListPositions extends Menu<PositionAndMaybePNL[]> implements Me
 
     makePositionLabelFootnote(p : PositionAndMaybePNL) : string {
         const position = p.position;
-        if (position.isConfirmingSell) {
-            return '(Attempting sell confirmation)';
-        }
-        else if (position.status === PositionStatus.Closing) {
+        if (position.status === PositionStatus.Closing) {
             return '(Attempting sale)';
         }
         else if (position.status === PositionStatus.Closed) {

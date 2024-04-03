@@ -1,14 +1,15 @@
+import { Connection } from "@solana/web3.js";
 import { isAdminOrSuperAdmin } from "../../admins";
 import { DecimalizedAmount } from "../../decimalized";
 import { toNumber } from "../../decimalized/decimalized_amount";
-import { Env } from "../../env";
+import { Env, getRPCUrl } from "../../env";
 import { logDebug, logError, logInfo } from "../../logging";
-import { PositionStatus } from "../../positions";
+import { Position, PositionStatus } from "../../positions";
 import { ChangeTrackedValue, assertNever, makeJSONResponse, makeSuccessResponse, strictParseBoolean, strictParseInt } from "../../util";
 import { ensureTokenPairIsRegistered } from "../heartbeat/heartbeat_do_interop";
 import { EditTriggerPercentOnOpenPositionResponse } from "../user/actions/edit_trigger_percent_on_open_position";
 import { SetSellAutoDoubleOnOpenPositionResponse } from "../user/actions/set_sell_auto_double_on_open_position";
-import { sendClosePositionOrdersToUserDOs, tryToConfirmBuysWithUserDOs, tryToConfirmSellsWithUserDOs } from "../user/userDO_interop";
+import { sendClosePositionOrdersToUserDOs } from "../user/userDO_interop";
 import { AdminDeleteAllInTrackerRequest, AdminDeleteAllInTrackerResponse } from "./actions/admin_delete_all_positions_in_tracker";
 import { EditTriggerPercentOnOpenPositionInTrackerRequest } from "./actions/edit_trigger_percent_on_open_position_in_tracker";
 import { GetPositionFromPriceTrackerRequest, GetPositionFromPriceTrackerResponse } from "./actions/get_position";
@@ -29,6 +30,8 @@ import { UpdatePriceRequest, UpdatePriceResponse } from "./actions/update_price"
 import { UpdateSellConfirmationStatusRequest, UpdateSellConfirmationStatusResponse } from "./actions/update_sell_confirmation_status";
 import { UpsertPositionsRequest, UpsertPositionsResponse } from "./actions/upsert_positions";
 import { WakeupTokenPairPositionTrackerRequest, WakeupTokenPairPositionTrackerResponse } from "./actions/wake_up";
+import { BuyConfirmer } from "./confirmers/buy_confirmer";
+import { SellConfirmer } from "./confirmers/sell_confirmer";
 import { PositionAndMaybePNL } from "./model/position_and_PNL";
 import { TokenPairPositionTrackerDOFetchMethod, parseTokenPairPositionTrackerDOFetchMethod } from "./token_pair_position_tracker_do_interop";
 import { CurrentPriceTracker } from "./trackers/current_price_tracker";
@@ -141,7 +144,7 @@ export class TokenPairPositionTrackerDO {
         try {
             const price = await this.getPrice();
             if (price != null) {
-                await this.handleUpdatePrice({ price, tokenAddress: this.tokenAddress.value, vsTokenAddress: this.vsTokenAddress.value });
+                await this.performTriggeredPriceUpdateActions({ price, tokenAddress: this.tokenAddress.value, vsTokenAddress: this.vsTokenAddress.value });
             }
             else {
                 logError("Could not retrieve price", this);
@@ -269,7 +272,7 @@ export class TokenPairPositionTrackerDO {
     async _fetch(method : TokenPairPositionTrackerDOFetchMethod, body : any) : Promise<Response> {
         switch(method) {
             case TokenPairPositionTrackerDOFetchMethod.updatePrice:
-                return await this.handleUpdatePrice(body);
+                return await this.performTriggeredPriceUpdateActions(body);
             case TokenPairPositionTrackerDOFetchMethod.upsertPositions:
                 return await this.handleUpsertPositions(body);
             case TokenPairPositionTrackerDOFetchMethod.markPositionAsClosing:
@@ -375,45 +378,8 @@ export class TokenPairPositionTrackerDO {
         return makeJSONResponse<UpdateSellConfirmationStatusResponse>(result);
     }
 
-    async handleUpdateSellConfirmationStatusInternal(body : UpdateSellConfirmationStatusRequest) : Promise<UpdateSellConfirmationStatusResponse> {
-        
-        const positionID = body.positionID;
-        const position = this.tokenPairPositionTracker.getPosition(positionID);
-        
-        if (position == null) {
-            return {};
-        }
-
-        position.isConfirmingSell = false;
-
-        if (body.sellTxSignature != null) {
-            position.txSellSignature = body.sellTxSignature;
-        }
-        if (body.sellLastValidBlockheight != null) {
-            position.sellLastValidBlockheight = body.sellLastValidBlockheight;
-        }
-        
-        if (body.status === 'confirmed') {
-            this.tokenPairPositionTracker.closePosition(positionID);
-        }
-        else if (body.status === 'unconfirmed') {
-            position.sellConfirmed = false;
-        }
-        else if (body.status === 'slippage-failed') {
-            position.sellConfirmed = null;
-            position.status = PositionStatus.Open;
-            const autoDoubleSlippage = position.sellAutoDoubleSlippage;
-            position.sellSlippagePercent = autoDoubleSlippage ? (2.0 * position.sellSlippagePercent) : position.sellSlippagePercent;
-        }
-        else if (body.status === 'failed') {
-            // re-open the position if we were able to confirm the sell failed
-            position.sellConfirmed = null;
-            position.status = PositionStatus.Open;
-        }
-        else {
-            assertNever(body.status);
-        }
-        return {};
+    async handleUpdateSellConfirmationStatusInternal(body : UpdateSellConfirmationStatusRequest) : Promise<UpdateSellConfirmationStatusResponse> {        
+        throw new Error("");
     }
 
     async handleEditTriggerPercentOnOpenPosition(body : EditTriggerPercentOnOpenPositionInTrackerRequest) : Promise<Response> {
@@ -515,8 +481,75 @@ export class TokenPairPositionTrackerDO {
 
     async handleHeartbeatWakeup(body : HeartbeatWakeupRequestForTokenPairPositionTracker) {
         // simply invoking any fetch method causes the DO to reschedule polling if needed
+        this.performHeartbeatTriggeredActions(); // deliberate lack of await
         return makeJSONResponse({});
     }
+
+    async performHeartbeatTriggeredActions() {
+
+        const startTimeMS = Date.now();
+        const connection = new Connection(getRPCUrl(this.env));
+
+        const unconfirmedBuys : { type: 'buy', pos : Position & { buyConfirmed: false } }[] = this.tokenPairPositionTracker.getUnconfirmedBuys().map(x => { return { type : 'buy', pos: x }; });
+        const unconfirmedSells : { type : 'sell', pos: Position & { sellConfirmed : false } }[] = this.tokenPairPositionTracker.getUnconfirmedSells().map(x => { return { type : 'sell', pos : x }});
+        const allThingsToDo = [...unconfirmedBuys, ...unconfirmedSells];
+        allThingsToDo.sort(x => -toNumber(x.pos.vsTokenAmt));
+
+        const buyConfirmer = new BuyConfirmer(connection, startTimeMS, this.env);
+        const sellConfirmer = new SellConfirmer(connection, startTimeMS, this.env);
+
+        for (const { type, pos } of allThingsToDo) {
+            if (type === 'buy') {
+                const confirmedBuy = await buyConfirmer.confirmBuy(pos);
+                if (confirmedBuy === 'api-error') {
+                    break;
+                }
+                else if (confirmedBuy === 'unconfirmed') {
+                    continue;
+                }
+                else if (confirmedBuy === 'failed') {
+                    this.tokenPairPositionTracker.removePosition(pos.positionID);
+                }
+                else if ('positionID' in confirmedBuy) {
+                    this.tokenPairPositionTracker.upsertPositions([confirmedBuy]);
+                }
+                else {
+                    assertNever(confirmedBuy);
+                }
+            }
+            else if (type === 'sell') {
+                const confirmedSellStatus = await sellConfirmer.confirmSell(pos);
+                if (confirmedSellStatus === 'api-error') {
+                    break;
+                }
+                else if (confirmedSellStatus === 'unconfirmed') {
+                    continue;
+                }
+                else if (confirmedSellStatus === 'failed') {
+                    this.tokenPairPositionTracker.markPositionAsOpen(pos.positionID);
+                }
+                else if (confirmedSellStatus === 'slippage-failed') {
+                    if (pos.sellAutoDoubleSlippage) {
+                        const maxSlippage = 100; // TODO: make a user global setting
+                        pos.sellSlippagePercent = Math.min(maxSlippage, 2 * pos.sellSlippagePercent);
+                        this.tokenPairPositionTracker.upsertPositions([pos]);
+                    }
+                    this.tokenPairPositionTracker.markPositionAsOpen(pos.positionID);
+                }
+                else if (confirmedSellStatus === 'confirmed') {
+                    // TODO: update with PNL
+                    this.tokenPairPositionTracker.closePosition(pos.positionID);
+                }
+                else {
+                    assertNever(confirmedSellStatus);
+                }
+            }
+            else {
+                assertNever(type);
+            }
+        }
+    }
+
 
     async handleUpsertPositions(body : UpsertPositionsRequest) {
         this.ensureIsInitialized(body);
@@ -581,30 +614,20 @@ export class TokenPairPositionTrackerDO {
         }
     }
 
-    async handleUpdatePrice(request : UpdatePriceRequest) : Promise<Response> {
+    async performTriggeredPriceUpdateActions(request : UpdatePriceRequest) : Promise<Response> {
 
         this.ensureIsInitialized(request);
         
         const newPrice = request.price;
         
-        const actionsToTake = this.updatePositionTracker(newPrice);
-        
-        // biggest SOL purchase first (highest priority)
-        actionsToTake.positionsToClose.sort(p => -toNumber(p.vsTokenAmt));
-        if (actionsToTake.positionsToClose.length > 0) {
-            sendClosePositionOrdersToUserDOs(actionsToTake.positionsToClose, this.env);
-        }
-        
-        // biggest SOL purchase first (highest priority)
-        actionsToTake.buysToConfirm.sort(p => -toNumber(p.vsTokenAmt));
-        if (actionsToTake.buysToConfirm.length > 0) {
-            tryToConfirmBuysWithUserDOs(actionsToTake.buysToConfirm, this.env);
-        }
+        this.tokenPairPositionTracker.updatePrice(newPrice);
 
+        const positionsToClose = this.tokenPairPositionTracker.collectPositionsToClose(newPrice);
+        
         // biggest SOL purchase first (highest priority)
-        actionsToTake.sellsToConfirm.sort(p => -toNumber(p.vsTokenAmt));
-        if (actionsToTake.sellsToConfirm.length > 0) {
-            tryToConfirmSellsWithUserDOs(actionsToTake.sellsToConfirm, this.env);
+        positionsToClose.sort(p => -toNumber(p.vsTokenAmt));
+        if (positionsToClose.length > 0) {
+            sendClosePositionOrdersToUserDOs(positionsToClose, this.env);
         }
 
         const responseBody : UpdatePriceResponse = {};

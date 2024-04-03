@@ -72,11 +72,7 @@ export class MenuViewOpenPosition extends Menu<PositionAndMaybePNL|BrandNewPosit
         }
 
         if (this.sellIsUnconfirmed()) {
-            lines.push(`:bullet: We had trouble confirming the last attempted sale of this position.`);
-        }
-
-        if (this.sellIsConfirming()) {
-            lines.push(`:bullet: We are currently re-attempting to sell the position`);
+            lines.push(`:bullet: We will be confirming the sale of this position in a moment.`);
         }
 
         // brand new position - refresh again, dear user!
@@ -151,10 +147,6 @@ export class MenuViewOpenPosition extends Menu<PositionAndMaybePNL|BrandNewPosit
 
     private pnlDeltaPct(this : { menuData : PositionAndMaybePNL & { PNL : PNL } }) : DecimalizedAmount {
         return dMult(fromNumber(100), this.menuData.PNL.PNLfrac);
-    }
-
-    private sellIsConfirming(): boolean {
-        return this.menuData.position.isConfirmingSell === true;
     }
 
     private isBrandNewPosition() : this is { menuData: BrandNewPosition } {
