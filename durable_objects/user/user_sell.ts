@@ -8,8 +8,8 @@ import { Position } from "../../positions";
 import { ParsedSuccessfulSwapSummary, isSuccessfullyParsedSwapSummary } from "../../rpc/rpc_types";
 import { TGStatusMessage, UpdateableNotification } from "../../telegram";
 import { assertNever } from "../../util";
-import { markAsOpen, updateSellConfirmationStatus } from "../token_pair_position_tracker/token_pair_position_tracker_do_interop";
-import { SwapExecutor, TransactionExecutionResult } from "./swap_executor";
+import { markAsOpen } from "../token_pair_position_tracker/token_pair_position_tracker_do_interop";
+import { SwapExecutor } from "./swap_executor";
 import { SwapTransactionSigner } from "./swap_transaction_signer";
 
 

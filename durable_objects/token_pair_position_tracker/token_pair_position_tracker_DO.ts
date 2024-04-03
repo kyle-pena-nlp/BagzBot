@@ -25,9 +25,7 @@ import { MarkPositionAsOpenRequest, MarkPositionAsOpenResponse } from "./actions
 import { PositionExistsInTrackerRequest, PositionExistsInTrackerResponse } from "./actions/position_exists_in_tracker";
 import { RemovePositionRequest, RemovePositionResponse } from "./actions/remove_position";
 import { SetSellAutoDoubleOnOpenPositionInTrackerRequest } from "./actions/set_sell_auto_double_on_open_position_in_tracker";
-import { UpdateBuyConfirmationStatusRequest, UpdateBuyConfirmationStatusResponse } from "./actions/update_buy_confirmation_status";
 import { UpdatePriceRequest, UpdatePriceResponse } from "./actions/update_price";
-import { UpdateSellConfirmationStatusRequest, UpdateSellConfirmationStatusResponse } from "./actions/update_sell_confirmation_status";
 import { UpsertPositionsRequest, UpsertPositionsResponse } from "./actions/upsert_positions";
 import { WakeupTokenPairPositionTrackerRequest, WakeupTokenPairPositionTrackerResponse } from "./actions/wake_up";
 import { BuyConfirmer } from "./confirmers/buy_confirmer";
@@ -297,10 +295,6 @@ export class TokenPairPositionTrackerDO {
                 return await this.handleGetPosition(body);
             case TokenPairPositionTrackerDOFetchMethod.editTriggerPercentOnOpenPosition:
                 return await this.handleEditTriggerPercentOnOpenPosition(body);
-            case TokenPairPositionTrackerDOFetchMethod.updateBuyConfirmationStatus:
-                return await this.handleUpdateBuyConfirmationStatus(body);
-            case TokenPairPositionTrackerDOFetchMethod.updateSellConfirmationStatus:
-                return await this.handleUpdateSellConfirmationStatus(body);
             case TokenPairPositionTrackerDOFetchMethod.setSellAutoDoubleOnOpenPosition:
                 return await this.handleSetSellAutoDoubleOnOpenPosition(body);
             case TokenPairPositionTrackerDOFetchMethod.adminInvokeAlarm:
@@ -362,24 +356,6 @@ export class TokenPairPositionTrackerDO {
         }
         position.sellAutoDoubleSlippage = body.choice;
         return {};
-    }
-
-    async handleUpdateBuyConfirmationStatus(body : UpdateBuyConfirmationStatusRequest) : Promise<Response> {
-        const result = await this.handleUpdateBuyConfirmationStatusInternal(body);
-        return makeJSONResponse<UpdateBuyConfirmationStatusResponse>(result);
-    }
-
-    async handleUpdateBuyConfirmationStatusInternal(body: UpdateBuyConfirmationStatusRequest) : Promise<UpdateBuyConfirmationStatusResponse> {
-        throw new Error("");
-    }
-
-    async handleUpdateSellConfirmationStatus(body: UpdateSellConfirmationStatusRequest) : Promise<Response> {
-        const result = await this.handleUpdateSellConfirmationStatusInternal(body);
-        return makeJSONResponse<UpdateSellConfirmationStatusResponse>(result);
-    }
-
-    async handleUpdateSellConfirmationStatusInternal(body : UpdateSellConfirmationStatusRequest) : Promise<UpdateSellConfirmationStatusResponse> {        
-        throw new Error("");
     }
 
     async handleEditTriggerPercentOnOpenPosition(body : EditTriggerPercentOnOpenPositionInTrackerRequest) : Promise<Response> {

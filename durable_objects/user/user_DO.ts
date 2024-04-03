@@ -11,12 +11,10 @@ import { ChangeTrackedValue, Structural, assertNever, groupIntoBatches, makeFail
 import { assertIs } from "../../util/enums";
 import { listUnclaimedBetaInviteCodes } from "../beta_invite_codes/beta_invite_code_interop";
 import { PositionAndMaybePNL } from "../token_pair_position_tracker/model/position_and_PNL";
-import { _adminDeleteAll, editTriggerPercentOnOpenPositionInTracker, getPositionAndMaybePNL, listPositionsByUser, setSellAutoDoubleOnOpenPositionInPositionTracker, updateBuyConfirmationStatus, updateSellConfirmationStatus } from "../token_pair_position_tracker/token_pair_position_tracker_do_interop";
+import { _adminDeleteAll, editTriggerPercentOnOpenPositionInTracker, getPositionAndMaybePNL, listPositionsByUser, setSellAutoDoubleOnOpenPositionInPositionTracker } from "../token_pair_position_tracker/token_pair_position_tracker_do_interop";
 import { AdminDeleteAllPositionsRequest, AdminDeleteAllPositionsResponse } from "./actions/admin_delete_all_positions";
 import { AutomaticallyClosePositionsRequest, AutomaticallyClosePositionsResponse } from "./actions/automatically_close_positions";
 import { BaseUserDORequest, isBaseUserDORequest } from "./actions/base_user_do_request";
-import { ConfirmBuysRequest, ConfirmBuysResponse } from "./actions/confirm_buys";
-import { ConfirmSellsRequest, ConfirmSellsResponse } from "./actions/confirm_sells";
 import { DeleteSessionRequest, DeleteSessionResponse } from "./actions/delete_session";
 import { EditTriggerPercentOnOpenPositionRequest, EditTriggerPercentOnOpenPositionResponse } from "./actions/edit_trigger_percent_on_open_position";
 import { GetImpersonatedUserIDRequest, GetImpersonatedUserIDResponse } from "./actions/get_impersonated_user_id";
@@ -35,11 +33,9 @@ import { SetSellAutoDoubleOnOpenPositionRequest, SetSellAutoDoubleOnOpenPosition
 import { StoreLegalAgreementStatusRequest, StoreLegalAgreementStatusResponse } from "./actions/store_legal_agreement_status";
 import { StoreSessionValuesRequest, StoreSessionValuesResponse } from "./actions/store_session_values";
 import { UnimpersonateUserRequest, UnimpersonateUserResponse } from "./actions/unimpersonate_user";
-import { SwapStatus } from "./model/swap_status";
 import { TokenPair } from "./model/token_pair";
 import { UserData } from "./model/user_data";
 import { PositionBuyer } from "./position_buyer";
-import { SwapConfirmer } from "./swap_confirmer";
 import { SessionTracker } from "./trackers/session_tracker";
 import { SOLBalanceTracker } from "./trackers/sol_balance_tracker";
 import { TokenPairsForPositionIDsTracker } from "./trackers/token_pairs_for_position_ids_tracker";
@@ -290,12 +286,6 @@ export class UserDO {
             case UserDOFetchMethod.editTriggerPercentOnOpenPosition:
                 response = await this.handleEditTriggerPercentOnOpenPosition(userAction);
                 break;
-            case UserDOFetchMethod.confirmBuys:
-                response = await this.handleConfirmBuys(userAction);
-                break;
-            case UserDOFetchMethod.confirmSells:
-                response = await this.handleConfirmSells(userAction);
-                break;
             case UserDOFetchMethod.setSellAutoDoubleOnOpenPositionRequest:
                 response = await this.handleSetSellAutoDoubleOnOpenPositionRequest(userAction);
                 break;
@@ -335,41 +325,6 @@ export class UserDO {
             await removePosition(position.positionID, position.token.address, position.vsToken.address, this.env);
         }
         return {};*/
-    }
-
-    /* When we are tracking a position whose buy has not been confirmed, we periodically send it here */
-    async handleConfirmBuys(userAction : ConfirmBuysRequest) : Promise<Response> {
-        const startTimeMS = Date.now();
-        const results : Record<string,SwapStatus> = {};
-        for (const position of userAction.positions) {
-            const channelPrefix = `<b>Confirming purchase of ${asTokenPrice(position.tokenAmt)} $${position.token.symbol}`;
-            const channel = TGStatusMessage.createAndSend('Attempting confirmation.', false, position.chatID, this.env, 'HTML', channelPrefix)
-            const swapConfirmer = new SwapConfirmer(this.wallet.value!!, this.env, startTimeMS, channel);
-            const buyStatus = await swapConfirmer.confirmSwap(position, 'buy');
-            results[position.positionID] = buyStatus;
-            TGStatusMessage.finalize(channel);
-        }
-        return makeJSONResponse<ConfirmBuysResponse>({ results: results });
-    }
-
-    /* When a sell couldn't be confirmed, we periodically send it here */
-    async handleConfirmSells(userAction : ConfirmSellsRequest) : Promise<Response> {
-        const startTimeMS = Date.now();
-        for (const position of userAction.positions) {
-            const channelPrefix = `Attempting to confirm sale of ${asTokenPrice(position.tokenAmt)} $${position.token.symbol}`;
-            const channel = TGStatusMessage.createAndSend('Attempting confirmation', false, position.chatID, this.env, 'HTML', channelPrefix);
-            const swapConfirmer = new SwapConfirmer(this.wallet.value!!, this.env, startTimeMS, channel);
-            const sellStatus = await swapConfirmer.confirmSwap(position, 'sell');
-            await updateSellConfirmationStatus(position.positionID, 
-                position.txSellSignature,
-                position.sellLastValidBlockheight,
-                position.token.address, 
-                position.vsToken.address, 
-                sellStatus, 
-                this.env);
-            TGStatusMessage.finalize(channel);
-        }
-        return makeJSONResponse<ConfirmSellsResponse>({});
     }
 
     private async handleSetSellAutoDoubleOnOpenPositionRequest(userAction : SetSellAutoDoubleOnOpenPositionRequest) : Promise<Response> {

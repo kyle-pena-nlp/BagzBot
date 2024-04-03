@@ -48,8 +48,6 @@ export enum UserDOFetchMethod {
 	getPositionFromUserDO = "getPositionFromUserDO",
 	sendMessageToUser = "sendMessageToUser",
 	editTriggerPercentOnOpenPosition = "editTriggerPercentOnOpenPosition",
-	confirmSells = "confirmSells",
-	confirmBuys = "confirmBuys",
 	setSellAutoDoubleOnOpenPositionRequest = "setSellAutoDoubleOnOpenPositionRequest",
 	adminDeleteAllPositions = "adminDeleteAllPositions"
 }
@@ -103,52 +101,10 @@ export async function getWalletData(telegramUserID : number, chatID : number, en
 	return await sendJSONRequestToUserDO<GetWalletDataRequest,GetWalletDataResponse>(telegramUserID, UserDOFetchMethod.getWalletData, request, env);
 }
 
-// care taken here not to exceed simultaneous subrequest limit
-export async function tryToConfirmBuysWithUserDOs(unconfirmedBuys : Position[], env : Env) {
-	const positionsGroupedByUser = groupIntoMap(unconfirmedBuys, (p : Position) => p.userID);
-	const pairs = [...positionsGroupedByUser];
-	const batchesOfUsers = groupIntoBatches(pairs,4);
-	for (const userBatch of batchesOfUsers) {
-		const promises = []
-		for (const [userID, group] of userBatch) {
-			promises.push(tryToConfirmBuys(userID,group,env));
-		}
-		await Promise.allSettled(promises);
-	}
-}
-
-export async function tryToConfirmBuys(userID : number, positions : Position[], env : Env) : Promise<ConfirmBuysResponse> {
-	const method = UserDOFetchMethod.confirmBuys;
-	const chatID = positions[0].chatID;
-	const individualRequestForUserDO : ConfirmBuysRequest = { telegramUserID: userID, chatID: chatID, positions: positions };
-	return await sendJSONRequestToUserDO<ConfirmBuysRequest,ConfirmBuysResponse>(userID, method, individualRequestForUserDO, env);
-}
-
-// care taken here not to exceed simultaneous subrequest limit
-export async function tryToConfirmSellsWithUserDOs(unconfirmedSells : Position[], env : Env) {
-	const positionsGroupedByUser = groupIntoMap(unconfirmedSells, (p : Position) => p.userID);
-	const pairs = [...positionsGroupedByUser];
-	const batchesOfUsers = groupIntoBatches(pairs,4);
-	for (const userBatch of batchesOfUsers) {
-		const promises = []
-		for (const [userID, group] of userBatch) {
-			promises.push(tryToConfirmSells(userID,group,env));
-		}
-		await Promise.allSettled(promises);
-	}
-}
-
 export async function adminDeleteAllPositions(telegramUserID : number, chatID : number, realTelegramUserID : number, env : Env) : Promise<AdminDeleteAllPositionsResponse> {
 	const method = UserDOFetchMethod.adminDeleteAllPositions;
 	const request : AdminDeleteAllPositionsRequest = { telegramUserID, chatID, realTelegramUserID };
 	return await sendJSONRequestToUserDO<AdminDeleteAllPositionsRequest,AdminDeleteAllPositionsResponse>(telegramUserID, method, request, env);
-}
-
-export async function tryToConfirmSells(userID : number, positions : Position[], env : Env) {
-	const method = UserDOFetchMethod.confirmSells;
-	const chatID = positions[0].chatID;
-	const individualRequestForUserDO : ConfirmSellsRequest = { telegramUserID: userID, chatID: chatID, positions: positions };
-	await sendJSONRequestToUserDO<ConfirmSellsRequest,ConfirmSellsResponse>(userID, method, individualRequestForUserDO, env);
 }
 
 
