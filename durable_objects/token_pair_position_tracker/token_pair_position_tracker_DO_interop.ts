@@ -4,6 +4,7 @@ import { Position } from "../../positions";
 import { makeJSONRequest, makeRequest, strictParseInt } from "../../util";
 import { EditTriggerPercentOnOpenPositionResponse } from "../user/actions/edit_trigger_percent_on_open_position";
 import { SetSellAutoDoubleOnOpenPositionResponse } from "../user/actions/set_sell_auto_double_on_open_position";
+import { AdminDeleteAllInTrackerRequest, AdminDeleteAllInTrackerResponse } from "./actions/admin_delete_all_positions_in_tracker";
 import { EditTriggerPercentOnOpenPositionInTrackerRequest } from "./actions/edit_trigger_percent_on_open_position_in_tracker";
 import { GetPositionFromPriceTrackerRequest, GetPositionFromPriceTrackerResponse } from "./actions/get_position";
 import { GetPositionAndMaybePNLFromPriceTrackerRequest, GetPositionAndMaybePNLFromPriceTrackerResponse } from "./actions/get_position_and_maybe_pnl";
@@ -39,7 +40,14 @@ export enum TokenPairPositionTrackerDOFetchMethod {
 	updateBuyConfirmationStatus = "updateBuyConfirmationStatus",
 	updateSellConfirmationStatus = "updateSellConfirmationStatus",
 	setSellAutoDoubleOnOpenPosition = "setSellAutoDoubleOnOpenPosition",
-	adminInvokeAlarm = "adminInvokeAlarm"
+	adminInvokeAlarm = "adminInvokeAlarm",
+	adminDeleteAllInTracker = "adminDeleteAllInTracker"
+}
+
+export async function adminDeleteAll(userID : number, tokenAddress : string, vsTokenAddress : string, env : Env) : Promise<AdminDeleteAllInTrackerResponse> {
+	const request : AdminDeleteAllInTrackerRequest =  { userID, tokenAddress, vsTokenAddress };
+	const method = TokenPairPositionTrackerDOFetchMethod.adminDeleteAllInTracker;
+	return await sendJSONRequestToTokenPairPositionTracker<AdminDeleteAllInTrackerRequest,AdminDeleteAllInTrackerResponse>(method,request,tokenAddress,vsTokenAddress,env);
 }
 
 export async function adminInvokeAlarm(tokenAddress : string, vsTokenAddress : string, env : Env) {

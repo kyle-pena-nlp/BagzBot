@@ -19,7 +19,7 @@ export interface Stuff {
 export class MenuMain extends Menu<UserData & Stuff> implements MenuCapabilities {
     renderText(): string {
         const lines = [
-            `<b>:bot: ${this.menuData.botName} Main Menu</b>`,
+            `<b>${this.menuData.botName} Main Menu</b>`,
             `<i>${this.menuData.botTagline}</i>`
         ];
 

@@ -355,7 +355,7 @@ export class Worker {
                 }                
                 const tokenValidationInfo = await getTokenInfo(newTokenAddress, this.env);
                 if (isInvalidTokenInfoResponse(tokenValidationInfo)) {
-                    return new MenuContinueMessage(`Sorry - ${newTokenAddress} was not recognized as a valid token. If it is a new token, you may want to try in a few minutes.  See Jupiter's <a href='https://jup.ag/'>swap UI</a> for a list of supported tokens.`, MenuCode.TrailingStopLossRequestReturnToEditorMenu);
+                    return new MenuContinueMessage(`Sorry - <code>${newTokenAddress}</code> was not recognized as a valid token. If it is a new token, you may want to try in a few minutes.  See Jupiter's <a href='https://jup.ag/'>swap UI</a> for a list of supported tokens.`, MenuCode.TrailingStopLossRequestReturnToEditorMenu);
                 }
                 const newTokenInfo = tokenValidationInfo.tokenInfo;
                 positionRequest.token = newTokenInfo;

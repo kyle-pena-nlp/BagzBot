@@ -10,6 +10,7 @@ export class CurrentPriceTracker {
         this.currentPrice.initialize(entries);
         this.priceLastRefreshed.initialize(entries);
     }
+    
     async flushToStorage(storage : DurableObjectStorage) {
         const p1 = this.currentPrice.flushToStorage(storage);
         const p2 = this.priceLastRefreshed.flushToStorage(storage);

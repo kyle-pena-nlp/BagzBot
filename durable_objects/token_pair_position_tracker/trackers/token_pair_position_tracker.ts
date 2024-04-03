@@ -22,6 +22,10 @@ export class TokenPairPositionTracker {
     constructor() {
     }
 
+    clearAllPositions() {
+        this.pricePeaks.clearAllPositions();
+    }
+
     any() : boolean {
         return  this.pricePeaks.any();
     }

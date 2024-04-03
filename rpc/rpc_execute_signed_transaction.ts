@@ -55,6 +55,8 @@ export async function executeAndMaybeConfirmTx(
 
         let returnStatus : TransactionExecutionError|'timed-out'|undefined = undefined;
         
+        let expBackoffFactor = 1.0;
+
         // Until this loop is signalled to stop
         while(!stopSendingTx) {
 
@@ -67,11 +69,22 @@ export async function executeAndMaybeConfirmTx(
                 preflightCommitment: 'confirmed'
             }).then(async _ => {
                 anyTxSent = true;
-                logDebug("Tx successfully sent.")
+                logDebug("Tx successfully sent.");
+                if (expBackoffFactor > 1) {
+                    logDebug("Halving exp backoff");
+                    expBackoffFactor = expBackoffFactor / 2.0;
+                }
+                
             })
             .catch(e => {
                 rpcExceptions += 1;
                 logError("sendRawTransaction threw an exception", e, signature);
+                if ((e.message as string).includes("429")) {
+                    if (expBackoffFactor < 8) {
+                        logDebug("Doubling exp backoff");
+                        expBackoffFactor = Math.min(2.0 * expBackoffFactor,8.0);
+                    }
+                }
             });
 
             const blockheight = await connection.getBlockHeight('confirmed').catch(r => {
@@ -96,7 +109,7 @@ export async function executeAndMaybeConfirmTx(
                 break;
             }
 
-            await sleep(REBROADCAST_DELAY_MS);
+            await sleep(expBackoffFactor * REBROADCAST_DELAY_MS);
         }
 
         // confirmation is a worthy activity only if at least one tx was sent to the RPC

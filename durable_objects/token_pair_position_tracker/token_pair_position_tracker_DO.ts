@@ -1,3 +1,4 @@
+import { isAdminOrSuperAdmin } from "../../admins";
 import { DecimalizedAmount } from "../../decimalized";
 import { toNumber } from "../../decimalized/decimalized_amount";
 import { Env } from "../../env";
@@ -8,6 +9,7 @@ import { ensureTokenPairIsRegistered } from "../heartbeat/heartbeat_do_interop";
 import { EditTriggerPercentOnOpenPositionResponse } from "../user/actions/edit_trigger_percent_on_open_position";
 import { SetSellAutoDoubleOnOpenPositionResponse } from "../user/actions/set_sell_auto_double_on_open_position";
 import { sendClosePositionOrdersToUserDOs, tryToConfirmBuysWithUserDOs, tryToConfirmSellsWithUserDOs } from "../user/userDO_interop";
+import { AdminDeleteAllInTrackerRequest, AdminDeleteAllInTrackerResponse } from "./actions/admin_delete_all_positions_in_tracker";
 import { EditTriggerPercentOnOpenPositionInTrackerRequest } from "./actions/edit_trigger_percent_on_open_position_in_tracker";
 import { GetPositionFromPriceTrackerRequest, GetPositionFromPriceTrackerResponse } from "./actions/get_position";
 import { GetPositionAndMaybePNLFromPriceTrackerRequest, GetPositionAndMaybePNLFromPriceTrackerResponse } from "./actions/get_position_and_maybe_pnl";
@@ -299,9 +301,25 @@ export class TokenPairPositionTrackerDO {
             case TokenPairPositionTrackerDOFetchMethod.adminInvokeAlarm:
                 await this.alarm();
                 return makeJSONResponse<{}>({});
+            case TokenPairPositionTrackerDOFetchMethod.adminDeleteAllInTracker:
+                return await this.handleAdminDeleteAllInTracker(body);
             default:
                 assertNever(method);
         }
+    }
+
+    async handleAdminDeleteAllInTracker(body: AdminDeleteAllInTrackerRequest) : Promise<Response> {
+        // this is really the nuclear option.  that's why I'm putting these checks in place.
+        if (this.env.ENVIRONMENT === 'dev') {
+            const userID = body.userID;
+            if (!isAdminOrSuperAdmin(userID,this.env)) {
+                return makeJSONResponse<AdminDeleteAllInTrackerResponse>({});
+            }
+            this.tokenPairPositionTracker.clearAllPositions();
+            await this.state.storage.deleteAll();
+            return makeJSONResponse<AdminDeleteAllInTrackerResponse>({});
+        }
+        return makeJSONResponse<AdminDeleteAllInTrackerResponse>({});
     }
 
     async handleSetSellAutoDoubleOnOpenPosition(body : SetSellAutoDoubleOnOpenPositionInTrackerRequest) : Promise<Response> {

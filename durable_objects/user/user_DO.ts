@@ -11,7 +11,7 @@ import { ChangeTrackedValue, Structural, assertNever, groupIntoBatches, makeFail
 import { assertIs } from "../../util/enums";
 import { listUnclaimedBetaInviteCodes } from "../beta_invite_codes/beta_invite_code_interop";
 import { PositionAndMaybePNL } from "../token_pair_position_tracker/model/position_and_PNL";
-import { editTriggerPercentOnOpenPositionInTracker, getPositionAndMaybePNL, listPositionsByUser, removePosition, setSellAutoDoubleOnOpenPositionInPositionTracker, updateBuyConfirmationStatus, updateSellConfirmationStatus } from "../token_pair_position_tracker/token_pair_position_tracker_do_interop";
+import { adminDeleteAll, editTriggerPercentOnOpenPositionInTracker, getPositionAndMaybePNL, listPositionsByUser, setSellAutoDoubleOnOpenPositionInPositionTracker, updateBuyConfirmationStatus, updateSellConfirmationStatus } from "../token_pair_position_tracker/token_pair_position_tracker_do_interop";
 import { AdminDeleteAllPositionsRequest, AdminDeleteAllPositionsResponse } from "./actions/admin_delete_all_positions";
 import { AutomaticallyClosePositionsRequest, AutomaticallyClosePositionsResponse } from "./actions/automatically_close_positions";
 import { BaseUserDORequest, isBaseUserDORequest } from "./actions/base_user_do_request";
@@ -321,13 +321,20 @@ export class UserDO {
             logError(`Only admin user can delete all positions - was ${realUserID}`);
             return {};
         }
-        const positions = await this.listPositionsFromUserDO(userID);
+        const uniquePairs = this.tokenPairsForPositionIDsTracker.listUniqueTokenPairs();
+        for (const pair of uniquePairs) {
+            await adminDeleteAll(realUserID, pair.tokenAddress, pair.vsTokenAddress, this.env);
+        }
+
+        return {};
+        
+        /*const positions = await this.listPositionsFromUserDO(userID);
         for (const posAndMaybePNL of positions) {
             const position = posAndMaybePNL.position;
             logInfo(`Removing position with ID ${position.positionID}`);
             await removePosition(position.positionID, position.token.address, position.vsToken.address, this.env);
         }
-        return {};
+        return {};*/
     }
 
     /* When we are tracking a position whose buy has not been confirmed, we periodically send it here */
