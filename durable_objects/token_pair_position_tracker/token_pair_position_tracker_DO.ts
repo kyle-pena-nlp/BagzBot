@@ -16,7 +16,7 @@ import { GetPositionFromPriceTrackerRequest, GetPositionFromPriceTrackerResponse
 import { GetPositionAndMaybePNLFromPriceTrackerRequest, GetPositionAndMaybePNLFromPriceTrackerResponse } from "./actions/get_position_and_maybe_pnl";
 import { GetTokenPriceRequest, GetTokenPriceResponse } from "./actions/get_token_price";
 import { HasPairAddresses } from "./actions/has_pair_addresses";
-import { HeartbeatWakeupRequestForTokenPairPositionTracker, isHeartbeatRequest } from "./actions/heartbeat_wake_up_for_token_pair_position_tracker";
+import { isHeartbeatRequest } from "./actions/heartbeat_wake_up_for_token_pair_position_tracker";
 import { ListPositionsByUserRequest, ListPositionsByUserResponse } from "./actions/list_positions_by_user";
 import { MarkBuyAsConfirmedRequest, MarkBuyAsConfirmedResponse } from "./actions/mark_buy_as_confirmed";
 import { MarkPositionAsClosedRequest, MarkPositionAsClosedResponse } from "./actions/mark_position_as_closed";
@@ -289,8 +289,6 @@ export class TokenPairPositionTrackerDO {
                 return await this.handleRemovePosition(body);
             case TokenPairPositionTrackerDOFetchMethod.getPositionAndMaybePNL:
                 return await this.handleGetPositionAndMaybePNL(body);
-            case TokenPairPositionTrackerDOFetchMethod.heartbeatWakeup:
-                return await this.handleHeartbeatWakeup(body);
             case TokenPairPositionTrackerDOFetchMethod.getPosition:
                 return await this.handleGetPosition(body);
             case TokenPairPositionTrackerDOFetchMethod.editTriggerPercentOnOpenPosition:
@@ -322,7 +320,7 @@ export class TokenPairPositionTrackerDO {
 
     async handlePositionExistsInTracker(body : PositionExistsInTrackerRequest) : Promise<Response> {
         const pos = this.tokenPairPositionTracker.getPosition(body.positionID);
-        const responseBody : PositionExistsInTrackerResponse = { exists : pos !== null };
+        const responseBody : PositionExistsInTrackerResponse = { exists : pos != null };
         return makeJSONResponse<PositionExistsInTrackerResponse>(responseBody);
     }
 
@@ -452,16 +450,11 @@ export class TokenPairPositionTrackerDO {
     async handleWakeup(body : WakeupTokenPairPositionTrackerRequest) {
         // this is a no-op, because by simply calling a request we wake up the DO
         const responseBody : WakeupTokenPairPositionTrackerResponse = {};
+        this.performWakupActions(); // deliberate lack of await
         return makeJSONResponse(responseBody);
     }
 
-    async handleHeartbeatWakeup(body : HeartbeatWakeupRequestForTokenPairPositionTracker) {
-        // simply invoking any fetch method causes the DO to reschedule polling if needed
-        this.performHeartbeatTriggeredActions(); // deliberate lack of await
-        return makeJSONResponse({});
-    }
-
-    async performHeartbeatTriggeredActions() {
+    async performWakupActions() {
 
         const startTimeMS = Date.now();
         const connection = new Connection(getRPCUrl(this.env));

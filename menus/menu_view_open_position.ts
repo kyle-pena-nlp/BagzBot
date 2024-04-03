@@ -55,8 +55,8 @@ export class MenuViewOpenPosition extends Menu<PositionAndMaybePNL|BrandNewPosit
         ];
 
         // whether or not is confirmed, or is confirming
-        if (!this.buyIsConfirmed()) {
-            lines.push(`:stop: <b>WARNING: THIS PURCHASE HAS NOT BEEN CONFIRMED!</b>`);
+        if (this.isOpen() && !this.buyIsConfirmed()) {
+            lines.push(`:hollow: <b>WARNING: THIS PURCHASE HAS NOT BEEN CONFIRMED!</b>`);
             lines.push(`:bullet: We will retry confirming your purchase with Solana soon`)
         }
         
@@ -67,7 +67,7 @@ export class MenuViewOpenPosition extends Menu<PositionAndMaybePNL|BrandNewPosit
             lines.push(`:bullet: We are attempting to sell this position.`);
         }
 
-        if (this.sellIsUnconfirmed()) {
+        if (this.isClosing() && this.sellIsUnconfirmed()) {
             lines.push(`:bullet: We will be confirming the sale of this position in a moment.`);
         }
 
@@ -131,6 +131,10 @@ export class MenuViewOpenPosition extends Menu<PositionAndMaybePNL|BrandNewPosit
 
     private buyIsConfirmed() : boolean {
         return this.menuData.position.buyConfirmed;
+    }
+
+    private isOpen() : boolean {
+        return this.menuData.position.status === PositionStatus.Open;
     }
 
     private isClosing() : boolean {

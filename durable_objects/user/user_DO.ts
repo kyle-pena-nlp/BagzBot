@@ -91,7 +91,7 @@ export class UserDO {
 
     // has the user signed legal?
     legalAgreementStatus : ChangeTrackedValue<'agreed'|'refused'|'has-not-responded'> = new ChangeTrackedValue<'agreed'|'refused'|'has-not-responded'>('hasSignedLegal', 'has-not-responded');
-    
+
     // stores just the positionID / tokenAddress / vsTokenAddress
     tokenPairsForPositionIDsTracker : TokenPairsForPositionIDsTracker = new TokenPairsForPositionIDsTracker();
 
@@ -596,7 +596,7 @@ export class UserDO {
             positionRequest.chatID, 
             this.env,
             'HTML',
-            '<b>New Position</b>: ');        
+            `<a href="${positionRequest.token.logoURI}">\u200B</a><b>Purchase of ${asTokenPrice(positionRequest.quote.outTokenAmt)} $${positionRequest.token.symbol}</b>: `);        
         /*
             This is deliberately not awaited.
             Durable Objects will continue processing requests for up to 30 seconds

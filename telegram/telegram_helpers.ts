@@ -119,8 +119,9 @@ export async function updateTGMessage(chatID : number,
     text : string, 
     env : Env,
     parseMode : 'HTML'|'MarkdownV2' = 'HTML', 
-    includeDismissButton : boolean = false) : Promise<TgMessageSentInfo> {
-    const request = makeTelegramUpdateMessageRequest(chatID, messageID, text, env, parseMode, includeDismissButton);
+    dismissButton : boolean|MenuCode = false,
+    menuArg : string|null = null) : Promise<TgMessageSentInfo> {
+    const request = makeTelegramUpdateMessageRequest(chatID, messageID, text, env, parseMode, dismissButton, menuArg);
     return await transformToTGMessageSentInfo(fetch(request));
 }
 
@@ -128,9 +129,10 @@ export async function sendMessageToTG(chatID : number,
     text : string, 
     env : Env,
     parseMode : 'HTML'|'MarkdownV2' = 'HTML', 
-    includeDismissButton : boolean = false) : Promise<TgMessageSentInfo> {
+    dismissButton : boolean|MenuCode = false,
+    menuArg : string|null = null) : Promise<TgMessageSentInfo> {
     
-    const request = makeTelegramSendMessageRequest(chatID, text, env, parseMode, includeDismissButton);
+    const request = makeTelegramSendMessageRequest(chatID, text, env, parseMode, dismissButton, menuArg);
     return await transformToTGMessageSentInfo(fetch(request));
 }
 
@@ -166,7 +168,8 @@ function makeTelegramSendMessageRequest(chatID : number,
     text : string, 
     env : Env, 
     parseMode : 'MarkdownV2'|'HTML',
-    includeDismissButton : boolean) : Request {
+    dismissButton : boolean|MenuCode,
+    menuArg : string|null) : Request {
     const url = makeTelegramBotUrl('sendMessage', env);
     parseMode = parseMode||'HTML';
     let sendMessageBody : any = {
@@ -174,8 +177,8 @@ function makeTelegramSendMessageRequest(chatID : number,
         "text": escapeTGText(text, parseMode),
         "parse_mode": parseMode
     };
-    if (includeDismissButton) {
-        sendMessageBody = addDismissButton(sendMessageBody);
+    if (dismissButton) {
+        sendMessageBody = addDismissButton(dismissButton, menuArg, sendMessageBody);
     }
     const request = makeJSONRequest(url, sendMessageBody);
     return request;
@@ -186,7 +189,8 @@ function makeTelegramUpdateMessageRequest(chatID : number,
     text : string, 
     env : Env, 
     parseMode : 'MarkdownV2'|'HTML',
-    includeDismissButton : boolean) : Request {
+    dismissButton : boolean|MenuCode,
+    menuArg : string|null) : Request {
     const url = makeTelegramBotUrl('editMessageText', env);
     parseMode = parseMode||'HTML';
     let sendMessageBody : any = {
@@ -195,17 +199,18 @@ function makeTelegramUpdateMessageRequest(chatID : number,
         "text": escapeTGText(text, parseMode),
         "parse_mode": parseMode
     };
-    if (includeDismissButton) {
-        sendMessageBody = addDismissButton(sendMessageBody);
+    if (dismissButton) {
+        sendMessageBody = addDismissButton(dismissButton, menuArg, sendMessageBody);
     }
     const request = makeJSONRequest(url, sendMessageBody);
     return request;
 }
 
-function addDismissButton(requestBody: any) {
+function addDismissButton(dimissButton : true|MenuCode, menuArg : string|null, requestBody: any) {
+    const menuCode = dimissButton === true ? MenuCode.Close : dimissButton;
     const dismissButton : CallbackButton = {
-        text: "Dismiss",
-        callback_data: new CallbackData(MenuCode.Close).toString()
+        text: "OK",
+        callback_data: new CallbackData(menuCode,menuArg||undefined).toString()
     };
     const dismissButtonKeyboard : CallbackButton[][] = [[dismissButton]];
     return {

@@ -25,7 +25,6 @@ import { PositionAndMaybePNL } from "./model/position_and_PNL";
 
 export enum TokenPairPositionTrackerDOFetchMethod {
 	wakeUp = "wakeUp",
-	heartbeatWakeup = "heartbeatWakeup",
 	updatePrice = "updatePrice",
 	upsertPositions = "upsertPositions",
 	markPositionAsClosing = "markPositionAsClosing",

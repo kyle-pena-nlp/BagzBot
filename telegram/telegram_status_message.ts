@@ -1,5 +1,6 @@
 import { Env } from "../env";
 import { logError } from "../logging";
+import { MenuCode } from "../menus";
 import { pause } from "../util";
 import { subInEmojis } from "./emojis";
 import { deleteTGMessage, sendMessageToTG, updateTGMessage } from "./telegram_helpers";
@@ -14,11 +15,19 @@ export class TGStatusMessage {
     message : string;
     prefix : string;
     parseMode : 'HTML'|'MarkdownV2';
-    dismissable : boolean;
+    dismissable : boolean|MenuCode;
+    menuArg : string|null
     lastSendSuccessful : boolean;
     env : Env;
     deleted : boolean = false;
-    private constructor(message : string, parseMode : 'HTML'|'MarkdownV2', dismissable : boolean, messageID : number, chatID : number, env : Env, prefix : string|null) {
+    private constructor(message : string, 
+        parseMode : 'HTML'|'MarkdownV2', 
+        dismissable : boolean|MenuCode, 
+        messageID : number, 
+        chatID : number, 
+        env : Env, 
+        prefix : string|null,
+        menuArg : string|null) {
         this.messageID = messageID;
         this.chatID = chatID;
         this.message = subInEmojis(message);        
@@ -27,20 +36,22 @@ export class TGStatusMessage {
         this.lastSendSuccessful = true;
         this.env = env;
         this.prefix = prefix || '';
+        this.menuArg = menuArg;
     }
     /* Create a status message that can be updated, in a non-blocking fashion, with minimum 500ms updates between updates */
     static createAndSend(message : string, 
-        dismissable : boolean, 
+        dismissable : boolean|MenuCode, 
         chatID : number, 
         env : Env, 
         parseMode : 'HTML'|'MarkdownV2' = 'HTML',
-        prefix : string|null = null) : UpdateableNotification {
-        const promiseChain = sendMessageToTG(chatID, (prefix||'') + message, env, parseMode, dismissable).then(sentMsgInfo => {
+        prefix : string|null = null,
+        menuArg : string|null = null) : UpdateableNotification {
+        const promiseChain = sendMessageToTG(chatID, (prefix||'') + message, env, parseMode, dismissable, menuArg).then(sentMsgInfo => {
             if (!sentMsgInfo.success) {
-                return { chatID: chatID, env : env, parseMode: parseMode, prefix: prefix };
+                return { chatID: chatID, env : env, parseMode: parseMode, prefix: prefix, menuArg: menuArg };
             }
             const messageID = sentMsgInfo.messageID!!;
-            return new TGStatusMessage(message, parseMode, dismissable, messageID, chatID, env, prefix);
+            return new TGStatusMessage(message, parseMode, dismissable, messageID, chatID, env, prefix, menuArg);
         });
         return {
             promiseChain: promiseChain
@@ -53,8 +64,9 @@ export class TGStatusMessage {
         chatID : number,
         env : Env,
         parseMode : 'HTML'|'MarkdownV2' = 'HTML',
-        prefix : string|null = null) : UpdateableNotification {
-            const statusMessage = new TGStatusMessage(message,parseMode,dismissable,messageID,chatID,env,prefix);
+        prefix : string|null = null,
+        menuArg : string|null = null) : UpdateableNotification {
+            const statusMessage = new TGStatusMessage(message,parseMode,dismissable,messageID,chatID,env,prefix,menuArg);
             return {
                 promiseChain: statusMessage.send()
             };
@@ -62,13 +74,14 @@ export class TGStatusMessage {
     /* Append a status message to a queue of status messages, in a non-blocking fashion, with 500ms pauses between messages. */
     static async queue(statusMessage : UpdateableNotification, 
         message : string, 
-        dismissable : boolean) {
+        dismissable : boolean|MenuCode,
+        menuArg : string|null = null) {
         statusMessage.promiseChain = statusMessage.promiseChain.then(m => {
             if ('messageID' in m) {
-                return m.updateAndSend(message, dismissable);
+                return m.updateAndSend(message, dismissable, menuArg);
             }
             else {
-                return TGStatusMessage.createAndSend(message, dismissable, m.chatID, m.env, m.parseMode, m.prefix).promiseChain;
+                return TGStatusMessage.createAndSend(message, dismissable, m.chatID, m.env, m.parseMode, m.prefix, menuArg).promiseChain;
             }
         }).then(pause(500));
     }
@@ -88,9 +101,12 @@ export class TGStatusMessage {
             }
         });
     }
-    private async updateAndSend(message : string, dismissable ?: boolean) : Promise<TGStatusMessage> {
+    private async updateAndSend(message : string, dismissable ?: boolean|MenuCode, menuArg : string|null = null) : Promise<TGStatusMessage> {
         if (dismissable != null) {
             this.dismissable = dismissable;
+        }
+        if (menuArg != null) {
+            this.menuArg = menuArg;
         }
         this.message = message;
         await this.send();
@@ -102,7 +118,8 @@ export class TGStatusMessage {
             (this.prefix||'') + this.message, 
             this.env, 
             this.parseMode, 
-            this.dismissable);
+            this.dismissable,
+            this.menuArg);
         this.lastSendSuccessful = sentMsgInfo.success;
         return this;
     }
