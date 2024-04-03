@@ -526,17 +526,6 @@ export class TokenPairPositionTrackerDO {
         // update the positions in the tracker.
         this.tokenPairPositionTracker.upsertPositions(body.positions);
 
-        // update the price tracker if any of the new positions have more recent quoted prices
-        let updatedPrice : DecimalizedAmount|null = null;
-        for (const position of body.positions) {
-            updatedPrice = this.currentPriceTracker.maybeAcceptPrice(position.fillPrice, position.fillPriceMS);
-        }
-
-        // if there was a more recent price in the batch, update the position tracker with the latest
-        if (updatedPrice != null) {
-            this.tokenPairPositionTracker.updatePrice(updatedPrice);
-        }
-
         return makeJSONResponse(responseBody);
     }
 

@@ -4,7 +4,7 @@ import { UserAddress, Wallet, toUserAddress } from "../../crypto";
 import { Env } from "../../env";
 import { logDebug, logError, logInfo } from "../../logging";
 import { Swappable, getSwapOfXDescription, isPosition, isPositionRequest } from "../../positions";
-import { executeAndMaybeConfirmTx } from "../../rpc/rpc_execute_signed_transaction";
+import { executeAndConfirmSignedTx } from "../../rpc/rpc_execute_signed_transaction";
 import { parseBuySwapTransaction, parseSellSwapTransaction } from "../../rpc/rpc_parse";
 import { ParsedSuccessfulSwapSummary, ParsedSwapSummary, PreparseConfirmedSwapResult, SwapExecutionError, TransactionExecutionError, TransactionExecutionErrorCouldntConfirm, UnknownTransactionParseSummary, isConfirmed as isConfirmedTxExecution, isFailedSwapSlippageTxExecution, isFailedSwapTxExecution, isFailedTxExecution, isSuccessfullyParsedSwapSummary, isSwapExecutionErrorParseSwapSummary, isUnknownTransactionParseSummary } from "../../rpc/rpc_types";
 import { TGStatusMessage, UpdateableNotification } from "../../telegram";
@@ -63,16 +63,19 @@ export class SwapExecutor {
     env : Env
     notificationChannel: UpdateableNotification
     connection : Connection
+    lastValidBH : number
     startTimeMS : number
     constructor(wallet : Wallet, 
         env : Env, 
         notificationChannel : UpdateableNotification, 
         connection : Connection,
+        lastValidBH : number,
         startTimeMS : number) {
         this.wallet = wallet;
         this.env = env;
         this.notificationChannel = notificationChannel;
         this.connection = connection;
+        this.lastValidBH = lastValidBH
         this.startTimeMS = startTimeMS;
     }
 
@@ -85,22 +88,10 @@ export class SwapExecutor {
         // get some stuff we'll need
         const signature = bs58.encode(signedTx.signatures[0]);
         const userAddress = toUserAddress(this.wallet);
-
-        // TODO: RPC node health check, per: https://solana.com/docs/core/transactions/confirmation#use-healthy-rpc-nodes-when-fetching-blockhashes 
-        let lastValidBH = await this.connection.getLatestBlockhash('confirmed')
-            .then(x => x.lastValidBlockHeight)
-            .catch(r => {
-                logError(`Could not get latestBlockhash`, r);
-                return null;
-            });
-
-        if (lastValidBH == null) {
-            return 'tx-failed';
-        }
         
         // attempt to execute and confirm tx
         TGStatusMessage.queue(this.notificationChannel, `Executing transaction... (this could take a moment)`, false);
-        let maybeExecutedTx = await executeAndMaybeConfirmTx(s.positionID, signedTx, lastValidBH, this.connection, this.env, this.startTimeMS);
+        let maybeExecutedTx = await executeAndConfirmSignedTx(s.positionID, signedTx, this.lastValidBH, this.connection, this.env, this.startTimeMS);
 
 
         if (isFailedSwapSlippageTxExecution(maybeExecutedTx)) {

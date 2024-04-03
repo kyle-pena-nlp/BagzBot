@@ -1,7 +1,6 @@
 
 import { DecimalizedAmount, DecimalizedAmountMap, toFriendlyString } from "../../../decimalized";
 import { Position } from "../../../positions";
-import { structuralEquals } from "../../../util";
 import { ReadonlySparseArray } from "./readonly_sparse_array";
 
 // represents the location of a position within the peak price tracker
@@ -88,6 +87,9 @@ export class LocationSet {
         this.items = this.items.filter(item => !LocationSet.equals(item,itemToDelete));
     }
     private static equals(a : PeakPriceLocation, b : PeakPriceLocation) : boolean {
-        return structuralEquals({ price: a[0], index: a[1] }, { price: b[0], index: b[1] })
+        // TODO: equals operator for DecimalizedAmount?
+        return a[0].decimals === b[0].decimals && 
+            a[0].tokenAmount === b[0].tokenAmount &&
+            a[1] === b[1];
     }
 }

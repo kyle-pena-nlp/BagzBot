@@ -634,12 +634,23 @@ export class UserDO {
             token: { address : openPositionRequest.positionRequest.token.address },
             vsToken: { address : openPositionRequest.positionRequest.vsToken.address }
         });
+
+
+        // non-blocking notification channel to push update messages to TG
+        const channel = TGStatusMessage.replaceWithNotification(
+            positionRequest.messageID, 
+            `Initiating swap...`, 
+            false, 
+            positionRequest.chatID, 
+            this.env,
+            'HTML',
+            '<b>New Position</b>: ');        
         /*
             This is deliberately not awaited.
             Durable Objects will continue processing requests for up to 30 seconds
             (Which means the buy has to happen in 30 secs, or it is considered unconfirmed!!!)
         */
-        const positionBuyer = new PositionBuyer(this.wallet.value!!, this.env, startTimeMS);    
+        const positionBuyer = new PositionBuyer(this.wallet.value!!, this.env, startTimeMS, channel);    
         positionBuyer.buy(positionRequest);
         return makeJSONResponse<OpenPositionResponse>({});
     }

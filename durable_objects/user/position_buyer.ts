@@ -1,14 +1,16 @@
 
 import { Connection, VersionedTransaction } from "@solana/web3.js";
+import * as bs58 from "bs58";
 import { Wallet } from "../../crypto";
 import { fromNumber } from "../../decimalized";
 import { Env, getRPCUrl } from "../../env";
 import { logError, logInfo } from "../../logging";
 import { MenuRetryBuy, MenuRetryBuySlippageError, MenuViewOpenPosition } from "../../menus";
-import { Position, PositionRequest, PositionStatus, Quote, getSwapOfXDescription } from "../../positions";
+import { Position, PositionRequest, PositionStatus, Quote } from "../../positions";
+import { getLatestValidBlockhash } from "../../rpc/rpc_blocks";
 import { TGStatusMessage, UpdateableNotification } from "../../telegram";
 import { assertNever } from "../../util";
-import { upsertPosition } from "../token_pair_position_tracker/token_pair_position_tracker_do_interop";
+import { removePosition, upsertPosition } from "../token_pair_position_tracker/token_pair_position_tracker_do_interop";
 import { CouldNotConfirmTxResultAndInfo, SuccessfulTxResultAndInfo, SwapExecutor, TransactionExecutionResult, isCouldNotConfirmTxResultAndInfo, isSuccessfulTxExecutionResult, isSwapFailedSlippageTxResultAndInfo, isSwapFailedTxResultAndInfo } from "./swap_executor";
 import { SwapTransactionSigner } from "./swap_transaction_signer";
 
@@ -16,59 +18,110 @@ export class PositionBuyer {
     wallet : Wallet
     env : Env
     startTimeMS : number
+    channel : UpdateableNotification
     constructor(wallet : Wallet, 
         env : Env,  
-        startTimeMS : number) {
+        startTimeMS : number,
+        channel : UpdateableNotification) {
         this.wallet = wallet;
         this.env = env;
         this.startTimeMS = startTimeMS;
+        this.channel = channel;
     }
-    async buy(positionRequest : PositionRequest) {
+    async buy(positionRequest : PositionRequest) : Promise<'already-processed'|'could-not-create-tx'|'failed'|'slippage-failed'|'unconfirmed'|'confirmed'> {
+        try {
+            return await this.buyInternal(positionRequest);
+        }
+        finally {
+            await TGStatusMessage.finalize(this.channel);
+        }
+    }
 
-        // non-blocking notification channel to push update messages to TG
-        const notificationChannel = TGStatusMessage.replaceWithNotification(
-            positionRequest.messageID, 
-            `Initiating swap...`, 
-            false, 
-            positionRequest.chatID, 
-            this.env,
-            'HTML',
-            '<b>New Position</b>: ');
+    async buyInternal(positionRequest : PositionRequest) : Promise<'already-processed'|'could-not-create-tx'|'failed'|'slippage-failed'|'unconfirmed'|'confirmed'> {
 
         // RPC connection
         const connection = new Connection(getRPCUrl(this.env));
 
-        // get signed tx
-        const signedTx = await this.createSignedTx(positionRequest, notificationChannel);
+        // idempotency
+        if (await existsInTracker(positionRequest.positionID)) {
+            return 'already-processed';
+        }
 
-        // if failed to get signedTx, early out but allow retry (maybe jup API down?)
+        // get signed tx (signed does not mean executed, per se)
+        const signedTx = await this.createSignedTx(positionRequest, this.channel);
+
+        // if failed to get signedTx, early out.
         if (signedTx == null) {
-            TGStatusMessage.queue(notificationChannel, `Unable to sign transaction for ${getSwapOfXDescription(positionRequest)}`, true);
-            return 'can-retry';
+            TGStatusMessage.queue(this.channel, `Unable to sign transaction.`, true);
+            return 'could-not-create-tx';
         }
 
-        // try to buy.
-        const result = await this.buyInternal(positionRequest, signedTx, connection, notificationChannel);
+        // get latest valid BH (tells us how long to keep trying to send tx)
+        let lastValidBH = await getLatestValidBlockhash(connection, 3);
 
-        // send out any queued messages in the channel
-        await TGStatusMessage.finalize(notificationChannel);
-        
-        // display the next option to the user, depending on whether they can retry to the buy, or it succeeded
-        if (result === 'can-retry') {
-            // give user option to retry
-            const retryBuyMenuRequest = new MenuRetryBuy(positionRequest).getUpdateExistingMenuRequest(positionRequest.chatID, positionRequest.messageID, this.env);
-            await fetch(retryBuyMenuRequest);
+        // if failed, can't proceed.
+        if (lastValidBH == null) {
+            TGStatusMessage.queue(this.channel, `Unable to complete transaction due to high trade volume.`, true);
+            return 'could-not-create-tx';
         }
-        else if (result === 'can-retry-slippage-error') {
-            const retryBuyMenuRequest = new MenuRetryBuySlippageError(positionRequest).getUpdateExistingMenuRequest(positionRequest.chatID, positionRequest.messageID, this.env);
-            await fetch(retryBuyMenuRequest);
+
+        // upsert as an unconfirmed position. 
+        // tracker will periodically attempts to reconfirm unconfirmed positions
+        const unconfirmedPosition = this.convertRequestToPosition(positionRequest, signatureOf(signedTx), lastValidBH);
+        await upsertPosition(unconfirmedPosition, this.env);
+
+        // try to do the swap.
+        const result = await this.performSwap(positionRequest, signedTx, connection);
+
+        // no guarantees that anything after this point executes... CF may drop it.
+
+        if (result === 'failed' || result === 'slippage-failed') {
+            await removePosition(positionRequest.positionID, positionRequest.token.address, positionRequest.vsToken.address, this.env);
+            return result;
+        }
+        else if (result === 'unconfirmed') {
+            return result;
+        }
+        else if ('newPosition' in result) {
+            const { newPosition } = result;
+            await markBuyAsConfirmed(newPosition.positionID);
         }
         else {
-            // take straight to position view
-            const newPosition = result.newPosition;
-            const viewOpenPositionMenuRequest = new MenuViewOpenPosition({ brandNewPosition : true, position: newPosition }).getUpdateExistingMenuRequest(positionRequest.chatID, positionRequest.messageID, this.env);
-            await fetch(viewOpenPositionMenuRequest); 
+            assertNever(result);
         }
+    }
+
+    private convertRequestToPosition(positionRequest : PositionRequest, signature : string, lastValidBH : number) {
+        const position : Position = {
+            userID: positionRequest.userID,
+            chatID : positionRequest.chatID,
+            messageID : positionRequest.messageID,
+            positionID : positionRequest.positionID,
+            type: positionRequest.positionType,
+            status: PositionStatus.Open,
+    
+            buyConfirmed: false, // <----------
+            isConfirmingBuy: false,
+            txBuySignature: signature,
+            buyLastValidBlockheight: lastValidBH,
+            
+            sellConfirmed: null,
+            isConfirmingSell: false,
+            txSellSignature: null,
+            sellLastValidBlockheight: null,
+    
+            token: positionRequest.token,
+            vsToken: positionRequest.vsToken,
+            vsTokenAmt : fromNumber(positionRequest.vsTokenAmt), // don't use the quote, it includes fees.
+            tokenAmt: positionRequest.quote.outTokenAmt,
+    
+            sellSlippagePercent: positionRequest.slippagePercent,
+            triggerPercent : positionRequest.triggerPercent,
+            sellAutoDoubleSlippage : positionRequest.sellAutoDoubleSlippage,
+            fillPrice: positionRequest.quote.fillPrice,
+            fillPriceMS : positionRequest.quote.quoteTimeMS
+        };
+        return position;
     }
 
     private async createSignedTx(positionRequest : PositionRequest, notificationChannel : UpdateableNotification) {
@@ -77,24 +130,25 @@ export class PositionBuyer {
         return signedTx;
     }
 
-    private async buyInternal(positionRequest: PositionRequest, signedTx : VersionedTransaction, connection : Connection, notificationChannel : UpdateableNotification) : Promise<'can-retry'|'can-retry-slippage-error'|{ newPosition: Position }> {
+    private async performSwap(positionRequest: PositionRequest, signedTx : VersionedTransaction, connection : Connection) : Promise<'slippage-failed'|'failed'|'unconfirmed'|{ newPosition: Position }> {
         
         // create a time-limited tx executor and confirmer
-        const txExecute = new SwapExecutor(this.wallet, this.env, notificationChannel, connection, this.startTimeMS);
+        const swapExecutor = new SwapExecutor(this.wallet, this.env, this.channel, connection, this.startTimeMS);
 
         // attempt to execute and confirm w/in time limit
-        const txExecutionResult = await txExecute.executeAndConfirmSignedTx(positionRequest, signedTx);
+        const txExecutionResult = await swapExecutor.executeAndConfirmSignedTx(positionRequest, signedTx);
 
         // convert the tx execution result to a position, if possible
-        let newPosition : Position|undefined = await this.maybeCreatePosition(positionRequest, txExecutionResult, notificationChannel);
+        let newPosition : Position|undefined = await this.maybeCreatePosition(positionRequest, txExecutionResult, this.channel);
 
         // newPosition is null indicates no pos created (confirmed OR unconfirmed)
         // and therefore, user can retry.
         if (isSwapFailedSlippageTxResultAndInfo(txExecutionResult)) {
-            return 'can-retry-slippage-error';
+            return 'slippage-failed';
         }
+        // TODO: insufficient funds error
         else if (newPosition == null) {
-            return 'can-retry';
+            return 'failed';
         }
         else if (newPosition != null) {
             return  { newPosition };
@@ -213,4 +267,8 @@ function convertConfirmedRequestToPosition(positionRequest: PositionRequest, txE
         fillPriceMS : txExecutionResult.result.swapSummary.swapTimeMS
     };
     return position;
+}
+
+function signatureOf(signedTx : VersionedTransaction) : string {
+    return bs58.encode(signedTx.signatures[0]);
 }

@@ -1,4 +1,4 @@
-import { Connection, SignatureStatus, VersionedTransaction } from "@solana/web3.js";
+import { Connection, SendOptions, SignatureStatus, VersionedTransaction } from "@solana/web3.js";
 import * as bs58 from "bs58";
 import { Buffer } from "node:buffer";
 import { Env } from "../env";
@@ -7,109 +7,103 @@ import { assertNever, sleep, strictParseInt } from "../util";
 import { assertIs } from "../util/enums";
 import { parseInstructionError } from "./rpc_parse_instruction_error";
 import {
-    PreparseSwapResult,
     SwapExecutionError,
     TransactionExecutionError,
     TransactionExecutionErrorCouldntConfirm
 } from "./rpc_types";
 
-// this method is unholy and needs to be split up.
-export async function executeAndMaybeConfirmTx(
-    positionID : string,
+/*
+    Send a transaction.
+    This does not say whether the swap failed or succeeded,
+    only the state of the transaction itself!
+*/
+export async function executeAndConfirmSignedTx(
     rawSignedTx : VersionedTransaction, 
     lastValidBlockHeight : number,
     connection : Connection,
     env : Env,
-    startTimeMS : number) : Promise<PreparseSwapResult> {
+    startTimeMS : number) : Promise<'confirmed'|'failed'|'unconfirmed'> {
 
     const isTimedOut : () => boolean = () => {
         return (Date.now() - startTimeMS) > strictParseInt(env.TX_TIMEOUT_MS);
     }
 
     // Define some settings
-    const maxConfirmRpcExceptions = parseInt(env.RPC_MAX_CONFIRM_EXCEPTIONS,10);
+    const RPC_MAX_SEND_EXCEPTIONS = 10;
+    const RPC_MAX_CONFIRM_EXCEPTIONS = parseInt(env.RPC_MAX_CONFIRM_EXCEPTIONS,10);
     const REBROADCAST_DELAY_MS = parseInt(env.RPC_REBROADCAST_DELAY_MS, 10);
     const REATTEMPT_CONFIRM_DELAY = parseInt(env.RPC_REATTEMPT_CONFIRM_DELAY, 10);
+    const RPC_SEND_MAX_RETRIES = strictParseInt(env.RPC_SEND_RAW_TRANSACTION_MAX_RETRIES);
 
     // transform tx to buffer, extract signature yo damn self
     const txBuffer = Buffer.from(rawSignedTx.serialize());
     const signature = bs58.encode(rawSignedTx.signatures[0]);
-    
-    /*
-        We are going to set up two async loops ;
-            One for resending the tx until blockheight exceeded
-            One for confirming until timeout or (signature not found AND blockheight exceeded)
-    */
+
+    // very carefully chosen opts for sending tx's
+    const sendOpts : SendOptions = {
+        skipPreflight : true,
+        maxRetries: RPC_SEND_MAX_RETRIES, 
+        preflightCommitment: 'confirmed' // per: https://solana.com/docs/core/transactions/confirmation#use-an-appropriate-preflight-commitment-level
+    };    
+
+    // options for checking signature status
+    const sigStatOpts = { searchTransactionHistory: false };
 
     let stopSendingTx = false;
     let stopConfirming = false;
     let anyTxSent = false;
+    let sendLoopState : 'normal'|'blockhash-expired'|'too-many-exceptions' = 'normal';
+    let confirmLoopState : 'unconfirmed'|'tx-dropped'|'timed-out'|'too-many-exceptions'|'confirmed' = 'unconfirmed';
 
-    const resendTxTask = (async () => {
+    const sendTransactionTask = (async () => {
 
-        // Count failures (i.e.; 429 errors)
-        let rpcExceptions = 0;
+        // exception counting, exp backoff
+        let sendRpcExceptions = 0;
+        let sendExpBackoffFactor = 1.0;
+        const increaseExpBackoff = () => { 
+            sendExpBackoffFactor = Math.min(8, 2 * sendExpBackoffFactor);
+        };
 
-        // TODO: make it a setting
-        const maxRPCSendExceptions = 10;
-
-        let returnStatus : TransactionExecutionError|'timed-out'|undefined = undefined;
-        
-        let expBackoffFactor = 1.0;
-
-        // Until this loop is signalled to stop
+        // Until this loop is signalled to stop by the confirm loop
         while(!stopSendingTx) {
 
             // try to send the tx. if it sends w/o exception, set anyTxSent to true.
-            logDebug("Attempting to send tx")
-            await connection.sendRawTransaction(txBuffer, {
-                skipPreflight : true,
-                maxRetries: strictParseInt(env.RPC_SEND_RAW_TRANSACTION_MAX_RETRIES), 
-                // per: https://solana.com/docs/core/transactions/confirmation#use-an-appropriate-preflight-commitment-level
-                preflightCommitment: 'confirmed'
-            }).then(async _ => {
-                anyTxSent = true;
-                logDebug("Tx successfully sent.");
-                if (expBackoffFactor > 1) {
-                    logDebug("Halving exp backoff");
-                    expBackoffFactor = expBackoffFactor / 2.0;
-                }
-                
-            })
-            .catch(e => {
-                rpcExceptions += 1;
-                logError("sendRawTransaction threw an exception", e, signature);
-                if ((e.message as string).includes("429")) {
-                    if (expBackoffFactor < 8) {
-                        logDebug("Doubling exp backoff");
-                        expBackoffFactor = Math.min(2.0 * expBackoffFactor,8.0);
+            await connection.sendRawTransaction(txBuffer, sendOpts)
+                .then(_ => { anyTxSent = true; })
+                .catch(e => {
+                    if (is429(e)) {
+                        increaseExpBackoff();
                     }
-                }
-            });
+                    else {
+                        logError("sendRawTransaction threw an exception", e);
+                        sendRpcExceptions += 1;
+                    }
+                });
 
-            const blockheight = await connection.getBlockHeight('confirmed').catch(r => {
-                logError("send loop - could not poll blockheight");
+            const blockheight = await connection.getBlockHeight('confirmed').catch(e => {
+                if (is429(e)) {
+                    increaseExpBackoff();
+                }
+                else {
+                    logError("send loop - could not poll blockheight");
+                    sendRpcExceptions += 1;
+                }
                 return null;
             });
 
-            // if we cannot poll blockheight, immediately terminate send loop (otherwise, 429 -> infinite loop)
-            if (blockheight == null) {
-                rpcExceptions += 1;
-            }
-
             if (blockheight != null && blockheight > lastValidBlockHeight) {
                 logDebug("send loop - blockhash expired - stopping send tx");
-                returnStatus = TransactionExecutionError.BlockheightExceeded;
+                sendLoopState = 'blockhash-expired';
                 break;
             }
 
-            if (rpcExceptions > maxRPCSendExceptions) {
+            if (sendRpcExceptions > RPC_MAX_SEND_EXCEPTIONS) {
                 // TODO: better error enum
-                returnStatus = TransactionExecutionError.TransactionFailedOtherReason;
+                sendLoopState = 'too-many-exceptions';
                 break;
             }
 
-            await sleep(expBackoffFactor * REBROADCAST_DELAY_MS);
+            await sleep(sendExpBackoffFactor * REBROADCAST_DELAY_MS);
         }
 
         // confirmation is a worthy activity only if at least one tx was sent to the RPC
@@ -117,8 +111,6 @@ export async function executeAndMaybeConfirmTx(
             logDebug("No tx sent - stopping confirmation loop");
             stopConfirming = true;
         }
-
-        return returnStatus;
     })();
 
     /*
@@ -129,18 +121,16 @@ export async function executeAndMaybeConfirmTx(
     */
     const confirmTransactionTask = (async () => {
 
-        let rpcExceptions = 0;
-        let returnStatus : TransactionExecutionError | 
-            TransactionExecutionErrorCouldntConfirm | 
-            SwapExecutionError | 
-            'timed-out'|
-            'transaction-confirmed' | 
-            undefined = undefined;
+        let confirmRpcExceptions = 0;
+        let confirmExpBackoffFactor = 1.0;
+        const increaseExpBackoff = () => { 
+            confirmExpBackoffFactor = Math.min(8, 2 * confirmExpBackoffFactor);
+        };        
         
         while(!stopConfirming) {
 
             if (isTimedOut()) {
-                returnStatus = 'timed-out';
+                confirmLoopState = 'timed-out';
                 break;
             }
 
@@ -150,94 +140,98 @@ export async function executeAndMaybeConfirmTx(
                 continue;
             }
             
-            // get signature status
-            logDebug("confirm loop - getting signature status");
-            const sigStatOpts = { searchTransactionHistory: false }; // TODO: should this change?
-            const signatureStatus : SignatureStatus|'tx-does-not-exist'|'get-signature-status-method-failed' = await connection.getSignatureStatus(signature, sigStatOpts)
-                .then(res => { return (res.value == null) ? 'tx-does-not-exist' : res.value })
-                .catch(e => {
-                    logError("getSignatureStatus threw an exception", e, signature)
-                    return 'get-signature-status-method-failed'
-                });
+            let hasA429 = false;
 
-            // if we successfully got the signature status...
-            const isSignatureStatus = typeof signatureStatus === 'object' && 'slot' in signatureStatus;
-            if (isSignatureStatus) {
-                // parse it.
-                const simpleTxSigStatus = interpretTxSignatureStatus(signatureStatus);
-                // if the tx failed, end confirmation loop, indicate parsed error
-                if (simpleTxSigStatus === 'failed') {
-                    logDebug("confirm loop - tx failed", signature);                    
-                    returnStatus = parseSwapExecutionError(signatureStatus.err, rawSignedTx, env);
-                    break;
-                }
-                // if the tx failed, end confirmation loop, indicate success
-                else if (simpleTxSigStatus === 'succeeded') {
-                    logDebug("confirm loop - tx succeeded", signature);
-                    returnStatus = 'transaction-confirmed';
-                    break;
-                }
-                // if the tx is still unconfirmed, keep going.
-                else if (simpleTxSigStatus === 'unconfirmed') {
-                    logDebug("confirm loop - tx unconfirmed - reattempting confirmation", signature);
+            // get BH (intentionally getting this before getting sig status below)
+            const blockheight : number|'429'|'api-call-failed' = await connection.getBlockHeight('confirmed').catch(e => {
+                if (is429(e)) {
+                    hasA429 = true;
+                    return '429';
                 }
                 else {
-                    assertNever(simpleTxSigStatus);
+                    logError(e);
+                    confirmRpcExceptions += 1;
+                    return 'api-call-failed';
                 }
-            }
-            else if (signatureStatus === 'tx-does-not-exist') {
+            });
 
-                const blockheight = await connection.getBlockHeight('confirmed').catch(r => {
-                    logError("send loop - could not poll blockheight");
-                    return null;
+            // get signature status
+            logDebug("confirm loop - getting signature status");
+            const signatureStatus : SignatureStatus|'tx-DNE'|'429'|'api-call-failed' = await connection.getSignatureStatus(signature, sigStatOpts)
+                .then(res => { return (res.value == null) ? 'tx-DNE' : res.value })
+                .catch(e => {
+                    if (is429(e)) {
+                        hasA429 = true;
+                        return '429';
+                    }
+                    else {
+                        logError("getSignatureStatus threw an exception", e);
+                        confirmRpcExceptions += 1;
+                        return 'api-call-failed'
+                    }
                 });
 
-                if (blockheight == null) {
-                    logError("confirm loop - could not determine blockheight");
-                    rpcExceptions += 1;
-                }
-                else if (blockheight != null && blockheight <= lastValidBlockHeight) {
-                    logDebug("tx not found yet blockhash still valid");
-                }
-                else if (blockheight != null && blockheight > lastValidBlockHeight) {
-                    logError("tx not found and blockhash expired - considered dropped", signature);
-                    returnStatus = TransactionExecutionError.TransactionDropped;
+            if (hasA429) {
+                increaseExpBackoff();
+            }
+
+            if (signatureStatus === '429') {
+                // no-op. allow for reattempt of confirmation.
+            }
+            else if (signatureStatus == 'api-call-failed') {
+                // no-op. allow for reattempt of confirmation
+            }
+            else if (signatureStatus == 'tx-DNE') {
+                // if the tx DNE and the blockheight 
+                if (blockheight !== '429' && blockheight !== 'api-call-failed' && blockheight > lastValidBlockHeight) {
+                    confirmLoopState = 'tx-dropped';
                     break;
                 }
             }
-            // if could not get sig status due to RPC error, increment exception count
-            else if (signatureStatus === 'get-signature-status-method-failed') {
-                logDebug('confirm loop - failure determining sig status')
-                rpcExceptions += 1;
+            else if ('slot' in signatureStatus) {
+                confirmLoopState = 'confirmed'; // maybe the swap failed, but the tx certainly executed.
+                break;
             }
             else {
                 assertNever(signatureStatus);
             }
 
-            /* if too many exception, could not confirm. stop reattempting confirmation */
-            if (rpcExceptions >= maxConfirmRpcExceptions) {
-                logError("Too many exceptions when trying to confirm", signature);                
-                returnStatus = TransactionExecutionErrorCouldntConfirm.CouldNotConfirmTooManyExceptions; //'confirmation-too-many-exceptions';
+            if (confirmRpcExceptions > RPC_MAX_CONFIRM_EXCEPTIONS) {
+                confirmLoopState = 'too-many-exceptions';
                 break;
             }
 
-            await sleep(REATTEMPT_CONFIRM_DELAY);
+            await sleep(confirmExpBackoffFactor * REATTEMPT_CONFIRM_DELAY);
         }
-        logDebug('confirm loop ended - stopping send of tx')
+        // this line is very important
         stopSendingTx = true;
-        return returnStatus;
     })();
 
-    const confirmStatus = await confirmTransactionTask;
-    const sendStatus = await resendTxTask;
+    await Promise.all([sendTransactionTask, confirmTransactionTask]);
 
-    const finalStatus = determineTxConfirmationFinalStatus(anyTxSent, sendStatus, confirmStatus);
+    const finalStatus = finalExecutionDisposition(sendLoopState, confirmLoopState);
 
-    return { 
-        positionID : positionID, 
-        status: finalStatus, 
-        signature: signature
-    };
+    return finalStatus;
+}
+
+function finalExecutionDisposition(
+    sendLoopState : 'normal'|'blockhash-expired'|'too-many-exceptions', 
+    confirmLoopState : 'unconfirmed'|'tx-dropped'|'timed-out'|'too-many-exceptions'|'confirmed') : 'confirmed'|'failed'|'unconfirmed' {
+
+        if (confirmLoopState === 'confirmed') {
+            return 'confirmed';
+        }
+        else if (confirmLoopState === 'tx-dropped') {
+            return 'failed';
+        }
+        else {
+            return 'unconfirmed';
+        }
+
+}
+
+function is429(e : any) {
+    return (e?.message||'').includes("429");
 }
 
 function parseSwapExecutionError(err : any, rawSignedTx : VersionedTransaction, env : Env) : SwapExecutionError {
