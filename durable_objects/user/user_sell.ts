@@ -124,6 +124,6 @@ export async function sellPosition(position : Position, wallet : Wallet, env : E
 
     const connection = new Connection(getRPCUrl(env));
     const txExecutor = new SwapExecutor(wallet, env, notificationChannel, connection, startTimeMS);
-    const executionResult = await txExecutor.executeAndConfirmSignedTx(position, signedTx);
+    const executionResult = await txExecutor.executeTxAndParseResult(position, signedTx);
     return executionResult;
 }

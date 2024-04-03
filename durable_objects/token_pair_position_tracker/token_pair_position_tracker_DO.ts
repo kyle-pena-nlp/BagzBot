@@ -17,9 +17,11 @@ import { GetTokenPriceRequest, GetTokenPriceResponse } from "./actions/get_token
 import { HasPairAddresses } from "./actions/has_pair_addresses";
 import { HeartbeatWakeupRequestForTokenPairPositionTracker, isHeartbeatRequest } from "./actions/heartbeat_wake_up_for_token_pair_position_tracker";
 import { ListPositionsByUserRequest, ListPositionsByUserResponse } from "./actions/list_positions_by_user";
+import { MarkBuyAsConfirmedRequest, MarkBuyAsConfirmedResponse } from "./actions/mark_buy_as_confirmed";
 import { MarkPositionAsClosedRequest, MarkPositionAsClosedResponse } from "./actions/mark_position_as_closed";
 import { MarkPositionAsClosingRequest, MarkPositionAsClosingResponse } from "./actions/mark_position_as_closing";
 import { MarkPositionAsOpenRequest, MarkPositionAsOpenResponse } from "./actions/mark_position_as_open";
+import { PositionExistsInTrackerRequest, PositionExistsInTrackerResponse } from "./actions/position_exists_in_tracker";
 import { RemovePositionRequest, RemovePositionResponse } from "./actions/remove_position";
 import { SetSellAutoDoubleOnOpenPositionInTrackerRequest } from "./actions/set_sell_auto_double_on_open_position_in_tracker";
 import { UpdateBuyConfirmationStatusRequest, UpdateBuyConfirmationStatusResponse } from "./actions/update_buy_confirmation_status";
@@ -303,9 +305,28 @@ export class TokenPairPositionTrackerDO {
                 return makeJSONResponse<{}>({});
             case TokenPairPositionTrackerDOFetchMethod.adminDeleteAllInTracker:
                 return await this.handleAdminDeleteAllInTracker(body);
+            case TokenPairPositionTrackerDOFetchMethod.positionExists:
+                return await this.handlePositionExistsInTracker(body);
+            case TokenPairPositionTrackerDOFetchMethod.markBuyAsConfirmed:
+                return await this.handleMarkBuyAsConfirmed(body);
             default:
                 assertNever(method);
         }
+    }
+
+    async handleMarkBuyAsConfirmed(body: MarkBuyAsConfirmedRequest) : Promise<Response> {
+        const pos = this.tokenPairPositionTracker.getPosition(body.positionID);
+        if (pos != null) {
+            pos.buyConfirmed = true;
+        }
+        const responseBody : MarkBuyAsConfirmedResponse = {};
+        return makeJSONResponse<MarkBuyAsConfirmedResponse>(responseBody);
+    }
+
+    async handlePositionExistsInTracker(body : PositionExistsInTrackerRequest) : Promise<Response> {
+        const pos = this.tokenPairPositionTracker.getPosition(body.positionID);
+        const responseBody : PositionExistsInTrackerResponse = { exists : pos !== null };
+        return makeJSONResponse<PositionExistsInTrackerResponse>(responseBody);
     }
 
     async handleAdminDeleteAllInTracker(body: AdminDeleteAllInTrackerRequest) : Promise<Response> {
@@ -346,28 +367,7 @@ export class TokenPairPositionTrackerDO {
     }
 
     async handleUpdateBuyConfirmationStatusInternal(body: UpdateBuyConfirmationStatusRequest) : Promise<UpdateBuyConfirmationStatusResponse> {
-        const positionID = body.positionID;
-        const position = this.tokenPairPositionTracker.getPosition(positionID);
-        if (position == null) {
-            return {};
-        }
-        position.isConfirmingBuy = false;
-        if (body.status === 'confirmed') {
-            position.buyConfirmed = true;
-        }
-        else if (body.status === 'unconfirmed') {
-            // no-op
-        }
-        else if (body.status === 'failed') {
-            this.tokenPairPositionTracker.removePosition(positionID);
-        }
-        else if (body.status === 'slippage-failed') {
-            this.tokenPairPositionTracker.removePosition(positionID);
-        }
-        else {
-            assertNever(body.status);
-        }
-        return {};
+        throw new Error("");
     }
 
     async handleUpdateSellConfirmationStatus(body: UpdateSellConfirmationStatusRequest) : Promise<Response> {

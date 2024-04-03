@@ -102,7 +102,7 @@ export function parseSwappableParsedTransactionWithMeta(position : Position, par
     return parseParsedTransactionWithMeta(parsedTransaction, inTokenAddress, outTokenAddress, signature, userAddress, env);
 }
 
-function parseParsedTransactionWithMeta(parsedTransaction : ParsedTransactionWithMeta, inTokenAddress : string, outTokenAddress : string, signature : string, userAddress : UserAddress, env : Env) : ParsedSuccessfulSwapSummary|SwapExecutionErrorParseSummary {
+export function parseParsedTransactionWithMeta(parsedTransaction : ParsedTransactionWithMeta, inTokenAddress : string, outTokenAddress : string, signature : string, userAddress : UserAddress, env : Env) : ParsedSuccessfulSwapSummary|SwapExecutionErrorParseSummary {
 
     const err = parsedTransaction.meta?.err;
     if (err) {

@@ -539,9 +539,7 @@ export class Worker {
             case MenuCode.ManuallyConfirmBuy:
                 const pID = callbackData.menuArg||'';
                 const maybePositionToConfirm = await getPositionFromUserDO(params.getTelegramUserID(), params.chatID, pID, this.env);
-                if (maybePositionToConfirm != null && 
-                    !maybePositionToConfirm.position.buyConfirmed &&
-                    !maybePositionToConfirm.position.isConfirmingBuy) {
+                if (maybePositionToConfirm != null && !maybePositionToConfirm.position.buyConfirmed) {
                     // todo: some way to set as being confirmed. fire-and-forget.
                     this.context.waitUntil(this.manuallyConfirmBuys(params, maybePositionToConfirm.position));
                 }

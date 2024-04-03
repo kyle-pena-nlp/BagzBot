@@ -4,14 +4,13 @@ import * as bs58 from "bs58";
 import { Wallet } from "../../crypto";
 import { fromNumber } from "../../decimalized";
 import { Env, getRPCUrl } from "../../env";
-import { logError, logInfo } from "../../logging";
-import { MenuRetryBuy, MenuRetryBuySlippageError, MenuViewOpenPosition } from "../../menus";
-import { Position, PositionRequest, PositionStatus, Quote } from "../../positions";
+import { Position, PositionRequest, PositionStatus } from "../../positions";
 import { getLatestValidBlockhash } from "../../rpc/rpc_blocks";
+import { ParsedSuccessfulSwapSummary, isSlippageSwapExecutionErrorParseSummary, isSuccessfulSwapSummary, isSwapExecutionErrorParseSummary, isUnknownTransactionParseSummary } from "../../rpc/rpc_types";
 import { TGStatusMessage, UpdateableNotification } from "../../telegram";
 import { assertNever } from "../../util";
-import { removePosition, upsertPosition } from "../token_pair_position_tracker/token_pair_position_tracker_do_interop";
-import { CouldNotConfirmTxResultAndInfo, SuccessfulTxResultAndInfo, SwapExecutor, TransactionExecutionResult, isCouldNotConfirmTxResultAndInfo, isSuccessfulTxExecutionResult, isSwapFailedSlippageTxResultAndInfo, isSwapFailedTxResultAndInfo } from "./swap_executor";
+import { markBuyAsConfirmed, positionExistsInTracker, removePosition, upsertPosition } from "../token_pair_position_tracker/token_pair_position_tracker_do_interop";
+import { SwapExecutor } from "./swap_executor";
 import { SwapTransactionSigner } from "./swap_transaction_signer";
 
 export class PositionBuyer {
@@ -28,9 +27,10 @@ export class PositionBuyer {
         this.startTimeMS = startTimeMS;
         this.channel = channel;
     }
-    async buy(positionRequest : PositionRequest) : Promise<'already-processed'|'could-not-create-tx'|'failed'|'slippage-failed'|'unconfirmed'|'confirmed'> {
+
+    async buy(positionRequest : PositionRequest) : Promise<void> {
         try {
-            return await this.buyInternal(positionRequest);
+            await this.buyInternal(positionRequest);
         }
         finally {
             await TGStatusMessage.finalize(this.channel);
@@ -43,7 +43,7 @@ export class PositionBuyer {
         const connection = new Connection(getRPCUrl(this.env));
 
         // idempotency
-        if (await existsInTracker(positionRequest.positionID)) {
+        if (await positionExistsInTracker(positionRequest.positionID, positionRequest.token.address, positionRequest.vsToken.address, this.env)) {
             return 'already-processed';
         }
 
@@ -67,11 +67,11 @@ export class PositionBuyer {
 
         // upsert as an unconfirmed position. 
         // tracker will periodically attempts to reconfirm unconfirmed positions
-        const unconfirmedPosition = this.convertRequestToPosition(positionRequest, signatureOf(signedTx), lastValidBH);
+        const unconfirmedPosition = this.convertRequestToUnconfirmedPosition(positionRequest, signatureOf(signedTx), lastValidBH);
         await upsertPosition(unconfirmedPosition, this.env);
 
         // try to do the swap.
-        const result = await this.performSwap(positionRequest, signedTx, connection);
+        const result = await this.executeAndParseSwap(positionRequest, signedTx, lastValidBH, connection);
 
         // no guarantees that anything after this point executes... CF may drop it.
 
@@ -82,17 +82,20 @@ export class PositionBuyer {
         else if (result === 'unconfirmed') {
             return result;
         }
-        else if ('newPosition' in result) {
-            const { newPosition } = result;
-            await markBuyAsConfirmed(newPosition.positionID);
+        else if ('confirmedPosition' in result) {
+            const { confirmedPosition } = result;
+            // TODO: second pass.
+            // await upsertConfirmedPosition(confirmedPosition, env);
+            await markBuyAsConfirmed(confirmedPosition.positionID, confirmedPosition.token.address, confirmedPosition.vsToken.address, this.env);
+            return 'confirmed';
         }
         else {
             assertNever(result);
         }
     }
 
-    private convertRequestToPosition(positionRequest : PositionRequest, signature : string, lastValidBH : number) {
-        const position : Position = {
+    private convertRequestToUnconfirmedPosition(positionRequest : PositionRequest, signature : string, lastValidBH : number) : Position & { buyConfirmed: false } {
+        const position : Position & { buyConfirmed : false } = {
             userID: positionRequest.userID,
             chatID : positionRequest.chatID,
             messageID : positionRequest.messageID,
@@ -101,7 +104,6 @@ export class PositionBuyer {
             status: PositionStatus.Open,
     
             buyConfirmed: false, // <----------
-            isConfirmingBuy: false,
             txBuySignature: signature,
             buyLastValidBlockheight: lastValidBH,
             
@@ -130,114 +132,55 @@ export class PositionBuyer {
         return signedTx;
     }
 
-    private async performSwap(positionRequest: PositionRequest, signedTx : VersionedTransaction, connection : Connection) : Promise<'slippage-failed'|'failed'|'unconfirmed'|{ newPosition: Position }> {
+    private async executeAndParseSwap(positionRequest: PositionRequest, signedTx : VersionedTransaction, lastValidBH : number, connection : Connection) : Promise<'slippage-failed'|'failed'|'unconfirmed'|{ confirmedPosition: Position & { buyConfirmed : true } }> {
         
         // create a time-limited tx executor and confirmer
-        const swapExecutor = new SwapExecutor(this.wallet, this.env, this.channel, connection, this.startTimeMS);
+        const swapExecutor = new SwapExecutor(this.wallet, 'buy', this.env, this.channel, connection, lastValidBH, this.startTimeMS);
 
-        // attempt to execute and confirm w/in time limit
-        const txExecutionResult = await swapExecutor.executeAndConfirmSignedTx(positionRequest, signedTx);
+        // attempt to execute, confirm, and parse w/in time limit
+        const parsedSwapSummary = await swapExecutor.executeTxAndParseResult(positionRequest, signedTx);
 
         // convert the tx execution result to a position, if possible
-        let newPosition : Position|undefined = await this.maybeCreatePosition(positionRequest, txExecutionResult, this.channel);
-
-        // newPosition is null indicates no pos created (confirmed OR unconfirmed)
-        // and therefore, user can retry.
-        if (isSwapFailedSlippageTxResultAndInfo(txExecutionResult)) {
-            return 'slippage-failed';
-        }
-        // TODO: insufficient funds error
-        else if (newPosition == null) {
+ 
+        if (parsedSwapSummary === 'tx-failed') {
             return 'failed';
         }
-        else if (newPosition != null) {
-            return  { newPosition };
+        else if (parsedSwapSummary === 'unconfirmed') {
+            return 'unconfirmed';
+        }
+        else if (isUnknownTransactionParseSummary(parsedSwapSummary)) {
+            return 'unconfirmed';
+        }
+        else if (isSlippageSwapExecutionErrorParseSummary(parsedSwapSummary)) {
+            return 'slippage-failed';
+        }
+        else if (isSwapExecutionErrorParseSummary(parsedSwapSummary)) {
+            return 'failed';
+        }        
+        else if (isSuccessfulSwapSummary(parsedSwapSummary)) {
+            const confirmedPosition = await this.makeConfirmedPositionFromSwapResult(positionRequest, signatureOf(signedTx), lastValidBH, parsedSwapSummary);
+            return { confirmedPosition };
         }
         else {
-            assertNever(newPosition);
+            assertNever(parsedSwapSummary);
         }
     }
 
-    private async maybeCreatePosition(
+    private async makeConfirmedPositionFromSwapResult(
         positionRequest : PositionRequest, 
-        txExecutionResult : TransactionExecutionResult, 
-        notificationChannel: UpdateableNotification) : Promise<Position | undefined> {
-    
-        let newPosition : Position|undefined = undefined;
+        signature : string,
+        lastValidBH: number,
+        successfulSwapParsed : ParsedSuccessfulSwapSummary) : Promise<Position & { buyConfirmed : true }> {
         
-        // if the tx failed to send at all
-        if (txExecutionResult === 'tx-failed') {
-            logInfo("Tx failed", positionRequest);
-        }
-        // if the tx was executed, but the swap failed due to slippage
-        else if (isSwapFailedSlippageTxResultAndInfo(txExecutionResult)) {
-            logInfo("slippage on buy", positionRequest);
-            TGStatusMessage.queue(notificationChannel, 'The buy failed due to slippage tolerance being exceeded.  Your order was not placed.', false);
-        }        
-        // if the tx was executed but the swap failed (for some reason other than slippage)
-        else if (isSwapFailedTxResultAndInfo(txExecutionResult)) {
-            logInfo("Swap failed", positionRequest);
-        }
-        // if we couldn't determine the state of the tx (this is where things get hairy and the hendersons)
-        else if (isCouldNotConfirmTxResultAndInfo(txExecutionResult)) {
-            logError("Could not retrieve tx - converting to unconfirmed position", positionRequest);
-            // ship the possibly-real position to the tracker in a state of 'unconfirmed'
-            // the tracker will periodically attempt to reconfirm (and will remove if it in fact failed after all)
-            const quote = positionRequest.quote;
-            newPosition = convertToUnconfirmedPosition(positionRequest, quote, txExecutionResult);
-            await upsertPosition(newPosition, this.env);
-            TGStatusMessage.queue(notificationChannel, 'Transaction could not be confirmed - we will attempt to confirm later.', false);
-        }
-        // the swap succeeded! this is happy world.
-        else if (isSuccessfulTxExecutionResult(txExecutionResult)) {
-            newPosition = convertConfirmedRequestToPosition(positionRequest, txExecutionResult);
-            await upsertPosition(newPosition, this.env);
-            TGStatusMessage.queue(notificationChannel, `Peak Price is now being tracked. Position will be unwound when price dips below ${positionRequest.triggerPercent}% of peak.`, false);
-        }
-        else {
-            assertNever(txExecutionResult);
-        }
+        const newPosition = convertToConfirmedPosition(positionRequest, signature, lastValidBH, successfulSwapParsed);
 
         // has or has not been set depending on above logic.
         return newPosition;
     }    
 }
 
-function convertToUnconfirmedPosition(positionRequest : PositionRequest, quote : Quote, txExecutionResult : CouldNotConfirmTxResultAndInfo) {
-    const position : Position = {
-        userID: positionRequest.userID,
-        chatID : positionRequest.chatID,
-        messageID : positionRequest.messageID,
-        positionID : positionRequest.positionID,
-        type: positionRequest.positionType,
-        status: PositionStatus.Open,
-
-        buyConfirmed: false, // <----------
-        isConfirmingBuy: false,
-        txBuySignature: txExecutionResult.signature,
-        buyLastValidBlockheight: txExecutionResult.lastValidBH,
-        
-        sellConfirmed: null,
-        isConfirmingSell: false,
-        txSellSignature: null,
-        sellLastValidBlockheight: null,
-
-        token: positionRequest.token,
-        vsToken: positionRequest.vsToken,
-        vsTokenAmt : fromNumber(positionRequest.vsTokenAmt), // don't use the quote, it includes fees.
-        tokenAmt: quote.outTokenAmt,
-
-        sellSlippagePercent: positionRequest.slippagePercent,
-        triggerPercent : positionRequest.triggerPercent,
-        sellAutoDoubleSlippage : positionRequest.sellAutoDoubleSlippage,
-        fillPrice: quote.fillPrice,
-        fillPriceMS : quote.quoteTimeMS
-    };
-    return position;
-}
-
-function convertConfirmedRequestToPosition(positionRequest: PositionRequest, txExecutionResult : SuccessfulTxResultAndInfo) : Position {
-    const position : Position = {
+function convertToConfirmedPosition(positionRequest: PositionRequest, signature : string, lastValidBH : number, parsedSuccessfulSwap : ParsedSuccessfulSwapSummary) : Position & { buyConfirmed : true } {
+    const position : Position & { buyConfirmed : true } = {
         userID: positionRequest.userID,
         chatID : positionRequest.chatID,
         messageID : positionRequest.messageID,
@@ -246,9 +189,8 @@ function convertConfirmedRequestToPosition(positionRequest: PositionRequest, txE
         status: PositionStatus.Open,
 
         buyConfirmed: true, // <-------------
-        isConfirmingBuy: false,
-        txBuySignature: txExecutionResult.signature,  
-        buyLastValidBlockheight: txExecutionResult.lastValidBH,        
+        txBuySignature: signature,  
+        buyLastValidBlockheight: lastValidBH,        
 
         sellConfirmed: null,
         isConfirmingSell: false,
@@ -262,9 +204,9 @@ function convertConfirmedRequestToPosition(positionRequest: PositionRequest, txE
         sellAutoDoubleSlippage : positionRequest.sellAutoDoubleSlippage,
     
         vsTokenAmt : fromNumber(positionRequest.vsTokenAmt),
-        tokenAmt: txExecutionResult.result.swapSummary.outTokenAmt,        
-        fillPrice: txExecutionResult.result.swapSummary.fillPrice,
-        fillPriceMS : txExecutionResult.result.swapSummary.swapTimeMS
+        tokenAmt: parsedSuccessfulSwap.swapSummary.outTokenAmt,        
+        fillPrice: parsedSuccessfulSwap.swapSummary.fillPrice,
+        fillPriceMS : parsedSuccessfulSwap.swapSummary.swapTimeMS
     };
     return position;
 }

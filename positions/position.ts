@@ -51,7 +51,6 @@ export interface Position {
 	txBuySignature : string
 	buyLastValidBlockheight : number
 	buyConfirmed : boolean
-	isConfirmingBuy : boolean
 
 	// TODO: set this & lastvalidBH on buy
 	txSellSignature : string|null

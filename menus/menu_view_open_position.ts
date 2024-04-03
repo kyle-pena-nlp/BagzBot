@@ -34,7 +34,7 @@ export class MenuViewOpenPosition extends Menu<PositionAndMaybePNL|BrandNewPosit
                 this.insertButtonNextLine(options, ":cancel: Stop Monitoring And Sell Now", closePositionCallbackData);
             }
 
-            if (!this.buyIsConfirmed() && !this.buyIsConfirming()) {
+            if (!this.buyIsConfirmed()) {
                 this.insertButtonNextLine(options, "Try confirming now...", new CallbackData(MenuCode.ManuallyConfirmBuy, this.menuData.position.positionID));
             }
             
@@ -59,13 +59,9 @@ export class MenuViewOpenPosition extends Menu<PositionAndMaybePNL|BrandNewPosit
         ];
 
         // whether or not is confirmed, or is confirming
-        if (!this.buyIsConfirmed() && !this.buyIsConfirming()) {
+        if (!this.buyIsConfirmed()) {
             lines.push(`:stop: <b>WARNING: THIS PURCHASE HAS NOT BEEN CONFIRMED!</b>`);
             lines.push(`:bullet: We will retry confirming your purchase with Solana soon`)
-        }
-        else if (!this.buyIsConfirmed() && this.buyIsConfirming()) {
-            lines.push(`:caution: <b>WE ARE CONFIRMING YOUR PURCHASE</b>`);
-            lines.push(`:bullet: Refresh in a few moments for an update.`) 
         }
         
         if (this.triggerConditionMet()) {
@@ -143,10 +139,6 @@ export class MenuViewOpenPosition extends Menu<PositionAndMaybePNL|BrandNewPosit
 
     private buyIsConfirmed() : boolean {
         return this.menuData.position.buyConfirmed;
-    }
-
-    private buyIsConfirming() : boolean {
-        return this.menuData.position.isConfirmingBuy;
     }
 
     private isClosing() : boolean {

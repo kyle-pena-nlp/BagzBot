@@ -1,77 +1,32 @@
-import { Connection, VersionedTransaction } from "@solana/web3.js";
+import { Connection, GetVersionedTransactionConfig, ParsedTransactionWithMeta, VersionedTransaction } from "@solana/web3.js";
 import * as bs58 from "bs58";
 import { UserAddress, Wallet, toUserAddress } from "../../crypto";
 import { Env } from "../../env";
-import { logDebug, logError, logInfo } from "../../logging";
+import { logError } from "../../logging";
 import { Swappable, getSwapOfXDescription, isPosition, isPositionRequest } from "../../positions";
 import { executeAndConfirmSignedTx } from "../../rpc/rpc_execute_signed_transaction";
-import { parseBuySwapTransaction, parseSellSwapTransaction } from "../../rpc/rpc_parse";
-import { ParsedSuccessfulSwapSummary, ParsedSwapSummary, PreparseConfirmedSwapResult, SwapExecutionError, TransactionExecutionError, TransactionExecutionErrorCouldntConfirm, UnknownTransactionParseSummary, isConfirmed as isConfirmedTxExecution, isFailedSwapSlippageTxExecution, isFailedSwapTxExecution, isFailedTxExecution, isSuccessfullyParsedSwapSummary, isSwapExecutionErrorParseSwapSummary, isUnknownTransactionParseSummary } from "../../rpc/rpc_types";
+import { parseBuySwapTransaction, parseParsedTransactionWithMeta, parseSellSwapTransaction } from "../../rpc/rpc_parse";
+import { ParsedSwapSummary, PreparseConfirmedSwapResult, SwapExecutionError, TransactionExecutionError, TransactionExecutionErrorCouldntConfirm, UnknownTransactionParseSummary } from "../../rpc/rpc_types";
 import { TGStatusMessage, UpdateableNotification } from "../../telegram";
-import { assertNever } from "../../util";
-
-export type TransactionExecutionResult = 'tx-failed'|
-    SwapFailedTxResultAndInfo|
-    SwapFailedSlippageTxResultAndInfo|
-    CouldNotConfirmTxResultAndInfo|
-    SuccessfulTxResultAndInfo;
-
-export interface CouldNotConfirmTxResultAndInfo {
-    result:  'could-not-confirm'
-    signature : string
-    lastValidBH : number
-}
-
-export function isCouldNotConfirmTxResultAndInfo(x : TransactionExecutionResult) : x is CouldNotConfirmTxResultAndInfo {
-    return typeof x !== 'string' && x.result === 'could-not-confirm';
-}
-
-export interface SwapFailedTxResultAndInfo {
-    result:  'swap-failed'
-    signature : string
-    lastValidBH : number
-}
-
-export function isSwapFailedTxResultAndInfo(x : TransactionExecutionResult) : x is SwapFailedTxResultAndInfo {
-    return typeof x !== 'string' && x.result === 'swap-failed';
-}
-
-export interface SwapFailedSlippageTxResultAndInfo {
-    result:  'swap-failed-slippage'
-    signature : string
-    lastValidBH : number  
-}
-
-export function isSwapFailedSlippageTxResultAndInfo(x : TransactionExecutionResult) : x is SwapFailedSlippageTxResultAndInfo {
-    return typeof x !== 'string' && x.result === 'swap-failed-slippage';
-}
-
-export interface SuccessfulTxResultAndInfo { 
-    result : ParsedSuccessfulSwapSummary, 
-    signature: string, 
-    lastValidBH : number
-}
-
-export function isSuccessfulTxExecutionResult(x : TransactionExecutionResult) : x is SuccessfulTxResultAndInfo {
-    return typeof x !== 'string' && 
-        typeof x.result !== 'string' && 
-        isSuccessfullyParsedSwapSummary(x.result);
-}
+import { assertNever, sleep, strictParseInt } from "../../util";
 
 export class SwapExecutor {
     wallet : Wallet
+    type : 'buy'|'sell'
     env : Env
     notificationChannel: UpdateableNotification
     connection : Connection
     lastValidBH : number
     startTimeMS : number
     constructor(wallet : Wallet, 
+        type : 'buy'|'sell',
         env : Env, 
         notificationChannel : UpdateableNotification, 
         connection : Connection,
         lastValidBH : number,
         startTimeMS : number) {
         this.wallet = wallet;
+        this.type = type;
         this.env = env;
         this.notificationChannel = notificationChannel;
         this.connection = connection;
@@ -79,88 +34,109 @@ export class SwapExecutor {
         this.startTimeMS = startTimeMS;
     }
 
-    async executeAndConfirmSignedTx(s : Swappable, signedTx : VersionedTransaction) : Promise<TransactionExecutionResult> {
-          
-        // get a friendly description of what we are doing
-        const SwapOfX = getSwapOfXDescription(s, true);
-        const swapOfX = getSwapOfXDescription(s);
+    async executeTxAndParseResult(s : Swappable, signedTx : VersionedTransaction) : Promise<'tx-failed'|'unconfirmed'|ParsedSwapSummary> {
 
         // get some stuff we'll need
         const signature = bs58.encode(signedTx.signatures[0]);
-        const userAddress = toUserAddress(this.wallet);
         
-        // attempt to execute and confirm tx
-        TGStatusMessage.queue(this.notificationChannel, `Executing transaction... (this could take a moment)`, false);
-        let maybeExecutedTx = await executeAndConfirmSignedTx(s.positionID, signedTx, this.lastValidBH, this.connection, this.env, this.startTimeMS);
+        TGStatusMessage.queue(this.notificationChannel, `Executing transaction... (this can take a hot minute!)`, false);
+        
+        let txExecutionStatus = await executeAndConfirmSignedTx(signedTx, this.lastValidBH, this.connection, this.env, this.startTimeMS);
 
-
-        if (isFailedSwapSlippageTxExecution(maybeExecutedTx)) {
-            logInfo("Swap failed due to slippage", s, maybeExecutedTx);
-            const msg = makeSwapSummaryFailedMessage(maybeExecutedTx.status, s);
-            TGStatusMessage.queue(this.notificationChannel, msg, false);
-            return { result: 'swap-failed-slippage', signature : signature, lastValidBH: lastValidBH };
+        if (txExecutionStatus === 'failed') {
+            return 'tx-failed';
         }
-
-        // transaction didn't go through
-        if (isFailedTxExecution(maybeExecutedTx)) {
-            logError('Transaction execution failed', s, maybeExecutedTx);
-            const msg = makeTransactionFailedErrorMessage(s, maybeExecutedTx.status);
-            TGStatusMessage.queue(this.notificationChannel, msg, false);
-            return 'tx-failed';        
+        else if (txExecutionStatus === 'unconfirmed') {
+            return 'unconfirmed';
         }
-
-
-        // transaction went through, but swap failed for some other reason. early out.
-        if (isFailedSwapTxExecution(maybeExecutedTx)) {
-            logError('Swap failed', s, maybeExecutedTx);
-            const msg = makeSwapSummaryFailedMessage(maybeExecutedTx.status, s);
-            TGStatusMessage.queue(this.notificationChannel, msg, false);
-            return { result: 'swap-failed', signature : signature, lastValidBH: lastValidBH };
+        else if (txExecutionStatus === 'confirmed') {
+            const rawParsedTx =  await this.getParsedTx(signature, 3000);
+            if (rawParsedTx === 'timed-out') {
+                return 'unconfirmed';
+            }
+            else if ('slot' in rawParsedTx) {
+                const inTokenAddress = this.getInTokenAddress(s);
+                const outTokenAddress = this.getOutTokenAddress(s);
+                return parseParsedTransactionWithMeta(rawParsedTx, inTokenAddress, outTokenAddress, signature, toUserAddress(this.wallet), this.env)
+            }
+            else {
+                assertNever(rawParsedTx);
+            }
         }
+        else {
+            assertNever(txExecutionStatus);
+        }
+    }
 
-        let parsedSwapSummary : ParsedSwapSummary|null = null;
-
-        // if tx went through, attempt parse.
-        if (isConfirmedTxExecution(maybeExecutedTx)) {
-            logDebug('Transaction confirmed - preparing to parse', s, maybeExecutedTx);
-            parsedSwapSummary = await parseSwapTransaction(s, maybeExecutedTx, userAddress, this.connection, this.env).catch(r => {
-                logError("Error retrieving transaction", r)
-                return null;
+    async getParsedTx(signature : string, parseTimeoutMS : number) : Promise<'timed-out'|ParsedTransactionWithMeta> {
+        const startParseMS = Date.now();
+        let expBackoffFactor = 1.0;
+        const increaseExpBackoff = () => {
+            expBackoffFactor = Math.min(8, 2 * expBackoffFactor);
+        };
+        const opts : GetVersionedTransactionConfig = { maxSupportedTransactionVersion: 0, commitment: 'confirmed' };
+        const isTimedOut = () => {
+            return Date.now() > Math.min(startParseMS + parseTimeoutMS, this.startTimeMS + strictParseInt(this.env.TX_TIMEOUT_MS));
+        };
+        while (!isTimedOut()) {
+            const parsedTransaction = await this.connection.getParsedTransaction(signature, opts)
+            .then(tx => tx == null ? 'tx-DNE' : tx)
+            .catch(e => {
+                if (is429(e)) {
+                    increaseExpBackoff();
+                    return '429';
+                }
+                else {
+                    logError(e);
+                    return 'error';
+                }
             });
+            if (typeof parsedTransaction !== 'string') {
+                return parsedTransaction;
+            }
+            sleep(expBackoffFactor * 500);
         }
-        
-        // if the act of retrieving the parsed transaction failed... early out.
-        if (parsedSwapSummary == null) {
-            logInfo('Could not retrieve transaction', s, { signature : signature });
-            const msg = `Your ${swapOfX} could not be confirmed, but we will retry soon!`;
-            TGStatusMessage.queue(this.notificationChannel, msg, false);
-            return { result: 'could-not-confirm', signature: signature, lastValidBH: lastValidBH };
-        }
+        return 'timed-out';
+    }   
 
-        // if parsing the confirmed tx shows there was a problem with the swap, early out.
-        if (isSwapExecutionErrorParseSwapSummary(parsedSwapSummary)) {
-            logError('Swap execution error', s, parsedSwapSummary);
-            const failedMsg = makeSwapSummaryFailedMessage(parsedSwapSummary.status, s);
-            TGStatusMessage.queue(this.notificationChannel, failedMsg, false);
-            return { result: 'swap-failed', signature : signature, lastValidBH: lastValidBH };
+    getInTokenAddress(s : Swappable) : string {
+        if (this.type === 'buy') {
+            return s.vsToken.address;
         }
-
-        // if everything went ok
-        if (isSuccessfullyParsedSwapSummary(parsedSwapSummary)) {
-            logInfo('Swap successful', s, parsedSwapSummary);
-            const msg = `${SwapOfX} was successful.`;
-            TGStatusMessage.queue(this.notificationChannel, msg, true);
+        else if (this.type === 'sell') {
+            return s.token.address;
         }
-
-        // if we couldn't confirm.
-        if (isUnknownTransactionParseSummary(parsedSwapSummary)) {
-            logInfo('Tx did not exist', s, parsedSwapSummary);
-            const msg = `Could not confirm ${SwapOfX}.`;
-            TGStatusMessage.queue(this.notificationChannel, msg, false);
-            return { result: 'could-not-confirm', signature: signature, lastValidBH : lastValidBH };
+        else {
+            assertNever(this.type);
         }
+    }
 
-        return { result: parsedSwapSummary, signature: signature, lastValidBH: lastValidBH };
+    getOutTokenAddress(s : Swappable) : string {
+        if (this.type === 'buy') {
+            return s.token.address;
+        }
+        else if (this.type === 'sell') {
+            return s.vsToken.address;
+        }
+        else {
+            assertNever(this.type);
+        }
+    }
+}
+
+function is429(e: any) : boolean {
+    return (e?.message||'').includes("429");
+}
+
+function parseSwapTransaction(s : Swappable, confirmedTx : PreparseConfirmedSwapResult, userAddress : UserAddress, connection : Connection, env : Env) : Promise<ParsedSwapSummary> {
+    if (isPositionRequest(s)) {
+        return parseBuySwapTransaction(s, confirmedTx, userAddress, connection, env);
+    }
+    else if (isPosition(s)) {
+        return parseSellSwapTransaction(s, confirmedTx, userAddress, connection, env);
+    }
+    else {
+        throw new Error("Programmer error.");
     }
 }
 
@@ -187,17 +163,7 @@ function makeSwapSummaryFailedMessage(status : SwapExecutionError, s: Swappable)
     }
 }
 
-function parseSwapTransaction(s : Swappable, confirmedTx : PreparseConfirmedSwapResult, userAddress : UserAddress, connection : Connection, env : Env) : Promise<ParsedSwapSummary> {
-    if (isPositionRequest(s)) {
-        return parseBuySwapTransaction(s, confirmedTx, userAddress, connection, env);
-    }
-    else if (isPosition(s)) {
-        return parseSellSwapTransaction(s, confirmedTx, userAddress, connection, env);
-    }
-    else {
-        throw new Error("Programmer error.");
-    }
-}
+
 
 function makeTransactionFailedErrorMessage(s: Swappable, status : TransactionExecutionError) {
     const swapOfX = getSwapOfXDescription(s, true);
@@ -243,3 +209,5 @@ function makeTransactionUnconfirmedMessage(s: Swappable, status: TransactionExec
             assertNever(status);
     }
 }
+
+

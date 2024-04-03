@@ -11,7 +11,7 @@ import { ChangeTrackedValue, Structural, assertNever, groupIntoBatches, makeFail
 import { assertIs } from "../../util/enums";
 import { listUnclaimedBetaInviteCodes } from "../beta_invite_codes/beta_invite_code_interop";
 import { PositionAndMaybePNL } from "../token_pair_position_tracker/model/position_and_PNL";
-import { adminDeleteAll, editTriggerPercentOnOpenPositionInTracker, getPositionAndMaybePNL, listPositionsByUser, setSellAutoDoubleOnOpenPositionInPositionTracker, updateBuyConfirmationStatus, updateSellConfirmationStatus } from "../token_pair_position_tracker/token_pair_position_tracker_do_interop";
+import { _adminDeleteAll, editTriggerPercentOnOpenPositionInTracker, getPositionAndMaybePNL, listPositionsByUser, setSellAutoDoubleOnOpenPositionInPositionTracker, updateBuyConfirmationStatus, updateSellConfirmationStatus } from "../token_pair_position_tracker/token_pair_position_tracker_do_interop";
 import { AdminDeleteAllPositionsRequest, AdminDeleteAllPositionsResponse } from "./actions/admin_delete_all_positions";
 import { AutomaticallyClosePositionsRequest, AutomaticallyClosePositionsResponse } from "./actions/automatically_close_positions";
 import { BaseUserDORequest, isBaseUserDORequest } from "./actions/base_user_do_request";
@@ -323,7 +323,7 @@ export class UserDO {
         }
         const uniquePairs = this.tokenPairsForPositionIDsTracker.listUniqueTokenPairs();
         for (const pair of uniquePairs) {
-            await adminDeleteAll(realUserID, pair.tokenAddress, pair.vsTokenAddress, this.env);
+            await _adminDeleteAll(realUserID, pair.tokenAddress, pair.vsTokenAddress, this.env);
         }
 
         return {};
@@ -348,7 +348,6 @@ export class UserDO {
             const buyStatus = await swapConfirmer.confirmSwap(position, 'buy');
             results[position.positionID] = buyStatus;
             TGStatusMessage.finalize(channel);
-            await updateBuyConfirmationStatus(position.positionID, position.token.address, position.vsToken.address, buyStatus, this.env);
         }
         return makeJSONResponse<ConfirmBuysResponse>({ results: results });
     }

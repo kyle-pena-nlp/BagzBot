@@ -11,9 +11,11 @@ import { GetPositionAndMaybePNLFromPriceTrackerRequest, GetPositionAndMaybePNLFr
 import { GetTokenPriceRequest, GetTokenPriceResponse } from "./actions/get_token_price";
 import { HasPairAddresses } from "./actions/has_pair_addresses";
 import { ListPositionsByUserRequest, ListPositionsByUserResponse } from "./actions/list_positions_by_user";
+import { MarkBuyAsConfirmedRequest, MarkBuyAsConfirmedResponse } from "./actions/mark_buy_as_confirmed";
 import { MarkPositionAsClosedRequest, MarkPositionAsClosedResponse } from "./actions/mark_position_as_closed";
 import { MarkPositionAsClosingRequest, MarkPositionAsClosingResponse } from "./actions/mark_position_as_closing";
 import { MarkPositionAsOpenRequest, MarkPositionAsOpenResponse } from "./actions/mark_position_as_open";
+import { PositionExistsInTrackerRequest, PositionExistsInTrackerResponse } from "./actions/position_exists_in_tracker";
 import { RemovePositionRequest, RemovePositionResponse } from "./actions/remove_position";
 import { SetSellAutoDoubleOnOpenPositionInTrackerRequest } from "./actions/set_sell_auto_double_on_open_position_in_tracker";
 import { UpdateBuyConfirmationStatusRequest, UpdateBuyConfirmationStatusResponse } from "./actions/update_buy_confirmation_status";
@@ -41,10 +43,19 @@ export enum TokenPairPositionTrackerDOFetchMethod {
 	updateSellConfirmationStatus = "updateSellConfirmationStatus",
 	setSellAutoDoubleOnOpenPosition = "setSellAutoDoubleOnOpenPosition",
 	adminInvokeAlarm = "adminInvokeAlarm",
-	adminDeleteAllInTracker = "adminDeleteAllInTracker"
+	adminDeleteAllInTracker = "adminDeleteAllInTracker",
+	positionExists = "positionExists",
+	markBuyAsConfirmed = "markBuyAsConfirmed"
 }
 
-export async function adminDeleteAll(userID : number, tokenAddress : string, vsTokenAddress : string, env : Env) : Promise<AdminDeleteAllInTrackerResponse> {
+export async function positionExistsInTracker(positionID : string, tokenAddress : string, vsTokenAddress : string, env : Env) : Promise<boolean> {
+	const request : PositionExistsInTrackerRequest = { positionID, tokenAddress, vsTokenAddress };
+	const method = TokenPairPositionTrackerDOFetchMethod.positionExists;
+	const response = await sendJSONRequestToTokenPairPositionTracker<PositionExistsInTrackerRequest,PositionExistsInTrackerResponse>(method,request,tokenAddress,vsTokenAddress,env);
+	return response.exists;
+}
+
+export async function _adminDeleteAll(userID : number, tokenAddress : string, vsTokenAddress : string, env : Env) : Promise<AdminDeleteAllInTrackerResponse> {
 	const request : AdminDeleteAllInTrackerRequest =  { userID, tokenAddress, vsTokenAddress };
 	const method = TokenPairPositionTrackerDOFetchMethod.adminDeleteAllInTracker;
 	return await sendJSONRequestToTokenPairPositionTracker<AdminDeleteAllInTrackerRequest,AdminDeleteAllInTrackerResponse>(method,request,tokenAddress,vsTokenAddress,env);
@@ -69,9 +80,6 @@ export async function _devOnlyFeatureUpdatePrice(telegramUserID : number, tokenA
 	return response;
 }
 
-export function parseTokenPairPositionTrackerDOFetchMethod(value : string) : TokenPairPositionTrackerDOFetchMethod|null {
-	return Object.values(TokenPairPositionTrackerDOFetchMethod).find(x => x === value)||null;
-}
 
 export async function editTriggerPercentOnOpenPositionInTracker(positionID : string, tokenAddress : string, vsTokenAddress : string, percent : number, env : Env) : Promise<EditTriggerPercentOnOpenPositionResponse> {
 	const method = TokenPairPositionTrackerDOFetchMethod.editTriggerPercentOnOpenPosition;
@@ -183,6 +191,13 @@ export async function markAsOpen(positionID : string, tokenAddress : string, vsT
 	return response;
 }
 
+export async function markBuyAsConfirmed(positionID : string, tokenAddress : string, vsTokenAddress : string, env : Env) : Promise<MarkBuyAsConfirmedResponse> {
+	const method = TokenPairPositionTrackerDOFetchMethod.markBuyAsConfirmed;
+	const request : MarkBuyAsConfirmedRequest = { positionID, tokenAddress, vsTokenAddress };
+	const response = await sendJSONRequestToTokenPairPositionTracker<MarkBuyAsConfirmedRequest,MarkBuyAsConfirmedResponse>(method,request,tokenAddress,vsTokenAddress,env);
+	return response;
+}
+
 export async function importNewPosition(position : Position, env : Env) : Promise<UpsertPositionsResponse> {
 	const requestBody : UpsertPositionsRequest = { 
 		positions : [position], 
@@ -228,6 +243,10 @@ function getTokenPairPositionTrackerDO(tokenAddress : string, vsTokenAddress : s
 	const id = namespace.idFromName(new TokenPairKey(tokenAddress, vsTokenAddress).toString());
 	const stub = namespace.get(id);
 	return stub;
+}
+
+export function parseTokenPairPositionTrackerDOFetchMethod(value : string) : TokenPairPositionTrackerDOFetchMethod|null {
+	return Object.values(TokenPairPositionTrackerDOFetchMethod).find(x => x === value)||null;
 }
 
 
