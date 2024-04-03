@@ -1,4 +1,4 @@
-import { SellResult } from "../durable_objects/user/user_sell";
+import { SellResult } from "../durable_objects/user/user_sell_message";
 import { CallbackButton } from "../telegram";
 import { assertNever } from "../util";
 import { CallbackData } from "./callback_data";
