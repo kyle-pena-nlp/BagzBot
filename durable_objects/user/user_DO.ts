@@ -43,7 +43,6 @@ import { SOLBalanceTracker } from "./trackers/sol_balance_tracker";
 import { TokenPairsForPositionIDsTracker } from "./trackers/token_pairs_for_position_ids_tracker";
 import { UserPNLTracker } from "./trackers/user_pnl_tracker";
 import { UserDOFetchMethod, parseUserDOFetchMethod } from "./userDO_interop";
-import { publishFinalSellMessage } from "./user_sell_message";
 
 const DEFAULT_POSITION_PREREQUEST : PositionPreRequest = {
     userID: -1,
@@ -629,11 +628,11 @@ export class UserDO {
             return makeJSONResponse<ManuallyClosePositionResponse>({ message: "Position has already been sold." });
         }
         assertIs<PositionStatus.Open,typeof position.status>();
-        const channel = TGStatusMessage.createAndSend(`Initiating sale of ${asTokenPrice(position.tokenAmt)} ${position.token.symbol}`, false, position.chatID, this.env, 'HTML', '<b>Manual Sell</b>: ');
+        const channel = TGStatusMessage.createAndSend(`<a href="${position.token.logoURI}">\u200B</a>Initiating sale of ${asTokenPrice(position.tokenAmt)} ${position.token.symbol}`, false, position.chatID, this.env, 'HTML', '<b>Manual Sell</b>: ');
         // deliberate lack of await here (fire-and-forget). Must complete in 30s.
         const connection = new Connection(getRPCUrl(this.env));
-        const positionSeller = new PositionSeller(connection, this.wallet.value!!, startTimeMS, channel, this.env);
-        positionSeller.sell(position).then(sellStatus => publishFinalSellMessage(position, 'Sell', sellStatus, position.chatID, channel, this.env));
+        const positionSeller = new PositionSeller(connection, this.wallet.value!!, 'manual-sell', startTimeMS, channel, this.env);
+        positionSeller.sell(position);
         return makeJSONResponse<ManuallyClosePositionResponse>({ message: 'Position will now be closed. '});
     }
 
@@ -646,16 +645,13 @@ export class UserDO {
         const positionBatches = groupIntoBatches(positionsToClose,4);
         const channels : UpdateableNotification[] = [ ];
         const connection = new Connection(getRPCUrl(this.env));
-        let positionSeller : PositionSeller|null = null;
         for (const positionBatch of positionBatches) {
             // fire off a bunch of promises per batch (4)
             let sellPositionPromises = positionBatch.map(async position => {
                 const channel = TGStatusMessage.createAndSend(`Initiating.`, false, this.chatID.value||0, this.env, 'HTML', '<b>Auto-Sell</b>: ');
                 channels.push(channel);
-                if (positionSeller == null) {
-                    positionSeller = new PositionSeller(connection, this.wallet.value!!, startTimeMS, channel, this.env);
-                }
-                const sellPromise = positionSeller.sell(position).then(sellStatus => publishFinalSellMessage(position, 'Auto-sell', sellStatus, position.chatID, channel, this.env));
+                const positionSeller = new PositionSeller(connection, this.wallet.value!!, 'auto-sell', startTimeMS, channel, this.env);
+                const sellPromise = positionSeller.sell(position);
                 return await sellPromise;
             });
             // but wait for the entire batch to settle before doing the next batch

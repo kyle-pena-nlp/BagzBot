@@ -1,11 +1,12 @@
 import { Connection, VersionedTransaction } from "@solana/web3.js";
 import { Wallet } from "../../crypto";
 import { Env } from "../../env";
+import { MenuCode } from "../../menus";
 import { Position } from "../../positions";
 import { getLatestValidBlockhash } from "../../rpc/rpc_blocks";
 import { signatureOf } from "../../rpc/rpc_sign_tx";
 import { isSlippageSwapExecutionErrorParseSummary, isSuccessfulSwapSummary, isSwapExecutionErrorParseSummary, isUnknownTransactionParseSummary } from "../../rpc/rpc_types";
-import { UpdateableNotification } from "../../telegram";
+import { TGStatusMessage, UpdateableNotification } from "../../telegram";
 import { assertNever, strictParseInt } from "../../util";
 import { markAsClosed, markAsOpen, positionExistsInTracker, upsertPosition } from "../token_pair_position_tracker/token_pair_position_tracker_do_interop";
 import { SwapExecutor } from "./swap_executor";
@@ -14,12 +15,14 @@ import { SwapTransactionSigner } from "./swap_transaction_signer";
 export class PositionSeller {
     connection : Connection
     wallet : Wallet
+    type : 'manual-sell'|'auto-sell'
     startTimeMS : number
     channel : UpdateableNotification
     env : Env
-    constructor(connection : Connection, wallet : Wallet, startTimeMS : number, channel : UpdateableNotification, env : Env) {
+    constructor(connection : Connection, wallet : Wallet, type : 'manual-sell'|'auto-sell', startTimeMS : number, channel : UpdateableNotification, env : Env) {
         this.connection = connection;
         this.wallet = wallet;
+        this.type = type
         this.startTimeMS = startTimeMS;
         this.channel = channel;
         this.env = env;
@@ -27,7 +30,20 @@ export class PositionSeller {
     private isTimedOut() : boolean {
         return Date.now() > (this.startTimeMS + strictParseInt(this.env.TX_TIMEOUT_MS));
     }
-    async sell(position : Position) : Promise<'already-sold'|'failed'|'slippage-failed'|'unconfirmed'|'confirmed'> {
+    async sell(position : Position) : Promise<void> {
+        try {
+            const status = await this.sellInternal(position);
+            const statusMessage = this.makeFinalStatusMessage(position, status);
+            const menuCode = this.makeFinalMenuCode(status);
+            TGStatusMessage.queue(this.channel, statusMessage, menuCode, position.positionID);
+        }
+        catch {
+            const menuCode = this.type === 'manual-sell' ? MenuCode.ViewOpenPosition : MenuCode.Close;
+            TGStatusMessage.queue(this.channel, "There was an unexpected error", menuCode, position.positionID);
+        }
+    }
+
+    private async sellInternal(position : Position) : Promise<'already-sold'|'failed'|'slippage-failed'|'unconfirmed'|'confirmed'> {
         
         if (this.isTimedOut()) {
             await this.markAsOpen(position);
@@ -136,4 +152,47 @@ export class PositionSeller {
     private async markAsClosed(position : Position) {
         await markAsClosed(position.positionID, position.token.address, position.vsToken.address, this.env);
     }
+
+
+    private makeFinalStatusMessage(position : Position, status : 'already-sold' | 'failed' | 'slippage-failed' | 'unconfirmed' | 'confirmed') : string {
+        switch(status) {
+            case 'already-sold':
+                return 'The position was already sold.';
+            case 'confirmed':
+                return 'The sale was successful!';
+            case 'failed':
+                return 'The sale failed.';
+            case 'slippage-failed':
+                if (position.sellAutoDoubleSlippage) {
+                    return 'The sale failed due to slippage - the sale will be reattempted with doubled slippage up until 100%.';
+                }
+                else {
+                    return 'The sale failed due to slippage.'
+                }
+            case 'unconfirmed':
+                return 'The sale could not be confirmed.';
+            default:
+                assertNever(status);
+        }
+    }
+
+    private makeFinalMenuCode(status : 'already-sold' | 'failed' | 'slippage-failed' | 'unconfirmed' | 'confirmed') : MenuCode {
+        if (this.type === 'auto-sell') {
+            return MenuCode.Close;
+        }
+        switch(status) {
+            case 'already-sold':
+                return MenuCode.ListPositions;
+            case 'confirmed':
+                return MenuCode.ListPositions;
+            case 'failed':
+                return MenuCode.ViewOpenPosition;
+            case 'slippage-failed':
+                return MenuCode.ViewOpenPosition;
+            case 'unconfirmed':
+                return MenuCode.ViewOpenPosition;
+            default:
+                assertNever(status);
+        }
+    }    
 }

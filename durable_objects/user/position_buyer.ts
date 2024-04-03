@@ -3,6 +3,7 @@ import { Connection, VersionedTransaction } from "@solana/web3.js";
 import { UserAddress, Wallet, toUserAddress } from "../../crypto";
 import { fromNumber } from "../../decimalized";
 import { Env, getRPCUrl } from "../../env";
+import { MenuCode } from "../../menus";
 import { Position, PositionRequest, PositionStatus } from "../../positions";
 import { getLatestValidBlockhash } from "../../rpc/rpc_blocks";
 import { signatureOf } from "../../rpc/rpc_sign_tx";
@@ -31,32 +32,13 @@ export class PositionBuyer {
     async buy(positionRequest : PositionRequest) : Promise<void> {
         try {
             const finalStatus = await this.buyInternal(positionRequest);
-            TGStatusMessage.queue(this.channel, this.getFinalStatusMessage(finalStatus), true, positionRequest.positionID);
+            TGStatusMessage.queue(this.channel, this.getFinalStatusMessage(finalStatus), this.getFinalMenuCode(finalStatus), positionRequest.positionID);
         }
         catch {
-            TGStatusMessage.queue(this.channel, 'There was an unexpected error with this purchase', true, positionRequest.positionID);
+            TGStatusMessage.queue(this.channel, 'There was an unexpected error with this purchase', MenuCode.TrailingStopLossRequestReturnToEditorMenu, positionRequest.positionID);
         }
         finally {
             await TGStatusMessage.finalize(this.channel);
-        }
-    }
-
-    private getFinalStatusMessage(status: 'already-processed'|'could-not-create-tx'|'failed'|'slippage-failed'|'unconfirmed'|'confirmed') : string {
-        switch(status) {
-            case 'already-processed':
-                return 'This purchase was already completed.';
-            case 'could-not-create-tx':
-                return 'This purchase failed.';
-            case 'confirmed':
-                return 'Purchase was successful!';
-            case 'failed':
-                return 'This purchase failed.';
-            case 'slippage-failed':
-                return 'Purchase failed due to slippage tolerance exceeded.';
-            case 'unconfirmed':
-                return 'Purchase could not be confirmed due to platform usage.  We will reattempt to confirm the purchase soon.';
-            default:
-                assertNever(status);
         }
     }
 
@@ -197,6 +179,44 @@ export class PositionBuyer {
 
         // has or has not been set depending on above logic.
         return newPosition;
+    }
+    
+    private getFinalStatusMessage(status: 'already-processed'|'could-not-create-tx'|'failed'|'slippage-failed'|'unconfirmed'|'confirmed') : string {
+        switch(status) {
+            case 'already-processed':
+                return 'This purchase was already completed.';
+            case 'could-not-create-tx':
+                return 'This purchase failed.';
+            case 'confirmed':
+                return 'Purchase was successful!';
+            case 'failed':
+                return 'This purchase failed.';
+            case 'slippage-failed':
+                return 'Purchase failed due to slippage tolerance exceeded.';
+            case 'unconfirmed':
+                return 'Purchase could not be confirmed due to platform usage.  We will reattempt to confirm the purchase soon.';
+            default:
+                assertNever(status);
+        }
+    }
+
+    private getFinalMenuCode(status: 'already-processed'|'could-not-create-tx'|'failed'|'slippage-failed'|'unconfirmed'|'confirmed') : MenuCode {
+        switch(status) {
+            case 'already-processed':
+                return MenuCode.Main;
+            case 'could-not-create-tx':
+                return MenuCode.TrailingStopLossRequestReturnToEditorMenu;
+            case 'confirmed':
+                return MenuCode.ViewOpenPosition;
+            case 'failed':
+                return MenuCode.TrailingStopLossRequestReturnToEditorMenu;
+            case 'slippage-failed':
+                return MenuCode.TrailingStopLossRequestReturnToEditorMenu;
+            case 'unconfirmed':
+                return MenuCode.ViewOpenPosition;
+            default:
+                assertNever(status);
+        }
     }    
 }
 
