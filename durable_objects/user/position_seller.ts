@@ -3,10 +3,11 @@ import { Wallet } from "../../crypto";
 import { Env } from "../../env";
 import { Position } from "../../positions";
 import { getLatestValidBlockhash } from "../../rpc/rpc_blocks";
+import { signatureOf } from "../../rpc/rpc_sign_tx";
 import { isSlippageSwapExecutionErrorParseSummary, isSuccessfulSwapSummary, isSwapExecutionErrorParseSummary, isUnknownTransactionParseSummary } from "../../rpc/rpc_types";
 import { UpdateableNotification } from "../../telegram";
 import { assertNever, strictParseInt } from "../../util";
-import { markAsClosed, markAsOpen, positionExistsInTracker } from "../token_pair_position_tracker/token_pair_position_tracker_do_interop";
+import { markAsClosed, markAsOpen, positionExistsInTracker, upsertPosition } from "../token_pair_position_tracker/token_pair_position_tracker_do_interop";
 import { SwapExecutor } from "./swap_executor";
 import { SwapTransactionSigner } from "./swap_transaction_signer";
 
@@ -55,6 +56,11 @@ export class PositionSeller {
             await this.markAsOpen(position);
             return 'failed';
         }
+
+        // update the tracker with the sig & lastvalidBH for the sell.
+        position.txSellSignature = signatureOf(signedTx);
+        position.sellLastValidBlockheight = lastValidBH;
+        await upsertPosition(position, this.env);
 
         // try to do the swap.
         const result = await this.executeAndParseSwap(position, signedTx, lastValidBH);

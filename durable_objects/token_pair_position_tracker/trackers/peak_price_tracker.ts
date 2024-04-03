@@ -40,6 +40,16 @@ export class PeakPricePositionTracker {
     any() : boolean {
         return this.itemsByPeakPrice.any();
     }
+    upsertPosition(position : Position) {
+        const existingPosition = this.getPosition(position.positionID);
+        if (existingPosition == null) {
+            // TODO: includes timeMS with price, and then fold into peak or not depending.
+            this.add(position.fillPrice, position);
+        }
+        else {
+            Object.assign(existingPosition,position);
+        }
+    }
     add(price : DecimalizedAmount, position : Position) {
         this.itemsByPeakPrice.add(price, position);
     }

@@ -9,8 +9,7 @@ import { UserPNL } from "../model/user_data";
 
 // provides persisted and rate-limited access to wallet SOL balance.
 export class UserPNLTracker {
-
-    // TODO : to change tracked value
+    
     maybeUserPNL : ChangeTrackedValue<UserPNL|null> = new ChangeTrackedValue<UserPNL|null>('maybeUserPNL', null);
     lastRefreshedSOLBalance : number = 0; //ChangeTrackedValue<number> = new ChangeTrackedValue<number>('lastRefreshedSOLBalance', 0); // ms since epoch
     

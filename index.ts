@@ -191,7 +191,6 @@ export default {
     },
 
 	async enforceLegalAgreementGating(telegramWebhookInfo : TelegramWebhookInfo, handler : Handler, env : Env) : Promise<'proceed'|'do-not-proceed'> {
-		// TODO: finish this (allowing proper things thru)
 		const chatID = telegramWebhookInfo.chatID;
 		const callbackData = telegramWebhookInfo.callbackData;
 		const command = telegramWebhookInfo.command;
@@ -209,14 +208,12 @@ export default {
 		else if (legalAgreementStatus === 'refused' && command === '/legal_agreement') {
 			return 'proceed';
 		}
-		// TODO: permit legal agreement menu codes if refused
 		else if (legalAgreementStatus === 'refused') {
 			return 'do-not-proceed';
 		}
 		else if (legalAgreementStatus === 'has-not-responded'  && callbackData !== null && LegalAgreementMenuCodes.includes(callbackData.menuCode)) {
 			return 'proceed';
 		}
-		// TODO: permit legal agreement menu codes if has-not-responded
 		else if (legalAgreementStatus === 'has-not-responded') {
 			const legalAgreementMenuRequest = new LegalAgreement(undefined).getCreateNewMenuRequest(chatID, env);
 			await fetch(legalAgreementMenuRequest);

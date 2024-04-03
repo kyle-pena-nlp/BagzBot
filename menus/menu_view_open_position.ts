@@ -33,10 +33,6 @@ export class MenuViewOpenPosition extends Menu<PositionAndMaybePNL|BrandNewPosit
             if (this.buyIsConfirmed()) {
                 this.insertButtonNextLine(options, ":cancel: Stop Monitoring And Sell Now", closePositionCallbackData);
             }
-
-            if (!this.buyIsConfirmed()) {
-                this.insertButtonNextLine(options, "Try confirming now...", new CallbackData(MenuCode.ManuallyConfirmBuy, this.menuData.position.positionID));
-            }
             
             this.insertButtonNextLine(options, `:chart_down: ${this.menuData.position.triggerPercent}% Trigger`, new CallbackData(MenuCode.EditOpenPositionTriggerPercent, this.menuData.position.positionID));
             this.insertButtonNextLine(options, `:brain: ${this.menuData.position.sellAutoDoubleSlippage ? '': 'Do Not'} Auto-Double Slippage If Sell Fails :brain:`, new CallbackData(MenuCode.EditOpenPositionAutoDoubleSlippage, this.menuData.position.positionID));

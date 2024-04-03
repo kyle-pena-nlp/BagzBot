@@ -7,8 +7,7 @@ import { ChangeTrackedValue, strictParseFloat } from "../../../util";
 
 // provides persisted and rate-limited access to wallet SOL balance.
 export class SOLBalanceTracker {
-
-    // TODO : to change tracked value
+    
     maybeSOLBalance : ChangeTrackedValue<DecimalizedAmount|null> = new ChangeTrackedValue<DecimalizedAmount|null>('maybeSOLBalance', null);
     lastRefreshedSOLBalance : number = 0; //ChangeTrackedValue<number> = new ChangeTrackedValue<number>('lastRefreshedSOLBalance', 0); // ms since epoch
 

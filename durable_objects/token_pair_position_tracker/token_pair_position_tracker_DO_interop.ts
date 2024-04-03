@@ -202,7 +202,6 @@ async function sendJSONRequestToTokenPairPositionTracker<TRequestBody,TResponseB
 	return responseBody as TResponseBody;
 }
 
-// TODO: replace with non-anonymous interfaces
 export async function getTokenPrice(tokenAddress : string, vsTokenAddress : string, env : Env) : Promise<DecimalizedAmount|null> {
 	const method = TokenPairPositionTrackerDOFetchMethod.getTokenPrice;
 	const requestBody = { tokenAddress, vsTokenAddress };

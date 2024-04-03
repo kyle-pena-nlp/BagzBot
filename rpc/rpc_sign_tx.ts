@@ -10,8 +10,6 @@ export async function signTransaction(swapTransaction : Buffer|TransactionPrepar
     }
     try {
         var transaction = VersionedTransaction.deserialize(swapTransaction);
-        // TODO: is this needed?
-        //transaction.message.recentBlockhash = await getRecentBlockhash(env);
         const signer = await toSigner(wallet, userID, env);
         transaction.sign([signer]);
         return transaction;
@@ -30,5 +28,9 @@ async function toSigner(wallet : Wallet, userID : number, env : Env) : Promise<S
         publicKey : publicKey,
         secretKey : privateKey
     };
+}
+
+export function signatureOf(signedTx : VersionedTransaction) : string {
+    return bs58.encode(signedTx.signatures[0]);
 }
 

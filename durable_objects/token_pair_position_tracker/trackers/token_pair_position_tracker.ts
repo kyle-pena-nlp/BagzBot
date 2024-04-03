@@ -46,7 +46,7 @@ export class TokenPairPositionTracker {
     upsertPositions(positions : Position[]) {
         for (const position of positions) {
             // idempotentally add (can also work as an update)
-            this.pricePeaks.add(position.fillPrice, position);
+            this.pricePeaks.upsertPosition(position);
         }
     }
 
@@ -78,39 +78,16 @@ export class TokenPairPositionTracker {
     }
 
     markPositionAsOpen(positionID : string) {
-        this.pricePeaks.markAsOpen(positionID);
-
-        // TODO: ZOMBIE POSITION
-        // if it is closed, move it to closing (this is highly unusual and should not occur)
-        /*const closedPosition = this.closedPositions.get(positionID);
-        if (closedPosition) {
-            this.closedPositions.delete(positionID);
-            closedPosition.status = PositionStatus.Closing;
-            // TODO: this isn't quite correct.  other peaks may have been hit while not tracked.
-            this.pricePeaks.add(closedPosition.fillPrice, closedPosition);
-        }*/        
+        this.pricePeaks.markAsOpen(positionID);      
     }
 
     // idempotentally mark as closing
     markPositionAsClosing(positionID : string) {
 
         this.pricePeaks.markAsClosing(positionID);
-
-        // no need for action if already closing...
-
-        // TODO: ZOMBIE POSITION
-        // if it is closed, move it to closing (this is highly unusual and should not occur)
-        /*const closedPosition = this.closedPositions.get(positionID);
-        if (closedPosition) {
-            this.closedPositions.delete(positionID);
-            closedPosition.status = PositionStatus.Closing;
-            // TODO: this isn't quite correct.  other peaks may have been hit while not tracked.
-            this.pricePeaks.add(closedPosition.fillPrice, closedPosition);
-        }*/
     }
 
     // idempotentally mark position as closed from price tracking
-    // TODO: keep closed positions in price tracking for a while (aka: implement zombie positions)
     closePosition(positionID : string) {
         // also, remove it from peak prices data structure
         const maybeRemovedPosition = this.pricePeaks.remove(positionID);

@@ -45,9 +45,6 @@ import { UserPNLTracker } from "./trackers/user_pnl_tracker";
 import { UserDOFetchMethod, parseUserDOFetchMethod } from "./userDO_interop";
 import { publishFinalSellMessage } from "./user_sell_message";
 
-// TODO: all requests to UserDo include telegramUserID and telegramUserName
-// and ensure initialization.  That way, no purpose-specific initialization call is required
-
 const DEFAULT_POSITION_PREREQUEST : PositionPreRequest = {
     userID: -1,
     chatID: -1,
@@ -94,8 +91,7 @@ export class UserDO {
 
     // has the user signed legal?
     legalAgreementStatus : ChangeTrackedValue<'agreed'|'refused'|'has-not-responded'> = new ChangeTrackedValue<'agreed'|'refused'|'has-not-responded'>('hasSignedLegal', 'has-not-responded');
-
-    // TODO: periodic trimming of this list.
+    
     // stores just the positionID / tokenAddress / vsTokenAddress
     tokenPairsForPositionIDsTracker : TokenPairsForPositionIDsTracker = new TokenPairsForPositionIDsTracker();
 

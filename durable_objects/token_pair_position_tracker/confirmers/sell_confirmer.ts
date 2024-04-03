@@ -19,8 +19,17 @@ export class SellConfirmer {
         return (Date.now() > this.startTimeMS + strictParseInt(this.env.TX_TIMEOUT_MS));
     }    
     async confirmSell(position : Position & { sellConfirmed : false }) : Promise<'api-error'|'slippage-failed'|'failed'|'unconfirmed'|'confirmed'> {
+        
         if (this.isTimedOut()) {
             return 'unconfirmed';
+        }
+
+        if (position.txSellSignature == null) {
+            return 'failed';
+        }
+
+        if (position.sellLastValidBlockheight == null) {
+            return 'failed';
         }
 
         const blockheight : number | 'api-call-error' | '429' = await this.connection.getBlockHeight('confirmed').catch(r => {
@@ -52,7 +61,7 @@ export class SellConfirmer {
         const parsedTx = await this.getParsedTransaction(unconfirmedPosition);
         
         if (parsedTx === 'tx-DNE') {
-            if (blockheight > unconfirmedPosition.buyLastValidBlockheight) {
+            if (blockheight > unconfirmedPosition.sellLastValidBlockheight!!) {
                 return 'failed';
             }
             else {
@@ -77,7 +86,7 @@ export class SellConfirmer {
     }    
 
     private async getParsedTransaction(position : Position) : Promise<'api-error'|'tx-DNE'|ParsedSuccessfulSwapSummary|NonSlippageSwapExecutionErrorParseSummary|SlippageSwapExecutionErrorParseSummary> {
-        const parsedTransaction : 'api-error'|ParsedTransactionWithMeta|null = await this.connection.getParsedTransaction(position.txBuySignature, {
+        const parsedTransaction : 'api-error'|ParsedTransactionWithMeta|null = await this.connection.getParsedTransaction(position.txSellSignature!!, {
             maxSupportedTransactionVersion: 0,
             commitment: 'confirmed'
         }).catch(e => {

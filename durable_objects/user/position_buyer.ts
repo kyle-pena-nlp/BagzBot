@@ -9,9 +9,10 @@ import { getLatestValidBlockhash } from "../../rpc/rpc_blocks";
 import { ParsedSuccessfulSwapSummary, isSlippageSwapExecutionErrorParseSummary, isSuccessfulSwapSummary, isSwapExecutionErrorParseSummary, isUnknownTransactionParseSummary } from "../../rpc/rpc_types";
 import { TGStatusMessage, UpdateableNotification } from "../../telegram";
 import { assertNever } from "../../util";
-import { markBuyAsConfirmed, positionExistsInTracker, removePosition, upsertPosition } from "../token_pair_position_tracker/token_pair_position_tracker_do_interop";
+import { positionExistsInTracker, removePosition, upsertPosition } from "../token_pair_position_tracker/token_pair_position_tracker_do_interop";
 import { SwapExecutor } from "./swap_executor";
 import { SwapTransactionSigner } from "./swap_transaction_signer";
+import { signatureOf } from "../../rpc/rpc_sign_tx";
 
 export class PositionBuyer {
     wallet : Wallet
@@ -84,9 +85,7 @@ export class PositionBuyer {
         }
         else if ('confirmedPosition' in result) {
             const { confirmedPosition } = result;
-            // TODO: second pass.
-            // await upsertConfirmedPosition(confirmedPosition, env);
-            await markBuyAsConfirmed(confirmedPosition.positionID, confirmedPosition.token.address, confirmedPosition.vsToken.address, this.env);
+            await upsertPosition(confirmedPosition, this.env);
             return 'confirmed';
         }
         else {
@@ -211,6 +210,3 @@ function convertToConfirmedPosition(positionRequest: PositionRequest, signature 
     return position;
 }
 
-function signatureOf(signedTx : VersionedTransaction) : string {
-    return bs58.encode(signedTx.signatures[0]);
-}
