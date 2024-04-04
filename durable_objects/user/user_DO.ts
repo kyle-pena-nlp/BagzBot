@@ -23,6 +23,7 @@ import { GetLegalAgreementStatusRequest, GetLegalAgreementStatusResponse } from 
 import { GetPositionFromUserDORequest, GetPositionFromUserDOResponse } from "./actions/get_position_from_user_do";
 import { GetSessionValuesRequest, GetSessionValuesWithPrefixRequest, GetSessionValuesWithPrefixResponse } from "./actions/get_session_values";
 import { GetUserDataRequest } from "./actions/get_user_data";
+import { GetUserWalletSOLBalanceRequest, GetUserWalletSOLBalanceResponse } from "./actions/get_user_wallet_balance";
 import { GetWalletDataRequest, GetWalletDataResponse } from "./actions/get_wallet_data";
 import { ImpersonateUserRequest, ImpersonateUserResponse } from "./actions/impersonate_user";
 import { ListPositionsFromUserDORequest, ListPositionsFromUserDOResponse } from "./actions/list_positions_from_user_do";
@@ -293,11 +294,22 @@ export class UserDO {
             case UserDOFetchMethod.setSellSlippagePercentOnOpenPosition:
                 response = await this.handleSellSlippagePercentOnOpenPosition(userAction);
                 break;
+            case UserDOFetchMethod.getUserWalletSOLBalance:
+                response = await this.handleGetUserWalletSOLBalance(userAction);
+                break;
             default:
                 assertNever(method);
         }
 
         return [method,userAction,response];
+    }
+
+    async handleGetUserWalletSOLBalance(userAction : GetUserWalletSOLBalanceRequest) : Promise<Response> {
+        if (this.wallet.value == null) {
+            return makeJSONResponse<GetUserWalletSOLBalanceResponse>({ maybeSOLBalance : null });
+        }
+        const maybeSOLBalance = await this.solBalanceTracker.maybeGetBalance(this.wallet.value.publicKey, false, this.env)
+        return makeJSONResponse<GetUserWalletSOLBalanceResponse>({ maybeSOLBalance });
     }
 
     async handleSellSlippagePercentOnOpenPosition(userAction : SellSellSlippagePercentageOnOpenPositionRequest) : Promise<Response> {
@@ -669,7 +681,7 @@ export class UserDO {
         for (const positionBatch of positionBatches) {
             // fire off a bunch of promises per batch (4)
             let sellPositionPromises = positionBatch.map(async position => {
-                const channel = TGStatusMessage.createAndSend(`Initiating.`, false, this.chatID.value||0, this.env, 'HTML', '<b>Auto-Sell</b>: ');
+                const channel = TGStatusMessage.createAndSend(`Initiating.`, false, this.chatID.value||0, this.env, 'HTML', `<b>Auto-Sell of ${asTokenPrice(position.tokenAmt)} $${position.token.symbol}</b>: `);
                 channels.push(channel);
                 const positionSeller = new PositionSeller(connection, this.wallet.value!!, 'auto-sell', startTimeMS, channel, this.env);
                 const sellPromise = positionSeller.sell(position);

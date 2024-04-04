@@ -1,6 +1,7 @@
 import { DurableObjectStorage } from "@cloudflare/workers-types";
 import { DecimalizedAmount } from "../../../decimalized";
 import { Env } from "../../../env";
+import { logDebug } from "../../../logging";
 import { getSOLBalance } from "../../../rpc/rpc_wallet";
 import { getVsTokenInfo } from "../../../tokens";
 import { ChangeTrackedValue, strictParseFloat } from "../../../util";
@@ -16,15 +17,12 @@ export class SOLBalanceTracker {
 
     initialize(entries : Map<string,any>) {
         this.maybeSOLBalance.initialize(entries);
-        //this.lastRefreshedSOLBalance.initialize(entries);
     }
 
     async flushToStorage(storage : DurableObjectStorage) {
         const flushSOLBalance = this.maybeSOLBalance.flushToStorage(storage);
-        //const flushLastRefresh = this.lastRefreshedSOLBalance.flushToStorage(storage);
         return await Promise.allSettled([
-            flushSOLBalance,
-            //flushLastRefresh
+            flushSOLBalance
         ]);
     }
 
@@ -33,10 +31,16 @@ export class SOLBalanceTracker {
             return null;
         }
         if (this.refreshIntervalExpired(env) || forceRefresh) {
+            logDebug(`Refreshing SOL balance for ${address}`);
+            const startRefreshMS = Date.now();
             const refreshedBalance = await this.getBalanceFromRPC(address, env);
             if (refreshedBalance != null) {
                 this.maybeSOLBalance.value = refreshedBalance;
                 this.lastRefreshedSOLBalance = Date.now();
+                logDebug(`SOL balance refreshed for ${address} in ${Date.now() - startRefreshMS}ms`);
+            }
+            else {
+                logDebug(`SOL balance failed to refresh for ${address}`);
             }
         }
         return this.maybeSOLBalance.value||null;

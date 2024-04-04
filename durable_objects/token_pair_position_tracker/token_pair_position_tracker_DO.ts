@@ -489,7 +489,7 @@ export class TokenPairPositionTrackerDO {
 
         for (const { type, pos } of allThingsToDo) {
             if (type === 'buy') {
-                const buyConfirmPrefix = `<b>Confirming purchase of ${asTokenPrice(pos.tokenAmt)} ${pos.token.symbol}</b>`;
+                const buyConfirmPrefix = `<b>Confirming purchase of ${asTokenPrice(pos.tokenAmt)} ${pos.token.symbol}</b>: `;
                 const channel = TGStatusMessage.createAndSend('In progress...', false, pos.chatID, this.env, 'HTML', buyConfirmPrefix);
                 const confirmedBuy = await buyConfirmer.confirmBuy(pos);
                 if (confirmedBuy === 'api-error') {

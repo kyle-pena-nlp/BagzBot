@@ -1,7 +1,7 @@
 import { DurableObjectNamespace } from "@cloudflare/workers-types";
 import { randomUUID } from "node:crypto";
 import { decryptPrivateKey } from "../crypto";
-import { fromNumber } from "../decimalized";
+import { DecimalizedAmount, fromNumber } from "../decimalized";
 import { claimInviteCode, listUnclaimedBetaInviteCodes } from "../durable_objects/beta_invite_codes/beta_invite_code_interop";
 import { doHeartbeatWakeup } from "../durable_objects/heartbeat/heartbeat_do_interop";
 import { GetTokenInfoResponse, isInvalidTokenInfoResponse, isValidTokenInfoResponse } from "../durable_objects/polled_token_pair_list/actions/get_token_info";
@@ -10,7 +10,7 @@ import { _devOnlyFeatureUpdatePrice, adminInvokeAlarm } from "../durable_objects
 import { OpenPositionRequest } from "../durable_objects/user/actions/open_new_position";
 import { QuantityAndToken } from "../durable_objects/user/model/quantity_and_token";
 import { TokenSymbolAndAddress } from "../durable_objects/user/model/token_name_and_address";
-import { adminDeleteAllPositions, editTriggerPercentOnOpenPositionFromUserDO, getDefaultTrailingStopLoss, getPositionFromUserDO, getUserData, getWalletData, impersonateUser, listPositionsFromUserDO, manuallyClosePosition, maybeReadSessionObj, readSessionObj, requestNewPosition, sendMessageToUser, setSellAutoDoubleOnOpenPosition, setSellSlippagePercentOnOpenPosition, storeLegalAgreementStatus, storeSessionObj, storeSessionObjProperty, storeSessionValues, unimpersonateUser } from "../durable_objects/user/userDO_interop";
+import { adminDeleteAllPositions, editTriggerPercentOnOpenPositionFromUserDO, getDefaultTrailingStopLoss, getPositionFromUserDO, getUserData, getUserWalletSOLBalance, getWalletData, impersonateUser, listPositionsFromUserDO, manuallyClosePosition, maybeReadSessionObj, readSessionObj, requestNewPosition, sendMessageToUser, setSellAutoDoubleOnOpenPosition, setSellSlippagePercentOnOpenPosition, storeLegalAgreementStatus, storeSessionObj, storeSessionObjProperty, storeSessionValues, unimpersonateUser } from "../durable_objects/user/userDO_interop";
 import { Env } from "../env";
 import { logDebug, logError } from "../logging";
 import { BaseMenu, LegalAgreement, MenuBetaInviteFriends, MenuCode, MenuContinueMessage, MenuEditOpenPositionSellAutoDoubleSlippage, MenuEditOpenPositionSellSlippagePercent, MenuEditOpenPositionTriggerPercent, MenuEditPositionHelp, MenuEditPositionRequestSellAutoDoubleSlippage, MenuError, MenuFAQ, MenuListPositions, MenuMain, MenuOKClose, MenuTODO, MenuTrailingStopLossEntryBuyQuantity, MenuTrailingStopLossPickVsToken, MenuTrailingStopLossSlippagePercent, MenuTrailingStopLossTriggerPercent, MenuViewDecryptedWallet, MenuViewOpenPosition, MenuWallet, PositionIDAndChoice, SubmittedTriggerPctKey, WelcomeScreenPart1 } from "../menus";
@@ -126,7 +126,8 @@ export class Worker {
             POSITION_REQUEST_STORAGE_KEY, 
             this.env);
 
-        const menu = await this.makeStopLossRequestEditorMenu(positionRequest, this.env);
+        const maybeSOLBalance = await getUserWalletSOLBalance(info.getTelegramUserID(), info.chatID, this.env);
+        const menu = await this.makeStopLossRequestEditorMenu(positionRequest, maybeSOLBalance, this.env);
         const menuRequest = menu.getUpdateExistingMenuRequest(chatID, conversationMessageID, this.env);
         await fetch(menuRequest);
 
@@ -154,6 +155,7 @@ export class Worker {
         const chatID = params.chatID;
         const callbackData = params.callbackData;
         logDebug(`Invoking callback with ${callbackData.toString()}`);
+        const maybeSOLBalance = await getUserWalletSOLBalance(params.getTelegramUserID(), params.chatID, this.env);
         // TODO: factor this giant state machine switch statement into handlers (chain-of-responsibility-esque?)
         switch(callbackData.menuCode) {
             case MenuCode.Main:
@@ -176,7 +178,7 @@ export class Worker {
                 }
                 const request = convertPreRequestToRequest(newPrerequest, quote, tokenInfoResponse.tokenInfo);
                 await storeSessionObj<PositionRequest>(params.getTelegramUserID(), params.chatID, messageID, request, POSITION_REQUEST_STORAGE_KEY, this.env);
-                return new MenuEditPositionRequest(request);
+                return new MenuEditPositionRequest({ positionRequest: request, maybeSOLBalance });
             case MenuCode.Error:
                 return new MenuError(undefined);
             case MenuCode.ViewDecryptedWallet:
@@ -231,7 +233,7 @@ export class Worker {
                     await storeSessionObjProperty(params.getTelegramUserID(), params.chatID, messageID, "slippagePercent", slipPctEntry, POSITION_REQUEST_STORAGE_KEY, this.env);
                 }
                 const positionRequestAfterEditingSlippagePct = await readSessionObj<PositionRequest>(params.getTelegramUserID(), params.chatID, messageID, POSITION_REQUEST_STORAGE_KEY, this.env);
-                return await this.makeStopLossRequestEditorMenu(positionRequestAfterEditingSlippagePct, this.env);                
+                return await this.makeStopLossRequestEditorMenu(positionRequestAfterEditingSlippagePct, maybeSOLBalance, this.env);                
             case MenuCode.CustomBuyQuantity:
                 const buyQuantityQuestion  = new ReplyQuestion(
                     "Enter the quantity of SOL to buy", 
@@ -255,7 +257,7 @@ export class Worker {
                 }
                 await storeSessionObjProperty(params.getTelegramUserID(), params.chatID, messageID, "vsTokenAmt", submittedBuyQuantity, POSITION_REQUEST_STORAGE_KEY, this.env);
                 const trailingStopLossRequestStateAfterBuyQuantityEdited = await readSessionObj<PositionRequest>(params.getTelegramUserID(), params.chatID, messageID, POSITION_REQUEST_STORAGE_KEY, this.env);
-                return await this.makeStopLossRequestEditorMenu(trailingStopLossRequestStateAfterBuyQuantityEdited, this.env);
+                return await this.makeStopLossRequestEditorMenu(trailingStopLossRequestStateAfterBuyQuantityEdited, maybeSOLBalance, this.env);
             case MenuCode.CustomTriggerPct:
                 const triggerPctQuestion = new ReplyQuestion(
                     "Enter a custom trigger percent",
@@ -278,7 +280,7 @@ export class Worker {
                 }
                 await storeSessionObjProperty(params.getTelegramUserID(), params.chatID, messageID, "triggerPercent", triggerPctEntry, POSITION_REQUEST_STORAGE_KEY, this.env);
                 const updatedTSL = await readSessionObj<PositionRequest>(params.getTelegramUserID(), params.chatID, messageID, POSITION_REQUEST_STORAGE_KEY, this.env);
-                return await this.makeStopLossRequestEditorMenu(updatedTSL, this.env);                
+                return await this.makeStopLossRequestEditorMenu(updatedTSL, maybeSOLBalance, this.env);                
             case MenuCode.TrailingStopLossEditorFinalSubmit:
                 // TODO: do the read within UserDO to avoid the extra roundtrip
                 const positionRequestAfterFinalSubmit = await readSessionObj<PositionRequest>(params.getTelegramUserID(), params.chatID, messageID, POSITION_REQUEST_STORAGE_KEY, this.env);
@@ -304,7 +306,7 @@ export class Worker {
                     //["vsTokenAddress", vsTokenAddress]
                 ]), POSITION_REQUEST_STORAGE_KEY, this.env);
                 const trailingStopLossPositionRequestAfterSubmittingVsToken = await readSessionObj<PositionRequest>(params.getTelegramUserID(), params.chatID, messageID, POSITION_REQUEST_STORAGE_KEY, this.env);
-                return await this.makeStopLossRequestEditorMenu(trailingStopLossPositionRequestAfterSubmittingVsToken, this.env);
+                return await this.makeStopLossRequestEditorMenu(trailingStopLossPositionRequestAfterSubmittingVsToken, maybeSOLBalance, this.env);
             case MenuCode.TransferFunds:
                 return new MenuTODO(MenuCode.Wallet);
             case MenuCode.Wallet:
@@ -323,7 +325,7 @@ export class Worker {
                 return new MenuTrailingStopLossTriggerPercent(triggerPercent);
             case MenuCode.TrailingStopLossRequestReturnToEditorMenu:
                 const z = await readSessionObj<PositionRequest>(params.getTelegramUserID(), params.chatID, messageID, POSITION_REQUEST_STORAGE_KEY, this.env);
-                return await this.makeStopLossRequestEditorMenu(z, this.env);
+                return await this.makeStopLossRequestEditorMenu(z, maybeSOLBalance, this.env);
             case MenuCode.BetaGateInviteFriends:
                 const unclaimedBetaCodes = await listUnclaimedBetaInviteCodes({ userID : params.getTelegramUserID() }, this.env);
                 if (!unclaimedBetaCodes.success) {
@@ -351,7 +353,7 @@ export class Worker {
                 }
                 const positionRequest = await readSessionObj<PositionRequest>(params.getTelegramUserID(), params.chatID, messageID, POSITION_REQUEST_STORAGE_KEY, this.env);
                 if (positionRequest.token.address === newTokenAddress) {
-                    return new MenuEditPositionRequest(positionRequest);
+                    return new MenuEditPositionRequest({ positionRequest: positionRequest, maybeSOLBalance });
                 }                
                 const tokenValidationInfo = await getTokenInfo(newTokenAddress, this.env);
                 if (isInvalidTokenInfoResponse(tokenValidationInfo)) {
@@ -365,7 +367,7 @@ export class Worker {
                 }
                 positionRequest.quote = maybeQuote;
                 await storeSessionObj<PositionRequest>(params.getTelegramUserID(), params.chatID, messageID, positionRequest, POSITION_REQUEST_STORAGE_KEY, this.env);
-                return new MenuEditPositionRequest(positionRequest);
+                return new MenuEditPositionRequest({ positionRequest, maybeSOLBalance });
             case MenuCode.WelcomeScreenPart1:
                 return new WelcomeScreenPart1(undefined);
             case MenuCode.LegalAgreement:
@@ -523,7 +525,7 @@ export class Worker {
                         params.messageID, 
                         POSITION_REQUEST_STORAGE_KEY, 
                         this.env);
-                    return new MenuEditPositionRequest(pr);
+                    return new MenuEditPositionRequest({ positionRequest: pr, maybeSOLBalance });
                 }
             case MenuCode.AdminInvokeAlarm:
                 return new ReplyQuestion('Enter token address', ReplyQuestionCode.AdminInvokeAlarm, this.context, { callback: { linkedMessageID: params.messageID, nextMenuCode: MenuCode.SubmitAdminInvokeAlarm }});
@@ -619,9 +621,9 @@ export class Worker {
         };
     }
 
-    private async makeStopLossRequestEditorMenu(positionRequest : PositionRequest, env : Env) : Promise<BaseMenu> {
+    private async makeStopLossRequestEditorMenu(positionRequest : PositionRequest, maybeSOLBalance : DecimalizedAmount|null, env : Env) : Promise<BaseMenu> {
         await this.refreshQuote(positionRequest, env);
-        return new MenuEditPositionRequest(positionRequest);
+        return new MenuEditPositionRequest({ positionRequest, maybeSOLBalance });
     }
 
     private async handleManuallyClosePosition(telegramUserID : number, chatID : number, positionID : string, env : Env) : Promise<Response> {
@@ -781,7 +783,9 @@ export class Worker {
                     obj: positionRequest
                 };
 
-                return ['...', new MenuEditPositionRequest(positionRequest), storeObjectRequest];
+                const maybeSOLBalance = await getUserWalletSOLBalance(positionRequest.userID, positionRequest.chatID, this.env);
+
+                return ['...', new MenuEditPositionRequest({ positionRequest, maybeSOLBalance }), storeObjectRequest];
             default:
                 throw new Error(`Unrecognized command: ${command}`);
         }

@@ -1,5 +1,5 @@
 import { dAdd, toFriendlyString } from "../decimalized";
-import { toNumber } from "../decimalized/decimalized_amount";
+import { asTokenPrice, toNumber } from "../decimalized/decimalized_amount";
 import { UserData } from "../durable_objects/user/model/user_data";
 import { CallbackButton } from "../telegram";
 import { interpretPct, interpretSOLAmount } from "../telegram/emojis";
@@ -48,7 +48,7 @@ export class MenuMain extends Menu<UserData & Stuff> implements MenuCapabilities
         if (this.menuData.maybePNL != null && this.menuData.maybeSOLBalance != null) {
             const totalWalletValue = dAdd(this.menuData.maybeSOLBalance, this.menuData.maybePNL.currentTotalValue);
             const walletValueEmoji = interpretSOLAmount(toNumber(totalWalletValue));
-            lines.push(`<b>Total Value of Wallet:</b> ${toFriendlyString(totalWalletValue,4, { useSubscripts: false, addCommas: true, maxDecimalPlaces: 4 })} SOL ${walletValueEmoji}`)
+            lines.push(`<b>Total Value of Wallet:</b> ${asTokenPrice(totalWalletValue)} SOL ${walletValueEmoji}`)
         }
 
         if (this.menuData.isImpersonatingUser) {

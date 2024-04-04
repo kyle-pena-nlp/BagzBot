@@ -1,3 +1,4 @@
+import { DecimalizedAmount } from "../../decimalized";
 import { Env } from "../../env";
 import { Position } from "../../positions";
 import { TokenInfo } from "../../tokens";
@@ -12,6 +13,7 @@ import { GetLegalAgreementStatusRequest, GetLegalAgreementStatusResponse } from 
 import { GetPositionFromUserDORequest, GetPositionFromUserDOResponse } from "./actions/get_position_from_user_do";
 import { GetSessionValuesRequest, GetSessionValuesWithPrefixRequest, GetSessionValuesWithPrefixResponse, SessionValuesResponse } from "./actions/get_session_values";
 import { GetUserDataRequest } from "./actions/get_user_data";
+import { GetUserWalletSOLBalanceRequest, GetUserWalletSOLBalanceResponse } from "./actions/get_user_wallet_balance";
 import { GetWalletDataRequest, GetWalletDataResponse } from "./actions/get_wallet_data";
 import { ImpersonateUserRequest, ImpersonateUserResponse } from "./actions/impersonate_user";
 import { ListPositionsFromUserDORequest, ListPositionsFromUserDOResponse } from "./actions/list_positions_from_user_do";
@@ -49,7 +51,15 @@ export enum UserDOFetchMethod {
 	editTriggerPercentOnOpenPosition = "editTriggerPercentOnOpenPosition",
 	setSellAutoDoubleOnOpenPositionRequest = "setSellAutoDoubleOnOpenPositionRequest",
 	adminDeleteAllPositions = "adminDeleteAllPositions",
-	setSellSlippagePercentOnOpenPosition = "setSellSlippagePercentOnOpenPosition"
+	setSellSlippagePercentOnOpenPosition = "setSellSlippagePercentOnOpenPosition",
+	getUserWalletSOLBalance = "getUserSOLBalance"
+}
+
+export async function getUserWalletSOLBalance(telegramUserID : number, chatID : number, env : Env) : Promise<DecimalizedAmount|null> {
+	const request : GetUserWalletSOLBalanceRequest = { telegramUserID, chatID };
+	const method = UserDOFetchMethod.getUserWalletSOLBalance;
+	const response = await sendJSONRequestToUserDO<GetUserWalletSOLBalanceRequest,GetUserWalletSOLBalanceResponse>(telegramUserID, method, request, env);
+	return response.maybeSOLBalance;
 }
 
 export async function setSellSlippagePercentOnOpenPosition(telegramUserID : number, chatID : number, positionID : string, sellSlippagePercent : number, env : Env) : Promise<SellSellSlippagePercentageOnOpenPositionResponse> {

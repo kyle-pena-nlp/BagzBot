@@ -26,7 +26,7 @@ export class MenuViewOpenPosition extends Menu<PositionAndMaybePNL|BrandNewPosit
         if (this.isClosingOrClosed()) {
             // no-op
         }
-        else if (this.menuData.position.status === PositionStatus.Open) {
+        else if (this.menuData.position.status === PositionStatus.Open && !this.triggerConditionMet()) {
 
             const closePositionCallbackData = new CallbackData(MenuCode.ClosePositionManuallyAction, this.menuData.position.positionID);
             
@@ -38,10 +38,11 @@ export class MenuViewOpenPosition extends Menu<PositionAndMaybePNL|BrandNewPosit
             this.insertButtonNextLine(options, `:twisted_arrows: ${this.menuData.position.sellSlippagePercent}% Slippage`, new CallbackData(MenuCode.EditOpenPositionSellSlippagePercent, this.menuData.position.positionID));
             this.insertButtonNextLine(options, `:brain: ${this.menuData.position.sellAutoDoubleSlippage ? '': 'Do Not'} Auto-Double Slippage If Sell Fails :brain:`, new CallbackData(MenuCode.EditOpenPositionAutoDoubleSlippage, this.menuData.position.positionID));
 
-            const refreshPositionCallbackData = new CallbackData(MenuCode.ViewOpenPosition, this.menuData.position.positionID);
-            this.insertButtonNextLine(options, ":refresh: Refresh", refreshPositionCallbackData);
+            
         }
 
+        const refreshPositionCallbackData = new CallbackData(MenuCode.ViewOpenPosition, this.menuData.position.positionID);
+        this.insertButtonNextLine(options, ":refresh: Refresh", refreshPositionCallbackData);
         this.insertButtonNextLine(options, ":back: Back", this.menuCallback(MenuCode.ListPositions));
 
         return options;
@@ -50,8 +51,9 @@ export class MenuViewOpenPosition extends Menu<PositionAndMaybePNL|BrandNewPosit
     private headerLines() : string[] {
 
         // name and amount of position, and token address
+        const refreshNonce = Math.floor(Date.now() / 60000);
         const lines = [
-            `<b>${asTokenPrice(this.position().tokenAmt)} of $${this.position().token.symbol}</b>`,
+            `<b>${asTokenPrice(this.position().tokenAmt)} of <a href="https://birdeye.so/token/${this.menuData.position.token.address}?chain=solana&v=5&nonce=${refreshNonce}">$${this.position().token.symbol}</a></b>`,
             ` (<code>${this.position().token.address}</code>)`
         ];
 
@@ -62,7 +64,7 @@ export class MenuViewOpenPosition extends Menu<PositionAndMaybePNL|BrandNewPosit
         }
         
         if (this.triggerConditionMet()) {
-            lines.push(`:bullet: The position's trigger condition has been met! Look for a notification if the price stays at or below this level.`);
+            lines.push(`:bullet: The position's trigger condition has been met! This position will be sold if the price remains below this level.`);
         }
         else if (this.isClosing()) {
             lines.push(`:bullet: We are attempting to sell this position.`);

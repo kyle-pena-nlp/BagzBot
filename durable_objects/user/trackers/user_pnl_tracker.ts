@@ -2,6 +2,7 @@ import { DurableObjectStorage } from "@cloudflare/workers-types";
 import { dAdd, dDiv, dMult } from "../../../decimalized";
 import { MATH_DECIMAL_PLACES, dZero, fromNumber } from "../../../decimalized/decimalized_amount";
 import { Env } from "../../../env";
+import { logDebug } from "../../../logging";
 import { ChangeTrackedValue, strictParseFloat } from "../../../util";
 import { listPositionsByUser } from "../../token_pair_position_tracker/token_pair_position_tracker_do_interop";
 import { TokenPair } from "../model/token_pair";
@@ -32,6 +33,8 @@ export class UserPNLTracker {
         let originalTotalValue = dZero();
         let currentTotalValue = dZero();
         if (this.refreshIntervalExpired(env) || forceRefresh) {
+            logDebug(`Recalculating PNL for ${telegramUserID}`);
+            const startTimeMS = Date.now();
             for (const tokenPair of uniqueTokenPairs) {
                 const positionsWithPNL = await listPositionsByUser(telegramUserID, tokenPair.tokenAddress, tokenPair.vsTokenAddress, env);
                 for (const positionWithPNL of positionsWithPNL) {
@@ -50,6 +53,7 @@ export class UserPNLTracker {
                 PNL: PNL,
                 PNLpercent: PNLpercent||dZero()
             }
+            logDebug(`PNL recalculated for ${telegramUserID} in ${Date.now() - startTimeMS}ms`);
         }
         return this.maybeUserPNL.value||null;
     }
