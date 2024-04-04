@@ -24,7 +24,10 @@ export class MenuMain extends Menu<UserData & Stuff> implements MenuCapabilities
         ];
 
         if (this.menuData.isBeta) {
-            lines.push(`${this.menuData.botName} is in BETA - USE AT YOUR OWN RISK!`);
+            lines.push("");
+            lines.push(`<blockquote>${this.menuData.botName} is in BETA - USE AT YOUR OWN RISK!`);
+            lines.push(`Maintenance window will be from 12:00 AM to 2:00 AM EST.</blockquote>`);
+            lines.push("");
         }
         
         if (this.menuData.maybeSOLBalance != null) {
