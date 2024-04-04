@@ -1,3 +1,5 @@
+import { logError } from "../logging";
+
 export async function maybeGetJson<T>(x : Request|Response) : Promise<T|null> {
     try {
         return await x.json();
@@ -14,6 +16,28 @@ export async function tryReadResponseBody(x : Response) : Promise<any|null> {
     catch {
         return null;
     }
+}
+
+export async function fetchAndReadResponse(request : Request) : Promise<null|{ body: any, ok : boolean }> {
+    const response = await fetch(request)
+        .then(async tgResponse => {
+            const responseBody = (await tgResponse.json().catch(e => {})) as any;
+            let ok = tgResponse.ok;
+            if (!ok && (responseBody.description||'').includes("is not modified")) {
+                // TG has an annoying edge case where it considers an update with the same text to be an invalid request.
+                // I am overriding that determination by TG here.
+                ok = true;
+            }
+            else if (!ok) {
+                logError(responseBody.description||'');
+            }
+            return { body: responseBody, ok: ok };
+        })
+        .catch(e => {
+            logError(`Error sending request`, e);
+            return null;
+        });
+    return response;
 }
 
 

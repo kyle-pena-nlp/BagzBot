@@ -91,4 +91,8 @@ export class MenuMain extends Menu<UserData & Stuff> implements MenuCapabilities
         this.insertCloseButtonNextLine(options);
         return options;
     }
+
+    photo() {
+        return 'https://imgur.com/KMrMt85';
+    }
 }

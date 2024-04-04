@@ -215,8 +215,7 @@ export default {
 			return 'proceed';
 		}
 		else if (legalAgreementStatus === 'has-not-responded') {
-			const legalAgreementMenuRequest = new LegalAgreement(undefined).getCreateNewMenuRequest(chatID, env);
-			await fetch(legalAgreementMenuRequest);
+			await new LegalAgreement(undefined).sendToTG({ chatID }, env);
 			return 'do-not-proceed';
 		}
 		else {
@@ -270,7 +269,7 @@ export default {
 				{
 					timeoutMS: 10000
 				});
-			await replyQuestion.sendReplyQuestion(info.getTelegramUserID('real'), chatID, env);
+			await replyQuestion.sendReplyQuestionToTG(info.getTelegramUserID('real'), chatID, env);
 			return 'beta-restricted';
 		}
 		return 'proceed';

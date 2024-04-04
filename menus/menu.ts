@@ -2,8 +2,10 @@ import { Env } from "../env";
 import { CallbackData } from "./callback_data";
 import { MenuCode } from "./menu_code";
 
+import { logDebug } from "../logging";
 import { CallbackButton, escapeTGText, makeTelegramBotUrl, subInEmojis, subInEmojisOnButtons } from "../telegram";
 import { makeJSONRequest } from "../util";
+import { fetchAndReadResponse as safeFetchAndReadResponse } from "../util/http_helpers";
 
 export enum MenuDisplayMode {
 	UpdateMenu,
@@ -16,6 +18,7 @@ export interface MenuSpec {
 	parseMode : 'HTML'|'MarkdownV2'
 	mode : MenuDisplayMode
 	renderLinkPreviewAsIcon : boolean
+    photo : string|null
 }
 
 export interface MenuCapabilities {
@@ -23,6 +26,7 @@ export interface MenuCapabilities {
     renderOptions() : CallbackButton[][];
     parseMode() : 'MarkdownV2'|'HTML'
     renderURLPreviewNormally() : boolean
+    photo(): string|null
 }
 
 export abstract class BaseMenu {
@@ -30,48 +34,96 @@ export abstract class BaseMenu {
     constructor() {
     }
 
-    getCreateNewMenuRequest(chatID : number, env:  Env) {
+    async sendToTG(params: { chatID : number, messageID : number }|{ chatID : number }, env : Env) : Promise<boolean> {
+        const startMS = Date.now();
+        
+        // sometimes, updating a menu takes more than one request (only if sending photos)
+
+        let request : Request|null = null;
+
+        // get Requests used to build the menu
+        if ('messageID' in params) {
+            request = this.getUpdateExistingMenuRequest(params.chatID, params.messageID, env);
+        }
+        else {
+            request = this.getCreateNewMenuRequest(params.chatID, env);
+        }
+
+        const response = await safeFetchAndReadResponse(request);
+
+        if (response == null || !response.ok) {
+            return false;
+        }
+
+        await this.maybeSendPhoto(response.body, env);
+
+        logDebug(`Sent menu requests in ${Date.now() - startMS}ms`);
+        return true;
+    }
+
+    private async maybeSendPhoto(response : any, env: Env) {
+        const photo = (this as unknown as MenuCapabilities).photo();
+
+        if (photo != null) {
+            const messageID = response.body?.message_id;
+            const chatID = response.body?.chat.id;
+            if (messageID != null) {
+                const url = makeTelegramBotUrl('editMessageMedia', env);
+                const body : any = {
+                    chat_id : chatID,
+                    message_id : messageID,
+                    media : {
+                        type : 'photo',
+                        media : photo
+                    }
+                };
+                const request = makeJSONRequest(url, body);
+                const response = safeFetchAndReadResponse(request);
+            }
+        }
+    }
+
+    private getCreateNewMenuRequest(chatID : number, env:  Env) : Request {
         // == null is true when either null or undefined, but not zero
         const menuSpec = BaseMenu.renderMenuSpec(this as unknown as MenuCapabilities, MenuDisplayMode.NewMenu);
-        const body : any = { 
-            chat_id: chatID,
-            text: menuSpec.text,
-            parse_mode: menuSpec.parseMode
-        };
-        if (menuSpec.options.length > 0 && menuSpec.options[0].length > 0) {
-            body.reply_markup = {
-                "inline_keyboard": menuSpec.options
-            };
-        }
+        const body = this.createRequestBodyForMenu(menuSpec, chatID);
         const method = 'sendMessage';
         const url = makeTelegramBotUrl(method, env);
         const request = makeJSONRequest(url, body);
         return request;        
     }
 
-    getUpdateExistingMenuRequest(chatID : number, messageID : number, env : Env) {
+    private getUpdateExistingMenuRequest(chatID : number, messageID : number, env : Env) : Request {
         const menuSpec = BaseMenu.renderMenuSpec(this as unknown as MenuCapabilities, MenuDisplayMode.UpdateMenu);
+        menuSpec.photo = null; // i don't support sending photos with edited messages yet. would require a refactor.
+        const body = this.createRequestBodyForMenu(menuSpec, chatID);
+        body.message_id = messageID;
+        const method = 'editMessageText';
+        const url = makeTelegramBotUrl(method, env);
+        const request = makeJSONRequest(url, body);
+        return request;
+    }
+
+    private createRequestBodyForMenu(menuSpec: MenuSpec, chatID : number) : any {
         const body : any = { 
             chat_id: chatID,
-            text: menuSpec.text,
-            parse_mode: menuSpec.parseMode,
-            message_id: messageID
+            parse_mode: menuSpec.parseMode
         };
         if (menuSpec.renderLinkPreviewAsIcon) {
             body.link_preview_options = {
                 prefer_small_media: true,
                 show_above_text : true
             }
-        }
+        }        
         if (menuSpec.options.length > 0 && menuSpec.options[0].length > 0) {
             body.reply_markup = {
                 "inline_keyboard": menuSpec.options
             };
         }
-        const method = 'editMessageText';
-        const url = makeTelegramBotUrl(method, env);
-        const request = makeJSONRequest(url, body);
-        return request;
+        // TG gets upset if you update a message to the same exact content.  This makes all content unique.
+        const invisibleNonce = `<a href="t.me/share?url=google.com&text=${Date.now()}">\u200B</a>`
+        body.text = menuSpec.text + invisibleNonce;
+        return body;
     }
 
     private static renderMenuSpec(menu : MenuCapabilities, mode: MenuDisplayMode): MenuSpec {
@@ -80,7 +132,8 @@ export abstract class BaseMenu {
             options : subInEmojisOnButtons(menu.renderOptions()),
             parseMode : menu.parseMode(),
             mode : mode,
-            renderLinkPreviewAsIcon : !menu.renderURLPreviewNormally()
+            renderLinkPreviewAsIcon : !menu.renderURLPreviewNormally(),
+            photo: menu.photo()
         };
         return menuSpec;
     }
@@ -101,6 +154,10 @@ export abstract class Menu<T> extends BaseMenu {
     
     renderURLPreviewNormally(): boolean {
         return true;
+    }
+
+    photo() : string|null {
+        return null;
     }
 
     protected insertButton(options : CallbackButton[][], text : string, callbackData : CallbackData, lineNumber : number) {

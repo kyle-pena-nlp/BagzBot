@@ -22,7 +22,7 @@ import { ReplyQuestionData, replyQuestionHasNextSteps } from "../reply_question/
 import { quoteBuy } from "../rpc/jupiter_quotes";
 import { isGetQuoteFailure } from "../rpc/rpc_types";
 import { POSITION_REQUEST_STORAGE_KEY } from "../storage_keys";
-import { TelegramWebhookInfo, deleteTGMessage, sendMessageToTG, sendRequestToTG, updateTGMessage } from "../telegram";
+import { TelegramWebhookInfo, deleteTGMessage, sendMessageToTG, updateTGMessage } from "../telegram";
 import { TokenInfo, WEN_ADDRESS, getVsTokenInfo } from "../tokens";
 import { Structural, assertNever, makeFakeFailedRequestResponse, makeSuccessResponse, strictParseBoolean, strictParseFloat, strictParseInt, tryParseBoolean, tryParseFloat, tryParseInt } from "../util";
 import { assertIs } from "../util/enums";
@@ -128,9 +128,7 @@ export class Worker {
 
         const maybeSOLBalance = await getUserWalletSOLBalance(info.getTelegramUserID(), info.chatID, this.env);
         const menu = await this.makeStopLossRequestEditorMenu(positionRequest, maybeSOLBalance, this.env);
-        const menuRequest = menu.getUpdateExistingMenuRequest(chatID, conversationMessageID, this.env);
-        await fetch(menuRequest);
-
+        await menu.sendToTG({ chatID, messageID : conversationMessageID }, this.env);
         return makeSuccessResponse();
     }
 
@@ -140,11 +138,10 @@ export class Worker {
             return makeSuccessResponse();
         }
         else if ('question' in menuOrReplyQuestion) {
-            await menuOrReplyQuestion.sendReplyQuestion(params.getTelegramUserID('real'), params.chatID, this.env);
+            await menuOrReplyQuestion.sendReplyQuestionToTG(params.getTelegramUserID('real'), params.chatID, this.env);
         }
         else {
-            const menuDisplayRequest = menuOrReplyQuestion.getUpdateExistingMenuRequest(params.chatID, params.messageID, this.env);
-            await sendRequestToTG(menuDisplayRequest!!);
+            await menuOrReplyQuestion.sendToTG({ chatID: params.chatID, messageID: params.messageID }, this.env);
         }
         return makeSuccessResponse();
     }
@@ -423,11 +420,7 @@ export class Worker {
                 if (betaFeedbackAnswer !== '') {
                     this.context.waitUntil(this.sendBetaFeedbackToSuperAdmin(betaFeedbackAnswer, params.getTelegramUserName()));
                 }
-                const thankYouDialogueRequest = new MenuOKClose("Thank you!").getCreateNewMenuRequest(chatID, this.env);
-                await fetch(thankYouDialogueRequest).catch(r => {
-                    logError("Failed to send thank you");
-                    return null;
-                });
+                await new MenuOKClose("Thank you!").sendToTG({ chatID }, this.env);
                 return;
             case MenuCode.AdminDevSetPrice:
                 return new ReplyQuestion(
@@ -649,8 +642,7 @@ export class Worker {
             await storeSessionObj(telegramWebhookInfo.getTelegramUserID(), telegramWebhookInfo.chatID, conversationMessageID, storeSessionObjectRequest.obj, storeSessionObjectRequest.prefix, this.env);
         }
         if (menu != null) {
-            const menuDisplayRequest = menu.getUpdateExistingMenuRequest(telegramWebhookInfo.chatID, conversationMessageID, this.env);
-            fetch(menuDisplayRequest);
+            await menu.sendToTG({ chatID : telegramWebhookInfo.chatID, messageID :conversationMessageID}, this.env);
         }
         return makeSuccessResponse();
     }
@@ -714,8 +706,7 @@ export class Worker {
     }
 
     private async sendUserWelcomeScreen(telegramWebhookInfo : TelegramWebhookInfo, env : Env) {
-        const request = new WelcomeScreenPart1(undefined).getCreateNewMenuRequest(telegramWebhookInfo.chatID, env);
-        await fetch(request);
+        await new WelcomeScreenPart1(undefined).sendToTG({ chatID : telegramWebhookInfo.chatID }, env);
     }
 
     private async handleCommandInternal(command : string, info : TelegramWebhookInfo, messageID : number, env : Env) : Promise<[string,BaseMenu?,{ obj : any, prefix : string }?]> {

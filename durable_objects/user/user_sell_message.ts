@@ -13,8 +13,7 @@ export async function publishFinalSellMessage(position : Position, type : 'Sell'
     TGStatusMessage.queue(channel, finalSellMessage, true);
     await TGStatusMessage.finalize(channel);
     if (type === 'Sell' && (status !== 'confirmed' && status !== 'unconfirmed')) {
-        const requestSellDialogueRequest = new MenuRetryManualSell({ status: status, positionID : position.positionID }).getCreateNewMenuRequest(chatID, env);
-        await fetch(requestSellDialogueRequest);
+        await new MenuRetryManualSell({ status: status, positionID : position.positionID }).sendToTG({ chatID }, env);
     }
 }
 

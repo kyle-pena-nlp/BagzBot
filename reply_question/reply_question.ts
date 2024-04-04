@@ -39,7 +39,7 @@ export class ReplyQuestion {
         this.parseMode = opts?.parseMode || 'HTML';
         this.timeoutMS = opts?.timeoutMS;
     }
-    async sendReplyQuestion(telegramUserID : number, chatID : number, env : Env) : Promise<void> {
+    async sendReplyQuestionToTG(telegramUserID : number, chatID : number, env : Env) : Promise<void> {
         const tgSentMessageInfo = await sendQuestionToTG(chatID, this.question, this.context, env, this.parseMode, this.timeoutMS);
         if (!tgSentMessageInfo.success) {
             return;
