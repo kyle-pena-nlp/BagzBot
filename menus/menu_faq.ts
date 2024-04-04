@@ -1,7 +1,7 @@
 import { CallbackButton } from "../telegram";
 import { Menu, MenuCapabilities } from "./menu";
 
-export class MenuFAQ extends Menu<{ botName : string, botInstance : string, botTagline : string }> implements MenuCapabilities {
+export class MenuFAQ extends Menu<{ botName : string, botInstance : string, botTagline : string, userID : number, chatID : number }> implements MenuCapabilities {
     renderText(): string {
         return this.renderFAQ();
     }
@@ -63,6 +63,10 @@ at the last possible moment, and with a decryption key that is unique per-user.
 <b>Disclaimer</b>
 You use ${botName} at your own risk, without exceptions!
 We are not responsible for any losses, regardless of cause, origin, or fault.
+
+<b>Support Information</b>
+:bullet: User ID: ${this.menuData.userID}
+:bullet: Chat ID: ${this.menuData.chatID}
 `;
     }
 }

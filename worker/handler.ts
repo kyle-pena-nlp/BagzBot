@@ -192,7 +192,9 @@ export class Worker {
                 return new MenuFAQ({ 
                     botName : this.env.TELEGRAM_BOT_DISPLAY_NAME,
                     botInstance : this.env.TELEGRAM_BOT_INSTANCE_DISPLAY_NAME,
-                    botTagline: this.env.TELEGRAM_BOT_TAGLINE
+                    botTagline: this.env.TELEGRAM_BOT_TAGLINE,
+                    userID : params.getTelegramUserID(),
+                    chatID : params.chatID
                 });
             case MenuCode.ListPositions:
                 const positions = await listPositionsFromUserDO(params.getTelegramUserID(), params.chatID, this.env);
@@ -748,7 +750,12 @@ export class Worker {
             case '/legal_agreement':
                 return ['...', new LegalAgreement(undefined)];
             case '/faq':
-                return ['...', new MenuFAQ({ botName : env.TELEGRAM_BOT_DISPLAY_NAME, botInstance: env.TELEGRAM_BOT_INSTANCE_DISPLAY_NAME, botTagline: env.TELEGRAM_BOT_TAGLINE })]
+                return ['...', new MenuFAQ({ 
+                    botName : env.TELEGRAM_BOT_DISPLAY_NAME, 
+                    botInstance: env.TELEGRAM_BOT_INSTANCE_DISPLAY_NAME, 
+                    botTagline: env.TELEGRAM_BOT_TAGLINE,
+                    userID : info.getTelegramUserID(),
+                    chatID : info.chatID })];
             case '/list_positions':
                 const positions = await listPositionsFromUserDO(info.getTelegramUserID(), info.chatID, env);
                 return ['...', new MenuListPositions(positions)];

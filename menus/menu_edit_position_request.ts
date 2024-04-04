@@ -39,7 +39,7 @@ export class MenuEditPositionRequest extends Menu< { positionRequest: PositionRe
         this.insertButtonNextLine(options, `:brain: ${positionRequest.sellAutoDoubleSlippage ? 'Sell: Auto-Double Slippage': 'Sell: No Auto-Double Slippage'} :brain:`, new CallbackData(MenuCode.PosRequestChooseAutoDoubleSlippageOptions));
         this.insertButtonNextLine(options, `:refresh: Refresh Quote`, new CallbackData(MenuCode.TrailingStopLossRequestReturnToEditorMenu));
         this.insertButtonSameLine(options, `:cancel: Cancel`, new CallbackData(MenuCode.Main));
-        this.insertButtonSameLine(options, ':help: Help', new CallbackData(MenuCode.EditPositionHelp));
+        //this.insertButtonSameLine(options, ':help: Help', new CallbackData(MenuCode.EditPositionHelp));
         this.insertButtonNextLine(options, `:sparkle: Submit :sparkle:`, new CallbackData(MenuCode.TrailingStopLossEditorFinalSubmit));
         return options;
     }

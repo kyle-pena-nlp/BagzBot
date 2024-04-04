@@ -661,7 +661,7 @@ export class UserDO {
             return makeJSONResponse<ManuallyClosePositionResponse>({ message: "Position has already been sold." });
         }
         assertIs<PositionStatus.Open,typeof position.status>();
-        const channel = TGStatusMessage.createAndSend(`<a href="${position.token.logoURI}">\u200B</a>Initiating sale of ${asTokenPrice(position.tokenAmt)} ${position.token.symbol}`, false, position.chatID, this.env, 'HTML', '<b>Manual Sell</b>: ');
+        const channel = TGStatusMessage.createAndSend(`Initiating sale.`, false, position.chatID, this.env, 'HTML', `<a href="${position.token.logoURI}">\u200B</a><b>Manual Sell of ${asTokenPrice(position.tokenAmt)} ${position.token.symbol}</b>: `);
         // deliberate lack of await here (fire-and-forget). Must complete in 30s.
         const connection = new Connection(getRPCUrl(this.env));
         const positionSeller = new PositionSeller(connection, this.wallet.value!!, 'manual-sell', startTimeMS, channel, this.env);
