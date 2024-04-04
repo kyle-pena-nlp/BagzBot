@@ -368,12 +368,12 @@ export class Worker {
                 await storeSessionObj<PositionRequest>(params.getTelegramUserID(), params.chatID, messageID, positionRequest, POSITION_REQUEST_STORAGE_KEY, this.env);
                 return new MenuEditPositionRequest({ positionRequest, maybeSOLBalance });
             case MenuCode.WelcomeScreenPart1:
-                return new WelcomeScreenPart1(undefined);
+                return new WelcomeScreenPart1({ botDisplayName: this.env.TELEGRAM_BOT_DISPLAY_NAME });
             case MenuCode.LegalAgreement:
                 return new LegalAgreement(undefined);
             case MenuCode.LegalAgreementAgree:
                 await storeLegalAgreementStatus(params.getTelegramUserID('real'), params.chatID, 'agreed', this.env);
-                return new WelcomeScreenPart1(undefined);
+                return new WelcomeScreenPart1({ botDisplayName: this.env.TELEGRAM_BOT_DISPLAY_NAME });
             case MenuCode.LegalAgreementRefuse:
                 await storeLegalAgreementStatus(params.getTelegramUserID('real'), params.chatID, 'refused', this.env);
                 await sendMessageToTG(chatID, "You can agree at any time by opening the legal agreement in the menu", this.env);
@@ -726,7 +726,7 @@ export class Worker {
     }
 
     private async sendUserWelcomeScreen(telegramWebhookInfo : TelegramWebhookInfo, env : Env) {
-        await new WelcomeScreenPart1(undefined).sendToTG({ chatID : telegramWebhookInfo.chatID }, env);
+        await new WelcomeScreenPart1({ botDisplayName: this.env.TELEGRAM_BOT_DISPLAY_NAME }).sendToTG({ chatID : telegramWebhookInfo.chatID }, env);
     }
 
     private async handleCommandInternal(command : string, info : TelegramWebhookInfo, messageID : number, env : Env) : Promise<[string,BaseMenu?,{ obj : any, prefix : string }?]> {
@@ -757,7 +757,7 @@ export class Worker {
                     isDev : env.ENVIRONMENT === 'dev'
                 })];
             case '/welcome_screen':
-                return ['...', new WelcomeScreenPart1(undefined)];
+                return ['...', new WelcomeScreenPart1({ botDisplayName: this.env.TELEGRAM_BOT_DISPLAY_NAME })];
             case '/legal_agreement':
                 return ['...', new LegalAgreement(undefined)];
             case '/faq':
