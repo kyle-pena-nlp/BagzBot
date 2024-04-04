@@ -52,7 +52,8 @@ export enum UserDOFetchMethod {
 	setSellAutoDoubleOnOpenPositionRequest = "setSellAutoDoubleOnOpenPositionRequest",
 	adminDeleteAllPositions = "adminDeleteAllPositions",
 	setSellSlippagePercentOnOpenPosition = "setSellSlippagePercentOnOpenPosition",
-	getUserWalletSOLBalance = "getUserSOLBalance"
+	getUserWalletSOLBalance = "getUserSOLBalance",
+	getClosedPositionsAndPNLSummary = "getClosedPositionsAndPNLSummary"
 }
 
 export async function getUserWalletSOLBalance(telegramUserID : number, chatID : number, env : Env) : Promise<DecimalizedAmount|null> {

@@ -11,6 +11,9 @@ export interface ActionsToTake {
     sellsToConfirm : Position[]
 }
 
+// This class is really the heart of the whole application.
+// It tracks prices, and automatically dispatches requests to update positions
+// Point being, you can screw the whole app by messing this one up.
 export class TokenPairPositionTracker {
 
     // special-purpose datastructure for tracking peak prices
@@ -24,6 +27,14 @@ export class TokenPairPositionTracker {
 
     clearAllPositions() {
         this.pricePeaks.clearAllPositions();
+    }
+
+    listClosedPositionsForUser(telegramUserID : number) : Position[] {
+        const result : Position[] = [];
+        for (const closedPosition of this.closedPositions.values()) {
+            result.push(closedPosition);
+        }
+        return result;
     }
 
     any() : boolean {

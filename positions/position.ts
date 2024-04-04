@@ -59,6 +59,7 @@ export interface Position {
 	txSellSignature : string|null
 	sellLastValidBlockheight : number|null
 	sellConfirmed : boolean
+	netPNL : DecimalizedAmount|null
 };
 
 interface BasePositionRequest {

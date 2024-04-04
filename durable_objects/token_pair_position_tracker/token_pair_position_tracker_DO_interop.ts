@@ -11,6 +11,7 @@ import { GetPositionFromPriceTrackerRequest, GetPositionFromPriceTrackerResponse
 import { GetPositionAndMaybePNLFromPriceTrackerRequest, GetPositionAndMaybePNLFromPriceTrackerResponse } from "./actions/get_position_and_maybe_pnl";
 import { GetTokenPriceRequest, GetTokenPriceResponse } from "./actions/get_token_price";
 import { HasPairAddresses } from "./actions/has_pair_addresses";
+import { ListClosedPositionsFromTrackerRequest, ListClosedPositionsFromTrackerResponse } from "./actions/list_closed_positions_from_tracker";
 import { ListPositionsByUserRequest, ListPositionsByUserResponse } from "./actions/list_positions_by_user";
 import { MarkBuyAsConfirmedRequest, MarkBuyAsConfirmedResponse } from "./actions/mark_buy_as_confirmed";
 import { MarkPositionAsClosedRequest, MarkPositionAsClosedResponse } from "./actions/mark_position_as_closed";
@@ -43,7 +44,15 @@ export enum TokenPairPositionTrackerDOFetchMethod {
 	adminDeleteAllInTracker = "adminDeleteAllInTracker",
 	positionExists = "positionExists",
 	markBuyAsConfirmed = "markBuyAsConfirmed",
-	setSellSlippagePercentOnOpenPosition = "setSellSlippagePercentOnOpenPosition"
+	setSellSlippagePercentOnOpenPosition = "setSellSlippagePercentOnOpenPosition",
+	listClosedPositionsFromTracker = "listClosedPositionsFromTracker"
+}
+
+export async function listClosedPositionsFromTracker(telegramUserID : number, tokenAddress : string, vsTokenAddress : string, env : Env) : Promise<ListClosedPositionsFromTrackerResponse> {
+	const request : ListClosedPositionsFromTrackerRequest = { telegramUserID, tokenAddress, vsTokenAddress };
+	const method = TokenPairPositionTrackerDOFetchMethod.listClosedPositionsFromTracker;
+	const response = await sendJSONRequestToTokenPairPositionTracker<ListClosedPositionsFromTrackerRequest,ListClosedPositionsFromTrackerResponse>(method,request,tokenAddress,vsTokenAddress,env);
+	return response;
 }
 
 export async function setSellSlippagePercentOnOpenPositionInTracker(positionID : string, tokenAddress : string, vsTokenAddress : string, sellSlippagePercent : number, env : Env) : Promise<SellSellSlippagePercentageOnOpenPositionResponse> {

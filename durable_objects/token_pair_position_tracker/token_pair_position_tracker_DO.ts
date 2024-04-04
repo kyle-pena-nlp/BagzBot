@@ -19,6 +19,7 @@ import { GetPositionAndMaybePNLFromPriceTrackerRequest, GetPositionAndMaybePNLFr
 import { GetTokenPriceRequest, GetTokenPriceResponse } from "./actions/get_token_price";
 import { HasPairAddresses } from "./actions/has_pair_addresses";
 import { isHeartbeatRequest } from "./actions/heartbeat_wake_up_for_token_pair_position_tracker";
+import { ListClosedPositionsFromTrackerRequest, ListClosedPositionsFromTrackerResponse } from "./actions/list_closed_positions_from_tracker";
 import { ListPositionsByUserRequest, ListPositionsByUserResponse } from "./actions/list_positions_by_user";
 import { MarkBuyAsConfirmedRequest, MarkBuyAsConfirmedResponse } from "./actions/mark_buy_as_confirmed";
 import { MarkPositionAsClosedRequest, MarkPositionAsClosedResponse } from "./actions/mark_position_as_closed";
@@ -309,9 +310,17 @@ export class TokenPairPositionTrackerDO {
                 return await this.handleMarkBuyAsConfirmed(body);
             case TokenPairPositionTrackerDOFetchMethod.setSellSlippagePercentOnOpenPosition:
                 return await this.handleSetSellSlippagePercentOnOpenPosition(body);
+            case TokenPairPositionTrackerDOFetchMethod.listClosedPositionsFromTracker:
+                return await this.handleListClosedPositionsFromTracker(body);
             default:
                 assertNever(method);
         }
+    }
+
+    async handleListClosedPositionsFromTracker(body : ListClosedPositionsFromTrackerRequest) : Promise<Response> {
+        const closedPositions = this.tokenPairPositionTracker.listClosedPositionsForUser(body.telegramUserID);
+        const response : ListClosedPositionsFromTrackerResponse = { closedPositions: closedPositions };
+        return makeJSONResponse<ListClosedPositionsFromTrackerResponse>(response);
     }
 
     async handleSetSellSlippagePercentOnOpenPosition(body : SetSellSlippagePercentOnOpenPositionTrackerRequest) : Promise<Response> {

@@ -12,12 +12,13 @@ import { ChangeTrackedValue, Structural, assertNever, groupIntoBatches, makeFail
 import { assertIs } from "../../util/enums";
 import { listUnclaimedBetaInviteCodes } from "../beta_invite_codes/beta_invite_code_interop";
 import { PositionAndMaybePNL } from "../token_pair_position_tracker/model/position_and_PNL";
-import { _adminDeleteAll, editTriggerPercentOnOpenPositionInTracker, getPositionAndMaybePNL, listPositionsByUser, setSellAutoDoubleOnOpenPositionInPositionTracker, setSellSlippagePercentOnOpenPositionInTracker } from "../token_pair_position_tracker/token_pair_position_tracker_do_interop";
+import { _adminDeleteAll, editTriggerPercentOnOpenPositionInTracker, getPositionAndMaybePNL, listClosedPositionsFromTracker, listPositionsByUser, setSellAutoDoubleOnOpenPositionInPositionTracker, setSellSlippagePercentOnOpenPositionInTracker } from "../token_pair_position_tracker/token_pair_position_tracker_do_interop";
 import { AdminDeleteAllPositionsRequest, AdminDeleteAllPositionsResponse } from "./actions/admin_delete_all_positions";
 import { AutomaticallyClosePositionsRequest, AutomaticallyClosePositionsResponse } from "./actions/automatically_close_positions";
 import { BaseUserDORequest, isBaseUserDORequest } from "./actions/base_user_do_request";
 import { DeleteSessionRequest, DeleteSessionResponse } from "./actions/delete_session";
 import { EditTriggerPercentOnOpenPositionRequest, EditTriggerPercentOnOpenPositionResponse } from "./actions/edit_trigger_percent_on_open_position";
+import { GetClosedPositionsAndPNLSummaryRequest, GetClosedPositionsAndPNLSummaryResponse } from "./actions/get_closed_positions_and_pnl_summary";
 import { GetImpersonatedUserIDRequest, GetImpersonatedUserIDResponse } from "./actions/get_impersonated_user_id";
 import { GetLegalAgreementStatusRequest, GetLegalAgreementStatusResponse } from "./actions/get_legal_agreement_status";
 import { GetPositionFromUserDORequest, GetPositionFromUserDOResponse } from "./actions/get_position_from_user_do";
@@ -36,6 +37,7 @@ import { SellSellSlippagePercentageOnOpenPositionRequest, SellSellSlippagePercen
 import { StoreLegalAgreementStatusRequest, StoreLegalAgreementStatusResponse } from "./actions/store_legal_agreement_status";
 import { StoreSessionValuesRequest, StoreSessionValuesResponse } from "./actions/store_session_values";
 import { UnimpersonateUserRequest, UnimpersonateUserResponse } from "./actions/unimpersonate_user";
+import { ClosedPositionPNLSummarizer } from "./aggregators/closed_positions_pnl_summarizer";
 import { TokenPair } from "./model/token_pair";
 import { UserData } from "./model/user_data";
 import { PositionBuyer } from "./position_buyer";
@@ -297,11 +299,34 @@ export class UserDO {
             case UserDOFetchMethod.getUserWalletSOLBalance:
                 response = await this.handleGetUserWalletSOLBalance(userAction);
                 break;
+            case UserDOFetchMethod.getClosedPositionsAndPNLSummary:
+                response = await this.handleGetClosedPositionsAndPNLSummary(userAction);
+                break;
             default:
                 assertNever(method);
         }
 
         return [method,userAction,response];
+    }
+
+    async handleGetClosedPositionsAndPNLSummary(userAction : GetClosedPositionsAndPNLSummaryRequest) : Promise<Response> {
+        const response = await this.handleGetClosedPositionsAndPNLSummaryInternal(userAction)
+        return makeJSONResponse<GetClosedPositionsAndPNLSummaryResponse>(response);
+    }
+
+    async handleGetClosedPositionsAndPNLSummaryInternal(userAction : GetClosedPositionsAndPNLSummaryRequest) : Promise<GetClosedPositionsAndPNLSummaryResponse> {
+        const tokenPairs = this.tokenPairsForPositionIDsTracker.listUniqueTokenPairs();
+        const closedPositionPNLSummarizer = new ClosedPositionPNLSummarizer();
+        for (const tokenPair of tokenPairs) {
+            const { tokenAddress, vsTokenAddress } = tokenPair;
+            const closedPositions = await listClosedPositionsFromTracker(userAction.telegramUserID, tokenAddress, vsTokenAddress, this.env);
+            for (const closedPosition of closedPositions.closedPositions) {
+                closedPositionPNLSummarizer.update(closedPosition)
+            }
+        }
+        const closedPositionsPNLSummary = closedPositionPNLSummarizer.getSummary();
+        const closedPositions = closedPositionPNLSummarizer.listContributingPositions();
+        return { closedPositions, closedPositionsPNLSummary }
     }
 
     async handleGetUserWalletSOLBalance(userAction : GetUserWalletSOLBalanceRequest) : Promise<Response> {
