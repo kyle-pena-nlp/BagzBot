@@ -83,7 +83,10 @@ export class MenuMain extends Menu<UserData & Stuff> implements MenuCapabilities
             }
             if (this.menuData.isAdminOrSuperAdmin && this.menuData.isDev) {
                 this.insertButtonNextLine(options, 'ADMIN: Delete all positions', this.menuCallback(MenuCode.AdminDeleteAllPositions))
-            }            
+            }     
+            if (this.menuData.isAdminOrSuperAdmin) {
+                this.insertButtonNextLine(options, 'ADMIN: Send User Message', this.menuCallback(MenuCode.AdminSendUserMessage));
+            }       
             if (this.menuData.isBeta) {
                 this.insertButtonNextLine(options, ':love_letter: Send Feedback :love_letter:', this.menuCallback(MenuCode.BetaFeedbackQuestion));
             }

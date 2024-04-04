@@ -1,6 +1,7 @@
 
 export interface SendMessageToUserRequest {
     message : string
+    fromTelegramUserID : number
     toTelegramUserID : number
     fromTelegramUserName : string
 }

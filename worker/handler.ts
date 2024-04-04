@@ -418,7 +418,7 @@ export class Worker {
             case MenuCode.SubmitBetaFeedback:
                 const betaFeedbackAnswer = (callbackData.menuArg||'').trim();
                 if (betaFeedbackAnswer !== '') {
-                    this.context.waitUntil(this.sendBetaFeedbackToSuperAdmin(betaFeedbackAnswer, params.getTelegramUserName()));
+                    this.context.waitUntil(this.sendBetaFeedbackToSuperAdmin(betaFeedbackAnswer, params.getTelegramUserName(), params.getTelegramUserID()));
                 }
                 await new MenuOKClose("Thank you!").sendToTG({ chatID }, this.env);
                 return;
@@ -551,6 +551,26 @@ export class Worker {
                     return this.sorryError();
                 }
                 return new MenuViewOpenPosition(updatedPosition.positionAndMaybePNL);
+            case MenuCode.AdminSendUserMessage:
+                return new ReplyQuestion("Enter userID|message", ReplyQuestionCode.AdminSendUserMessage, this.context, {
+                    callback: {
+                        linkedMessageID: params.messageID,
+                        nextMenuCode: MenuCode.SubmitAdminSendUserMessage
+                    },
+                    timeoutMS: 60000
+                });
+            case MenuCode.SubmitAdminSendUserMessage:
+                const tokens = (callbackData.menuArg||'').split("|");
+                const recepientUserID = tryParseInt(tokens[0]||'');
+                const message = tokens[1]||'';
+                if (recepientUserID != null && message != null) {
+                    await sendMessageToUser(recepientUserID, this.env.TELEGRAM_BOT_DISPLAY_NAME, params.getTelegramUserID(), message, this.env);
+                    await new MenuOKClose(`Message sent.`).sendToTG({ chatID : params.chatID }, this.env);
+                }
+                else {
+                    await new MenuOKClose(`Couldn't send message - incorrect format.`).sendToTG({ chatID : params.chatID }, this.env);
+                }
+                return;
             default:
                 assertNever(callbackData.menuCode);
         }
@@ -568,8 +588,8 @@ export class Worker {
         return new MenuViewOpenPosition(positionAndMaybePNL);
     }
 
-    private async sendBetaFeedbackToSuperAdmin(feedback : string, myUserName : string) : Promise<void> {
-        await sendMessageToUser(strictParseInt(this.env.SUPER_ADMIN_USER_ID), myUserName, feedback, this.env);
+    private async sendBetaFeedbackToSuperAdmin(feedback : string, myUserName : string, myUserID : number) : Promise<void> {
+        await sendMessageToUser(strictParseInt(this.env.SUPER_ADMIN_USER_ID), myUserName, myUserID,feedback, this.env);
     }
 
     private async createMainMenu(info : CallbackHandlerParams, env : Env) : Promise<BaseMenu> {

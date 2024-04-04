@@ -65,8 +65,6 @@ You use ${botName} at your own risk, without exceptions!
 We are not responsible for any losses, regardless of cause, origin, or fault.
 
 <b>Support Information</b>
-:bullet: User ID: ${this.menuData.userID}
-:bullet: Chat ID: ${this.menuData.chatID}
-`;
+:bullet: User ID: ${this.menuData.userID}`;
     }
 }

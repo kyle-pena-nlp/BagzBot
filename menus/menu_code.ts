@@ -14,6 +14,8 @@ export enum MenuCode {
 	AdminDeleteAllPositions = "AdminDeleteAllPositions",
 	EditOpenPositionSellSlippagePercent = "EOP.SellSlippagePercent",
 	SubmitOpenPositionSellSlippagePercent = "SOP.SellSlippagePercent",
+	AdminSendUserMessage = "AdminSendUserMessage",
+	SubmitAdminSendUserMessage = "SubmitAdminSendUserMessage",
 
 	PosRequestChooseAutoDoubleSlippageOptions = "EPR.AutoDoubleSlip",
 	SubmitPosRequestAutoDoubleSlippageOptions = "SPR.AutoDoubleSlip",

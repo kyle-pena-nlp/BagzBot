@@ -69,8 +69,8 @@ export async function setSellSlippagePercentOnOpenPosition(telegramUserID : numb
 	return response;
 }
 
-export async function sendMessageToUser(toTelegramUserID : number, fromTelegramUserName : string, message : string, env : Env) : Promise<SendMessageToUserResponse> {
-	const request : SendMessageToUserRequest = { toTelegramUserID, fromTelegramUserName, message };
+export async function sendMessageToUser(toTelegramUserID : number, fromTelegramUserName : string, fromTelegramUserID: number, message : string, env : Env) : Promise<SendMessageToUserResponse> {
+	const request : SendMessageToUserRequest = { toTelegramUserID, fromTelegramUserName, fromTelegramUserID, message };
 	const method = UserDOFetchMethod.sendMessageToUser;
 	const response = await sendJSONRequestToUserDO<SendMessageToUserRequest,SendMessageToUserResponse>(toTelegramUserID, method, request, env);
 	return response;
