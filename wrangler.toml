@@ -55,6 +55,8 @@ MAX_BLOCK_FINALIZATION_TIME_MS = "60000"
 WALLET_BALANCE_REFRESH_INTERVAL_MS = "30000"
 TOKEN_LIST_REFRESH_TIMEOUT = "30000"
 USER_PNL_CALCULATION_REFRESH_MS = "30000"
+USE_QUICKNODE = "true"
+QUICKNODE_RPC_URL = "https://small-polished-pallet.solana-mainnet.quiknode.pro"
 
 
 [env.beta.vars]
@@ -99,6 +101,8 @@ MAX_BLOCK_FINALIZATION_TIME_MS = "60000"
 WALLET_BALANCE_REFRESH_INTERVAL_MS = "30000"
 TOKEN_LIST_REFRESH_TIMEOUT = "30000"
 USER_PNL_CALCULATION_REFRESH_MS = "30000"
+USE_QUICKNODE = "true"
+QUICKNODE_RPC_URL = "https://small-polished-pallet.solana-mainnet.quiknode.pro"
 
 [env.dev.durable_objects]
 bindings = [

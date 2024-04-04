@@ -91,7 +91,7 @@ export class TGStatusMessage {
         });
     }
     /* Remove a message in a non-blocking fashion. */
-    static async remove(statusMessage : UpdateableNotification) {
+    static async queueRemoval(statusMessage : UpdateableNotification) {
         statusMessage.promiseChain = statusMessage.promiseChain.then(m => {
             if ('messageID' in m) {
                 return m.remove();

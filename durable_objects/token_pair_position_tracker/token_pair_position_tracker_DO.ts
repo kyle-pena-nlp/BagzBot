@@ -1,10 +1,11 @@
 import { Connection } from "@solana/web3.js";
 import { isAdminOrSuperAdmin } from "../../admins";
 import { DecimalizedAmount } from "../../decimalized";
-import { toNumber } from "../../decimalized/decimalized_amount";
+import { asTokenPrice, toNumber } from "../../decimalized/decimalized_amount";
 import { Env, getRPCUrl } from "../../env";
 import { logDebug, logError, logInfo } from "../../logging";
 import { Position, PositionStatus } from "../../positions";
+import { TGStatusMessage } from "../../telegram";
 import { ChangeTrackedValue, assertNever, makeJSONResponse, makeSuccessResponse, strictParseBoolean, strictParseInt } from "../../util";
 import { ensureTokenPairIsRegistered } from "../heartbeat/heartbeat_do_interop";
 import { EditTriggerPercentOnOpenPositionResponse } from "../user/actions/edit_trigger_percent_on_open_position";
@@ -469,39 +470,59 @@ export class TokenPairPositionTrackerDO {
 
         for (const { type, pos } of allThingsToDo) {
             if (type === 'buy') {
+                const buyConfirmPrefix = `<b>Confirming purchase of ${asTokenPrice(pos.tokenAmt)} ${pos.token.symbol}</b>`;
+                const channel = TGStatusMessage.createAndSend('In progress...', false, pos.chatID, this.env, 'HTML', buyConfirmPrefix);
                 const confirmedBuy = await buyConfirmer.confirmBuy(pos);
                 if (confirmedBuy === 'api-error') {
+                    TGStatusMessage.queue(channel, "Confirmation failed.", false);
+                    TGStatusMessage.queueRemoval(channel);
                     break;
                 }
                 else if (confirmedBuy === 'unconfirmed') {
+                    TGStatusMessage.queue(channel, "Confirmation failed.", false);
+                    TGStatusMessage.queueRemoval(channel);
                     continue;
                 }
                 else if (confirmedBuy === 'failed') {
+                    TGStatusMessage.queue(channel, "On confirmation, we found that the purchase didn't go through.", true);
                     this.tokenPairPositionTracker.removePosition(pos.positionID);
                 }
                 else if ('positionID' in confirmedBuy) {
+                    TGStatusMessage.queue(channel, "We were able to confirm this purchase!", true);
                     this.tokenPairPositionTracker.upsertPositions([confirmedBuy]);
                 }
                 else {
                     assertNever(confirmedBuy);
                 }
+                TGStatusMessage.finalize(channel);
             }
             else if (type === 'sell') {
                 const confirmedSellStatus = await sellConfirmer.confirmSell(pos);
+                const sellConfirmPrefix = ``;
+                const channel = TGStatusMessage.createAndSend('In progress...', false, pos.chatID, this.env, 'HTML', sellConfirmPrefix);
                 if (confirmedSellStatus === 'api-error') {
+                    TGStatusMessage.queue(channel, "Confirmation failed.", false);
+                    TGStatusMessage.queueRemoval(channel);
                     break;
                 }
                 else if (confirmedSellStatus === 'unconfirmed') {
+                    TGStatusMessage.queue(channel, "Confirmation failed.", false);
+                    TGStatusMessage.queueRemoval(channel);
                     continue;
                 }
                 else if (confirmedSellStatus === 'failed') {
+                    TGStatusMessage.queue(channel, "On confirmation, we found that the sale didn't go through.", true);                
                     this.tokenPairPositionTracker.markPositionAsOpen(pos.positionID);
                 }
                 else if (confirmedSellStatus === 'slippage-failed') {
                     if (pos.sellAutoDoubleSlippage) {
                         const maxSlippage = 100; // TODO: make a user global setting
                         pos.sellSlippagePercent = Math.min(maxSlippage, 2 * pos.sellSlippagePercent);
+                        TGStatusMessage.queue(channel, "The sale failed due to slippage.  We have increased the slippage to ${sellSlippagePercent}% and will retry soon.", true);
                         this.tokenPairPositionTracker.upsertPositions([pos]);
+                    }
+                    else {
+                        TGStatusMessage.queue(channel, "The sale failed due to slippage. We will re-sell if the auto-sell trigger condition continues to hold.", true);
                     }
                     this.tokenPairPositionTracker.markPositionAsOpen(pos.positionID);
                 }

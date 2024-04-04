@@ -1,3 +1,4 @@
+import { strictParseBoolean } from "./util"
 
 export interface Env {
 	
@@ -58,6 +59,9 @@ export interface Env {
 	PRICE_POLL_INTERVAL_MS : string
 	FORBIDDEN_TOKENS : string
 	TX_TIMEOUT_MS : string
+	SECRET__QUICKNODE_API_KEY : string
+	USE_QUICKNODE : string
+	QUICKNODE_RPC_URL : string
 
 	UserDO : any // i'd like to strongly type this as DurableObjectNamespace, but can't for technical reasons
 	TokenPairPositionTrackerDO : any // ditto
@@ -67,5 +71,10 @@ export interface Env {
 };
 
 export function getRPCUrl(env : Env) {
-	return `${env.RPC_ENDPOINT_URL}?api-key=${env.SECRET__HELIUS_API_KEY}`
+	if (strictParseBoolean(env.USE_QUICKNODE)) {
+		return `${env.QUICKNODE_RPC_URL}/${env.SECRET__QUICKNODE_API_KEY}/`
+	}
+	else {
+		return `${env.RPC_ENDPOINT_URL}?api-key=${env.SECRET__HELIUS_API_KEY}`
+	}
 }
