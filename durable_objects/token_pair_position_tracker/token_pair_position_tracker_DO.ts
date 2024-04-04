@@ -323,7 +323,7 @@ export class TokenPairPositionTrackerDO {
         const positionID = body.positionID;
         const currentPrice = await this.getPrice();
         const positionAndMaybePNL = this.tokenPairPositionTracker.getPositionAndMaybePNL(positionID,currentPrice);
-        if (positionAndMaybePNL != null) {
+        if (positionAndMaybePNL != null && positionAndMaybePNL.position.status === PositionStatus.Open) {
             positionAndMaybePNL.position.sellSlippagePercent = body.sellSlippagePercent;
         }
         return { positionAndMaybePNL: positionAndMaybePNL||null };
