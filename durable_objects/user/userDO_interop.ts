@@ -5,8 +5,6 @@ import { Structural, groupIntoBatches, groupIntoMap, makeJSONRequest, makeReques
 import { PositionAndMaybePNL } from "../token_pair_position_tracker/model/position_and_PNL";
 import { AdminDeleteAllPositionsRequest, AdminDeleteAllPositionsResponse } from "./actions/admin_delete_all_positions";
 import { AutomaticallyClosePositionsRequest, AutomaticallyClosePositionsResponse } from "./actions/automatically_close_positions";
-import { ConfirmBuysRequest, ConfirmBuysResponse } from "./actions/confirm_buys";
-import { ConfirmSellsRequest, ConfirmSellsResponse } from "./actions/confirm_sells";
 import { DeleteSessionRequest } from "./actions/delete_session";
 import { EditTriggerPercentOnOpenPositionRequest, EditTriggerPercentOnOpenPositionResponse } from "./actions/edit_trigger_percent_on_open_position";
 import { GetImpersonatedUserIDRequest, GetImpersonatedUserIDResponse } from "./actions/get_impersonated_user_id";
@@ -22,6 +20,7 @@ import { OpenPositionRequest, OpenPositionResponse } from "./actions/open_new_po
 import { DefaultTrailingStopLossRequestRequest, DefaultTrailingStopLossRequestResponse } from "./actions/request_default_position_request";
 import { SendMessageToUserRequest, SendMessageToUserResponse } from "./actions/send_message_to_user";
 import { SetSellAutoDoubleOnOpenPositionRequest, SetSellAutoDoubleOnOpenPositionResponse } from "./actions/set_sell_auto_double_on_open_position";
+import { SellSellSlippagePercentageOnOpenPositionRequest, SellSellSlippagePercentageOnOpenPositionResponse } from "./actions/set_sell_slippage_percent_on_open_position";
 import { StoreLegalAgreementStatusRequest, StoreLegalAgreementStatusResponse } from "./actions/store_legal_agreement_status";
 import { StoreSessionValuesRequest, StoreSessionValuesResponse } from "./actions/store_session_values";
 import { UnimpersonateUserRequest, UnimpersonateUserResponse } from "./actions/unimpersonate_user";
@@ -49,7 +48,15 @@ export enum UserDOFetchMethod {
 	sendMessageToUser = "sendMessageToUser",
 	editTriggerPercentOnOpenPosition = "editTriggerPercentOnOpenPosition",
 	setSellAutoDoubleOnOpenPositionRequest = "setSellAutoDoubleOnOpenPositionRequest",
-	adminDeleteAllPositions = "adminDeleteAllPositions"
+	adminDeleteAllPositions = "adminDeleteAllPositions",
+	setSellSlippagePercentOnOpenPosition = "setSellSlippagePercentOnOpenPosition"
+}
+
+export async function setSellSlippagePercentOnOpenPosition(telegramUserID : number, chatID : number, positionID : string, sellSlippagePercent : number, env : Env) : Promise<SellSellSlippagePercentageOnOpenPositionResponse> {
+	const request : SellSellSlippagePercentageOnOpenPositionRequest = { telegramUserID, chatID, positionID, sellSlippagePercent };
+	const method = UserDOFetchMethod.setSellSlippagePercentOnOpenPosition;
+	const response = await sendJSONRequestToUserDO<SellSellSlippagePercentageOnOpenPositionRequest,SellSellSlippagePercentageOnOpenPositionResponse>(telegramUserID, method, request, env);
+	return response;
 }
 
 export async function sendMessageToUser(toTelegramUserID : number, fromTelegramUserName : string, message : string, env : Env) : Promise<SendMessageToUserResponse> {

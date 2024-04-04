@@ -10,6 +10,7 @@ import { ChangeTrackedValue, assertNever, makeJSONResponse, makeSuccessResponse,
 import { ensureTokenPairIsRegistered } from "../heartbeat/heartbeat_do_interop";
 import { EditTriggerPercentOnOpenPositionResponse } from "../user/actions/edit_trigger_percent_on_open_position";
 import { SetSellAutoDoubleOnOpenPositionResponse } from "../user/actions/set_sell_auto_double_on_open_position";
+import { SellSellSlippagePercentageOnOpenPositionResponse } from "../user/actions/set_sell_slippage_percent_on_open_position";
 import { sendClosePositionOrdersToUserDOs } from "../user/userDO_interop";
 import { AdminDeleteAllInTrackerRequest, AdminDeleteAllInTrackerResponse } from "./actions/admin_delete_all_positions_in_tracker";
 import { EditTriggerPercentOnOpenPositionInTrackerRequest } from "./actions/edit_trigger_percent_on_open_position_in_tracker";
@@ -26,6 +27,7 @@ import { MarkPositionAsOpenRequest, MarkPositionAsOpenResponse } from "./actions
 import { PositionExistsInTrackerRequest, PositionExistsInTrackerResponse } from "./actions/position_exists_in_tracker";
 import { RemovePositionRequest, RemovePositionResponse } from "./actions/remove_position";
 import { SetSellAutoDoubleOnOpenPositionInTrackerRequest } from "./actions/set_sell_auto_double_on_open_position_in_tracker";
+import { SetSellSlippagePercentOnOpenPositionTrackerRequest } from "./actions/set_sell_slippage_percent_on_open_position";
 import { UpdatePriceRequest, UpdatePriceResponse } from "./actions/update_price";
 import { UpsertPositionsRequest, UpsertPositionsResponse } from "./actions/upsert_positions";
 import { WakeupTokenPairPositionTrackerRequest, WakeupTokenPairPositionTrackerResponse } from "./actions/wake_up";
@@ -305,9 +307,26 @@ export class TokenPairPositionTrackerDO {
                 return await this.handlePositionExistsInTracker(body);
             case TokenPairPositionTrackerDOFetchMethod.markBuyAsConfirmed:
                 return await this.handleMarkBuyAsConfirmed(body);
+            case TokenPairPositionTrackerDOFetchMethod.setSellSlippagePercentOnOpenPosition:
+                return await this.handleSetSellSlippagePercentOnOpenPosition(body);
             default:
                 assertNever(method);
         }
+    }
+
+    async handleSetSellSlippagePercentOnOpenPosition(body : SetSellSlippagePercentOnOpenPositionTrackerRequest) : Promise<Response> {
+        const response = await this.handleSetSellSlippagePercentOnOpenPositionInternal(body);
+        return makeJSONResponse<SellSellSlippagePercentageOnOpenPositionResponse>(response);
+    }
+
+    async handleSetSellSlippagePercentOnOpenPositionInternal(body : SetSellSlippagePercentOnOpenPositionTrackerRequest) : Promise<SellSellSlippagePercentageOnOpenPositionResponse> {
+        const positionID = body.positionID;
+        const currentPrice = await this.getPrice();
+        const positionAndMaybePNL = this.tokenPairPositionTracker.getPositionAndMaybePNL(positionID,currentPrice);
+        if (positionAndMaybePNL != null) {
+            positionAndMaybePNL.position.sellSlippagePercent = body.sellSlippagePercent;
+        }
+        return { positionAndMaybePNL: positionAndMaybePNL||null };
     }
 
     async handleMarkBuyAsConfirmed(body: MarkBuyAsConfirmedRequest) : Promise<Response> {

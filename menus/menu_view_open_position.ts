@@ -35,6 +35,7 @@ export class MenuViewOpenPosition extends Menu<PositionAndMaybePNL|BrandNewPosit
             }
             
             this.insertButtonNextLine(options, `:chart_down: ${this.menuData.position.triggerPercent}% Trigger`, new CallbackData(MenuCode.EditOpenPositionTriggerPercent, this.menuData.position.positionID));
+            this.insertButtonNextLine(options, `:twisted_arrows: ${this.menuData.position.sellSlippagePercent}% Slippage`, new CallbackData(MenuCode.EditOpenPositionSellSlippagePercent, this.menuData.position.positionID));
             this.insertButtonNextLine(options, `:brain: ${this.menuData.position.sellAutoDoubleSlippage ? '': 'Do Not'} Auto-Double Slippage If Sell Fails :brain:`, new CallbackData(MenuCode.EditOpenPositionAutoDoubleSlippage, this.menuData.position.positionID));
 
             const refreshPositionCallbackData = new CallbackData(MenuCode.ViewOpenPosition, this.menuData.position.positionID);

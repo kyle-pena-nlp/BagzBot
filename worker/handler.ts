@@ -10,10 +10,11 @@ import { _devOnlyFeatureUpdatePrice, adminInvokeAlarm } from "../durable_objects
 import { OpenPositionRequest } from "../durable_objects/user/actions/open_new_position";
 import { QuantityAndToken } from "../durable_objects/user/model/quantity_and_token";
 import { TokenSymbolAndAddress } from "../durable_objects/user/model/token_name_and_address";
-import { adminDeleteAllPositions, editTriggerPercentOnOpenPositionFromUserDO, getDefaultTrailingStopLoss, getPositionFromUserDO, getUserData, getWalletData, impersonateUser, listPositionsFromUserDO, manuallyClosePosition, maybeReadSessionObj, readSessionObj, requestNewPosition, sendMessageToUser, setSellAutoDoubleOnOpenPosition, storeLegalAgreementStatus, storeSessionObj, storeSessionObjProperty, storeSessionValues, unimpersonateUser } from "../durable_objects/user/userDO_interop";
+import { adminDeleteAllPositions, editTriggerPercentOnOpenPositionFromUserDO, getDefaultTrailingStopLoss, getPositionFromUserDO, getUserData, getWalletData, impersonateUser, listPositionsFromUserDO, manuallyClosePosition, maybeReadSessionObj, readSessionObj, requestNewPosition, sendMessageToUser, setSellAutoDoubleOnOpenPosition, setSellSlippagePercentOnOpenPosition, storeLegalAgreementStatus, storeSessionObj, storeSessionObjProperty, storeSessionValues, unimpersonateUser } from "../durable_objects/user/userDO_interop";
 import { Env } from "../env";
 import { logDebug, logError } from "../logging";
-import { BaseMenu, LegalAgreement, MenuBetaInviteFriends, MenuCode, MenuContinueMessage, MenuEditOpenPositionSellAutoDoubleSlippage, MenuEditOpenPositionTriggerPercent, MenuEditPositionHelp, MenuEditPositionRequestSellAutoDoubleSlippage, MenuError, MenuFAQ, MenuListPositions, MenuMain, MenuOKClose, MenuTODO, MenuTrailingStopLossEntryBuyQuantity, MenuTrailingStopLossPickVsToken, MenuTrailingStopLossSlippagePercent, MenuTrailingStopLossTriggerPercent, MenuViewDecryptedWallet, MenuViewOpenPosition, MenuWallet, PositionIDAndChoice, SubmittedTriggerPctKey, WelcomeScreenPart1 } from "../menus";
+import { BaseMenu, LegalAgreement, MenuBetaInviteFriends, MenuCode, MenuContinueMessage, MenuEditOpenPositionSellAutoDoubleSlippage, MenuEditOpenPositionSellSlippagePercent, MenuEditOpenPositionTriggerPercent, MenuEditPositionHelp, MenuEditPositionRequestSellAutoDoubleSlippage, MenuError, MenuFAQ, MenuListPositions, MenuMain, MenuOKClose, MenuTODO, MenuTrailingStopLossEntryBuyQuantity, MenuTrailingStopLossPickVsToken, MenuTrailingStopLossSlippagePercent, MenuTrailingStopLossTriggerPercent, MenuViewDecryptedWallet, MenuViewOpenPosition, MenuWallet, PositionIDAndChoice, SubmittedTriggerPctKey, WelcomeScreenPart1 } from "../menus";
+import { PositionIDAndSellSlippagePercent } from "../menus/menu_edit_open_position_sell_slippage_percent";
 import { MenuEditPositionRequest } from "../menus/menu_edit_position_request";
 import { PositionPreRequest, PositionRequest, convertPreRequestToRequest } from "../positions";
 import { ReplyQuestion, ReplyQuestionCode } from "../reply_question";
@@ -541,13 +542,25 @@ export class Worker {
                     return null;
                 });
                 return new MenuContinueMessage(deleteAllPositionsResponse != null ? "Positions deleted" : "Error occurred", MenuCode.Main);
+            case MenuCode.EditOpenPositionSellSlippagePercent:
+                return new MenuEditOpenPositionSellSlippagePercent({ positionID : callbackData.menuArg||'' });
+            case MenuCode.SubmitOpenPositionSellSlippagePercent:
+                const positionIDAndSellSlippagePercent = PositionIDAndSellSlippagePercent.parse(callbackData.menuArg||'');
+                if (positionIDAndSellSlippagePercent == null) {
+                    return this.sorryError();
+                }
+                const updatedPosition = await setSellSlippagePercentOnOpenPosition(params.getTelegramUserID(), params.chatID, positionIDAndSellSlippagePercent.positionID, positionIDAndSellSlippagePercent.sellSlippagePercent, this.env);
+                if (updatedPosition.positionAndMaybePNL == null) {
+                    return this.sorryError();
+                }
+                return new MenuViewOpenPosition(updatedPosition.positionAndMaybePNL);
             default:
                 assertNever(callbackData.menuCode);
         }
     }
 
-    private sorryError() : MenuContinueMessage {
-        return new MenuContinueMessage(`We're sorry - an error has occurred`, MenuCode.Main);
+    private sorryError(menuCode ?: MenuCode, menuArg ?: string) : MenuContinueMessage {
+        return new MenuContinueMessage(`We're sorry - an error has occurred`, menuCode || MenuCode.Main, 'HTML', menuArg);
     }
 
     private async makeOpenPositionMenu(params : CallbackHandlerParams, positionID : string) : Promise<BaseMenu> {

@@ -4,6 +4,7 @@ import { Position } from "../../positions";
 import { makeJSONRequest, makeRequest, strictParseInt } from "../../util";
 import { EditTriggerPercentOnOpenPositionResponse } from "../user/actions/edit_trigger_percent_on_open_position";
 import { SetSellAutoDoubleOnOpenPositionResponse } from "../user/actions/set_sell_auto_double_on_open_position";
+import { SellSellSlippagePercentageOnOpenPositionResponse } from "../user/actions/set_sell_slippage_percent_on_open_position";
 import { AdminDeleteAllInTrackerRequest, AdminDeleteAllInTrackerResponse } from "./actions/admin_delete_all_positions_in_tracker";
 import { EditTriggerPercentOnOpenPositionInTrackerRequest } from "./actions/edit_trigger_percent_on_open_position_in_tracker";
 import { GetPositionFromPriceTrackerRequest, GetPositionFromPriceTrackerResponse } from "./actions/get_position";
@@ -18,6 +19,7 @@ import { MarkPositionAsOpenRequest, MarkPositionAsOpenResponse } from "./actions
 import { PositionExistsInTrackerRequest, PositionExistsInTrackerResponse } from "./actions/position_exists_in_tracker";
 import { RemovePositionRequest, RemovePositionResponse } from "./actions/remove_position";
 import { SetSellAutoDoubleOnOpenPositionInTrackerRequest } from "./actions/set_sell_auto_double_on_open_position_in_tracker";
+import { SetSellSlippagePercentOnOpenPositionTrackerRequest } from "./actions/set_sell_slippage_percent_on_open_position";
 import { UpdatePriceRequest, UpdatePriceResponse } from "./actions/update_price";
 import { UpsertPositionsRequest, UpsertPositionsResponse } from "./actions/upsert_positions";
 import { WakeupTokenPairPositionTrackerRequest, WakeupTokenPairPositionTrackerResponse } from "./actions/wake_up";
@@ -40,7 +42,15 @@ export enum TokenPairPositionTrackerDOFetchMethod {
 	adminInvokeAlarm = "adminInvokeAlarm",
 	adminDeleteAllInTracker = "adminDeleteAllInTracker",
 	positionExists = "positionExists",
-	markBuyAsConfirmed = "markBuyAsConfirmed"
+	markBuyAsConfirmed = "markBuyAsConfirmed",
+	setSellSlippagePercentOnOpenPosition = "setSellSlippagePercentOnOpenPosition"
+}
+
+export async function setSellSlippagePercentOnOpenPositionInTracker(positionID : string, tokenAddress : string, vsTokenAddress : string, sellSlippagePercent : number, env : Env) : Promise<SellSellSlippagePercentageOnOpenPositionResponse> {
+	const request : SetSellSlippagePercentOnOpenPositionTrackerRequest = { positionID, tokenAddress, vsTokenAddress, sellSlippagePercent };
+	const method = TokenPairPositionTrackerDOFetchMethod.setSellSlippagePercentOnOpenPosition;
+	const response = await sendJSONRequestToTokenPairPositionTracker<SetSellSlippagePercentOnOpenPositionTrackerRequest,SellSellSlippagePercentageOnOpenPositionResponse>(method,request,tokenAddress,vsTokenAddress,env);
+	return response;
 }
 
 export async function positionExistsInTracker(positionID : string, tokenAddress : string, vsTokenAddress : string, env : Env) : Promise<boolean> {
