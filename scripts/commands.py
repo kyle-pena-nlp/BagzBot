@@ -8,6 +8,10 @@ COMMANDS = [
         'description': 'Creates a new position'
     },
     {
+        'command': 'list_positions',
+        'description': 'Shows a list of your open positions'
+    },
+    {
         'command': 'menu',
         'description': 'Displays the main menu'
     },

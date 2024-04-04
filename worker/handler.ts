@@ -734,6 +734,9 @@ export class Worker {
                 return ['...', new LegalAgreement(undefined)];
             case '/faq':
                 return ['...', new MenuFAQ({ botName : env.TELEGRAM_BOT_DISPLAY_NAME, botInstance: env.TELEGRAM_BOT_INSTANCE_DISPLAY_NAME, botTagline: env.TELEGRAM_BOT_TAGLINE })]
+            case '/list_positions':
+                const positions = await listPositionsFromUserDO(info.getTelegramUserID(), info.chatID, env);
+                return ['...', new MenuListPositions(positions)];
             case '/new_position':
                 const defaultPr = await getDefaultTrailingStopLoss(info.getTelegramUserID(), info.chatID, messageID, env);
                 const prerequest = defaultPr.prerequest;

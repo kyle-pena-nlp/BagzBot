@@ -61,11 +61,14 @@ export async function executeAndConfirmSignedTx(
         let sendRpcExceptions = 0;
         let sendExpBackoffFactor = 1.0;
         const increaseExpBackoff = () => { 
+            logDebug("Increasing backoff", signature);
             sendExpBackoffFactor = Math.min(8, 2 * sendExpBackoffFactor);
         };
 
         // Until this loop is signalled to stop by the confirm loop
         while(!stopSendingTx) {
+
+            logDebug("Sending tx", signature);
 
             // try to send the tx. if it sends w/o exception, set anyTxSent to true.
             await connection.sendRawTransaction(txBuffer, sendOpts)
@@ -210,6 +213,8 @@ export async function executeAndConfirmSignedTx(
     await Promise.all([sendTransactionTask, confirmTransactionTask]);
 
     const finalStatus = finalExecutionDisposition(sendLoopState, confirmLoopState);
+
+    logDebug(sendLoopState, confirmLoopState, finalStatus, signature);
 
     return finalStatus;
 }
