@@ -30,7 +30,7 @@
           "program": "${file}",
           "console": "integratedTerminal",
           "args": [
-              "--env=${input:argValue}",
+              "--env=${input:logPullEnvValue}",
               "--start=${input:startValue}",
               "--end=${input:endValue}",
               "--limit=${input:limitValue}"
@@ -70,6 +70,12 @@
           "default": "dev"
         },
         {
+          "id": "logPullEnvValue",
+          "type": "promptString",
+          "description": "Enter the start datetime:",
+          "default": "beta"
+        },
+        {
           "id": "startValue",
           "type": "promptString",
           "description": "Enter the start datetime:",
@@ -79,7 +85,7 @@
           "id": "endValue",
           "type": "promptString",
           "description": "Enter the end datetime:",
-          "default": "2024-04-02"
+          "default": ""
         }, 
         {
           "id": "limitValue",

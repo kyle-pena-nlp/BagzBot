@@ -75,9 +75,13 @@ export class MenuViewOpenPosition extends Menu<PositionAndMaybePNL|BrandNewPosit
         const statusEmoji = this.statusEmoji();
         const refreshNonce = Math.floor(Date.now() / 60000);
         const lines = [
-            `${statusEmoji} <b>${asTokenPrice(this.position().tokenAmt)} of <a href="https://birdeye.so/token/${this.menuData.position.token.address}?chain=solana&v=5&nonce=${refreshNonce}">$${this.position().token.symbol}</a></b>`,
+            `${statusEmoji} <b>${asTokenPrice(this.position().tokenAmt)} of $${this.position().token.symbol}</b>`,
             ` (<code>${this.position().token.address}</code>)`
         ];
+
+        lines.push("");
+        lines.push("<blockquote><b>Note</b>: All prices are listed in SOL (fiat coming soon)</blockquote>")
+        lines.push("");
 
         lines.push(`<b><u>Status</u></b>:`)
 
@@ -119,10 +123,10 @@ export class MenuViewOpenPosition extends Menu<PositionAndMaybePNL|BrandNewPosit
         
         if (this.isPositionWithPNL() && !this.isClosingOrClosed() && !this.triggerConditionMet()) {
             const peakPriceComparison = this.lessThanPeakPrice() ? `${asPercentString(this.percentBelowPeak())} &lt;` : '=';
-            lines.push(`:bullet: <b>Current Price</b>: ${asTokenPrice(this.currentPrice())} (${peakPriceComparison} Peak Price)`);
-            lines.push(`:bullet: <b>Peak Price</b>: ${asTokenPrice(this.menuData.peakPrice)}`)
+            lines.push(`:bullet: <b>Current Price</b>: ${asTokenPrice(this.currentPrice())} SOL (${peakPriceComparison} Peak Price)`);
+            lines.push(`:bullet: <b>Peak Price</b>: ${asTokenPrice(this.menuData.peakPrice)} SOL`)
             lines.push(`:bullet: <b>Trigger Percent</b>: ${this.menuData.position.triggerPercent.toFixed(1)}%`)
-            lines.push(`:bullet: <b>PNL</b>: ${asTokenPriceDelta(this.calcPNL())} (${asPercentDeltaString(this.pnlDeltaPct())})`);
+            lines.push(`:bullet: <b>PNL</b>: ${asTokenPriceDelta(this.calcPNL())} SOL (${asPercentDeltaString(this.pnlDeltaPct())})`);
         }
 
         if (this.buyIsConfirmed() && this.isCloseToBeingTriggered() && !this.isClosingOrClosed() && !this.triggerConditionMet() && this.buyIsConfirmed()) {
