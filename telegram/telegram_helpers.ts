@@ -4,6 +4,7 @@ import { MenuCode } from "../menus";
 import { CallbackData } from "../menus/callback_data";
 import { makeFakeFailedRequestResponse, makeJSONRequest, makeSuccessResponse, sleep } from "../util";
 import { CallbackButton } from "./callback_button";
+import { subInEmojis } from "./emojis";
 
 export interface DeleteTGMessageResponse {
     success: boolean
@@ -121,6 +122,7 @@ export async function updateTGMessage(chatID : number,
     parseMode : 'HTML'|'MarkdownV2' = 'HTML', 
     dismissButton : boolean|MenuCode = false,
     menuArg : string|null = null) : Promise<TgMessageSentInfo> {
+    text = subInEmojis(text);
     const request = makeTelegramUpdateMessageRequest(chatID, messageID, text, env, parseMode, dismissButton, menuArg);
     return await transformToTGMessageSentInfo(fetch(request));
 }
@@ -131,7 +133,7 @@ export async function sendMessageToTG(chatID : number,
     parseMode : 'HTML'|'MarkdownV2' = 'HTML', 
     dismissButton : boolean|MenuCode = false,
     menuArg : string|null = null) : Promise<TgMessageSentInfo> {
-    
+    text = subInEmojis(text);
     const request = makeTelegramSendMessageRequest(chatID, text, env, parseMode, dismissButton, menuArg);
     return await transformToTGMessageSentInfo(fetch(request));
 }

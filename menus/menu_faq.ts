@@ -1,4 +1,5 @@
 import { CallbackButton } from "../telegram";
+import { logoHack } from "./logo_hack";
 import { Menu, MenuCapabilities } from "./menu";
 
 export class MenuFAQ extends Menu<{ botName : string, botInstance : string, botTagline : string, userID : number, chatID : number }> implements MenuCapabilities {
@@ -14,7 +15,7 @@ export class MenuFAQ extends Menu<{ botName : string, botInstance : string, botT
         const botName = this.menuData.botName;
         const botInstance = this.menuData.botInstance;
         const botTagline = this.menuData.botTagline;
-        return `<b>${botName} - ${botInstance}</b>
+        return `${logoHack()}<b>${botName} - ${botInstance}</b>
 <i>${botTagline}</i>
 
 <b>What is ${botName}?</b>
@@ -55,10 +56,11 @@ at the last possible moment, and with a decryption key that is unique per-user.
 4. Administrators do not have the ability to view your private key.
 
 <b>What features do you have planned?</b>
-1. <b>Auto-Buy</b>: Automatically buys a token when certain conditions are met
-2. <b>DCA Out</b>: Begins a DCA when the Trigger Percent condition is met.
-3. <b>Wave Rider</b>: Buys back in when the price starts going back up.  You're riding the waves!
-4. <b>Early Token Access</b>: Realtime access to fresh-minted coins - no waiting for Jupiter.
+1. <b>Auto-Buy</b>: Automatically creates an auto-sell a token when the price dips.
+2. <b>Wave Rider</b>: Buys back in after an auto-sell when the price starts going back up.  You're riding the waves!
+3. <b>DCA Out</b>: Begins a DCA when the Trigger Percent condition is met.
+4. <b>Faster Trading</b>: We plan on upgrading to a dedicated RPC node for faster price streaming and lower latency on auto-sells.
+5. <b>Early Token Access</b>: Realtime access to fresh-minted coins - no waiting for Jupiter.
 
 <b>Disclaimer</b>
 You use ${botName} at your own risk, without exceptions!
@@ -66,5 +68,9 @@ We are not responsible for any losses, regardless of cause, origin, or fault.
 
 <b>Support Information</b>
 :bullet: User ID: ${this.menuData.userID}`;
+    }
+
+    renderURLPreviewNormally(): boolean {
+        return false;
     }
 }

@@ -1,5 +1,5 @@
 import { Buffer } from "node:buffer";
-import { Env } from "../env";
+import { Env, getSwapAPIUrl } from "../env";
 import { deriveFeeAccount } from "../tokens";
 import { makeJSONRequest, strictParseBoolean as parseBoolStrict, tryReadResponseBody } from "../util";
 import { SwapRoute } from "./jupiter_types";
@@ -28,7 +28,7 @@ export async function serializeSwapRouteTransaction(swapRoute : SwapRoute|Transa
         body.feeAccount = feeAccount.toBase58();
     }
     try {
-        const swapRequest = makeJSONRequest(env.JUPITER_SWAP_API_URL, body);
+        const swapRequest = makeJSONRequest(getSwapAPIUrl(env), body);
         const swapResponse = await fetch(swapRequest);
         if (!swapResponse.ok) {
             const responseBody = await tryReadResponseBody(swapResponse);

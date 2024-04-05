@@ -57,7 +57,11 @@ TOKEN_LIST_REFRESH_TIMEOUT = "30000"
 USER_PNL_CALCULATION_REFRESH_MS = "30000"
 USE_QUICKNODE = "true"
 QUICKNODE_RPC_URL = "https://small-polished-pallet.solana-mainnet.quiknode.pro"
-
+USE_METIS = "false"
+METIS_PRICE_API_URL = ""
+METIS_QUOTE_API_URL = ""
+METIS_SWAP_API_URL = "false"
+DOWN_FOR_MAINTENANCE = "false"
 
 [env.beta.vars]
 # do not change this string EVER post launch
@@ -103,6 +107,11 @@ TOKEN_LIST_REFRESH_TIMEOUT = "30000"
 USER_PNL_CALCULATION_REFRESH_MS = "30000"
 USE_QUICKNODE = "true"
 QUICKNODE_RPC_URL = "https://small-polished-pallet.solana-mainnet.quiknode.pro"
+USE_METIS = "false"
+METIS_PRICE_API_URL = ""
+METIS_QUOTE_API_URL = ""
+METIS_SWAP_API_URL = "false"
+DOWN_FOR_MAINTENANCE = "false"
 
 [env.dev.durable_objects]
 bindings = [

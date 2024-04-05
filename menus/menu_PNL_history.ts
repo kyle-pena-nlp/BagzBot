@@ -3,6 +3,7 @@ import { Position } from "../positions";
 import { CallbackButton } from "../telegram";
 import { interpretPNLWithArrows } from "../telegram/emojis";
 import { CallbackData } from "./callback_data";
+import { logoHack } from "./logo_hack";
 import { Menu, MenuCapabilities } from "./menu";
 import { MenuCode } from "./menu_code";
 
@@ -27,17 +28,18 @@ export class MenuPNLHistory extends Menu<{ closedPositions : Position[], netPNL 
         return options;
     }
     private addNetPNLSummary(lines : string[]) {
-        lines.push("<u><b>PNL History</b></u>");
+        lines.push(`${logoHack()}<u><b>PNL History</b></u>`);
+        lines.push("");
         const pnlEmoji = interpretPNLWithArrows(toNumber(this.menuData.netPNL));
-        lines.push(`<b>Total Earnings</b>: ${asTokenPriceDelta(this.menuData.netPNL)} SOL ${pnlEmoji}`);
+        lines.push(`<b>Total Earnings</b>: <code>${asTokenPriceDelta(this.menuData.netPNL)} SOL</code>`);
     }
     private addClosedPositionSummary(lines : string[], position : Position) {
         if (position.netPNL == null) {
             return;
         }
-        const label = this.padRight(`$${position.token.symbol}: `, 6);
-        const pnlString = this.padRight(`${asTokenPriceDelta(position.netPNL)}`, 10);
-        lines.push(`<b>${label}</b>: ${pnlString} ${interpretPNLWithArrows(toNumber(position.netPNL))}`);
+        const label = this.padRight(`${position.token.symbol}: `, 7);
+        const pnlString = this.padRight(`${asTokenPriceDelta(position.netPNL)} SOL`, 10);
+        lines.push(`:bullet: Sale of <code>${label} ${pnlString}</code>`);
     }
 
     private padRight(text : string, length : number) : string {
@@ -47,5 +49,9 @@ export class MenuPNLHistory extends Menu<{ closedPositions : Position[], netPNL 
         else {
             return text.slice(0, length);
         }
+    }
+
+    renderURLPreviewNormally(): boolean {
+        return false;
     }
 }

@@ -62,6 +62,11 @@ export interface Env {
 	SECRET__QUICKNODE_API_KEY : string
 	USE_QUICKNODE : string
 	QUICKNODE_RPC_URL : string
+	USE_METIS : string
+	METIS_PRICE_API_URL : string
+	METIS_QUOTE_API_URL : string
+	METIS_SWAP_API_URL : string
+	DOWN_FOR_MAINTENANCE : string
 
 	UserDO : any // i'd like to strongly type this as DurableObjectNamespace, but can't for technical reasons
 	TokenPairPositionTrackerDO : any // ditto
@@ -76,5 +81,32 @@ export function getRPCUrl(env : Env) {
 	}
 	else {
 		return `${env.RPC_ENDPOINT_URL}?api-key=${env.SECRET__HELIUS_API_KEY}`
+	}
+}
+
+export function getPriceAPIURL(env : Env) {
+	if (strictParseBoolean(env.USE_METIS)) {
+		return env.METIS_PRICE_API_URL;
+	}
+	else {
+		return env.JUPITER_PRICE_API_URL;
+	}
+}
+
+export function getSwapAPIUrl(env : Env) {
+	if (strictParseBoolean(env.USE_METIS)) {
+		return env.METIS_SWAP_API_URL;
+	}
+	else {
+		return env.JUPITER_SWAP_API_URL;
+	}
+}
+
+export function getQuoteAPIURL(env : Env) {
+	if (strictParseBoolean(env.USE_METIS)) {
+		return env.METIS_QUOTE_API_URL;
+	}
+	else {
+		return env.JUPITER_QUOTE_API_URL;
 	}
 }

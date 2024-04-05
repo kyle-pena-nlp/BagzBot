@@ -1,5 +1,5 @@
 import { DurableObjectState } from "@cloudflare/workers-types";
-import { Env } from "../../env";
+import { Env, getPriceAPIURL } from "../../env";
 import { StagedTokenInfo, TokenInfo } from "../../tokens";
 import { assertNever, makeJSONResponse, makeSuccessResponse, maybeGetJson } from "../../util";
 import { GetTokenInfoRequest, GetTokenInfoResponse } from "./actions/get_token_info";
@@ -184,7 +184,7 @@ export class PolledTokenPairListDO {
     }
 
     toPriceAPIRequests(tokensByVsToken : Map<string,string[]>) {
-        const baseUrl = this.env.JUPITER_PRICE_API_URL;        
+        const baseUrl = getPriceAPIURL(this.env);        
         const priceAPIUrls : PriceAPIRequestSpec[] = [];
         for (const [vsToken,tokens] of tokensByVsToken) {
             const tokenBatches = this.divideIntoBatches(tokens, 99); // jupiter API accepts up to 100 at a time - 99 just to be safe.

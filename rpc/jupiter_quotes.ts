@@ -1,7 +1,7 @@
 
 import { DecimalizedAmount, MATH_DECIMAL_PLACES, dDiv, dSub } from "../decimalized";
 import { dZero } from "../decimalized/decimalized_amount";
-import { Env } from "../env";
+import { Env, getQuoteAPIURL } from "../env";
 import { Position, PositionPreRequest, PositionRequest, Quote } from "../positions";
 import { TokenInfo, getVsTokenDecimalsMultiplier, getVsTokenInfo } from "../tokens";
 import { JupiterQuoteAPIParams, SwapRoute } from "./jupiter_types";
@@ -133,7 +133,7 @@ function makeJupiterQuoteAPIURL(params : JupiterQuoteAPIParams,
     // https://station.jup.ag/api-v6/get-quote
     const hasPlatformFee = params.platformFeeBps && params.platformFeeBps > 0;
     const parts = [
-        `${env.JUPITER_QUOTE_API_URL}?inputMint=${params.inputTokenAddress}`,
+        `${getQuoteAPIURL(env)}?inputMint=${params.inputTokenAddress}`,
         `&outputMint=${params.outputTokenAddress}`,
         `&amount=${params.decimalizedAmount}`,
         `&slippageBps=${params.slippageBps}`,
