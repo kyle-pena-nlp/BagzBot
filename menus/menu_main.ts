@@ -19,7 +19,7 @@ export interface Stuff {
 export class MenuMain extends Menu<UserData & Stuff> implements MenuCapabilities {
     renderText(): string {
         const lines = [
-            `<b>${this.menuData.botName} Main Menu</b>`,
+            `<a href="https://drive.usercontent.google.com/download?id=1b8OCX_hJj6zwL_05gHMzOEPM8swgGmgg">\u200B</a><b>${this.menuData.botName} Main Menu</b>`,
             `<i>${this.menuData.botTagline}</i>`
         ];
 
@@ -66,6 +66,7 @@ export class MenuMain extends Menu<UserData & Stuff> implements MenuCapabilities
             this.insertButtonNextLine(options, ':sparkle: New Position :sparkle:', this.menuCallback(MenuCode.NewPosition));
             this.insertButtonNextLine(options, ':briefcase: Wallet', this.menuCallback(MenuCode.Wallet));
             this.insertButtonSameLine(options, ':chart_up: Positions', this.menuCallback(MenuCode.ListPositions));
+            this.insertButtonNextLine(options, ':ledger: PNL History', this.menuCallback(MenuCode.ViewPNLHistory));
             if (this.menuData.hasInviteBetaCodes) {
                 this.insertButtonNextLine(options, ":envelope: Invite Friends To Beta", this.menuCallback(MenuCode.BetaGateInviteFriends));
             }
@@ -98,7 +99,7 @@ export class MenuMain extends Menu<UserData & Stuff> implements MenuCapabilities
         return options;
     }
 
-    photo() {
-        return 'https://imgur.com/KMrMt85';
+    renderURLPreviewNormally(): boolean {
+        return false;
     }
 }

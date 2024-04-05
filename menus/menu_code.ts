@@ -16,6 +16,7 @@ export enum MenuCode {
 	SubmitOpenPositionSellSlippagePercent = "SOP.SellSlippagePercent",
 	AdminSendUserMessage = "AdminSendUserMessage",
 	SubmitAdminSendUserMessage = "SubmitAdminSendUserMessage",
+	ViewPNLHistory = "ViewPNLHistory",
 
 	PosRequestChooseAutoDoubleSlippageOptions = "EPR.AutoDoubleSlip",
 	SubmitPosRequestAutoDoubleSlippageOptions = "SPR.AutoDoubleSlip",

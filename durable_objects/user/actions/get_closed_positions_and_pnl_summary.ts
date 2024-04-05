@@ -1,8 +1,9 @@
+import { DecimalizedAmount } from "../../../decimalized";
 import { Position } from "../../../positions";
 import { BaseUserDORequest } from "./base_user_do_request";
 
 export interface ClosedPositionsPNLSummary {
-    netSOL : number
+    netSOL : DecimalizedAmount
 }
 
 export interface GetClosedPositionsAndPNLSummaryRequest extends BaseUserDORequest {

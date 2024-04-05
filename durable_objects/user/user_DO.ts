@@ -8,7 +8,7 @@ import { PositionPreRequest, PositionStatus, PositionType } from "../../position
 import { POSITION_REQUEST_STORAGE_KEY } from "../../storage_keys";
 import { TGStatusMessage, UpdateableNotification, sendMessageToTG } from "../../telegram";
 import { WEN_ADDRESS, getVsTokenInfo } from "../../tokens";
-import { ChangeTrackedValue, Structural, assertNever, groupIntoBatches, makeFailureResponse, makeJSONResponse, makeSuccessResponse, maybeGetJson, setDifference, sleep, strictParseBoolean } from "../../util";
+import { ChangeTrackedValue, Structural, assertNever, groupIntoBatches, makeFailureResponse, makeJSONResponse, makeSuccessResponse, maybeGetJson, sleep, strictParseBoolean } from "../../util";
 import { assertIs } from "../../util/enums";
 import { listUnclaimedBetaInviteCodes } from "../beta_invite_codes/beta_invite_code_interop";
 import { PositionAndMaybePNL } from "../token_pair_position_tracker/model/position_and_PNL";
@@ -486,10 +486,13 @@ export class UserDO {
         }
 
         // the tracker is the source of truth.  if the userDO has a token pair for a position that doesn't exist in the tracker, remove it
-        const currentPositionIDs = new Set<string>(positions.map(p => p.position.positionID));
+        // TODO: removed temporarily.  
+        // The problem was... if we remove here, we can't use this to know where to fetch closed positions from.
+        // How should we track which token pairs have closed positions?  It's a tough one.
+        /*const currentPositionIDs = new Set<string>(positions.map(p => p.position.positionID));
         const positionIDsInTracker = new Set<string>(this.tokenPairsForPositionIDsTracker.listPositionIDs());
         const deletedPositionIDs = setDifference(positionIDsInTracker, currentPositionIDs, Set<string>);
-        this.tokenPairsForPositionIDsTracker.removePositions([...deletedPositionIDs]);
+        this.tokenPairsForPositionIDsTracker.removePositions([...deletedPositionIDs]);*/
 
         // likewise, if for whatever reason the pair for this position is missing, this would rectify it
         for (const position of positions) {

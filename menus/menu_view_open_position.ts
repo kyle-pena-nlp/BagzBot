@@ -3,6 +3,7 @@ import { DecimalizedAmount, MATH_DECIMAL_PLACES, asPercentDeltaString, asPercent
 import { PNL, PositionAndMaybePNL } from "../durable_objects/token_pair_position_tracker/model/position_and_PNL";
 import { Position, PositionStatus } from "../positions";
 import { CallbackButton } from "../telegram";
+import { assertNever } from "../util";
 import { CallbackData } from "./callback_data";
 import { Menu, MenuCapabilities } from "./menu";
 import { MenuCode } from "./menu_code";
@@ -46,26 +47,56 @@ export class MenuViewOpenPosition extends Menu<PositionAndMaybePNL|BrandNewPosit
         return options;
     }
 
+    private statusEmoji() : string {
+        const status = this.position().status;
+        if (status === PositionStatus.Open && !this.position().buyConfirmed) {
+            return ':hollow:';
+        }
+        else if (status === PositionStatus.Open && this.triggerConditionMet()) {
+            return ':orange:';
+        }
+        else if (status === PositionStatus.Open) {
+            return ':green:';
+        }
+        else if (status === PositionStatus.Closing) {
+            return ':orange:';
+        }
+        else if (status === PositionStatus.Closed) {
+            return ':red:'
+        }
+        else {
+            assertNever(status);
+        }
+    }
+
     private headerLines() : string[] {
 
         // name and amount of position, and token address
+        const statusEmoji = this.statusEmoji();
         const refreshNonce = Math.floor(Date.now() / 60000);
         const lines = [
-            `<b>${asTokenPrice(this.position().tokenAmt)} of <a href="https://birdeye.so/token/${this.menuData.position.token.address}?chain=solana&v=5&nonce=${refreshNonce}">$${this.position().token.symbol}</a></b>`,
+            `${statusEmoji} <b>${asTokenPrice(this.position().tokenAmt)} of <a href="https://birdeye.so/token/${this.menuData.position.token.address}?chain=solana&v=5&nonce=${refreshNonce}">$${this.position().token.symbol}</a></b>`,
             ` (<code>${this.position().token.address}</code>)`
         ];
+
+        lines.push(`<b><u>Status</u></b>:`)
 
         // whether or not is confirmed, or is confirming
         if (this.isOpen() && !this.buyIsConfirmed()) {
             lines.push(`:hollow: <b>WARNING: THIS PURCHASE HAS NOT BEEN CONFIRMED!</b>`);
             lines.push(`:bullet: We will retry confirming your purchase with Solana soon`)
         }
-        
-        if (this.triggerConditionMet()) {
-            lines.push(`:bullet: The position's trigger condition has been met! This position will be sold if the price remains below this level.`);
+        else if (this.isOpen() && this.triggerConditionMet()) {
+            lines.push(`:bullet: The position's trigger percent condition has been met! This position will be sold if the price remains below this level.`);
+        }
+        else if (this.isOpen()) {
+            lines.push(`:bullet: This position is open and its price is being monitored to see if it falls ${this.position().triggerPercent.toFixed(1)}% below the peak.`)
         }
         else if (this.isClosing()) {
             lines.push(`:bullet: We are attempting to sell this position.`);
+        }
+        else if (this.isClosed()) {
+            lines.push(`:bullet: This position is closed.`);
         }
 
         if (this.isClosing() && this.sellIsUnconfirmed()) {
@@ -142,6 +173,10 @@ export class MenuViewOpenPosition extends Menu<PositionAndMaybePNL|BrandNewPosit
 
     private isClosing() : boolean {
         return this.menuData.position.status === PositionStatus.Closing;
+    }
+
+    private isClosed() : boolean {
+        return this.menuData.position.status === PositionStatus.Closed;
     }
 
     private sellIsUnconfirmed() : boolean {

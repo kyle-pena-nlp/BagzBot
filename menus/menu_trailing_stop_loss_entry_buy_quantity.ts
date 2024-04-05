@@ -4,18 +4,28 @@ import { CallbackData } from "./callback_data";
 import { Menu, MenuCapabilities } from "./menu";
 import { MenuCode } from "./menu_code";
 
-export class MenuTrailingStopLossEntryBuyQuantity extends Menu<QuantityAndToken> implements MenuCapabilities {
+export class MenuTrailingStopLossEntryBuyQuantity extends Menu<{ quantityAndToken: QuantityAndToken, isBeta : boolean }> implements MenuCapabilities {
     renderText(): string {
-        return `Choose ${this.menuData.thisTokenSymbol} quantity`;
+        return `Choose ${this.menuData.quantityAndToken.thisTokenSymbol} quantity`;
     }
     renderOptions(): CallbackButton[][] {
-        const symbol = this.menuData.thisTokenSymbol;
+        const symbol = this.menuData.quantityAndToken.thisTokenSymbol;
         const options = this.emptyMenu();
-        // todo: refer to configured buy limit
-        this.insertButtonNextLine(options, `0.1 ${symbol}`, new CallbackData(MenuCode.SubmitBuyQuantity, "0.1"));
-        this.insertButtonSameLine(options, `1 ${symbol}`, new CallbackData(MenuCode.SubmitBuyQuantity, "1"));
-        this.insertButtonSameLine(options, `5 ${symbol}`, new CallbackData(MenuCode.SubmitBuyQuantity, "5"));
-        this.insertButtonSameLine(options, `X ${symbol}`, new CallbackData(MenuCode.CustomBuyQuantity, this.menuData.quantity.toString()));
+        
+        let amounts = [];
+        
+        if (this.menuData.isBeta) {
+            amounts = [0.01,0.1,0.25,0.5];
+        }
+        else {
+            amounts = [0.1,1,5];
+        }
+
+        for (const amount of amounts) {
+            this.insertButtonNextLine(options, `${amount} ${symbol}`, new CallbackData(MenuCode.SubmitBuyQuantity, amount.toString()));
+        }
+
+        this.insertButtonSameLine(options, `X ${symbol}`, new CallbackData(MenuCode.CustomBuyQuantity, this.menuData.quantityAndToken.quantity.toString()));
         this.insertButtonNextLine(options, ":back: Back", new CallbackData(MenuCode.TrailingStopLossRequestReturnToEditorMenu));
         return options;
     }

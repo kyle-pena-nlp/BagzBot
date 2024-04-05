@@ -73,7 +73,7 @@ BETA_CODE_GATE_EXCEPTIONS = "6434185018,1632540473"
 ADMIN_TELEGRAM_USER_IDS = "6434185018"
 SUPER_ADMIN_USER_ID = "6434185018"
 FORBIDDEN_TOKENS = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v,Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB"
-SOL_BUY_LIMIT = "5"
+SOL_BUY_LIMIT = "1"
 TELEGRAM_BOT_DISPLAY_NAME = "SolSentry"
 TELEGRAM_BOT_TAGLINE = "Keeps watching, so you don't have to."
 # this is overridden when server is started locally to point to local telegram server 

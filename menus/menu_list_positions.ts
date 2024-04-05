@@ -1,5 +1,5 @@
 import { dAdd, dCompare, dDiv, dMult, fromNumber, toFriendlyString } from "../decimalized";
-import { DecimalizedAmount, MATH_DECIMAL_PLACES, asPercentDeltaString, asTokenPrice, dZero } from "../decimalized/decimalized_amount";
+import { DecimalizedAmount, MATH_DECIMAL_PLACES, asPercentDeltaString, asTokenPrice, dZero, toNumber } from "../decimalized/decimalized_amount";
 import { PositionAndMaybePNL } from "../durable_objects/token_pair_position_tracker/model/position_and_PNL";
 import { PositionStatus } from "../positions";
 import { CallbackButton } from "../telegram";
@@ -69,15 +69,17 @@ export class MenuListPositions extends Menu<PositionAndMaybePNL[]> implements Me
         }
         else {
             const position = p.position;
+            // TODO: unify the many places that this code is written in this codebase.
+            const triggerPercentMet = position.triggerPercent < (100 * toNumber(p.PNL.fracBelowPeak));
             if (!position.buyConfirmed) {
                 return ':hollow:';
             }
-            else if (position.status === PositionStatus.Open) {
-                return ':green:';
-            }
-            else if (position.status === PositionStatus.Closing) {
+            else if (triggerPercentMet || position.status === PositionStatus.Closing) {
                 return ':orange:';
             }
+            else if (position.status === PositionStatus.Open) {
+                return ':green:';
+            }            
             else if (position.status === PositionStatus.Closed) {
                 return ':red:';
             }

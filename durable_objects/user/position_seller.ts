@@ -114,7 +114,7 @@ export class PositionSeller {
     private async executeAndParseSwap(position : Position, signedTx : VersionedTransaction, lastValidBH : number) : Promise<'failed'|'slippage-failed'|'unconfirmed'|ParsedSuccessfulSwapSummary> {
         
         // create a time-limited tx executor and confirmer
-        const swapExecutor = new SwapExecutor(this.wallet, 'buy', this.env, this.channel, this.connection, lastValidBH, this.startTimeMS);
+        const swapExecutor = new SwapExecutor(this.wallet, 'sell', this.env, this.channel, this.connection, lastValidBH, this.startTimeMS);
 
         // attempt to execute, confirm, and parse w/in time limit
         const parsedSwapSummary = await swapExecutor.executeTxAndParseResult(position, signedTx);

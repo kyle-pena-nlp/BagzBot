@@ -1,9 +1,10 @@
-import { toNumber } from "../../../decimalized/decimalized_amount";
+import { DecimalizedAmount, dAdd } from "../../../decimalized";
+import { dZero } from "../../../decimalized/decimalized_amount";
 import { Position, PositionStatus } from "../../../positions";
 import { ClosedPositionsPNLSummary } from "../actions/get_closed_positions_and_pnl_summary";
 
 export class ClosedPositionPNLSummarizer {
-    netSOL : number = 0;
+    netSOL : DecimalizedAmount = dZero();
     closedPositions : Position[] = [];
     constructor() {
     }
@@ -20,7 +21,7 @@ export class ClosedPositionPNLSummarizer {
             return;
         }
         this.closedPositions.push(position);
-        this.netSOL += toNumber(position.netPNL);
+        this.netSOL = dAdd(this.netSOL, position.netPNL);
     }
     getSummary() : ClosedPositionsPNLSummary {
         return { 

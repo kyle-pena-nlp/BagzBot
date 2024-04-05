@@ -8,6 +8,7 @@ import { AdminDeleteAllPositionsRequest, AdminDeleteAllPositionsResponse } from 
 import { AutomaticallyClosePositionsRequest, AutomaticallyClosePositionsResponse } from "./actions/automatically_close_positions";
 import { DeleteSessionRequest } from "./actions/delete_session";
 import { EditTriggerPercentOnOpenPositionRequest, EditTriggerPercentOnOpenPositionResponse } from "./actions/edit_trigger_percent_on_open_position";
+import { GetClosedPositionsAndPNLSummaryRequest, GetClosedPositionsAndPNLSummaryResponse } from "./actions/get_closed_positions_and_pnl_summary";
 import { GetImpersonatedUserIDRequest, GetImpersonatedUserIDResponse } from "./actions/get_impersonated_user_id";
 import { GetLegalAgreementStatusRequest, GetLegalAgreementStatusResponse } from "./actions/get_legal_agreement_status";
 import { GetPositionFromUserDORequest, GetPositionFromUserDOResponse } from "./actions/get_position_from_user_do";
@@ -54,6 +55,13 @@ export enum UserDOFetchMethod {
 	setSellSlippagePercentOnOpenPosition = "setSellSlippagePercentOnOpenPosition",
 	getUserWalletSOLBalance = "getUserSOLBalance",
 	getClosedPositionsAndPNLSummary = "getClosedPositionsAndPNLSummary"
+}
+
+export async function getClosedPositionsAndPNLSummary(telegramUserID : number, chatID : number, env : Env) : Promise<GetClosedPositionsAndPNLSummaryResponse> {
+	const request : GetClosedPositionsAndPNLSummaryRequest = { telegramUserID, chatID };
+	const method = UserDOFetchMethod.getClosedPositionsAndPNLSummary;
+	const response = await sendJSONRequestToUserDO<GetClosedPositionsAndPNLSummaryRequest,GetClosedPositionsAndPNLSummaryResponse>(telegramUserID, method, request, env);
+	return response;
 }
 
 export async function getUserWalletSOLBalance(telegramUserID : number, chatID : number, env : Env) : Promise<DecimalizedAmount|null> {

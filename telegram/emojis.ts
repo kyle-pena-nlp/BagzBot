@@ -19,6 +19,11 @@ const emojis = {
     ':green:': '🟢',
     ':hollow:': '⚪',
 
+    ':down:': '🔻',
+    ':up:': '💰', // irritating, but no green triangle up in emojis.
+    ':equals:': '😑',
+    ':ledger:': '📒',
+
     ':bullet:': '•',
     ':pencil:': '✏️',
     ':refresh:': '\u27F3',
@@ -108,6 +113,18 @@ export function interpretPNL(pnl : number) : emojiTag {
     }
     else {
         return ':money_face:';
+    }
+}
+
+export function interpretPNLWithArrows(pnl : number) : emojiTag {
+    if (pnl < 0) {
+        return ':down:';
+    }
+    else if (pnl == 0) {
+        return ':equals:';
+    }
+    else {
+        return ':up:';
     }
 }
 

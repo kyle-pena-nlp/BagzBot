@@ -1,5 +1,6 @@
 import { LegalAgreement } from "./legal_agreement";
 import { BaseMenu } from "./menu";
+import { MenuPNLHistory } from "./menu_PNL_history";
 import { MenuBetaInviteFriends } from "./menu_beta_invite_friends";
 import { MenuCode } from "./menu_code";
 import { MenuContinueMessage } from "./menu_continue_message";
@@ -30,7 +31,7 @@ import { WelcomeScreenPart1 } from "./welcome_screen_part_1";
 
 export {
     BaseMenu, LegalAgreement, MenuBetaInviteFriends, MenuCode, MenuContinueMessage, MenuEditOpenPositionSellAutoDoubleSlippage, MenuEditOpenPositionSellSlippagePercent, MenuEditOpenPositionTriggerPercent, MenuEditPositionHelp, MenuEditPositionRequest, MenuEditPositionRequestSellAutoDoubleSlippage, MenuError, MenuFAQ,
-    MenuListPositions, MenuMain, MenuOKClose, MenuRetryBuy, MenuRetryBuySlippageError, MenuRetryManualSell, MenuTODO,
+    MenuListPositions, MenuMain, MenuOKClose, MenuPNLHistory, MenuRetryBuy, MenuRetryBuySlippageError, MenuRetryManualSell, MenuTODO,
     MenuTrailingStopLossEntryBuyQuantity,
     MenuTrailingStopLossPickVsToken,
     MenuTrailingStopLossSlippagePercent,
