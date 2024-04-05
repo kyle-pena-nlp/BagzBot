@@ -1,5 +1,5 @@
 import { Connection } from "@solana/web3.js";
-import { logError } from "../logging";
+import { logDebug, logError } from "../logging";
 
 export async function getLatestValidBlockhash(connection : Connection, max_retries : number) : Promise<number|null> {
     let lastValidBH = null;
@@ -10,11 +10,14 @@ export async function getLatestValidBlockhash(connection : Connection, max_retri
         .then(x => x.lastValidBlockHeight)
         .catch(r => {
             if ((r.message||'').includes("429")) {
+                logDebug('429 retrieving parsed transaction');
                 if (expBackoffFactor < 8) {
                     expBackoffFactor = 2.0 * expBackoffFactor;
                 }
             }
-            logError(`Could not get latestBlockhash`, r);
+            else {
+                logError(`Could not get latestBlockhash`, r);
+            }
             return null;
         });
         attempts += 1;

@@ -99,10 +99,11 @@ export class TokenPairPositionTracker {
     }
 
     // idempotentally mark position as closed from price tracking
-    closePosition(positionID : string) {
+    closePosition(positionID : string, netPNL : DecimalizedAmount) {
         // also, remove it from peak prices data structure
         const maybeRemovedPosition = this.pricePeaks.remove(positionID);
         if (maybeRemovedPosition != null) {
+            maybeRemovedPosition.netPNL = netPNL;
             this.closedPositions.set(maybeRemovedPosition.positionID, maybeRemovedPosition)
         }
     }

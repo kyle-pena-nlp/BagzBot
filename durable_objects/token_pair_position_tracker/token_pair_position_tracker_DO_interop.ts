@@ -164,9 +164,9 @@ export async function wakeUpTokenPairPositionTracker(tokenAddress : string, vsTo
 	return response;
 }
 
-export async function markAsClosed(positionID : string, tokenAddress : string, vsTokenAddress : string, env : Env) : Promise<MarkPositionAsClosedResponse> {
+export async function markAsClosed(positionID : string, tokenAddress : string, vsTokenAddress : string, netPNL: DecimalizedAmount, env : Env) : Promise<MarkPositionAsClosedResponse> {
 	const method = TokenPairPositionTrackerDOFetchMethod.markPositionAsClosed;
-	const request : MarkPositionAsClosedRequest = { positionID, tokenAddress, vsTokenAddress };
+	const request : MarkPositionAsClosedRequest = { positionID, tokenAddress, vsTokenAddress, netPNL };
 	return await sendJSONRequestToTokenPairPositionTracker<MarkPositionAsClosedRequest,MarkPositionAsClosedResponse>(
 		method, 
 		request, 

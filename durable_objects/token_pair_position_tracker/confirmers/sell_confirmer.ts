@@ -1,6 +1,6 @@
 import { Connection, ParsedTransactionWithMeta } from "@solana/web3.js";
 import { Env } from "../../../env";
-import { logError } from "../../../logging";
+import { logDebug, logError } from "../../../logging";
 import { Position } from "../../../positions";
 import { parseParsedTransactionWithMeta } from "../../../rpc/rpc_parse";
 import { NonSlippageSwapExecutionErrorParseSummary, ParsedSuccessfulSwapSummary, SlippageSwapExecutionErrorParseSummary, isNonSlippageExecutionErrorParseSummary, isSlippageSwapExecutionErrorParseSummary, isSuccessfulSwapSummary } from "../../../rpc/rpc_types";
@@ -18,7 +18,7 @@ export class SellConfirmer {
     private isTimedOut() : boolean {
         return (Date.now() > this.startTimeMS + strictParseInt(this.env.TX_TIMEOUT_MS));
     }    
-    async confirmSell(position : Position & { sellConfirmed : false }) : Promise<'api-error'|'slippage-failed'|'failed'|'unconfirmed'|'confirmed'> {
+    async confirmSell(position : Position & { sellConfirmed : false }) : Promise<'api-error'|'slippage-failed'|'failed'|'unconfirmed'|ParsedSuccessfulSwapSummary> {
         
         if (this.isTimedOut()) {
             return 'unconfirmed';
@@ -33,11 +33,12 @@ export class SellConfirmer {
         }
 
         const blockheight : number | 'api-call-error' | '429' = await this.connection.getBlockHeight('confirmed').catch(r => {
-            logError(r);
             if (is429(r)) {
+                logDebug('429 retrieving blockheight');
                 return '429';
             }
             else {
+                logError(r);
                 return 'api-call-error';
             }
         });
@@ -56,7 +57,7 @@ export class SellConfirmer {
         }
     }
 
-    private async attemptConfirmation(unconfirmedPosition : Position & { sellConfirmed : false }, blockheight : number) : Promise<'confirmed'|'slippage-failed'|'failed'|'unconfirmed'> {
+    private async attemptConfirmation(unconfirmedPosition : Position & { sellConfirmed : false }, blockheight : number) : Promise<ParsedSuccessfulSwapSummary|'slippage-failed'|'failed'|'unconfirmed'> {
         
         const parsedTx = await this.getParsedTransaction(unconfirmedPosition);
         
@@ -78,7 +79,7 @@ export class SellConfirmer {
             return 'failed';
         }
         else if (isSuccessfulSwapSummary(parsedTx)) {
-            return 'confirmed';
+            return parsedTx;
         }
         else {
             assertNever(parsedTx);

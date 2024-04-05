@@ -1,10 +1,11 @@
 import { Connection } from "@solana/web3.js";
 import { isAdminOrSuperAdmin } from "../../admins";
-import { DecimalizedAmount } from "../../decimalized";
+import { DecimalizedAmount, dSub } from "../../decimalized";
 import { asTokenPrice, toNumber } from "../../decimalized/decimalized_amount";
 import { Env, getRPCUrl } from "../../env";
 import { logDebug, logError, logInfo } from "../../logging";
 import { Position, PositionStatus } from "../../positions";
+import { isSuccessfullyParsedSwapSummary } from "../../rpc/rpc_types";
 import { TGStatusMessage } from "../../telegram";
 import { ChangeTrackedValue, assertNever, makeJSONResponse, makeSuccessResponse, strictParseBoolean, strictParseInt } from "../../util";
 import { ensureTokenPairIsRegistered } from "../heartbeat/heartbeat_do_interop";
@@ -554,9 +555,10 @@ export class TokenPairPositionTrackerDO {
                     }
                     this.tokenPairPositionTracker.markPositionAsOpen(pos.positionID);
                 }
-                else if (confirmedSellStatus === 'confirmed') {
+                else if (isSuccessfullyParsedSwapSummary(confirmedSellStatus)) {
                     // TODO: update with PNL
-                    this.tokenPairPositionTracker.closePosition(pos.positionID);
+                    const netPNL = dSub(pos.vsTokenAmt, confirmedSellStatus.swapSummary.outTokenAmt);
+                    this.tokenPairPositionTracker.closePosition(pos.positionID, netPNL);
                 }
                 else {
                     assertNever(confirmedSellStatus);
@@ -582,7 +584,7 @@ export class TokenPairPositionTrackerDO {
 
     async handleMarkPositionAsClosed(body: MarkPositionAsClosedRequest) : Promise<Response> {
         this.ensureIsInitialized(body);
-        this.tokenPairPositionTracker.closePosition(body.positionID);
+        this.tokenPairPositionTracker.closePosition(body.positionID, body.netPNL);
         const responseBody : MarkPositionAsClosedResponse = {};
         return makeJSONResponse(responseBody);
     }

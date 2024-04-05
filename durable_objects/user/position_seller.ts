@@ -1,11 +1,12 @@
 import { Connection, VersionedTransaction } from "@solana/web3.js";
 import { Wallet } from "../../crypto";
+import { DecimalizedAmount, dSub } from "../../decimalized";
 import { Env } from "../../env";
 import { MenuCode } from "../../menus";
 import { Position } from "../../positions";
 import { getLatestValidBlockhash } from "../../rpc/rpc_blocks";
 import { signatureOf } from "../../rpc/rpc_sign_tx";
-import { isSlippageSwapExecutionErrorParseSummary, isSuccessfulSwapSummary, isSwapExecutionErrorParseSummary, isUnknownTransactionParseSummary } from "../../rpc/rpc_types";
+import { ParsedSuccessfulSwapSummary, isSlippageSwapExecutionErrorParseSummary, isSuccessfulSwapSummary, isSuccessfullyParsedSwapSummary, isSwapExecutionErrorParseSummary, isUnknownTransactionParseSummary } from "../../rpc/rpc_types";
 import { TGStatusMessage, UpdateableNotification } from "../../telegram";
 import { assertNever, strictParseInt } from "../../util";
 import { markAsClosed, markAsOpen, positionExistsInTracker, upsertPosition } from "../token_pair_position_tracker/token_pair_position_tracker_do_interop";
@@ -94,8 +95,9 @@ export class PositionSeller {
         else if (result === 'unconfirmed') {
             return 'unconfirmed';
         }
-        else if (result === 'confirmed') {
-            await this.markAsClosed(position);
+        else if (isSuccessfullyParsedSwapSummary(result)) {
+            const netPNL = dSub(position.vsTokenAmt, result.swapSummary.outTokenAmt)
+            await this.markAsClosed(position, netPNL);
             return 'confirmed';
         }
         else {
@@ -109,7 +111,7 @@ export class PositionSeller {
         return signedTx;
     }
 
-    private async executeAndParseSwap(position : Position, signedTx : VersionedTransaction, lastValidBH : number) : Promise<'failed'|'slippage-failed'|'unconfirmed'|'confirmed'> {
+    private async executeAndParseSwap(position : Position, signedTx : VersionedTransaction, lastValidBH : number) : Promise<'failed'|'slippage-failed'|'unconfirmed'|ParsedSuccessfulSwapSummary> {
         
         // create a time-limited tx executor and confirmer
         const swapExecutor = new SwapExecutor(this.wallet, 'buy', this.env, this.channel, this.connection, lastValidBH, this.startTimeMS);
@@ -134,7 +136,7 @@ export class PositionSeller {
             return 'failed';
         }        
         else if (isSuccessfulSwapSummary(parsedSwapSummary)) {
-            return 'confirmed';
+            return parsedSwapSummary;
         }
         else {
             assertNever(parsedSwapSummary);
@@ -149,8 +151,8 @@ export class PositionSeller {
         await markAsOpen(position.positionID, position.token.address, position.vsToken.address, this.env);
     }
 
-    private async markAsClosed(position : Position) {
-        await markAsClosed(position.positionID, position.token.address, position.vsToken.address, this.env);
+    private async markAsClosed(position : Position, netPNL : DecimalizedAmount) {
+        await markAsClosed(position.positionID, position.token.address, position.vsToken.address, netPNL, this.env);
     }
 
 

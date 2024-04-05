@@ -2,7 +2,7 @@ import { Connection, GetVersionedTransactionConfig, ParsedTransactionWithMeta, V
 import * as bs58 from "bs58";
 import { UserAddress, Wallet, toUserAddress } from "../../crypto";
 import { Env } from "../../env";
-import { logError } from "../../logging";
+import { logDebug, logError } from "../../logging";
 import { Swappable, getSwapOfXDescription, isPosition, isPositionRequest } from "../../positions";
 import { executeAndConfirmSignedTx } from "../../rpc/rpc_execute_signed_transaction";
 import { parseBuySwapTransaction, parseParsedTransactionWithMeta, parseSellSwapTransaction } from "../../rpc/rpc_parse";
@@ -83,6 +83,7 @@ export class SwapExecutor {
             .then(tx => tx == null ? 'tx-DNE' : tx)
             .catch(e => {
                 if (is429(e)) {
+                    logDebug('429 retrieving parsed transaction');
                     increaseExpBackoff();
                     return '429';
                 }

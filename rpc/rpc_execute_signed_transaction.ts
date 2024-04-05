@@ -75,6 +75,7 @@ export async function executeAndConfirmSignedTx(
                 .then(_ => { anyTxSent = true; })
                 .catch(e => {
                     if (is429(e)) {
+                        logDebug('429 sending raw transaction')
                         increaseExpBackoff();
                     }
                     else {
@@ -85,6 +86,7 @@ export async function executeAndConfirmSignedTx(
 
             const blockheight = await connection.getBlockHeight('confirmed').catch(e => {
                 if (is429(e)) {
+                    logDebug('429 retrieving blockheight');
                     increaseExpBackoff();
                 }
                 else {
@@ -148,6 +150,7 @@ export async function executeAndConfirmSignedTx(
             // get BH (intentionally getting this before getting sig status below)
             const blockheight : number|'429'|'api-call-failed' = await connection.getBlockHeight('confirmed').catch(e => {
                 if (is429(e)) {
+                    logDebug('429 getting blockheight');
                     hasA429 = true;
                     return '429';
                 }
@@ -164,6 +167,7 @@ export async function executeAndConfirmSignedTx(
                 .then(res => { return (res.value == null) ? 'tx-DNE' : res.value })
                 .catch(e => {
                     if (is429(e)) {
+                        logDebug('429 getting signature status');
                         hasA429 = true;
                         return '429';
                     }

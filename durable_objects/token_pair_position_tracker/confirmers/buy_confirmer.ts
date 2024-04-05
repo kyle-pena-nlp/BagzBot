@@ -1,6 +1,6 @@
 import { Connection, ParsedTransactionWithMeta } from "@solana/web3.js";
 import { Env } from "../../../env";
-import { logError } from "../../../logging";
+import { logDebug, logError } from "../../../logging";
 import { Position, PositionStatus } from "../../../positions";
 import { parseParsedTransactionWithMeta } from "../../../rpc/rpc_parse";
 import { ParsedSuccessfulSwapSummary, SwapExecutionErrorParseSummary, isSuccessfulSwapSummary, isSwapExecutionErrorParseSummary } from "../../../rpc/rpc_types";
@@ -31,9 +31,11 @@ export class BuyConfirmer {
         const blockheight : number | 'api-call-error' | '429' = await this.connection.getBlockHeight('confirmed').catch(r => {
             logError(r);
             if (is429(r)) {
+                logDebug('429 retrieving blockheight');
                 return '429';
             }
             else {
+                logError(r);
                 return 'api-call-error';
             }
         });
@@ -106,7 +108,8 @@ export class BuyConfirmer {
             vsTokenAmt : unconfirmedPosition.vsTokenAmt,
             tokenAmt: parsedSuccessfulSwap.swapSummary.outTokenAmt,        
             fillPrice: parsedSuccessfulSwap.swapSummary.fillPrice,
-            fillPriceMS : parsedSuccessfulSwap.swapSummary.swapTimeMS
+            fillPriceMS : parsedSuccessfulSwap.swapSummary.swapTimeMS,
+            netPNL: null // to be set on sell
         };
         return confirmedPosition;
     }

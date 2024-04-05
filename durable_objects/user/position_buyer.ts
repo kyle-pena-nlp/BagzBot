@@ -124,7 +124,8 @@ export class PositionBuyer {
             triggerPercent : positionRequest.triggerPercent,
             sellAutoDoubleSlippage : positionRequest.sellAutoDoubleSlippage,
             fillPrice: positionRequest.quote.fillPrice,
-            fillPriceMS : positionRequest.quote.quoteTimeMS
+            fillPriceMS : positionRequest.quote.quoteTimeMS,
+            netPNL: null // to be set when position is closed
         };
         return position;
     }
@@ -247,7 +248,8 @@ function convertToConfirmedPosition(positionRequest: PositionRequest, signature 
         vsTokenAmt : fromNumber(positionRequest.vsTokenAmt),
         tokenAmt: parsedSuccessfulSwap.swapSummary.outTokenAmt,        
         fillPrice: parsedSuccessfulSwap.swapSummary.fillPrice,
-        fillPriceMS : parsedSuccessfulSwap.swapSummary.swapTimeMS
+        fillPriceMS : parsedSuccessfulSwap.swapSummary.swapTimeMS,
+        netPNL: null // to be set when position is sold
     };
     return position;
 }
