@@ -1,6 +1,6 @@
 
 import { Env } from "./env";
-import { TelegramWebhookInfo } from "./telegram";
+import { TelegramWebhookInfo, sendMessageToTG } from "./telegram";
 import { Result, assertNever, makeFakeFailedRequestResponse, makeSuccessResponse, strictParseBoolean } from "./util";
 import { Worker as Handler } from "./worker/handler";
 
@@ -14,7 +14,7 @@ import { TokenPairPositionTrackerDO } from "./durable_objects/token_pair_positio
 import { getImpersonatedUserID, getLegalAgreementStatus, maybeReadSessionObj, unimpersonateUser } from "./durable_objects/user/userDO_interop";
 import { UserDO } from "./durable_objects/user/user_DO";
 import { logError } from "./logging";
-import { LegalAgreement, MenuCode } from "./menus";
+import { LegalAgreement, MenuCode, logoHack } from "./menus";
 import { ReplyQuestion, ReplyQuestionCode } from "./reply_question";
 import { ReplyQuestionData } from "./reply_question/reply_question_data";
 import { CallbackHandlerParams } from "./worker/model/callback_handler_params";
@@ -82,6 +82,11 @@ export default {
 		const telegramWebhookInfo = new TelegramWebhookInfo(telegramRequestBody, env);
 
 		const handler = new Handler(context, env);
+
+		if (strictParseBoolean(env.DOWN_FOR_MAINTENANCE)) {
+			await sendMessageToTG(telegramWebhookInfo.chatID, `${logoHack()} Sorry, <b>${env.TELEGRAM_BOT_DISPLAY_NAME} - ${env.TELEGRAM_BOT_INSTANCE_DISPLAY_NAME}</b> is currently down for scheduled maintenance.`, env);
+			return makeSuccessResponse();
+		}
 
 		// allow the unimpersonate request
 		if (telegramWebhookInfo.callbackData && telegramWebhookInfo.callbackData.menuCode === MenuCode.UnimpersonateUser) {
