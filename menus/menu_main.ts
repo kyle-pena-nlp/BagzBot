@@ -88,7 +88,7 @@ export class MenuMain extends Menu<UserData & Stuff> implements MenuCapabilities
             if (this.menuData.isAdminOrSuperAdmin && this.menuData.isDev) {
                 this.insertButtonNextLine(options, 'ADMIN (Dev Only): Set Price', this.menuCallback(MenuCode.AdminDevSetPrice));
             }
-            if (this.menuData.isAdminOrSuperAdmin && this.menuData.isDev) {
+            if (this.menuData.isAdminOrSuperAdmin && (this.menuData.isDev || this.menuData.isBeta)) {
                 this.insertButtonNextLine(options, 'ADMIN: Delete all positions', this.menuCallback(MenuCode.AdminDeleteAllPositions))
             }     
             if (this.menuData.isAdminOrSuperAdmin) {
