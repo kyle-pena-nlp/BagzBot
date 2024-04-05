@@ -8,7 +8,7 @@ export class MenuComingSoon extends Menu<string> implements MenuCapabilities {
         const lines : string[] = [];
         lines.push(`${logoHack()}<b><u>This Feature Is Coming Soon!</u></b>`);
         lines.push("");
-        lines.push(`<blockquote>${this.menuData}</blockquote>`);
+        lines.push(`<b>Description</b>: ${this.menuData}`);
         lines.push("");
         return lines.join("\r\n");
     }

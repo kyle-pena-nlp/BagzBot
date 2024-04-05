@@ -65,10 +65,10 @@ export class MenuMain extends Menu<UserData & Stuff> implements MenuCapabilities
         const options = this.emptyMenu();
         const hasWallet = this.menuData.hasWallet;
         if (hasWallet) {
-            this.insertButtonNextLine(options, ':sparkle: New Auto-Sell Position :sparkle:', this.menuCallback(MenuCode.NewPosition));
+            this.insertButtonNextLine(options, ':sparkle: Auto-Sell :sparkle:', this.menuCallback(MenuCode.NewPosition));
             if (this.menuData.isBeta) {
-                this.insertButtonNextLine(options, ':sparkle: New Auto-Buy Position :sparkle:', new CallbackData(MenuCode.ComingSoon, "Automatically buy the dip!"));
-                this.insertButtonNextLine(options, ':wave: New Wave Rider Position :wave:', new CallbackData(MenuCode.ComingSoon, "Combines Auto-Buy and Auto-Sell!"));
+                this.insertButtonSameLine(options, ':cart: Auto-Buy :cart:', new CallbackData(MenuCode.ComingSoon, "Automatically buy the dip!"));
+                this.insertButtonSameLine(options, ':wave: Wave Rider :wave:', new CallbackData(MenuCode.ComingSoon, "Combines Auto-Buy and Auto-Sell!"));
             }
             this.insertButtonNextLine(options, ':briefcase: Wallet', this.menuCallback(MenuCode.Wallet));
             this.insertButtonSameLine(options, ':chart_up: Positions', this.menuCallback(MenuCode.ListPositions));
