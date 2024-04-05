@@ -25,6 +25,10 @@ export class MenuMain extends Menu<UserData & Stuff> implements MenuCapabilities
             `<i>${this.menuData.botTagline}</i>`
         ];
 
+        if (!this.menuData.hasWallet) {
+            lines.push("<blockquote>We are creating your wallet! Refresh in a few seconds to see the full menu.</blockquote>")
+        }        
+
         if (this.menuData.isBeta) {
             lines.push("");
             lines.push(`<blockquote>${this.menuData.botName} is in BETA - USE AT YOUR OWN RISK!`);
@@ -55,6 +59,8 @@ export class MenuMain extends Menu<UserData & Stuff> implements MenuCapabilities
             const walletValueEmoji = interpretSOLAmount(toNumber(totalWalletValue));
             lines.push(`<b>Total Value of Wallet:</b> ${asTokenPrice(totalWalletValue)} SOL ${walletValueEmoji}`)
         }
+
+
 
         if (this.menuData.isImpersonatingUser) {
             lines.push(`Currently IMPERSONATING '${this.menuData.impersonatedUserID||''}'`)
