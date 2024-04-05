@@ -13,7 +13,7 @@ export class MenuTrailingStopLossEntryBuyQuantity extends Menu<{ quantityAndToke
         const options = this.emptyMenu();
         
         let amounts = [];
-        
+
         if (this.menuData.isBeta) {
             amounts = [0.01,0.1,0.25,0.5];
         }
@@ -25,7 +25,7 @@ export class MenuTrailingStopLossEntryBuyQuantity extends Menu<{ quantityAndToke
             this.insertButtonNextLine(options, `${amount} ${symbol}`, new CallbackData(MenuCode.SubmitBuyQuantity, amount.toString()));
         }
 
-        this.insertButtonSameLine(options, `X ${symbol}`, new CallbackData(MenuCode.CustomBuyQuantity, this.menuData.quantityAndToken.quantity.toString()));
+        this.insertButtonNextLine(options, `X ${symbol}`, new CallbackData(MenuCode.CustomBuyQuantity, this.menuData.quantityAndToken.quantity.toString()));
         this.insertButtonNextLine(options, ":back: Back", new CallbackData(MenuCode.TrailingStopLossRequestReturnToEditorMenu));
         return options;
     }

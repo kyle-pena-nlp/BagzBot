@@ -12,7 +12,7 @@ import { ChangeTrackedValue, Structural, assertNever, groupIntoBatches, makeFail
 import { assertIs } from "../../util/enums";
 import { listUnclaimedBetaInviteCodes } from "../beta_invite_codes/beta_invite_code_interop";
 import { PositionAndMaybePNL } from "../token_pair_position_tracker/model/position_and_PNL";
-import { _adminDeleteAll, editTriggerPercentOnOpenPositionInTracker, getPositionAndMaybePNL, listClosedPositionsFromTracker, listPositionsByUser, removePosition, setSellAutoDoubleOnOpenPositionInPositionTracker, setSellSlippagePercentOnOpenPositionInTracker } from "../token_pair_position_tracker/token_pair_position_tracker_do_interop";
+import { editTriggerPercentOnOpenPositionInTracker, getPositionAndMaybePNL, listClosedPositionsFromTracker, listPositionsByUser, removePosition, setSellAutoDoubleOnOpenPositionInPositionTracker, setSellSlippagePercentOnOpenPositionInTracker } from "../token_pair_position_tracker/token_pair_position_tracker_do_interop";
 import { AdminDeleteAllPositionsRequest, AdminDeleteAllPositionsResponse } from "./actions/admin_delete_all_positions";
 import { AutomaticallyClosePositionsRequest, AutomaticallyClosePositionsResponse } from "./actions/automatically_close_positions";
 import { BaseUserDORequest, isBaseUserDORequest } from "./actions/base_user_do_request";
@@ -362,21 +362,13 @@ export class UserDO {
     async handleAdminDeleteAllPositionsInternal(userAction : AdminDeleteAllPositionsRequest) : Promise<AdminDeleteAllPositionsResponse> {
         const realUserID = userAction.realTelegramUserID;
         const userID = userAction.telegramUserID;
+        
         if (!isAdminOrSuperAdmin(realUserID, this.env)) {
             logError(`Only admin user can delete all positions - was ${realUserID}`);
             return {};
         }
 
-        // DELETES ALL POSITIONS FOR ALL USERS IN DEV
-        if (this.env.ENVIRONMENT === 'dev') {
-            const uniquePairs = this.tokenPairsForPositionIDsTracker.listUniqueTokenPairs();
-            for (const pair of uniquePairs) {
-                await _adminDeleteAll(realUserID, pair.tokenAddress, pair.vsTokenAddress, this.env);
-            }
-            return {};
-        }
-        // ONLY DELETES THIS USER'S POSITIONS IN BETA
-        else if (this.env.ENVIRONMENT === 'beta') {
+        if (this.env.ENVIRONMENT === 'dev' || this.env.ENVIRONMENT === 'beta') {
             const positions = await this.listPositionsFromUserDO(userID);
             for (const posAndMaybePNL of positions) {
                 const position = posAndMaybePNL.position;
@@ -385,6 +377,8 @@ export class UserDO {
             }
             return {};
         }
+        
+        return {};
     }
 
     private async handleSetSellAutoDoubleOnOpenPositionRequest(userAction : SetSellAutoDoubleOnOpenPositionRequest) : Promise<Response> {

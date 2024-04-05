@@ -608,7 +608,7 @@ export class Worker {
             impersonatedUserID: info.isImpersonatingAUser() ? info.getTelegramUserID() : undefined,
             botName : this.getBotName(env),
             botTagline: env.TELEGRAM_BOT_TAGLINE,
-            isBeta : strictParseBoolean(env.IS_BETA_CODE_GATED),
+            isBeta : env.ENVIRONMENT === 'beta',
             isDev : env.ENVIRONMENT === 'dev'
         });
     }
@@ -749,7 +749,7 @@ export class Worker {
                     impersonatedUserID: info.isImpersonatingAUser() ? info.getTelegramUserID() : undefined,
                     botName : this.getBotName(env),
                     botTagline: env.TELEGRAM_BOT_TAGLINE,
-                    isBeta: strictParseBoolean(env.IS_BETA_CODE_GATED),
+                    isBeta: env.ENVIRONMENT === 'beta',
                     isDev : env.ENVIRONMENT === 'dev'
                 })];
             case '/menu':
@@ -761,7 +761,7 @@ export class Worker {
                     impersonatedUserID: info.isImpersonatingAUser() ? info.getTelegramUserID() : undefined,
                     botName : this.getBotName(env),
                     botTagline: env.TELEGRAM_BOT_TAGLINE,
-                    isBeta : strictParseBoolean(env.IS_BETA_CODE_GATED),
+                    isBeta : env.ENVIRONMENT === 'beta',
                     isDev : env.ENVIRONMENT === 'dev'
                 })];
             case '/welcome_screen':
