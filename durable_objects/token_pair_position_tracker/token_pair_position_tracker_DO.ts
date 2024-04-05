@@ -480,7 +480,10 @@ export class TokenPairPositionTrackerDO {
     async handleWakeup(body : WakeupTokenPairPositionTrackerRequest) {
         // this is a no-op, because by simply calling a request we wake up the DO
         const responseBody : WakeupTokenPairPositionTrackerResponse = {};
-        this.performWakupActions(); // deliberate lack of await
+         // deliberate lack of await, but still writes to storage when complete.
+        this.performWakupActions().finally(async () => {
+            await this.flushToStorage();
+        });
         return makeJSONResponse(responseBody);
     }
 
@@ -499,6 +502,9 @@ export class TokenPairPositionTrackerDO {
 
         for (const { type, pos } of allThingsToDo) {
             if (type === 'buy') {
+                if (buyConfirmer.isTimedOut()) {
+                    continue;
+                }
                 const buyConfirmPrefix = `:notify: <b>Attempting to confirm purchase of ${asTokenPrice(pos.tokenAmt)} ${pos.token.symbol}</b>: `;
                 const channel = TGStatusMessage.createAndSend('In progress...', false, pos.chatID, this.env, 'HTML', buyConfirmPrefix);
                 const confirmedBuy = await buyConfirmer.confirmBuy(pos);
@@ -526,6 +532,9 @@ export class TokenPairPositionTrackerDO {
                 TGStatusMessage.finalize(channel);
             }
             else if (type === 'sell') {
+                if (sellConfirmer.isTimedOut()) {
+                    continue;
+                }
                 const confirmedSellStatus = await sellConfirmer.confirmSell(pos);
                 const sellConfirmPrefix = `:notify: <b>Attempting to confirm sale of ${asTokenPrice(pos.tokenAmt)} $${pos.token.symbol}</b>:`;
                 const channel = TGStatusMessage.createAndSend('In progress...', false, pos.chatID, this.env, 'HTML', sellConfirmPrefix);

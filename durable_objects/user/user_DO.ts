@@ -8,7 +8,7 @@ import { PositionPreRequest, PositionStatus, PositionType } from "../../position
 import { POSITION_REQUEST_STORAGE_KEY } from "../../storage_keys";
 import { TGStatusMessage, UpdateableNotification, sendMessageToTG } from "../../telegram";
 import { WEN_ADDRESS, getVsTokenInfo } from "../../tokens";
-import { ChangeTrackedValue, Structural, assertNever, groupIntoBatches, makeFailureResponse, makeJSONResponse, makeSuccessResponse, maybeGetJson, sleep, strictParseBoolean } from "../../util";
+import { ChangeTrackedValue, Structural, assertNever, groupIntoBatches, makeFailureResponse, makeJSONResponse, makeSuccessResponse, maybeGetJson, sleep, strictParseBoolean, strictParseInt } from "../../util";
 import { assertIs } from "../../util/enums";
 import { listUnclaimedBetaInviteCodes } from "../beta_invite_codes/beta_invite_code_interop";
 import { PositionAndMaybePNL } from "../token_pair_position_tracker/model/position_and_PNL";
@@ -362,7 +362,7 @@ export class UserDO {
     async handleAdminDeleteAllPositionsInternal(userAction : AdminDeleteAllPositionsRequest) : Promise<AdminDeleteAllPositionsResponse> {
         const realUserID = userAction.realTelegramUserID;
         const userID = userAction.telegramUserID;
-        
+
         if (!isAdminOrSuperAdmin(realUserID, this.env)) {
             logError(`Only admin user can delete all positions - was ${realUserID}`);
             return {};
@@ -665,7 +665,10 @@ export class UserDO {
             (Which means the buy has to happen in 30 secs, or it is considered unconfirmed!!!)
         */
         const positionBuyer = new PositionBuyer(this.wallet.value!!, this.env, startTimeMS, channel);    
-        positionBuyer.buy(positionRequest);
+        // deliberate lack of await, but writes to storage when complete
+        positionBuyer.buy(positionRequest).finally(async () => {
+            await this.flushToStorage();
+        });
         return makeJSONResponse<OpenPositionResponse>({});
     }
     
@@ -692,10 +695,12 @@ export class UserDO {
         }
         assertIs<PositionStatus.Open,typeof position.status>();
         const channel = TGStatusMessage.createAndSend(`Initiating sale.`, false, position.chatID, this.env, 'HTML', `<a href="${position.token.logoURI}">\u200B</a><b>Manual Sell of ${asTokenPrice(position.tokenAmt)} ${position.token.symbol}</b>: `);
-        // deliberate lack of await here (fire-and-forget). Must complete in 30s.
         const connection = new Connection(getRPCUrl(this.env));
         const positionSeller = new PositionSeller(connection, this.wallet.value!!, 'manual-sell', startTimeMS, channel, this.env);
-        positionSeller.sell(position);
+        // deliberate lack of await here (fire-and-forget). But still writes to storage.
+        positionSeller.sell(position).finally(async () => {
+            await this.flushToStorage();
+        });
         return makeJSONResponse<ManuallyClosePositionResponse>({ message: 'Position will now be closed. '});
     }
 
@@ -708,13 +713,23 @@ export class UserDO {
         const positionBatches = groupIntoBatches(positionsToClose,4);
         const channels : UpdateableNotification[] = [ ];
         const connection = new Connection(getRPCUrl(this.env));
+        const timedOut = () => (Date.now() - startTimeMS) > strictParseInt(this.env.TX_TIMEOUT_MS);
         for (const positionBatch of positionBatches) {
             // fire off a bunch of promises per batch (4)
+            if (timedOut()) {
+                continue;
+            }
             let sellPositionPromises = positionBatch.map(async position => {
                 const channel = TGStatusMessage.createAndSend(`Initiating.`, false, this.chatID.value||0, this.env, 'HTML', `:notify: <b>Auto-Sell of ${asTokenPrice(position.tokenAmt)} $${position.token.symbol}</b>: `);
                 channels.push(channel);
                 const positionSeller = new PositionSeller(connection, this.wallet.value!!, 'auto-sell', startTimeMS, channel, this.env);
-                const sellPromise = positionSeller.sell(position);
+                // deliberate lack of await here, but still writes to storage afterwards
+                if (timedOut()) {
+                    return;
+                }
+                const sellPromise = positionSeller.sell(position).finally(async () => {
+                    await this.flushToStorage();
+                });
                 return await sellPromise;
             });
             // but wait for the entire batch to settle before doing the next batch

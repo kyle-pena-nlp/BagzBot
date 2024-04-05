@@ -19,8 +19,8 @@ export class BuyConfirmer {
         this.startTimeMS = startTimeMS;
         this.env = env;
     }
-    private isTimedOut() : boolean {
-        return (Date.now() > this.startTimeMS + strictParseInt(this.env.TX_TIMEOUT_MS));
+    isTimedOut() : boolean {
+        return (Date.now() > this.startTimeMS + strictParseInt(this.env.CONFIRM_TIMEOUT_MS));
     }
     async confirmBuy(position : Position & { buyConfirmed: false }) : Promise<'api-error'|'unconfirmed'|'failed'|(Position & { buyConfirmed : true })> {
 

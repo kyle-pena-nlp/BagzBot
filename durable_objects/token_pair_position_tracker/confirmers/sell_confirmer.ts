@@ -15,8 +15,8 @@ export class SellConfirmer {
         this.startTimeMS = startTimeMS;
         this.env = env;
     }
-    private isTimedOut() : boolean {
-        return (Date.now() > this.startTimeMS + strictParseInt(this.env.TX_TIMEOUT_MS));
+    isTimedOut() : boolean {
+        return (Date.now() > this.startTimeMS + strictParseInt(this.env.CONFIRM_TIMEOUT_MS));
     }    
     async confirmSell(position : Position & { sellConfirmed : false }) : Promise<'api-error'|'slippage-failed'|'failed'|'unconfirmed'|ParsedSuccessfulSwapSummary> {
         

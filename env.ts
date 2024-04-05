@@ -59,6 +59,7 @@ export interface Env {
 	PRICE_POLL_INTERVAL_MS : string
 	FORBIDDEN_TOKENS : string
 	TX_TIMEOUT_MS : string
+	CONFIRM_TIMEOUT_MS : string
 	SECRET__QUICKNODE_API_KEY : string
 	USE_QUICKNODE : string
 	QUICKNODE_RPC_URL : string

@@ -28,7 +28,7 @@ export class PositionSeller {
         this.channel = channel;
         this.env = env;
     }
-    private isTimedOut() : boolean {
+    isTimedOut() : boolean {
         return Date.now() > (this.startTimeMS + strictParseInt(this.env.TX_TIMEOUT_MS));
     }
     async sell(position : Position) : Promise<void> {
