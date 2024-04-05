@@ -177,7 +177,8 @@ async function runEvents(
             tracker.remove(event.remove);
         }
         else if (isUpdatePriceEvent(event)) {
-            const positionsToClose = tracker.update(event);
+            tracker.update(event);
+            const positionsToClose = tracker.collectPositionsToClose(event);
             // if it's a close position request, 
             // go ahead and remove the position from the tracker
             for (const position of positionsToClose) {
@@ -233,7 +234,17 @@ function posWithPrice(initPrice : DecimalizedAmount) : Position {
         triggerPercent: 5,
         retrySellIfSlippageExceeded: true,
         txSignature: 'some-sig',
-        confirmed: true
+        confirmed: true,
+        userAddress: { address : '' },
+        fillPriceMS: 0,
+        txBuySignature: '',
+        txSellSignature: '',
+        buyConfirmed: false,
+        sellConfirmed: false,
+        sellAutoDoubleSlippage: false,
+        buyLastValidBlockheight: 0,
+        sellLastValidBlockheight: null,
+        netPNL: null
     }
 }
 

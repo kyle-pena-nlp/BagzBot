@@ -30,3 +30,5 @@ archive/
 !.vscode/launch.json
 .*/
 **/.*
+**/*.db
+*.db

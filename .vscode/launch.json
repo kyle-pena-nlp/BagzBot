@@ -21,7 +21,21 @@
             "args": [
                 "--env=${input:argValue}"
               ]
-        },        
+        },
+        
+        {
+          "name": "Python Debugger: Pull Logs",
+          "type": "debugpy",
+          "request": "launch",
+          "program": "${file}",
+          "console": "integratedTerminal",
+          "args": [
+              "--env=${input:argValue}",
+              "--start=${input:startValue}",
+              "--end=${input:endValue}",
+              "--limit=${input:limitValue}"
+            ]
+      },        
 
         {
             "name": "Wrangler",
@@ -54,6 +68,24 @@
           "type": "promptString",
           "description": "Enter the value:",
           "default": "dev"
-        }
+        },
+        {
+          "id": "startValue",
+          "type": "promptString",
+          "description": "Enter the start datetime:",
+          "default": "2024-04-01"
+        },
+        {
+          "id": "endValue",
+          "type": "promptString",
+          "description": "Enter the end datetime:",
+          "default": "2024-04-02"
+        }, 
+        {
+          "id": "limitValue",
+          "type": "promptString",
+          "description": "Enter the limit (optional):",
+          "default": ""
+        }                        
     ]
 }

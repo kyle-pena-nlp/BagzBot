@@ -20,6 +20,13 @@
       "./node_modules/@cloudflare/workers-types/*.ts"
    ],
    "exclude": [
-    "./test/*"
-   ]
+    "test/"
+   ],
+   "jest": {
+    "globals": {
+      "ts-jest": {
+        "tsconfig": "test/jest.tsconfig.json"
+      }
+    }
+  }
 }
