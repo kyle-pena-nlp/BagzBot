@@ -712,7 +712,7 @@ export class UserDO {
         for (const positionBatch of positionBatches) {
             // fire off a bunch of promises per batch (4)
             let sellPositionPromises = positionBatch.map(async position => {
-                const channel = TGStatusMessage.createAndSend(`Initiating.`, false, this.chatID.value||0, this.env, 'HTML', `<b>Auto-Sell of ${asTokenPrice(position.tokenAmt)} $${position.token.symbol}</b>: `);
+                const channel = TGStatusMessage.createAndSend(`Initiating.`, false, this.chatID.value||0, this.env, 'HTML', `:notify: <b>Auto-Sell of ${asTokenPrice(position.tokenAmt)} $${position.token.symbol}</b>: `);
                 channels.push(channel);
                 const positionSeller = new PositionSeller(connection, this.wallet.value!!, 'auto-sell', startTimeMS, channel, this.env);
                 const sellPromise = positionSeller.sell(position);

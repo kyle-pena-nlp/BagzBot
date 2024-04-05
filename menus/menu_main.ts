@@ -3,6 +3,8 @@ import { asTokenPrice, toNumber } from "../decimalized/decimalized_amount";
 import { UserData } from "../durable_objects/user/model/user_data";
 import { CallbackButton } from "../telegram";
 import { interpretPct, interpretSOLAmount } from "../telegram/emojis";
+import { CallbackData } from "./callback_data";
+import { logoHack } from "./logo_hack";
 import { Menu, MenuCapabilities } from "./menu";
 import { MenuCode } from "./menu_code";
 
@@ -19,7 +21,7 @@ export interface Stuff {
 export class MenuMain extends Menu<UserData & Stuff> implements MenuCapabilities {
     renderText(): string {
         const lines = [
-            `<a href="https://drive.usercontent.google.com/download?id=1b8OCX_hJj6zwL_05gHMzOEPM8swgGmgg">\u200B</a><b>${this.menuData.botName} Main Menu</b>`,
+            `${logoHack()}<b>${this.menuData.botName} Main Menu</b>`,
             `<i>${this.menuData.botTagline}</i>`
         ];
 
@@ -63,7 +65,11 @@ export class MenuMain extends Menu<UserData & Stuff> implements MenuCapabilities
         const options = this.emptyMenu();
         const hasWallet = this.menuData.hasWallet;
         if (hasWallet) {
-            this.insertButtonNextLine(options, ':sparkle: New Position :sparkle:', this.menuCallback(MenuCode.NewPosition));
+            this.insertButtonNextLine(options, ':sparkle: New Auto-Sell Position :sparkle:', this.menuCallback(MenuCode.NewPosition));
+            if (this.menuData.isBeta) {
+                this.insertButtonNextLine(options, ':sparkle: New Auto-Buy Position :sparkle:', new CallbackData(MenuCode.ComingSoon, "Automatically buy the dip!"));
+                this.insertButtonNextLine(options, ':wave: New Wave Rider Position :wave:', new CallbackData(MenuCode.ComingSoon, "Combines Auto-Buy and Auto-Sell!"));
+            }
             this.insertButtonNextLine(options, ':briefcase: Wallet', this.menuCallback(MenuCode.Wallet));
             this.insertButtonSameLine(options, ':chart_up: Positions', this.menuCallback(MenuCode.ListPositions));
             this.insertButtonNextLine(options, ':ledger: PNL History', this.menuCallback(MenuCode.ViewPNLHistory));

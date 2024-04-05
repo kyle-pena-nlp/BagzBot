@@ -12,6 +12,7 @@ const emojis = {
 
     ':notify:': '🔔',
     ':mountain:': '🏔️',
+    ':wave:': '🌊',
 
     ':red:': '🔴',
     ':yellow:': '🟡',

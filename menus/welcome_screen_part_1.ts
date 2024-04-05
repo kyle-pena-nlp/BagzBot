@@ -1,12 +1,12 @@
 import { CallbackButton } from "../telegram";
 import { CallbackData } from "./callback_data";
+import { logoHack } from "./logo_hack";
 import { Menu, MenuCapabilities } from "./menu";
 import { MenuCode } from "./menu_code";
 
 export class WelcomeScreenPart1 extends Menu<{ botDisplayName : string }> implements MenuCapabilities {
     renderText(): string {
-        const invisibleLogoLink = `<a href="https://drive.usercontent.google.com/download?id=1b8OCX_hJj6zwL_05gHMzOEPM8swgGmgg">\u200B</a>`;
-        return `${invisibleLogoLink}<blockquote>Thank you for trying <b>${this.menuData.botDisplayName}</b>.  
+        return `${logoHack()}<blockquote>Thank you for trying <b>${this.menuData.botDisplayName}</b>.  
         If I could have just a moment of your time.</blockquote>
 
 ${this.menuData.botDisplayName} implements a unique feature called a <b>'Trailing Stop Loss'</b>.

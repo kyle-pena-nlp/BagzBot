@@ -1,8 +1,10 @@
 import { LegalAgreement } from "./legal_agreement";
+import { logoHack } from "./logo_hack";
 import { BaseMenu } from "./menu";
 import { MenuPNLHistory } from "./menu_PNL_history";
 import { MenuBetaInviteFriends } from "./menu_beta_invite_friends";
 import { MenuCode } from "./menu_code";
+import { MenuComingSoon } from "./menu_coming_soon";
 import { MenuContinueMessage } from "./menu_continue_message";
 import { MenuEditOpenPositionSellAutoDoubleSlippage } from "./menu_edit_open_position_sell_auto_double_slippage";
 import { MenuEditOpenPositionSellSlippagePercent, PositionIDAndSellSlippagePercent } from "./menu_edit_open_position_sell_slippage_percent";
@@ -30,12 +32,12 @@ import { MenuTODO } from "./todo_menu";
 import { WelcomeScreenPart1 } from "./welcome_screen_part_1";
 
 export {
-    BaseMenu, LegalAgreement, MenuBetaInviteFriends, MenuCode, MenuContinueMessage, MenuEditOpenPositionSellAutoDoubleSlippage, MenuEditOpenPositionSellSlippagePercent, MenuEditOpenPositionTriggerPercent, MenuEditPositionHelp, MenuEditPositionRequest, MenuEditPositionRequestSellAutoDoubleSlippage, MenuError, MenuFAQ,
+    BaseMenu, LegalAgreement, MenuBetaInviteFriends, MenuCode, MenuComingSoon, MenuContinueMessage, MenuEditOpenPositionSellAutoDoubleSlippage, MenuEditOpenPositionSellSlippagePercent, MenuEditOpenPositionTriggerPercent, MenuEditPositionHelp, MenuEditPositionRequest, MenuEditPositionRequestSellAutoDoubleSlippage, MenuError, MenuFAQ,
     MenuListPositions, MenuMain, MenuOKClose, MenuPNLHistory, MenuRetryBuy, MenuRetryBuySlippageError, MenuRetryManualSell, MenuTODO,
     MenuTrailingStopLossEntryBuyQuantity,
     MenuTrailingStopLossPickVsToken,
     MenuTrailingStopLossSlippagePercent,
     MenuTrailingStopLossTriggerPercent, MenuViewDecryptedWallet, MenuViewOpenPosition,
-    MenuWallet, PositionIDAndChoice, PositionIDAndSellSlippagePercent as PositionIDAndSlippagePercent, SubmittedTriggerPctKey, WelcomeScreenPart1
+    MenuWallet, PositionIDAndChoice, PositionIDAndSellSlippagePercent as PositionIDAndSlippagePercent, SubmittedTriggerPctKey, WelcomeScreenPart1, logoHack
 };
 

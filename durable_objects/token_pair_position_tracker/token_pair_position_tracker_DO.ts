@@ -499,25 +499,25 @@ export class TokenPairPositionTrackerDO {
 
         for (const { type, pos } of allThingsToDo) {
             if (type === 'buy') {
-                const buyConfirmPrefix = `<b>Confirming purchase of ${asTokenPrice(pos.tokenAmt)} ${pos.token.symbol}</b>: `;
+                const buyConfirmPrefix = `:notify: <b>Attempting to confirm purchase of ${asTokenPrice(pos.tokenAmt)} ${pos.token.symbol}</b>: `;
                 const channel = TGStatusMessage.createAndSend('In progress...', false, pos.chatID, this.env, 'HTML', buyConfirmPrefix);
                 const confirmedBuy = await buyConfirmer.confirmBuy(pos);
                 if (confirmedBuy === 'api-error') {
-                    TGStatusMessage.queue(channel, "Confirmation failed.", false);
+                    TGStatusMessage.queue(channel, "We had a hard time confirming the purchase - sorry, we will retry confirmation again soon.", false);
                     TGStatusMessage.queueRemoval(channel);
                     break;
                 }
                 else if (confirmedBuy === 'unconfirmed') {
-                    TGStatusMessage.queue(channel, "Confirmation failed.", false);
+                    TGStatusMessage.queue(channel, "We had a hard time confirming the purchase - sorry, we will retry confirmation again soon.", false);
                     TGStatusMessage.queueRemoval(channel);
                     continue;
                 }
                 else if (confirmedBuy === 'failed') {
-                    TGStatusMessage.queue(channel, "On confirmation, we found that the purchase didn't go through.", true);
+                    TGStatusMessage.queue(channel, "After checking, we found that the purchase didn't go through.", true);
                     this.tokenPairPositionTracker.removePosition(pos.positionID);
                 }
                 else if ('positionID' in confirmedBuy) {
-                    TGStatusMessage.queue(channel, "We were able to confirm this purchase!", true);
+                    TGStatusMessage.queue(channel, "We were able to confirm this purchase! It will be listed in your open positions.", true);
                     this.tokenPairPositionTracker.upsertPositions([confirmedBuy]);
                 }
                 else {
@@ -527,7 +527,7 @@ export class TokenPairPositionTrackerDO {
             }
             else if (type === 'sell') {
                 const confirmedSellStatus = await sellConfirmer.confirmSell(pos);
-                const sellConfirmPrefix = ``;
+                const sellConfirmPrefix = `:notify: <b>Attempting to confirm sale of ${asTokenPrice(pos.tokenAmt)} $${pos.token.symbol}</b>:`;
                 const channel = TGStatusMessage.createAndSend('In progress...', false, pos.chatID, this.env, 'HTML', sellConfirmPrefix);
                 if (confirmedSellStatus === 'api-error') {
                     TGStatusMessage.queue(channel, "Confirmation failed.", false);

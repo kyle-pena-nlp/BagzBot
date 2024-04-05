@@ -1,7 +1,7 @@
 import { dAdd, dCompare, dDiv, dMult, fromNumber, toFriendlyString } from "../decimalized";
 import { DecimalizedAmount, MATH_DECIMAL_PLACES, asPercentDeltaString, asTokenPrice, dZero, toNumber } from "../decimalized/decimalized_amount";
 import { PositionAndMaybePNL } from "../durable_objects/token_pair_position_tracker/model/position_and_PNL";
-import { PositionStatus } from "../positions";
+import { Position, PositionStatus } from "../positions";
 import { CallbackButton } from "../telegram";
 import { CallbackData } from "./callback_data";
 import { Menu, MenuCapabilities } from "./menu";
@@ -30,6 +30,9 @@ export class MenuListPositions extends Menu<PositionAndMaybePNL[]> implements Me
         
         for (const p of this.menuData) {
             const position = p.position;
+            if (!this.shouldBeListed(position)) {
+                continue;
+            }
             const positionLabel = this.makePositionLabel(p);
             const callbackData = new CallbackData(MenuCode.ViewOpenPosition, position.positionID);
             this.insertButtonNextLine(options, positionLabel, callbackData);
@@ -43,6 +46,9 @@ export class MenuListPositions extends Menu<PositionAndMaybePNL[]> implements Me
         for (const p of this.menuData) {
             if (p.PNL == null) {
                 return;
+            }
+            if (!this.shouldBeListed(p.position)) {
+                continue;
             }
             totalPNL = dAdd(totalPNL, p.PNL.PNL);
         }
@@ -111,5 +117,9 @@ export class MenuListPositions extends Menu<PositionAndMaybePNL[]> implements Me
             return '(Closed)';
         }
         return '';
+    }
+
+    shouldBeListed(position : Position) : boolean {
+        return position.status === PositionStatus.Open && position.buyConfirmed;
     }
 }

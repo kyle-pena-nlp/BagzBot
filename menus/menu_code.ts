@@ -17,6 +17,7 @@ export enum MenuCode {
 	AdminSendUserMessage = "AdminSendUserMessage",
 	SubmitAdminSendUserMessage = "SubmitAdminSendUserMessage",
 	ViewPNLHistory = "ViewPNLHistory",
+	ComingSoon = "CS", // as short as possible to make room for the coming soon message
 
 	PosRequestChooseAutoDoubleSlippageOptions = "EPR.AutoDoubleSlip",
 	SubmitPosRequestAutoDoubleSlippageOptions = "SPR.AutoDoubleSlip",
