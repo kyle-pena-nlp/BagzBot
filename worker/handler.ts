@@ -23,6 +23,7 @@ import { quoteBuy } from "../rpc/jupiter_quotes";
 import { isGetQuoteFailure } from "../rpc/rpc_types";
 import { POSITION_REQUEST_STORAGE_KEY } from "../storage_keys";
 import { TelegramWebhookInfo, deleteTGMessage, sendMessageToTG, updateTGMessage } from "../telegram";
+import { TGMessageChannel } from "../telegram/telegram_status_message";
 import { TokenInfo, WEN_ADDRESS, getVsTokenInfo } from "../tokens";
 import { Structural, assertNever, makeFakeFailedRequestResponse, makeSuccessResponse, strictParseBoolean, strictParseFloat, strictParseInt, tryParseBoolean, tryParseFloat, tryParseInt } from "../util";
 import { assertIs } from "../util/enums";
@@ -391,7 +392,10 @@ export class CallbackHandler {
                 return new WelcomeScreenPart1({ botDisplayName: this.env.TELEGRAM_BOT_DISPLAY_NAME });
             case MenuCode.LegalAgreementRefuse:
                 await storeLegalAgreementStatus(params.getTelegramUserID('real'), params.chatID, 'refused', this.env);
-                await sendMessageToTG(chatID, "You can agree at any time by opening the legal agreement in the menu", this.env);
+                const youCanChangeYourMind = TGMessageChannel.createAndSend("You can agree to the legal agreement at any time if you change your mind!", false, params.chatID, this.env);
+                TGMessageChannel.queueWait(youCanChangeYourMind, 10000);
+                TGMessageChannel.queueRemoval(youCanChangeYourMind);
+                this.context.waitUntil(TGMessageChannel.finalize(youCanChangeYourMind));
                 await this.handleMenuClose(chatID, messageID, this.env);
                 return;
             case MenuCode.ImpersonateUser:
@@ -691,7 +695,7 @@ export class CallbackHandler {
         }
         return makeSuccessResponse();
     }
-    
+
     async handleReplyToBot(info : TelegramWebhookInfo) : Promise<Response> {
         const userAnswer = info.text||'';
 

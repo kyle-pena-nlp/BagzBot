@@ -1,7 +1,8 @@
+import { isTheSuperAdminUserID } from "../../admins";
 import { DecimalizedAmount } from "../../decimalized";
 import { Env } from "../../env";
 import { Position } from "../../positions";
-import { makeJSONRequest, makeRequest, strictParseInt } from "../../util";
+import { makeJSONRequest, makeRequest } from "../../util";
 import { EditTriggerPercentOnOpenPositionResponse } from "../user/actions/edit_trigger_percent_on_open_position";
 import { SetSellAutoDoubleOnOpenPositionResponse } from "../user/actions/set_sell_auto_double_on_open_position";
 import { SellSellSlippagePercentageOnOpenPositionResponse } from "../user/actions/set_sell_slippage_percent_on_open_position";
@@ -24,7 +25,6 @@ import { SetSellAutoDoubleOnOpenPositionInTrackerRequest } from "./actions/set_s
 import { SetSellSlippagePercentOnOpenPositionTrackerRequest } from "./actions/set_sell_slippage_percent_on_open_position";
 import { UpdatePositionRequest, UpdatePositionResponse } from "./actions/update_position";
 import { UpdatePriceRequest, UpdatePriceResponse } from "./actions/update_price";
-import { UpsertPositionsResponse } from "./actions/upsert_positions";
 import { WakeupTokenPairPositionTrackerRequest, WakeupTokenPairPositionTrackerResponse } from "./actions/wake_up";
 import { PositionAndMaybePNL } from "./model/position_and_PNL";
 
@@ -85,7 +85,7 @@ export async function adminInvokeAlarm(tokenAddress : string, vsTokenAddress : s
 }
 
 export async function _devOnlyFeatureUpdatePrice(telegramUserID : number, tokenAddress : string, vsTokenAddress : string, price : DecimalizedAmount, env : Env) {
-	if (telegramUserID != strictParseInt(env.SUPER_ADMIN_USER_ID)) {
+	if (!isTheSuperAdminUserID(telegramUserID,env)) {
 		throw new Error("Cannot do that if not the super admin");
 	}
 	if (env.ENVIRONMENT !== 'dev') {

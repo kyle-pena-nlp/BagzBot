@@ -207,8 +207,8 @@ export default {
 			return null;
 		}
 		else if (response.status === 'has-not-responded' || response.status === 'refused') {
-			const channel = TGStatusMessage.createAndSend(`Please agree to the Terms Of Service (see under 'Legal Agreement' under 'Menu') to use ${env.TELEGRAM_BOT_DISPLAY_NAME}`,false,info.chatID,env);
-			TGStatusMessage.queueWait(channel, 5000);
+			const channel = TGStatusMessage.createAndSend(`Please agree to the Terms Of Service (see under 'Legal Agreement' under 'Menu').`,false,info.chatID,env);
+			TGStatusMessage.queueWait(channel, 15000);
 			TGStatusMessage.queueRemoval(channel)
 			context.waitUntil(TGStatusMessage.finalize(channel));
 			return makeSuccessResponse("User has not agreed to legal agreement");
@@ -226,7 +226,7 @@ export default {
 		}
 		
 		// see if we just sent a prompt to the user for the beta code
-		const betaCodeQuestionData = this.maybeGetBetaCodeQuestion(info, env);
+		const betaCodeQuestionData : ReplyQuestionData|null = await this.maybeGetBetaCodeQuestion(info, env);
 
 		// If we did, process it.
 		if (betaCodeQuestionData != null) {
@@ -410,7 +410,7 @@ export default {
 
 	async handleViewLegalAgreement(info : TelegramWebhookInfo, handler : Handler, env : Env) : Promise<Response|null> {
 		if (this.isViewLegalAgreementCommand(info)) {
-			return await handler.handleMessage(info);
+			return await handler.handleCommand(info);
 		}
 		else if (this.isViewLegalAgreementMenuCode(info)) {
 			const params = new CallbackHandlerParams(info);
@@ -431,15 +431,6 @@ export default {
 			return await handler.handleCallback(params);
 		}
 		return null;
-	},
-
-	async processBetaCodeResponse(info : TelegramWebhookInfo, replyQuestionData : ReplyQuestionData|undefined, handler : Handler, env : Env) {
-		if (this.isBetaCodeStartCommand(info)) {
-			await handler.handleEnterBetaInviteCode(info, info.commandTokens?.[1]?.text||'', env);
-		}
-		else if (this.isBetaCodeQuestionResponse(info,replyQuestionData)) {
-			await handler.handleEnterBetaInviteCode(info, info.text||'', env);
-		}	
 	},
 
 	async enforceLegalAgreementGating(telegramWebhookInfo : TelegramWebhookInfo, handler : Handler, env : Env) : Promise<'proceed'|'do-not-proceed'> {
