@@ -27,7 +27,7 @@ export { BetaInviteCodesDO, HeartbeatDO, PolledTokenPairListDO, TokenPairPositio
  */
 export default {
 
-	// Worker CRON job
+	// Worker CRON job (invoked by CF infra)
 	async scheduled(event : ScheduledEvent, env : Env, context : FetchEvent) {
 
 		// no CRON if down for maintenance
@@ -60,7 +60,8 @@ export default {
 		// Setting the response means early out in chain-of-responsibility.
 		let response : Response|null = null;
 
-		// If the request doesn't contain the secret key in the header (is probably not from TG, might be sniffing), respond with uninformative 403 
+		// If the request doesn't contain the secret key in the header...
+		//  (is probably not from TG, might be sniffing), respond with uninformative 403 
 		response = this.handleSuspiciousRequest(req,env);
 		if (response != null) {
 			return response;
@@ -72,28 +73,29 @@ export default {
 			return makeFakeFailedRequestResponse(400);
 		}
 
-		// If down for maintenance, no requests go through.
+		// If down for maintenance, no requests go through. early out.
 		response = await this.handleDownForMaintenance(telegramWebhookInfo,env);
 		if (response != null) {
 			return response;
 		}
 
+		// knows how to handle callbacks from the user.
 		const callbackHandler = new Handler(context, env);		
 
-		// The term 'impersonate' means: Begin User Support, not 'Identity Theft'.
-		// It's a technical term.
-		// It allows an admin to view a user's positions, etc (but not place/sell positions)
+		/*
+			Please Note:
+				The term 'impersonate' means: Begin User Support, not 'Identity Theft'.
+				It's a technical term.
+				It allows an admin to view a user's positions, etc (but not place/sell positions)
+		*/
 
 		// If unimpersonate, remove impersonation user ID from UserDO, and then proceed.
-		response = await this.handleUnimpersonateUser(telegramWebhookInfo, env);
-		if (response != null) {
-			return response;
-		}
+		await this.handleUnimpersonateUser(telegramWebhookInfo, env);
 
 		// if impersonated, set impersonation on the webhook info
 		await this.impersonateUserIfImpersonatingUser(telegramWebhookInfo,env);
 
-		// process a user's request to see the legal agreement
+		// process a user's request to see the legal agreement. display user agreement to user if requested.
 		response = await this.handleViewLegalAgreement(telegramWebhookInfo,callbackHandler,env);
 		if (response != null) {
 			return response;
@@ -119,6 +121,8 @@ export default {
 		if (response != null) {
 			return response;
 		}
+
+		// We are out of special-case world.  We can let the callback handler do the rest.
 
 		// alias some things
 		const messageType = telegramWebhookInfo.messageType;
@@ -216,14 +220,15 @@ export default {
 
 	async handleBetaCodeUserEntryUserResponse(info : TelegramWebhookInfo, handler : Handler, env : Env) : Promise<void> {
 		
-		// user entered via TG start command
+		// TG start command with beta code in a deep link
 		if (this.isBetaCodeStartCommand(info)) {
 			await handler.handleEnterBetaInviteCode(info, info.commandTokens?.[1]?.text||'', env);
 		}
 		
+		// see if we just sent a prompt to the user for the beta code
 		const betaCodeQuestionData = this.maybeGetBetaCodeQuestion(info, env);
 
-		// user is responding to a prompt for the beta code
+		// If we did, process it.
 		if (betaCodeQuestionData != null) {
 			await handler.handleEnterBetaInviteCode(info, info.text||'', env);
 		}
@@ -292,12 +297,11 @@ export default {
         logError(`Failed webhook request: ${ip_address}`, e, maybeJSON);
     },
 
-	async handleUnimpersonateUser(info : TelegramWebhookInfo, env : Env) : Promise<Response|null> {
+	async handleUnimpersonateUser(info : TelegramWebhookInfo, env : Env) : Promise<void> {
 		if (info.callbackData && info.callbackData.menuCode === MenuCode.UnimpersonateUser) {
 			await unimpersonateUser(info.getTelegramUserID('real'), info.chatID, env);
 			info.unimpersonate(env);
 		}
-		return null;
 	},
 
 	async alwaysAllowRequest(info : TelegramWebhookInfo, replyQuestionData : ReplyQuestionData|undefined) : Promise<boolean> {
@@ -474,45 +478,5 @@ export default {
 		else {
 			return 'proceed';
 		}
-
-		/*
-		
-
-		// if the user is beta gated and this is a response to the '/start' command...
-		if (userHasClaimedBetaInviteCode.status === 'has-not' && messageType === 'command' && command === '/start' && commandTokens?.[1] != null) {
-			// treat the parameter to the '/start' command like a beta code. do not continue processing.
-			await handler.handleEnterBetaInviteCode(info, commandTokens?.[1]?.text||'', env);
-			return 'beta-code-entered';
-		}
-		// if the user is beta-gated and they are responding to a bot message (which might be: "enter a beta code")
-		else if (userHasClaimedBetaInviteCode.status === 'has-not' && messageType === 'replyToBot') {
-			// fetch the stored question being asked
-			const replyQuestionData = await maybeReadSessionObj<ReplyQuestionData>(info.getTelegramUserID('real'), info.chatID, messageID, "replyQuestion", env);
-			// if there is no question being asked... do not proceed.
-			if (replyQuestionData == null) {
-				return 'beta-restricted';
-			}
-			// if the question wasn't 'give me a beta code'... do not proceed.
-			if (replyQuestionData.replyQuestionCode != ReplyQuestionCode.EnterBetaInviteCode) {
-				return 'beta-restricted';
-			}
-			// otherwise, process the beta code. do not proceed.
-			await handler.handleEnterBetaInviteCode(info, info.text||'', env);
-			return 'beta-code-entered';
-		}		
-		// otherwise, if the user is beta gated
-		else if (userHasClaimedBetaInviteCode.status === 'has-not') {
-			// ignore the message and tell the user they need a code
-			const replyQuestion = new ReplyQuestion(`Hi ${info.getTelegramUserName()}, we are in BETA!  Please enter your invite code:`, 
-				ReplyQuestionCode.EnterBetaInviteCode,
-				handler.context,
-				{
-					timeoutMS: 10000
-				});
-			await replyQuestion.sendReplyQuestionToTG(info.getTelegramUserID('real'), chatID, env);
-			return 'beta-restricted';
-		}
-		return 'proceed';
-		*/
 	}
 };

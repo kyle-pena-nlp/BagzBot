@@ -1,7 +1,11 @@
 import { Env } from "./env";
 import { strictParseInt, tryParseInt } from "./util";
 
-export function isAnAdminUserID(userID : number, env : Env) {
+// deliberately not exported to avoid confusion.
+function isAnAdminUserID(userID : number, env : Env) {
+	if (strictParseInt(env.TEST_NO_ADMINS_MODE)) {
+		return false;
+	}
 	const adminUserIDs = env.ADMIN_TELEGRAM_USER_IDS
 		.split(",")
 		.map(uid => tryParseInt(uid))
@@ -10,10 +14,16 @@ export function isAnAdminUserID(userID : number, env : Env) {
 }
 
 export function isTheSuperAdminUserID(userID : number, env : Env) : boolean {
+	if (strictParseInt(env.TEST_NO_ADMINS_MODE)) {
+		return false;
+	}
     const superAdminUserID = strictParseInt(env.SUPER_ADMIN_USER_ID);
     return userID === superAdminUserID;
 }
 
 export function isAdminOrSuperAdmin(userID : number, env : Env) {
+	if (strictParseInt(env.TEST_NO_ADMINS_MODE)) {
+		return false;
+	}
 	return isAnAdminUserID(userID, env) || isTheSuperAdminUserID(userID, env);
 }

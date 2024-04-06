@@ -63,6 +63,8 @@ METIS_PRICE_API_URL = ""
 METIS_QUOTE_API_URL = ""
 METIS_SWAP_API_URL = "false"
 DOWN_FOR_MAINTENANCE = "false"
+# don't ever set to true.  just for dev.
+TEST_NO_ADMINS_MODE = "false"
 
 [env.beta.vars]
 # do not change this string EVER post launch
@@ -114,6 +116,8 @@ METIS_PRICE_API_URL = ""
 METIS_QUOTE_API_URL = ""
 METIS_SWAP_API_URL = "false"
 DOWN_FOR_MAINTENANCE = "true"
+# don't ever set to true.  just for dev.
+TEST_NO_ADMINS_MODE = "false"
 
 [env.dev.durable_objects]
 bindings = [

@@ -1,5 +1,5 @@
 import { Connection } from "@solana/web3.js";
-import { isAdminOrSuperAdmin, isAnAdminUserID } from "../../admins";
+import { isAdminOrSuperAdmin } from "../../admins";
 import { Wallet, encryptPrivateKey, generateEd25519Keypair } from "../../crypto";
 import { asTokenPrice } from "../../decimalized/decimalized_amount";
 import { Env, getRPCUrl } from "../../env";
@@ -439,7 +439,7 @@ export class UserDO {
         const sendSuccessIdxs : number[] = [];
         this.inbox.forEach(async (message,index) => {
             let messageWithContext = `$<b>${message.from} - ${this.env.TELEGRAM_BOT_INSTANCE_DISPLAY_NAME}</b>: ${message.message}`;
-            if (this.telegramUserID.value != null && isAnAdminUserID(this.telegramUserID.value, this.env)) {
+            if (this.telegramUserID.value != null && isAdminOrSuperAdmin(this.telegramUserID.value, this.env)) {
                 messageWithContext += `(from user ID: ${request.fromTelegramUserID})`;
             }
             const result = await sendMessageToTG(chatID, messageWithContext, this.env);

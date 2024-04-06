@@ -1,4 +1,4 @@
-import { isAnAdminUserID, isTheSuperAdminUserID } from "../../admins";
+import { isAdminOrSuperAdmin, isTheSuperAdminUserID } from "../../admins";
 import { Env } from "../../env";
 import { CallbackData } from "../../menus/callback_data";
 import { ReplyQuestionWithNextSteps } from "../../reply_question/reply_question_data";
@@ -54,7 +54,7 @@ export class CallbackHandlerParams {
 	}
 
 	isAdminOrSuperAdmin(env : Env) {
-		return isAnAdminUserID(this._realUserID, env) || isTheSuperAdminUserID(this._realUserID, env);
+		return isAdminOrSuperAdmin(this._realUserID, env);
 	}
 
 	isImpersonatingAUser() {
@@ -62,10 +62,10 @@ export class CallbackHandlerParams {
 	}	
 
 	impersonate(userToImpersonateID : number, env : Env) : 'now-impersonating-user'|'not-permitted' {
-		if (!isAnAdminUserID(this._realUserID, env)) {
+		if (!isAdminOrSuperAdmin(this._realUserID, env)) {
 			return 'not-permitted';
 		}
-		const impersonatingAnAdmin = isAnAdminUserID(userToImpersonateID, env);
+		const impersonatingAnAdmin = isAdminOrSuperAdmin(userToImpersonateID, env);
 		if (impersonatingAnAdmin && !isTheSuperAdminUserID(this._realUserID, env)) {
 			return 'not-permitted';
 		}
