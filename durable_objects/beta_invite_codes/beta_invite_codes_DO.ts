@@ -24,7 +24,6 @@ export class BetaInviteCodesDO {
     }
 
     async loadStateFromStorage(storage : DurableObjectStorage) {
-        await storage.deleteAll();
         const storageEntries = await storage.list();
         this.betaInviteCodesTracker.initialize(storageEntries);     
     }
@@ -85,9 +84,13 @@ export class BetaInviteCodesDO {
         // if there are less codes than allowed, generate new ones
         if (inviteCodes.length < strictParseInt(this.env.INVITE_CODES_PER_USER)) {
             const myInviteCode = this.betaInviteCodesTracker.getByClaimer(me);
-            const depth = (myInviteCode != null) ? myInviteCode.depth + 1 : 1;
+            if (myInviteCode == null) {
+                // don't generate codes for users that haven't claimed a code
+                return { success: true, data : { betaInviteCodes: [] } };
+            }
+            const depth = myInviteCode.depth + 1;
             if (depth > strictParseInt(this.env.MAX_BETA_INVITE_CODE_CHAIN_DEPTH)) {
-                return { success: true, data : { betaInviteCodes: [] } }
+                return { success: true, data : { betaInviteCodes: [] } };
             }
             const newCodes = this.betaInviteCodesTracker.generateAndStoreBetaInviteCodes(me, strictParseInt(this.env.INVITE_CODES_PER_USER) - inviteCodes.length, depth);
             inviteCodes = [...inviteCodes, ...newCodes];
