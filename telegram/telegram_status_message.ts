@@ -5,11 +5,11 @@ import { pause } from "../util";
 import { subInEmojis } from "./emojis";
 import { deleteTGMessage, sendMessageToTG, updateTGMessage } from "./telegram_helpers";
 
-export interface UpdateableNotification { 
-    promiseChain: Promise<TGStatusMessage|{ chatID : number, env : Env, parseMode : 'HTML'|'MarkdownV2', prefix: string|null }> 
+export interface UpdateableMessage { 
+    promiseChain: Promise<TGMessageChannel|{ chatID : number, env : Env, parseMode : 'HTML'|'MarkdownV2', prefix: string|null }> 
 }
 
-export class TGStatusMessage {
+export class TGMessageChannel {
     messageID : number;
     chatID : number;
     message : string;
@@ -45,13 +45,13 @@ export class TGStatusMessage {
         env : Env, 
         parseMode : 'HTML'|'MarkdownV2' = 'HTML',
         prefix : string|null = null,
-        menuArg : string|null = null) : UpdateableNotification {
+        menuArg : string|null = null) : UpdateableMessage {
         const promiseChain = sendMessageToTG(chatID, (prefix||'') + message, env, parseMode, dismissable, menuArg).then(sentMsgInfo => {
             if (!sentMsgInfo.success) {
                 return { chatID: chatID, env : env, parseMode: parseMode, prefix: prefix, menuArg: menuArg };
             }
             const messageID = sentMsgInfo.messageID!!;
-            return new TGStatusMessage(message, parseMode, dismissable, messageID, chatID, env, prefix, menuArg);
+            return new TGMessageChannel(message, parseMode, dismissable, messageID, chatID, env, prefix, menuArg);
         });
         return {
             promiseChain: promiseChain
@@ -65,14 +65,14 @@ export class TGStatusMessage {
         env : Env,
         parseMode : 'HTML'|'MarkdownV2' = 'HTML',
         prefix : string|null = null,
-        menuArg : string|null = null) : UpdateableNotification {
-            const statusMessage = new TGStatusMessage(message,parseMode,dismissable,messageID,chatID,env,prefix,menuArg);
+        menuArg : string|null = null) : UpdateableMessage {
+            const statusMessage = new TGMessageChannel(message,parseMode,dismissable,messageID,chatID,env,prefix,menuArg);
             return {
                 promiseChain: statusMessage.send()
             };
     }
     /* Append a status message to a queue of status messages, in a non-blocking fashion, with 500ms pauses between messages. */
-    static async queue(statusMessage : UpdateableNotification, 
+    static async queue(statusMessage : UpdateableMessage, 
         message : string, 
         dismissable : boolean|MenuCode,
         menuArg : string|null = null) {
@@ -81,17 +81,20 @@ export class TGStatusMessage {
                 return m.updateAndSend(message, dismissable, menuArg);
             }
             else {
-                return TGStatusMessage.createAndSend(message, dismissable, m.chatID, m.env, m.parseMode, m.prefix, menuArg).promiseChain;
+                return TGMessageChannel.createAndSend(message, dismissable, m.chatID, m.env, m.parseMode, m.prefix, menuArg).promiseChain;
             }
         }).then(pause(500));
     }
-    static async finalize(statusMessage : UpdateableNotification) {
+    static async finalize(statusMessage : UpdateableMessage) {
         await statusMessage.promiseChain.catch(r => {
             logError(r);
         });
     }
+    static async queueWait(statusMessage : UpdateableMessage, waitMS : number) {
+        statusMessage.promiseChain = statusMessage.promiseChain.then(pause(waitMS));
+    }
     /* Remove a message in a non-blocking fashion. */
-    static async queueRemoval(statusMessage : UpdateableNotification) {
+    static async queueRemoval(statusMessage : UpdateableMessage) {
         statusMessage.promiseChain = statusMessage.promiseChain.then(m => {
             if ('messageID' in m) {
                 return m.remove();
@@ -101,7 +104,7 @@ export class TGStatusMessage {
             }
         });
     }
-    private async updateAndSend(message : string, dismissable ?: boolean|MenuCode, menuArg : string|null = null) : Promise<TGStatusMessage> {
+    private async updateAndSend(message : string, dismissable ?: boolean|MenuCode, menuArg : string|null = null) : Promise<TGMessageChannel> {
         if (dismissable != null) {
             this.dismissable = dismissable;
         }
@@ -112,7 +115,7 @@ export class TGStatusMessage {
         await this.send();
         return this;
     }
-    private async send() : Promise<TGStatusMessage> {
+    private async send() : Promise<TGMessageChannel> {
         const sentMsgInfo = await updateTGMessage(this.chatID, 
             this.messageID, 
             (this.prefix||'') + this.message, 
@@ -123,7 +126,7 @@ export class TGStatusMessage {
         this.lastSendSuccessful = sentMsgInfo.success;
         return this;
     }
-    private async remove() : Promise<TGStatusMessage> {
+    private async remove() : Promise<TGMessageChannel> {
         const result = await deleteTGMessage(this.messageID, this.chatID, this.env);
         this.deleted = result.success;
         return this;

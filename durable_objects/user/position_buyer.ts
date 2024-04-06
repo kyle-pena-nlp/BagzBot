@@ -113,6 +113,7 @@ export class PositionBuyer {
             
             sellConfirmed: false,
             txSellSignature: null,
+            txSellAttemptTimeMS: null,
             sellLastValidBlockheight: null,
     
             token: positionRequest.token,
@@ -237,6 +238,7 @@ function convertToConfirmedPosition(positionRequest: PositionRequest, signature 
 
         sellConfirmed: false,
         txSellSignature: null,
+        txSellAttemptTimeMS: null,
         sellLastValidBlockheight: null,
 
         token: positionRequest.token,

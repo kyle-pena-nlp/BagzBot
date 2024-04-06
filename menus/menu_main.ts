@@ -1,8 +1,7 @@
 import { dAdd, toFriendlyString } from "../decimalized";
-import { asTokenPrice, toNumber } from "../decimalized/decimalized_amount";
+import { asTokenPrice } from "../decimalized/decimalized_amount";
 import { UserData } from "../durable_objects/user/model/user_data";
 import { CallbackButton } from "../telegram";
-import { interpretPct, interpretSOLAmount } from "../telegram/emojis";
 import { CallbackData } from "./callback_data";
 import { logoHack } from "./logo_hack";
 import { Menu, MenuCapabilities } from "./menu";
@@ -15,7 +14,8 @@ export interface Stuff {
     botName : string
     botTagline : string
     isBeta : boolean
-    isDev : boolean
+    isDev : boolean,
+    isInviteCodeGated : boolean
 }
 
 export class MenuMain extends Menu<UserData & Stuff> implements MenuCapabilities {
@@ -37,10 +37,9 @@ export class MenuMain extends Menu<UserData & Stuff> implements MenuCapabilities
         }
         
         if (this.menuData.maybeSOLBalance != null) {
-            const unspentSOLEmoji = interpretSOLAmount(toNumber(this.menuData.maybeSOLBalance));
             lines.push(
                 `:wallet: <b>Wallet</b>: <code>${this.menuData.address}</code>`,
-                `<b>Unspent SOL Balance</b>: ${toFriendlyString(this.menuData.maybeSOLBalance, 4)} SOL ${unspentSOLEmoji}`,
+                `<b>Unspent SOL Balance</b>: ${toFriendlyString(this.menuData.maybeSOLBalance, 4)} SOL`,
             );
         }
         else {
@@ -48,16 +47,14 @@ export class MenuMain extends Menu<UserData & Stuff> implements MenuCapabilities
         }
 
         if (this.menuData.maybePNL != null) {
-            const pnlEmoji = interpretPct(toNumber(this.menuData.maybePNL.PNLpercent));
             lines.push(
-                `<b>Total Value Of Open Positions</b>: ${toFriendlyString(this.menuData.maybePNL.currentTotalValue, 4)} SOL (${toFriendlyString(this.menuData.maybePNL.PNLpercent,4, { useSubscripts: false,  addCommas: false, includePlusSign: true, maxDecimalPlaces: 2 })}%) ${pnlEmoji}`
+                `<b>Total Value Of Open Positions</b>: ${toFriendlyString(this.menuData.maybePNL.currentTotalValue, 4)} SOL (${toFriendlyString(this.menuData.maybePNL.PNLpercent,4, { useSubscripts: false,  addCommas: false, includePlusSign: true, maxDecimalPlaces: 2 })}%)`
             );
         }
 
         if (this.menuData.maybePNL != null && this.menuData.maybeSOLBalance != null) {
             const totalWalletValue = dAdd(this.menuData.maybeSOLBalance, this.menuData.maybePNL.currentTotalValue);
-            const walletValueEmoji = interpretSOLAmount(toNumber(totalWalletValue));
-            lines.push(`<b>Total Value of Wallet:</b> ${asTokenPrice(totalWalletValue)} SOL ${walletValueEmoji}`)
+            lines.push(`<b>Total Value of Wallet:</b> ${asTokenPrice(totalWalletValue)} SOL`)
         }
 
 

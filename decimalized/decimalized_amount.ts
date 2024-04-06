@@ -51,7 +51,7 @@ function optDefaults(x : toFriendlyStringOpts) : DefaultedOpts {
 }
 
 export function asPercentDeltaString(x : DecimalizedAmount) : string {
-    return toFriendlyString(x, 4, { useSubscripts: false, maxDecimalPlaces: 1, includePlusSign: true }) + "%";
+    return toFriendlyString(x, 4, { useSubscripts: false, maxDecimalPlaces: 2, includePlusSign: true }) + "%";
 }
 
 export function asPercentString(x : DecimalizedAmount) : string {

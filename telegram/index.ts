@@ -12,12 +12,12 @@ import {
     sendRequestToTG,
     updateTGMessage
 } from "./telegram_helpers";
-import { TGStatusMessage, UpdateableNotification } from "./telegram_status_message";
+import { TGMessageChannel, UpdateableMessage } from "./telegram_status_message";
 import { TelegramWebhookInfo } from "./telegram_webhook_info";
 
 export {
     CallbackButton,
-    DeleteTGMessageResponse, TGStatusMessage, TGTextEntity,
-    TGTextEntityType, TelegramWebhookInfo, TgMessageSentInfo, UpdateableNotification, deleteTGMessage, escapeTGText, makeTelegramBotUrl, sendMessageToTG, sendRequestToTG, subInEmojis, subInEmojisOnButtons, updateTGMessage
+    DeleteTGMessageResponse, TGMessageChannel as TGStatusMessage, TGTextEntity,
+    TGTextEntityType, TelegramWebhookInfo, TgMessageSentInfo, UpdateableMessage as UpdateableNotification, deleteTGMessage, escapeTGText, makeTelegramBotUrl, sendMessageToTG, sendRequestToTG, subInEmojis, subInEmojisOnButtons, updateTGMessage
 };
 

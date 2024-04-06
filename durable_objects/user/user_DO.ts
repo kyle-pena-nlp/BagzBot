@@ -176,6 +176,9 @@ export class UserDO {
     }
 
     shouldScheduleNextAlarm() {
+        if (strictParseBoolean(this.env.DOWN_FOR_MAINTENANCE)) {
+            return false;
+        }
         return this.tokenPairsForPositionIDsTracker.any();
     }
 

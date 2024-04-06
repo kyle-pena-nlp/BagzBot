@@ -1,6 +1,6 @@
 import { DecimalizedAmount } from "../../../decimalized";
 import { logDebug, logError } from "../../../logging";
-import { Position } from "../../../positions";
+import { Position, PositionStatus } from "../../../positions";
 import { MapWithStorage } from "../../../util";
 import { PositionAndMaybePNL } from "../model/position_and_PNL";
 import { PeakPricePositionTracker } from "./peak_price_tracker";
@@ -114,6 +114,7 @@ export class TokenPairPositionTracker {
         const maybeRemovedPosition = this.pricePeaks.remove(positionID);
         if (maybeRemovedPosition != null) {
             maybeRemovedPosition.netPNL = netPNL;
+            maybeRemovedPosition.status = PositionStatus.Closed;
             this.closedPositions.set(maybeRemovedPosition.positionID, maybeRemovedPosition)
         }
     }

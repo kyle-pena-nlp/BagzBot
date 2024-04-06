@@ -12,6 +12,10 @@ COMMANDS = [
         'description': 'Shows a list of your open positions'
     },
     {
+        'command': 'pnl_history',
+        'description': 'Show a history of your gains and losses on your positions'
+    },
+    {
         'command': 'menu',
         'description': 'Displays the main menu'
     },

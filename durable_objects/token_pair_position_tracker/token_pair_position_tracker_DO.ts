@@ -90,7 +90,6 @@ export class TokenPairPositionTrackerDO {
 
     async loadStateFromStorage(storage : DurableObjectStorage) {
         logDebug("Loading token_pair_position_tracker from storage");
-        //await storage.deleteAll();
         const entries = await storage.list();
         this.tokenAddress.initialize(entries);
         this.vsTokenAddress.initialize(entries);
@@ -564,6 +563,11 @@ export class TokenPairPositionTrackerDO {
             }
             else if (type === 'sell') {
                 if (sellConfirmer.isTimedOut()) {
+                    continue;
+                }
+                // hack to prevent confirm attempts from firing off during sale. TODO: less hacky way to do this.
+                const tooLittleTimeHasPassedSinceSellAttempt = pos.txSellAttemptTimeMS != null && pos.txSellAttemptTimeMS > (Date.now() - strictParseInt(this.env.TX_TIMEOUT_MS));
+                if (tooLittleTimeHasPassedSinceSellAttempt) {
                     continue;
                 }
                 const confirmedSellStatus = await sellConfirmer.confirmSell(pos);

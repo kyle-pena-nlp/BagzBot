@@ -1,11 +1,11 @@
 
 import { Env } from "./env";
-import { TelegramWebhookInfo, sendMessageToTG } from "./telegram";
-import { Result, assertNever, makeFakeFailedRequestResponse, makeSuccessResponse, strictParseBoolean } from "./util";
-import { Worker as Handler } from "./worker/handler";
+import { TGStatusMessage, TelegramWebhookInfo, sendMessageToTG } from "./telegram";
+import { assertNever, makeFakeFailedRequestResponse, makeSuccessResponse, strictParseBoolean } from "./util";
+import { CallbackHandler as Handler } from "./worker/handler";
 
 /* Durable Objects */
-import { isAnAdminUserID, isTheSuperAdminUserID } from "./admins";
+import { isAdminOrSuperAdmin } from "./admins";
 import { getUserHasClaimedBetaInviteCode } from "./durable_objects/beta_invite_codes/beta_invite_code_interop";
 import { BetaInviteCodesDO } from "./durable_objects/beta_invite_codes/beta_invite_codes_DO";
 import { HeartbeatDO } from "./durable_objects/heartbeat/heartbeat_do";
@@ -14,138 +14,240 @@ import { TokenPairPositionTrackerDO } from "./durable_objects/token_pair_positio
 import { getImpersonatedUserID, getLegalAgreementStatus, maybeReadSessionObj, unimpersonateUser } from "./durable_objects/user/userDO_interop";
 import { UserDO } from "./durable_objects/user/user_DO";
 import { logError } from "./logging";
-import { LegalAgreement, MenuCode, logoHack } from "./menus";
+import { MenuCode, logoHack } from "./menus";
 import { ReplyQuestion, ReplyQuestionCode } from "./reply_question";
 import { ReplyQuestionData } from "./reply_question/reply_question_data";
 import { CallbackHandlerParams } from "./worker/model/callback_handler_params";
 
-/* Export of imported DO's (required by wrangler) */
+/* CF requires export of any imported durable objects */
 export { BetaInviteCodesDO, HeartbeatDO, PolledTokenPairListDO, TokenPairPositionTrackerDO, UserDO };
-
-enum ERRORS {
-   UNHANDLED_EXCEPTION = 500,
-   MISMATCHED_SECRET_TOKEN = 1000,
-   COULDNT_PARSE_REQUEST_BODY_JSON = 1500,
-   NO_RESPONSE = 2000,
-   NOT_A_PRIVATE_CHAT = 3000,
-   NOT_FROM_TELEGRAM = 4000
-}
 
 /**
  * Worker
  */
 export default {
 
+	// Worker CRON job
 	async scheduled(event : ScheduledEvent, env : Env, context : FetchEvent) {
+
+		// no CRON if down for maintenance
 		if (strictParseBoolean(env.DOWN_FOR_MAINTENANCE)) {
 			return;
 		}
+
+		// we use the per-minute CRON job to handle cold-start / making sure token pairs are polling
 		const handler = new Handler(context, env);
 		if (event.cron === "* * * * *") {
-			// we use the per-minute CRON job to handle cold-start / making sure token pairs are polling
 			context.waitUntil(handler.handleMinuteCRONJob(env));
 		}
 	},
 
+	// Worker fetch method (this is what the TG webhook calls)
 	async fetch(req : Request, env : Env, context : FetchEvent) {
 		try {
-			const response = await this._fetch(req, context, env);
-			if (!response) {
-				this.logWebhookRequestFailure(req, ERRORS.NO_RESPONSE, {});
-				return makeFakeFailedRequestResponse(500);
-			}
-			return response;
+			return await this._fetch(req, context, env);
 		}
 		catch(e : any) {
-			this.logWebhookRequestFailure(req, ERRORS.UNHANDLED_EXCEPTION, { "e": e.toString() });
-			return makeFakeFailedRequestResponse(500); // 500 is stored in statusText, status is still 200
+			// TG re-broadcasts any message it gets a failed status code from, so we avoid failed status codes			
+			await this.logWebhookRequestFailure(req, e);
+			return makeFakeFailedRequestResponse(500);
 		}
 	},
 
 	async _fetch(req : Request, context : FetchEvent, env : Env) : Promise<Response> {
 
-		// First, validate that this req is coming from the telegram bot's webhook by checking secret key.
-		const webhookRequestValidation = this.validateFetchRequest(req,env);
-		if (!webhookRequestValidation.ok) {
-			this.logWebhookRequestFailure(req,webhookRequestValidation.message, {});
-			return this.makeResponseToSuspiciousWebhookRequest();
+		// Let a series of handlers set the response. 
+		// Setting the response means early out in chain-of-responsibility.
+		let response : Response|null = null;
+
+		// If the request doesn't contain the secret key in the header (is probably not from TG, might be sniffing), respond with uninformative 403 
+		response = this.handleSuspiciousRequest(req,env);
+		if (response != null) {
+			return response;
 		}
 
-		// Parse JSON from request
-		let telegramRequestBody = null;
-		try {
-			telegramRequestBody = await this.parseRequestBody(req,env);
-		}
-		catch(e) {
-			this.logWebhookRequestFailure(req, ERRORS.COULDNT_PARSE_REQUEST_BODY_JSON, {});
+		// Parse the webhook info. Early out if fails.
+		const telegramWebhookInfo = await this.tryGetTelegramWebhookInfo(req,env);
+		if (telegramWebhookInfo == null) {
 			return makeFakeFailedRequestResponse(400);
 		}
 
-		// get some important info from the telegram request
-		const telegramWebhookInfo = new TelegramWebhookInfo(telegramRequestBody, env);
-
-		const handler = new Handler(context, env);
-
-		if (strictParseBoolean(env.DOWN_FOR_MAINTENANCE)) {
-			await sendMessageToTG(telegramWebhookInfo.chatID, `${logoHack()} Sorry, <b>${env.TELEGRAM_BOT_DISPLAY_NAME} - ${env.TELEGRAM_BOT_INSTANCE_DISPLAY_NAME}</b> is currently down for scheduled maintenance.`, env);
-			return makeSuccessResponse();
+		// If down for maintenance, no requests go through.
+		response = await this.handleDownForMaintenance(telegramWebhookInfo,env);
+		if (response != null) {
+			return response;
 		}
 
-		// allow the unimpersonate request
-		if (telegramWebhookInfo.callbackData && telegramWebhookInfo.callbackData.menuCode === MenuCode.UnimpersonateUser) {
-			await unimpersonateUser(telegramWebhookInfo.getTelegramUserID('real'), telegramWebhookInfo.chatID, env);
-			telegramWebhookInfo.unimpersonate(env);
-			return handler.handleCallback(new CallbackHandlerParams(telegramWebhookInfo));
+		const callbackHandler = new Handler(context, env);		
+
+		// The term 'impersonate' means: Begin User Support, not 'Identity Theft'.
+		// It's a technical term.
+		// It allows an admin to view a user's positions, etc (but not place/sell positions)
+
+		// If unimpersonate, remove impersonation user ID from UserDO, and then proceed.
+		response = await this.handleUnimpersonateUser(telegramWebhookInfo, env);
+		if (response != null) {
+			return response;
 		}
 
-		// do user impersonation, if an admin or *the* super admin is impersonating another user
-		if (isAnAdminUserID(telegramWebhookInfo.getTelegramUserID('real'), env) || isTheSuperAdminUserID(telegramWebhookInfo.getTelegramUserID('real'), env)) {
-			const impersonatedUserID = (await getImpersonatedUserID(telegramWebhookInfo.getTelegramUserID('real'), telegramWebhookInfo.chatID, env)).impersonatedUserID;
-			if (impersonatedUserID !=  null) {
-				const impersonationSuccess = telegramWebhookInfo.impersonate(impersonatedUserID, env);
-				if (impersonationSuccess === 'not-permitted') {
-					logError(`Could not impersonate '${impersonatedUserID}'`, telegramWebhookInfo);
-				}
-			}
+		// if impersonated, set impersonation on the webhook info
+		await this.impersonateUserIfImpersonatingUser(telegramWebhookInfo,env);
+
+		// process a user's request to see the legal agreement
+		response = await this.handleViewLegalAgreement(telegramWebhookInfo,callbackHandler,env);
+		if (response != null) {
+			return response;
+		}
+
+		// process a user's response to the legal agreement
+		response = await this.handleLegalAgreementUserResponse(telegramWebhookInfo,callbackHandler,env);
+		if (response != null) {
+			return response;
+		}
+
+		// process an user's entry of a beta code
+		await this.handleBetaCodeUserEntryUserResponse(telegramWebhookInfo,callbackHandler,env);
+
+		// if the user hasn't agreed to legal agreement, let them know and early out.
+		response = await this.handleLegalAgreementGating(telegramWebhookInfo,context,env);
+		if (response != null) {
+			return response;
+		}
+
+		// if the user needs a beta invite code and they don't have one, let them know and early out.
+		response = await this.handleBetaInviteCodeGating(telegramWebhookInfo,context,env);
+		if (response != null) {
+			return response;
 		}
 
 		// alias some things
 		const messageType = telegramWebhookInfo.messageType;
-		
-		// enforce legal agreement gating
-		const legalAgreementGatingAction = await this.enforceLegalAgreementGating(telegramWebhookInfo, handler, env);
-		if (legalAgreementGatingAction !== 'proceed') {
-			return makeSuccessResponse();
-		}
 
-		// enforce beta code gating (if enabled).
-		const betaEntryGateAction = await this.maybeEnforceBetaGating(telegramWebhookInfo, handler, env);
-		if (betaEntryGateAction !== 'proceed') {
-			return makeSuccessResponse();
-		}
-
-		// handle reply-tos
+		// user responds to a bot question
 		if (messageType === 'replyToBot') {
-			return await handler.handleReplyToBot(telegramWebhookInfo);
+			return await callbackHandler.handleReplyToBot(telegramWebhookInfo);
 		}
 
 		// User clicks a menu button
 		if (messageType === 'callback') {
-			return await handler.handleCallback(new CallbackHandlerParams(telegramWebhookInfo));
+			return await callbackHandler.handleCallback(new CallbackHandlerParams(telegramWebhookInfo));
 		}
 
-		// User issues a command
+		// User issues a TG command
 		if (messageType === 'command') {
-			return await handler.handleCommand(telegramWebhookInfo);
+			return await callbackHandler.handleCommand(telegramWebhookInfo);
 		}
 		
-		// User types a message
+		// User types a message to the bot
 		if (messageType === 'message') {
-			return await handler.handleMessage(telegramWebhookInfo);
+			return await callbackHandler.handleMessage(telegramWebhookInfo);
 		}
 		
 		// Never send anything but a 200 back to TG ---- otherwise telegram will keep trying to resend
 		return makeSuccessResponse();
+	},
+
+	async tryGetTelegramWebhookInfo(req : Request, env: Env) : Promise<TelegramWebhookInfo|null> {
+		const telegramRequestBody = await this.parseRequestBody(req,env).catch(e => {
+			logError(`No JSON on request body - IP: ${this.ip_address_of(req)}`);
+			return null;
+		});	
+		if (telegramRequestBody == null) {
+			return null;
+		}
+		try {
+			return new TelegramWebhookInfo(telegramRequestBody, env);
+		}
+		catch(e) {
+			// I don't anticipate parsing errors, but maybe some weird kind of message gets sent from the user?
+			logError(`Error parsing TG webhook`, e);
+			return null;
+		}
+		
+	},
+
+	async handleBetaInviteCodeGating(info : TelegramWebhookInfo, context: FetchEvent, env : Env) : Promise<Response|null> {
+		// enforce beta code gating (if enabled).
+
+		// if beta code gating is off, no need.
+		if (!strictParseBoolean(env.IS_BETA_CODE_GATED)) {
+			return null;
+		}
+
+		// see if the user has claimed a beta code (or is exempt from needing one)
+		const userHasClaimedBetaInviteCode = await getUserHasClaimedBetaInviteCode({ userID: info.getTelegramUserID() }, env);
+		
+		if (userHasClaimedBetaInviteCode.status === 'has-not') {
+			const replyQuestion = new ReplyQuestion(`Hi ${info.getTelegramUserName()}, we are in BETA!  Please enter your invite code:`, 
+				ReplyQuestionCode.EnterBetaInviteCode,
+				context,
+				{
+					timeoutMS: 10000
+				});
+			await replyQuestion.sendReplyQuestionToTG(info.getTelegramUserID('real'), info.chatID, env);
+			return makeSuccessResponse();
+		}
+		else if (userHasClaimedBetaInviteCode.status === 'has') {
+			return null;
+		}
+		else {
+			assertNever(userHasClaimedBetaInviteCode.status);
+		}
+	},
+
+	async handleLegalAgreementGating(info : TelegramWebhookInfo, context: FetchEvent, env: Env) : Promise<Response|null> {
+		
+		const response = await getLegalAgreementStatus(info.getTelegramUserID('real'), info.chatID, env);
+		
+		if (response.status === 'agreed') {
+			return null;
+		}
+		else if (response.status === 'has-not-responded' || response.status === 'refused') {
+			const channel = TGStatusMessage.createAndSend(`Please agree to the Terms Of Service (see under 'Legal Agreement' under 'Menu') to use ${env.TELEGRAM_BOT_DISPLAY_NAME}`,false,info.chatID,env);
+			TGStatusMessage.queueWait(channel, 5000);
+			TGStatusMessage.queueRemoval(channel)
+			context.waitUntil(TGStatusMessage.finalize(channel));
+			return makeSuccessResponse("User has not agreed to legal agreement");
+		}
+		else {
+			assertNever(response.status);
+		}
+	},
+
+	async handleBetaCodeUserEntryUserResponse(info : TelegramWebhookInfo, handler : Handler, env : Env) : Promise<void> {
+		
+		// user entered via TG start command
+		if (this.isBetaCodeStartCommand(info)) {
+			await handler.handleEnterBetaInviteCode(info, info.commandTokens?.[1]?.text||'', env);
+		}
+		
+		const betaCodeQuestionData = this.maybeGetBetaCodeQuestion(info, env);
+
+		// user is responding to a prompt for the beta code
+		if (betaCodeQuestionData != null) {
+			await handler.handleEnterBetaInviteCode(info, info.text||'', env);
+		}
+	},
+
+	async handleDownForMaintenance(info : TelegramWebhookInfo, env : Env) {
+		if (strictParseBoolean(env.DOWN_FOR_MAINTENANCE)) {
+			await sendMessageToTG(info.chatID, `${logoHack()} Sorry, <b>${env.TELEGRAM_BOT_DISPLAY_NAME} - ${env.TELEGRAM_BOT_INSTANCE_DISPLAY_NAME}</b> is currently down for scheduled maintenance.`, env);
+			return makeSuccessResponse();
+		}
+		return null;
+	},
+
+	async impersonateUserIfImpersonatingUser(info : TelegramWebhookInfo, env : Env) : Promise<void> {
+		// do user impersonation, if an admin or *the* super admin is impersonating another user
+		if (isAdminOrSuperAdmin(info.getTelegramUserID('real'), env)) {
+			const impersonatedUserID = (await getImpersonatedUserID(info.getTelegramUserID('real'), info.chatID, env)).impersonatedUserID;
+			if (impersonatedUserID !=  null) {
+				const impersonationSuccess = info.impersonate(impersonatedUserID, env);
+				if (impersonationSuccess === 'not-permitted') {
+					logError(`Could not impersonate '${impersonatedUserID}'`, info);
+				}
+			}
+		}
 	},
 
 
@@ -154,23 +256,16 @@ export default {
         return requestBody;
     },
 
-    validateFetchRequest(req : Request, env : Env) : Result<boolean> {
-        const requestSecretToken = req.headers.get('X-Telegram-Bot-Api-Secret-Token');
+	handleSuspiciousRequest(req : Request, env : Env) : Response|null {
+		const requestSecretToken = req.headers.get('X-Telegram-Bot-Api-Secret-Token');
         const secretTokensMatch = (requestSecretToken === env.SECRET__TELEGRAM_BOT_WEBHOOK_SECRET_TOKEN);
         if (!secretTokensMatch) {
-            return Result.failure(ERRORS.MISMATCHED_SECRET_TOKEN.toString());
+            return new Response(null, {
+				status: 403 // forbidden
+			});;
         }
-        return Result.success(true);
-    },
-
-    makeResponseToSuspiciousWebhookRequest() : Response {
-        // 403, forbidden
-        const response = new Response(null, {
-            status: 403
-        });
-        return response;
-    },
-
+		return null;
+	},
 	ip_address_of(req : Request) : string {
 		const ip = req.headers.get('cf-connecting-ip');
 		const forwarded_ip = req.headers.get('x-forwarded-for');
@@ -191,39 +286,171 @@ export default {
 		return response;
 	},
 
-    logWebhookRequestFailure(req : Request, error_code : ERRORS | string | undefined, addl_info_obj : any) {
+    async logWebhookRequestFailure(req : Request, e : any) {
         const ip_address = this.ip_address_of(req);
-        const addl_info = JSON.stringify(addl_info_obj || {}, null, 0);
-        const error_code_string = (error_code || '').toString();
-        console.log(`${ip_address} :: ${error_code_string} :: ${addl_info}`);
+		const maybeJSON = await req.json().catch(r => null);
+        logError(`Failed webhook request: ${ip_address}`, e, maybeJSON);
     },
 
+	async handleUnimpersonateUser(info : TelegramWebhookInfo, env : Env) : Promise<Response|null> {
+		if (info.callbackData && info.callbackData.menuCode === MenuCode.UnimpersonateUser) {
+			await unimpersonateUser(info.getTelegramUserID('real'), info.chatID, env);
+			info.unimpersonate(env);
+		}
+		return null;
+	},
+
+	async alwaysAllowRequest(info : TelegramWebhookInfo, replyQuestionData : ReplyQuestionData|undefined) : Promise<boolean> {
+
+		// if is an admin clicking 'unimpersonate'
+		const unimpersonateCallback = info.callbackData && info.callbackData.menuCode === MenuCode.UnimpersonateUser;
+		if (unimpersonateCallback) {
+			return true;
+		}
+
+		if (this.isLegalAgreementTermsUserResponse(info)) {
+			return true;
+		}
+
+		if (this.isBetaCodeQuestionResponse(info, replyQuestionData)) {
+			return true;
+		}
+
+		return false;
+	},
+
+	async maybeGetBetaCodeQuestion(info : TelegramWebhookInfo, env : Env) : Promise<ReplyQuestionData|null> {
+		if (info.messageType === 'replyToBot') {
+			const replyQuestionData = await this.readReplyQuestionData(info, env);
+			if (replyQuestionData == null) {
+				return null;
+			}
+			else if (replyQuestionData.requestQuestionCode === ReplyQuestionCode.EnterBetaInviteCode) {
+				return replyQuestionData;
+			}
+			else {
+				return null;
+			}
+		}
+		else {
+			return null;
+		}
+	},
+
+	async readReplyQuestionData(info : TelegramWebhookInfo, env : Env) {
+		return await maybeReadSessionObj<ReplyQuestionData>(info.getTelegramUserID('real'), info.chatID, info.messageID, "replyQuestion", env);
+	},
+
+	isBetaCodeQuestionResponse(info : TelegramWebhookInfo, replyQuestionData : ReplyQuestionData|undefined) {
+
+		if (this.isBetaCodeStartCommand(info)) {
+			return true;
+		}
+
+		if (this.isBetaCodeQuestionReplyTo(info, replyQuestionData)) {
+			return true;
+		}
+		
+		return false;
+	},
+
+	isBetaCodeStartCommand(info : TelegramWebhookInfo) : boolean {
+		// is start message with parameter (which would be an invite code)
+		if (info.messageType === 'command' && info.command === '/start' && info.commandTokens?.[1] != null) {
+			return true;
+		}
+
+		return false;
+	},
+
+	isBetaCodeQuestionReplyTo(info : TelegramWebhookInfo, replyQuestionData : ReplyQuestionData|undefined) : boolean {
+		// if replying to question asking for beta code
+		if (info.messageType === 'replyToBot') {
+			
+			// if there is no question being asked... do not proceed.
+			if (replyQuestionData == null) {
+				return false;
+			}
+			
+			// if the question wasn't 'give me a beta code'... do not proceed.
+			if (replyQuestionData.replyQuestionCode == ReplyQuestionCode.EnterBetaInviteCode) {
+				return true;
+			}
+		}
+
+		return false;
+	},
+
+	isLegalAgreementTermsUserResponse(info : TelegramWebhookInfo) : boolean {
+		return this.isLegalAgreementMenuCode(info) || this.isViewLegalAgreementCommand(info);
+	},
+
+	isLegalAgreementMenuCode(info : TelegramWebhookInfo) : boolean {
+		const LegalAgreementMenuCodes = [ MenuCode.LegalAgreement, MenuCode.LegalAgreementAgree, MenuCode.LegalAgreementRefuse ];
+		if (info.callbackData && LegalAgreementMenuCodes.includes(info.callbackData.menuCode)) {
+			return true;
+		}
+		else {
+			return false;
+		}
+	},
+
+	isViewLegalAgreementCommand(info : TelegramWebhookInfo) : boolean {
+		if (info.messageType === 'command' && info.command === '/legal_agreement') {
+			return true;
+		}
+		else {
+			return false;
+		}
+	},
+
+	async handleViewLegalAgreement(info : TelegramWebhookInfo, handler : Handler, env : Env) : Promise<Response|null> {
+		if (this.isViewLegalAgreementCommand(info)) {
+			return await handler.handleMessage(info);
+		}
+		else if (this.isViewLegalAgreementMenuCode(info)) {
+			const params = new CallbackHandlerParams(info);
+			return await handler.handleCallback(params);
+		}
+		else {
+			return null;
+		}
+	},
+
+	isViewLegalAgreementMenuCode(info : TelegramWebhookInfo) {
+		return info.callbackData != null && info.callbackData.menuCode === MenuCode.LegalAgreement;
+	},
+
+	async handleLegalAgreementUserResponse(info : TelegramWebhookInfo, handler : Handler, env : Env) : Promise<Response|null> {
+		if (this.isLegalAgreementMenuCode(info)) {
+			const params = new CallbackHandlerParams(info);
+			return await handler.handleCallback(params);
+		}
+		return null;
+	},
+
+	async processBetaCodeResponse(info : TelegramWebhookInfo, replyQuestionData : ReplyQuestionData|undefined, handler : Handler, env : Env) {
+		if (this.isBetaCodeStartCommand(info)) {
+			await handler.handleEnterBetaInviteCode(info, info.commandTokens?.[1]?.text||'', env);
+		}
+		else if (this.isBetaCodeQuestionResponse(info,replyQuestionData)) {
+			await handler.handleEnterBetaInviteCode(info, info.text||'', env);
+		}	
+	},
+
 	async enforceLegalAgreementGating(telegramWebhookInfo : TelegramWebhookInfo, handler : Handler, env : Env) : Promise<'proceed'|'do-not-proceed'> {
-		const chatID = telegramWebhookInfo.chatID;
-		const callbackData = telegramWebhookInfo.callbackData;
-		const command = telegramWebhookInfo.command;
 		// Of note: I am using real User ID for legal agreement gating.
 		// That way, we can't circumvent legal agreement by impersonating.
 		const response = await getLegalAgreementStatus(telegramWebhookInfo.getTelegramUserID('real'), telegramWebhookInfo.chatID, env);
 		const legalAgreementStatus = response.status;
-		const LegalAgreementMenuCodes = [ MenuCode.LegalAgreement, MenuCode.LegalAgreementAgree, MenuCode.LegalAgreementRefuse ];
+		
 		if (legalAgreementStatus === 'agreed') {
-			return 'proceed';
-		}
-		else if (legalAgreementStatus === 'refused' && callbackData !== null && LegalAgreementMenuCodes.includes(callbackData.menuCode)) {
-			return 'proceed';
-		}
-		else if (legalAgreementStatus === 'refused' && command === '/legal_agreement') {
 			return 'proceed';
 		}
 		else if (legalAgreementStatus === 'refused') {
 			return 'do-not-proceed';
 		}
-		else if (legalAgreementStatus === 'has-not-responded'  && callbackData !== null && LegalAgreementMenuCodes.includes(callbackData.menuCode)) {
-			return 'proceed';
-		}
 		else if (legalAgreementStatus === 'has-not-responded') {
-			await new LegalAgreement(undefined).sendToTG({ chatID }, env);
 			return 'do-not-proceed';
 		}
 		else {
@@ -231,21 +458,26 @@ export default {
 		}
 	},
 
-	async maybeEnforceBetaGating(info: TelegramWebhookInfo, handler: Handler, env : Env) : Promise<'proceed'|'beta-restricted'|'beta-code-entered'> {
+	async enforceBetaGating(info: TelegramWebhookInfo, handler: Handler, env : Env) : Promise<'proceed'|'beta-restricted'|'beta-code-entered'> {
 
+		// if beta code gating is off, no need.
 		if (!strictParseBoolean(env.IS_BETA_CODE_GATED)) {
 			return 'proceed';
 		}
 
-		const messageID = info.messageID;
-		const chatID = info.chatID;
-		const messageType = info.messageType;
-		const command = info.command;
-		const commandTokens = info.commandTokens;
-
-		// see if the user has claimed a beta code
+		// see if the user has claimed a beta code (or is exempt from needing one)
 		const userHasClaimedBetaInviteCode = await getUserHasClaimedBetaInviteCode({ userID: info.getTelegramUserID() }, env);
 		
+		if (userHasClaimedBetaInviteCode.status === 'has-not') {
+			return 'beta-restricted';
+		}
+		else {
+			return 'proceed';
+		}
+
+		/*
+		
+
 		// if the user is beta gated and this is a response to the '/start' command...
 		if (userHasClaimedBetaInviteCode.status === 'has-not' && messageType === 'command' && command === '/start' && commandTokens?.[1] != null) {
 			// treat the parameter to the '/start' command like a beta code. do not continue processing.
@@ -281,5 +513,6 @@ export default {
 			return 'beta-restricted';
 		}
 		return 'proceed';
+		*/
 	}
 };

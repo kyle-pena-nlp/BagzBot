@@ -37,8 +37,8 @@ export class MenuPNLHistory extends Menu<{ closedPositions : Position[], netPNL 
         if (position.netPNL == null) {
             return;
         }
-        const label = this.padRight(`${position.token.symbol}: `, 7);
-        const pnlString = this.padRight(`${asTokenPriceDelta(position.netPNL)} SOL`, 10);
+        const label = this.padRight(`${position.token.symbol}: `, 9);
+        const pnlString = `${asTokenPriceDelta(position.netPNL)} SOL`;
         lines.push(`:bullet: Sale of <code>${label} ${pnlString}</code>`);
     }
 

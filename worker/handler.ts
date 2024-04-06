@@ -29,10 +29,10 @@ import { assertIs } from "../util/enums";
 import { CallbackHandlerParams } from "./model/callback_handler_params";
 import { TokenAddressExtractor } from "./token_address_extractor";
 
-
+// TODO: -> CF environment variable.
 const QUESTION_TIMEOUT_MS = 10000
 
-export class Worker {
+export class CallbackHandler {
 
     env : Env
     context: FetchEvent
@@ -59,9 +59,11 @@ export class Worker {
         const initiatingMessageID = info.messageID;
         const initiatingMessage = info.text||'';
 
-        const tokenAddressParser = new TokenAddressExtractor()
+        // try to parse the message as a token address
+        const tokenAddressParser = new TokenAddressExtractor();
         const maybeTokenAddress = tokenAddressParser.maybeExtractTokenAddress(initiatingMessage);
         
+        // if that didn't work, tell them so.
         if (maybeTokenAddress == null) {
             await sendMessageToTG(chatID, `'${initiatingMessage.trim()}' does not appear to be a valid token address.  You can paste in a token address or a birdeye.so link!  Also, see the "/new_position" command in the menu.`, this.env);
             return makeFakeFailedRequestResponse(404, "Token does not exist");
@@ -85,6 +87,8 @@ export class Worker {
         if (!conversation.success) {
             return makeFakeFailedRequestResponse(500, "Failed to send response to telegram");
         }
+
+        // start a new conversation, with the 'Token address recognized' message
         const conversationMessageID = conversation.messageID;
 
         // get default settings for a position request
@@ -126,6 +130,7 @@ export class Worker {
             POSITION_REQUEST_STORAGE_KEY, 
             this.env);
 
+        // render the request editor menu
         const maybeSOLBalance = await getUserWalletSOLBalance(info.getTelegramUserID(), info.chatID, this.env);
         const menu = await this.makeStopLossRequestEditorMenu(positionRequest, maybeSOLBalance, this.env);
         await menu.sendToTG({ chatID, messageID : conversationMessageID }, this.env);
@@ -133,20 +138,30 @@ export class Worker {
     }
 
     async handleCallback(params : CallbackHandlerParams) : Promise<Response> {
+
+        // process the callback
         const menuOrReplyQuestion = await this.handleCallbackQueryInternal(params);
+
+        // we either get a new menu to render, a question to ask the user, or nothing.
         if (menuOrReplyQuestion == null) {
             return makeSuccessResponse();
         }
         else if ('question' in menuOrReplyQuestion) {
             await menuOrReplyQuestion.sendReplyQuestionToTG(params.getTelegramUserID('real'), params.chatID, this.env);
         }
-        else {
+        else if ('isMenu' in menuOrReplyQuestion) {
             await menuOrReplyQuestion.sendToTG({ chatID: params.chatID, messageID: params.messageID }, this.env);
         }
+        else {
+            assertNever(menuOrReplyQuestion);
+        }
+
         return makeSuccessResponse();
     }
 
-    // TODO: switch to handlers, factor handlers out into little classes (preferably into the menu classes themselves)
+    // I'm fully aware this is an abomination.  
+    // There was never a good time to refactor this and it's not broken.
+    // But as soon as the hack-a-thon is done, I'm tackling it.
     async handleCallbackQueryInternal(params : CallbackHandlerParams) : Promise<BaseMenu|ReplyQuestion|void> {
         const messageID = params.messageID;
         const chatID = params.chatID;
@@ -399,6 +414,7 @@ export class Worker {
                 params.impersonate(userIDToImpersonate, this.env);
                 return this.createMainMenu(params, this.env);
             case MenuCode.UnimpersonateUser:
+                // should already be done by worker, but just in case.
                 await unimpersonateUser(params.getTelegramUserID('real'), params.chatID, this.env);
                 params.unimpersonate(this.env);
                 return this.createMainMenu(params, this.env);
@@ -609,7 +625,8 @@ export class Worker {
             botName : this.getBotName(env),
             botTagline: env.TELEGRAM_BOT_TAGLINE,
             isBeta : env.ENVIRONMENT === 'beta',
-            isDev : env.ENVIRONMENT === 'dev'
+            isDev : env.ENVIRONMENT === 'dev',
+            isInviteCodeGated : strictParseBoolean(env.IS_BETA_CODE_GATED)
         });
     }
 
@@ -674,7 +691,7 @@ export class Worker {
         }
         return makeSuccessResponse();
     }
-
+    
     async handleReplyToBot(info : TelegramWebhookInfo) : Promise<Response> {
         const userAnswer = info.text||'';
 
@@ -750,7 +767,8 @@ export class Worker {
                     botName : this.getBotName(env),
                     botTagline: env.TELEGRAM_BOT_TAGLINE,
                     isBeta: env.ENVIRONMENT === 'beta',
-                    isDev : env.ENVIRONMENT === 'dev'
+                    isDev : env.ENVIRONMENT === 'dev',
+                    isInviteCodeGated : strictParseBoolean(env.IS_BETA_CODE_GATED)
                 })];
             case '/menu':
                 const menuUserData = await getUserData(info.getTelegramUserID(), info.chatID, info.messageID, false, env);
@@ -762,7 +780,8 @@ export class Worker {
                     botName : this.getBotName(env),
                     botTagline: env.TELEGRAM_BOT_TAGLINE,
                     isBeta : env.ENVIRONMENT === 'beta',
-                    isDev : env.ENVIRONMENT === 'dev'
+                    isDev : env.ENVIRONMENT === 'dev',
+                    isInviteCodeGated : strictParseBoolean(env.IS_BETA_CODE_GATED)
                 })];
             case '/welcome_screen':
                 return ['...', new WelcomeScreenPart1({ botDisplayName: this.env.TELEGRAM_BOT_DISPLAY_NAME })];
@@ -778,6 +797,9 @@ export class Worker {
             case '/list_positions':
                 const positions = await listPositionsFromUserDO(info.getTelegramUserID(), info.chatID, env);
                 return ['...', new MenuListPositions(positions)];
+            case '/pnl_history':
+                const closedPositionsAndPNLSummary = await getClosedPositionsAndPNLSummary(info.getTelegramUserID(), info.chatID, this.env);
+                return ['...',new MenuPNLHistory({ closedPositions : closedPositionsAndPNLSummary.closedPositions, netPNL: closedPositionsAndPNLSummary.closedPositionsPNLSummary.netSOL })];
             case '/new_position':
                 const defaultPr = await getDefaultTrailingStopLoss(info.getTelegramUserID(), info.chatID, messageID, env);
                 const prerequest = defaultPr.prerequest;

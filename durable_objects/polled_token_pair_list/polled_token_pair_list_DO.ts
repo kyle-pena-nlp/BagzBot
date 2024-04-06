@@ -33,7 +33,6 @@ export class PolledTokenPairListDO {
 
     async loadStateFromStorage(storage : DurableObjectStorage) {
         logDebug("Loading polled_token_pair_list from storage");
-        //await storage.deleteAll();
         const storageEntries = await storage.list();
         this.tokenTracker.initialize(storageEntries);        
         logDebug("Loaded loading polled_token_pair_list from storage");

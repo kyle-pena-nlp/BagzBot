@@ -18,6 +18,7 @@ export interface MenuSpec {
 	parseMode : 'HTML'|'MarkdownV2'
 	mode : MenuDisplayMode
 	renderLinkPreviewAsIcon : boolean
+    // TODO: finish the implementation of sendPhoto / media (to support 'cards')
     photo : string|null
 }
 
@@ -27,9 +28,13 @@ export interface MenuCapabilities {
     parseMode() : 'MarkdownV2'|'HTML'
     renderURLPreviewNormally() : boolean
     photo(): string|null
+    // TODO: factor things out of the abominable switch statement and into this:
+    //handleCallback(incomingMenuCode : MenuCode, params : CallbackHandlerParams, context : FetchEvent, env : Env);
 }
 
 export abstract class BaseMenu {
+
+    isMenu : boolean = true
 
     constructor() {
     }

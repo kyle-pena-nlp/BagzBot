@@ -27,7 +27,6 @@ export class HeartbeatDO {
 
     async loadStateFromStorage(storage : DurableObjectStorage) {
         logDebug("Loading heartbeatDO from storage");
-        //await storage.deleteAll();
         const storageEntries = await storage.list();   
         this.tokenPairPositionTrackerInstances.initialize(storageEntries);
         logDebug("Loaded loading heartbeatDO from storage")

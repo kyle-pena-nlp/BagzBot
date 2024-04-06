@@ -78,6 +78,7 @@ export class PositionSeller {
         position.txSellSignature = signatureOf(signedTx);
         position.sellLastValidBlockheight = lastValidBH;
         position.status = PositionStatus.Closing;
+        position.txSellAttemptTimeMS = Date.now();
         await updatePosition(position, this.env);
 
         // try to do the swap.

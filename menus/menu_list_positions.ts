@@ -1,6 +1,6 @@
 import { dAdd, dCompare, dDiv, dMult, fromNumber, toFriendlyString } from "../decimalized";
 import { DecimalizedAmount, MATH_DECIMAL_PLACES, asPercentDeltaString, asTokenPrice, dZero, toNumber } from "../decimalized/decimalized_amount";
-import { PositionAndMaybePNL } from "../durable_objects/token_pair_position_tracker/model/position_and_PNL";
+import { PNL, PositionAndMaybePNL } from "../durable_objects/token_pair_position_tracker/model/position_and_PNL";
 import { Position, PositionStatus } from "../positions";
 import { CallbackButton } from "../telegram";
 import { CallbackData } from "./callback_data";
@@ -66,7 +66,8 @@ export class MenuListPositions extends Menu<PositionAndMaybePNL[]> implements Me
         const name = this.makePositionLabelName(p);
         const pnlIcon = this.makePositionLabelPNLIcon(p);
         const footnote = this.makePositionLabelFootnote(p);
-        return [labelIcon,name,pnlIcon,footnote].filter(x => (x||'') != '').join(" ");
+        const peakDescription = this.makePeakDescription(p);
+        return [labelIcon,name,pnlIcon,footnote,peakDescription].filter(x => (x||'') != '').join(" ");
     }
 
     makePositionLabelIcon(p : PositionAndMaybePNL) {
@@ -117,6 +118,37 @@ export class MenuListPositions extends Menu<PositionAndMaybePNL[]> implements Me
             return '(Closed)';
         }
         return '';
+    }
+
+    makePeakDescription(p : PositionAndMaybePNL) : string {
+        if (this.hasPNL(p) && this.isOpen(p) && this.buyConfirmed(p) && !this.triggerConditionMet(p)) {
+            const pctBelowPeak = dMult(fromNumber(100), (p.PNL.fracBelowPeak));
+            if (toNumber(pctBelowPeak) <= 0.0) {
+                return ' :mountain: At Peak Price!';
+            }
+            else {
+                return ` ${asPercentDeltaString(pctBelowPeak)} Below Peak`
+            }
+        }
+        else {
+            return '';
+        }
+    }
+
+    hasPNL(p : PositionAndMaybePNL) : p is PositionAndMaybePNL & { PNL : PNL } {
+        return p.PNL != null;
+    }
+
+    isOpen(p : PositionAndMaybePNL) : p is PositionAndMaybePNL & { position : Position & { status: PositionStatus.Open }} {
+        return p.position.status === PositionStatus.Open;
+    }
+
+    buyConfirmed(p : PositionAndMaybePNL) : p is PositionAndMaybePNL & { position : Position & { buyConfirmed : true }} {
+        return p.position.buyConfirmed;
+    }
+
+    triggerConditionMet(p : PositionAndMaybePNL & { PNL : PNL }) {
+        return p.position.triggerPercent <  (100 * toNumber(p.PNL.fracBelowPeak));
     }
 
     shouldBeListed(position : Position) : boolean {
