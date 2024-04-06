@@ -37,6 +37,9 @@ enum ERRORS {
 export default {
 
 	async scheduled(event : ScheduledEvent, env : Env, context : FetchEvent) {
+		if (strictParseBoolean(env.DOWN_FOR_MAINTENANCE)) {
+			return;
+		}
 		const handler = new Handler(context, env);
 		if (event.cron === "* * * * *") {
 			// we use the per-minute CRON job to handle cold-start / making sure token pairs are polling

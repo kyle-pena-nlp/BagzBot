@@ -10,7 +10,7 @@ import { signatureOf } from "../../rpc/rpc_sign_tx";
 import { ParsedSuccessfulSwapSummary, isSlippageSwapExecutionErrorParseSummary, isSuccessfulSwapSummary, isSwapExecutionErrorParseSummary, isUnknownTransactionParseSummary } from "../../rpc/rpc_types";
 import { TGStatusMessage, UpdateableNotification } from "../../telegram";
 import { assertNever } from "../../util";
-import { positionExistsInTracker, removePosition, upsertPosition } from "../token_pair_position_tracker/token_pair_position_tracker_do_interop";
+import { insertPosition, positionExistsInTracker, removePosition, updatePosition } from "../token_pair_position_tracker/token_pair_position_tracker_do_interop";
 import { SwapExecutor } from "./swap_executor";
 import { SwapTransactionSigner } from "./swap_transaction_signer";
 
@@ -73,7 +73,7 @@ export class PositionBuyer {
         // upsert as an unconfirmed position. 
         // tracker will periodically attempts to reconfirm unconfirmed positions
         const unconfirmedPosition = this.convertRequestToUnconfirmedPosition(positionRequest, signatureOf(signedTx), lastValidBH);
-        await upsertPosition(unconfirmedPosition, this.env);
+        await insertPosition(unconfirmedPosition, this.env);
 
         // try to do the swap.
         const result = await this.executeAndParseSwap(positionRequest, signedTx, lastValidBH, connection);
@@ -89,7 +89,7 @@ export class PositionBuyer {
         }
         else if ('confirmedPosition' in result) {
             const { confirmedPosition } = result;
-            await upsertPosition(confirmedPosition, this.env);
+            await updatePosition(confirmedPosition, this.env);
             return 'confirmed';
         }
         else {

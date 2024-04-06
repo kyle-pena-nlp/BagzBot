@@ -79,6 +79,10 @@ export class MenuViewOpenPosition extends Menu<PositionAndMaybePNL|BrandNewPosit
             ` (<code>${this.position().token.address}</code>)`
         ];
 
+        if (this.isPositionWithPNL() && !this.isClosingOrClosed() && this.buyIsConfirmed() && !this.triggerConditionMet()) {
+            lines.push(`(${asPercentDeltaString(this.pnlDeltaPct())})`);
+        }
+
         lines.push("");
         lines.push("<blockquote><b>Note</b>: All prices are listed in SOL (fiat coming soon)</blockquote>")
         lines.push("");

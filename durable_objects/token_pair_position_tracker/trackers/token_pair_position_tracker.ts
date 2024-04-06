@@ -1,5 +1,5 @@
 import { DecimalizedAmount } from "../../../decimalized";
-import { logError } from "../../../logging";
+import { logDebug, logError } from "../../../logging";
 import { Position } from "../../../positions";
 import { MapWithStorage } from "../../../util";
 import { PositionAndMaybePNL } from "../model/position_and_PNL";
@@ -37,6 +37,11 @@ export class TokenPairPositionTracker {
         return result;
     }
 
+    // handy for debugging but is expensive.
+    countPositions() : number {
+        return this.pricePeaks.countPositions();
+    }
+
     any() : boolean {
         return  this.pricePeaks.any();
     }
@@ -54,11 +59,16 @@ export class TokenPairPositionTracker {
         return this.pricePeaks.listByUser(userID, currentPrice);
     }
 
-    upsertPositions(positions : Position[]) {
-        for (const position of positions) {
-            // idempotentally add (can also work as an update)
-            this.pricePeaks.upsertPosition(position);
-        }
+    updatePosition(position : Position) : boolean {
+        return this.pricePeaks.updatePosition(position);
+    }
+
+    insertPosition(position : Position) : boolean {
+        return this.pricePeaks.insertPosition(position);
+    }
+
+    updateSlippage(positionID : string, sellSlippagePercent : number) : boolean {
+        return this.pricePeaks.setSellSlippage(positionID, sellSlippagePercent)
     }
 
     updatePrice(newPrice : DecimalizedAmount) : void {
@@ -114,8 +124,13 @@ export class TokenPairPositionTracker {
     }
 
     initialize(entries : Map<string,any>) {
-        this.pricePeaks.initialize(entries);
-        this.closedPositions.initialize(entries);
+        try {
+            this.pricePeaks.initialize(entries);
+            this.closedPositions.initialize(entries);
+        }
+        catch(e) {
+            logError(`Error initializing token_pair_position_tracker`, e);
+        }
     }
 
     async flushToStorage(storage : DurableObjectStorage) : Promise<void> {
@@ -126,6 +141,7 @@ export class TokenPairPositionTracker {
             logError("Flushing to storage failed for TokenPairPositionTracker", this);
             return;
         }).then(() => {
+            logDebug("Done flushing to storage");
             return;
         });
     }

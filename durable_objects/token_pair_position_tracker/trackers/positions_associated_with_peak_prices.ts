@@ -28,6 +28,18 @@ export class PositionsAssociatedWithPeakPrices extends DecimalizedAmountMap<Read
         return this.positionIDMap.size > 0;
     }
 
+    countPositions() : number {
+        let count = 0;
+        for (const [key,array] of this.inner) {
+            array.forEach((elem,idx) => {
+                if (elem != null) {
+                    count += 1;
+                }
+            })
+        }
+        return count;
+    }
+
     // get positions associated with this peak price
     get(price : DecimalizedAmount) : ReadonlySparseArray<Position>|undefined {
         return super.get(price);
@@ -274,7 +286,6 @@ export class PositionsAssociatedWithPeakPrices extends DecimalizedAmountMap<Read
                 }
                 else {
                     positionFound = true;
-                    position.status = PositionStatus.Closed;
                     delete (positionArray as Position[])[index];
                     this.removeFromLookupCaches(position, location);
                 }

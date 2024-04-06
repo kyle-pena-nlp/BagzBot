@@ -118,6 +118,7 @@ export class UserDO {
     }
 
     async loadStateFromStorage() {
+        logDebug("Loading userDO from storage");
         const storage = await this.state.storage.list();
         this.wallet.initialize(storage);
         this.telegramUserID.initialize(storage);
@@ -129,6 +130,7 @@ export class UserDO {
         this.tokenPairsForPositionIDsTracker.initialize(storage);
         this.userPNLTracker.initialize(storage);
         this.chatID.initialize(storage);
+        logInfo("Loaded userDO from storage: ", this.telegramUserID.value);
     }
 
     async flushToStorage() {

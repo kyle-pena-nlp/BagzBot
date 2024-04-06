@@ -120,6 +120,6 @@ export class MenuListPositions extends Menu<PositionAndMaybePNL[]> implements Me
     }
 
     shouldBeListed(position : Position) : boolean {
-        return position.status === PositionStatus.Open && position.buyConfirmed;
+        return position.status != PositionStatus.Closed && position.buyConfirmed;
     }
 }

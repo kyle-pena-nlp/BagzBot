@@ -11,6 +11,7 @@ import { GetPositionFromPriceTrackerRequest, GetPositionFromPriceTrackerResponse
 import { GetPositionAndMaybePNLFromPriceTrackerRequest, GetPositionAndMaybePNLFromPriceTrackerResponse } from "./actions/get_position_and_maybe_pnl";
 import { GetTokenPriceRequest, GetTokenPriceResponse } from "./actions/get_token_price";
 import { HasPairAddresses } from "./actions/has_pair_addresses";
+import { InsertPositionRequest, InsertPositionResponse } from "./actions/insert_position";
 import { ListClosedPositionsFromTrackerRequest, ListClosedPositionsFromTrackerResponse } from "./actions/list_closed_positions_from_tracker";
 import { ListPositionsByUserRequest, ListPositionsByUserResponse } from "./actions/list_positions_by_user";
 import { MarkBuyAsConfirmedRequest, MarkBuyAsConfirmedResponse } from "./actions/mark_buy_as_confirmed";
@@ -21,15 +22,15 @@ import { PositionExistsInTrackerRequest, PositionExistsInTrackerResponse } from 
 import { RemovePositionRequest, RemovePositionResponse } from "./actions/remove_position";
 import { SetSellAutoDoubleOnOpenPositionInTrackerRequest } from "./actions/set_sell_auto_double_on_open_position_in_tracker";
 import { SetSellSlippagePercentOnOpenPositionTrackerRequest } from "./actions/set_sell_slippage_percent_on_open_position";
+import { UpdatePositionRequest, UpdatePositionResponse } from "./actions/update_position";
 import { UpdatePriceRequest, UpdatePriceResponse } from "./actions/update_price";
-import { UpsertPositionsRequest, UpsertPositionsResponse } from "./actions/upsert_positions";
+import { UpsertPositionsResponse } from "./actions/upsert_positions";
 import { WakeupTokenPairPositionTrackerRequest, WakeupTokenPairPositionTrackerResponse } from "./actions/wake_up";
 import { PositionAndMaybePNL } from "./model/position_and_PNL";
 
 export enum TokenPairPositionTrackerDOFetchMethod {
 	wakeUp = "wakeUp",
 	updatePrice = "updatePrice",
-	upsertPositions = "upsertPositions",
 	markPositionAsClosing = "markPositionAsClosing",
 	markPositionAsClosed = "markPositionAsClosed",
 	markPositionAsOpen = "markPositionAsOpen",	
@@ -45,7 +46,9 @@ export enum TokenPairPositionTrackerDOFetchMethod {
 	positionExists = "positionExists",
 	markBuyAsConfirmed = "markBuyAsConfirmed",
 	setSellSlippagePercentOnOpenPosition = "setSellSlippagePercentOnOpenPosition",
-	listClosedPositionsFromTracker = "listClosedPositionsFromTracker"
+	listClosedPositionsFromTracker = "listClosedPositionsFromTracker",
+	insertPosition = "insertPosition",
+	updatePosition = "updatePosition"
 }
 
 export async function listClosedPositionsFromTracker(telegramUserID : number, tokenAddress : string, vsTokenAddress : string, env : Env) : Promise<ListClosedPositionsFromTrackerResponse> {
@@ -123,11 +126,20 @@ export async function getPosition(positionID : string, tokenAddress : string, vs
 	return response.maybePosition;
 }
 
-export async function upsertPosition(position : Position, env : Env) : Promise<UpsertPositionsResponse> {
-	const method = TokenPairPositionTrackerDOFetchMethod.upsertPositions;
-	const request : UpsertPositionsRequest = { positions: [position], tokenAddress: position.token.address, vsTokenAddress: position.vsToken.address };
-	const response = await sendJSONRequestToTokenPairPositionTracker<UpsertPositionsRequest,UpsertPositionsResponse>(method, request, request.tokenAddress, request.vsTokenAddress, env);
-	return response;
+export async function insertPosition(position : Position, env : Env) : Promise<InsertPositionResponse> {
+	const method = TokenPairPositionTrackerDOFetchMethod.insertPosition;
+	const tokenAddress = position.token.address;
+	const vsTokenAddress = position.vsToken.address;
+	const request : InsertPositionRequest = { position, tokenAddress, vsTokenAddress };
+	return await sendJSONRequestToTokenPairPositionTracker<InsertPositionRequest,InsertPositionResponse>(method,request,tokenAddress,vsTokenAddress,env);
+}
+
+export async function updatePosition(position : Position, env : Env) : Promise<UpdatePositionResponse> {
+	const method = TokenPairPositionTrackerDOFetchMethod.updatePosition;
+	const tokenAddress = position.token.address;
+	const vsTokenAddress = position.vsToken.address;
+	const request : UpdatePositionRequest = { position, tokenAddress, vsTokenAddress };
+	return await sendJSONRequestToTokenPairPositionTracker<UpdatePositionRequest,UpdatePositionResponse>(method, request, tokenAddress, vsTokenAddress, env);
 }
 
 // this straight-up deletes the position, doesn't just mark it as closed.
@@ -198,18 +210,6 @@ export async function markBuyAsConfirmed(positionID : string, tokenAddress : str
 	const request : MarkBuyAsConfirmedRequest = { positionID, tokenAddress, vsTokenAddress };
 	const response = await sendJSONRequestToTokenPairPositionTracker<MarkBuyAsConfirmedRequest,MarkBuyAsConfirmedResponse>(method,request,tokenAddress,vsTokenAddress,env);
 	return response;
-}
-
-export async function importNewPosition(position : Position, env : Env) : Promise<UpsertPositionsResponse> {
-	const requestBody : UpsertPositionsRequest = { 
-		positions : [position], 
-		tokenAddress: position.token.address, 
-		vsTokenAddress: position.vsToken.address
-	};
-	const method = TokenPairPositionTrackerDOFetchMethod.upsertPositions;
-	const tokenAddress = position.token.address;
-	const vsTokenAddress = position.vsToken.address;
-	return await sendJSONRequestToTokenPairPositionTracker<UpsertPositionsRequest,UpsertPositionsResponse>(method, requestBody, tokenAddress, vsTokenAddress, env);
 }
 
 async function sendJSONRequestToTokenPairPositionTracker<TRequestBody,TResponseBody>(method : TokenPairPositionTrackerDOFetchMethod, requestBody : TRequestBody, tokenAddress : string, vsTokenAddress : string, env : Env) {

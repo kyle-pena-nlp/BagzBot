@@ -1,11 +1,12 @@
 import * as dMath from "../../../decimalized";
 import { DecimalizedAmount, DecimalizedAmountSet, MATH_DECIMAL_PLACES, dAdd, fromKey, fromNumber, toKey } from "../../../decimalized";
-import { dZero } from "../../../decimalized/decimalized_amount";
-import { logError } from "../../../logging";
+import { asTokenPrice, dZero } from "../../../decimalized/decimalized_amount";
+import { logDebug, logError } from "../../../logging";
 import { Position, PositionStatus, PositionType } from "../../../positions";
 import { setDifference, setIntersection, setUnion, structuralEquals } from "../../../util";
 import { PositionAndMaybePNL } from "../model/position_and_PNL";
 import { PositionsAssociatedWithPeakPrices } from "./positions_associated_with_peak_prices";
+
 
 /* 
     CONTAINS POSITION LIST FOR THE ENTIRE APP FOR THIS TOKEN PAIR!
@@ -37,19 +38,52 @@ export class PeakPricePositionTracker {
         this._buffer.clear()
         this.itemsByPeakPrice.clear()
     }
+
     any() : boolean {
         return this.itemsByPeakPrice.any();
     }
-    upsertPosition(position : Position) {
+
+    countPositions() : number {
+        return this.itemsByPeakPrice.countPositions();
+    }
+
+    updatePosition(position : Position) : boolean {
         const existingPosition = this.getPosition(position.positionID);
         if (existingPosition == null) {
-            // TODO: includes timeMS with price, and then fold into peak or not depending.
-            this.add(position.fillPrice, position);
+            return false;
         }
         else {
+            logDebug(`Updated position with ID ${position.positionID} (${position.userID})`);
             Object.assign(existingPosition,position);
+            return true;
         }
     }
+
+    insertPosition(position : Position) : boolean {
+        const existingPosition = this.getPosition(position.positionID);
+        if (existingPosition == null) {
+            this.add(position.fillPrice, position);
+            logDebug(`Inserted position with ID ${position.positionID} and fillPrice ${asTokenPrice(position.fillPrice)} (${position.userID})`);
+            return true;
+        }
+        else {
+            return false;
+        }
+    }
+
+    setSellSlippage(positionID : string, sellSlippagePercent : number) : boolean {
+        const existingPosition = this.getPosition(positionID);
+        if (existingPosition == null) {
+            return false;
+        }
+        else {
+            const oldSellSlippagePercent = existingPosition.sellSlippagePercent;
+            logDebug(`Updated sell slippage of position ${positionID} from ${oldSellSlippagePercent} to ${sellSlippagePercent}`)
+            existingPosition.sellSlippagePercent = sellSlippagePercent;
+            return true;
+        }
+    }
+
     add(price : DecimalizedAmount, position : Position) {
         this.itemsByPeakPrice.add(price, position);
     }
@@ -212,7 +246,12 @@ export class PeakPricePositionTracker {
         const [putEntries,deletedKeys] = this.generateDiffFromItemsBuffer();        
         const putPromise = storage.put(putEntries);
         const deletePromise = storage.delete([...deletedKeys]);
-        await Promise.all([putPromise,deletePromise]).then(() => {
+        logDebug(`${Object.keys(putEntries).length} puts.  ${deletedKeys.size} deletes.`)
+        await Promise.all([putPromise,deletePromise])
+        .catch(r => {
+            logError(`failed to flush peak price tracker to storage`, r);
+        })
+        .then(() => {
             this.overwriteBufferWithCurrentState();
         });
     }
@@ -305,13 +344,14 @@ export class PeakPricePositionTracker {
         for (const key of this.itemsByPeakPrice.keys()) {
             this._buffer.set(key, []);
             const currentItems = this.itemsByPeakPrice.get(key)||[];
-            currentItems.forEach((position) => {
+            currentItems.forEach((position,index) => {
                 if (position == null) {
                     return;
                 }
                 const clonedPositionObject = structuredClone(position);
-                this._buffer.add(key, clonedPositionObject);
-            })
+                //this._buffer.add(key, clonedPositionObject);
+                this._buffer._setAtIndex(key,index,clonedPositionObject);
+            });
         }
     }
     private positionsEqualByValue(a : Position, b : Position) : boolean {

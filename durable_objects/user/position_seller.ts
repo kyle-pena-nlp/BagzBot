@@ -9,7 +9,7 @@ import { signatureOf } from "../../rpc/rpc_sign_tx";
 import { ParsedSuccessfulSwapSummary, isSlippageSwapExecutionErrorParseSummary, isSuccessfulSwapSummary, isSuccessfullyParsedSwapSummary, isSwapExecutionErrorParseSummary, isUnknownTransactionParseSummary } from "../../rpc/rpc_types";
 import { TGStatusMessage, UpdateableNotification } from "../../telegram";
 import { assertNever, strictParseInt } from "../../util";
-import { markAsClosed, markAsOpen, positionExistsInTracker, upsertPosition } from "../token_pair_position_tracker/token_pair_position_tracker_do_interop";
+import { markAsClosed, markAsOpen, positionExistsInTracker, updatePosition } from "../token_pair_position_tracker/token_pair_position_tracker_do_interop";
 import { SwapExecutor } from "./swap_executor";
 import { SwapTransactionSigner } from "./swap_transaction_signer";
 
@@ -77,7 +77,7 @@ export class PositionSeller {
         // update the tracker with the sig & lastvalidBH for the sell.
         position.txSellSignature = signatureOf(signedTx);
         position.sellLastValidBlockheight = lastValidBH;
-        await upsertPosition(position, this.env);
+        await updatePosition(position, this.env);
 
         // try to do the swap.
         const result = await this.executeAndParseSwap(position, signedTx, lastValidBH);

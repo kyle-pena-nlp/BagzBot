@@ -20,6 +20,7 @@ import { GetPositionAndMaybePNLFromPriceTrackerRequest, GetPositionAndMaybePNLFr
 import { GetTokenPriceRequest, GetTokenPriceResponse } from "./actions/get_token_price";
 import { HasPairAddresses } from "./actions/has_pair_addresses";
 import { isHeartbeatRequest } from "./actions/heartbeat_wake_up_for_token_pair_position_tracker";
+import { InsertPositionRequest, InsertPositionResponse } from "./actions/insert_position";
 import { ListClosedPositionsFromTrackerRequest, ListClosedPositionsFromTrackerResponse } from "./actions/list_closed_positions_from_tracker";
 import { ListPositionsByUserRequest, ListPositionsByUserResponse } from "./actions/list_positions_by_user";
 import { MarkBuyAsConfirmedRequest, MarkBuyAsConfirmedResponse } from "./actions/mark_buy_as_confirmed";
@@ -30,8 +31,8 @@ import { PositionExistsInTrackerRequest, PositionExistsInTrackerResponse } from 
 import { RemovePositionRequest, RemovePositionResponse } from "./actions/remove_position";
 import { SetSellAutoDoubleOnOpenPositionInTrackerRequest } from "./actions/set_sell_auto_double_on_open_position_in_tracker";
 import { SetSellSlippagePercentOnOpenPositionTrackerRequest } from "./actions/set_sell_slippage_percent_on_open_position";
+import { UpdatePositionRequest, UpdatePositionResponse } from "./actions/update_position";
 import { UpdatePriceRequest, UpdatePriceResponse } from "./actions/update_price";
-import { UpsertPositionsRequest, UpsertPositionsResponse } from "./actions/upsert_positions";
 import { WakeupTokenPairPositionTrackerRequest, WakeupTokenPairPositionTrackerResponse } from "./actions/wake_up";
 import { BuyConfirmer } from "./confirmers/buy_confirmer";
 import { SellConfirmer } from "./confirmers/sell_confirmer";
@@ -48,6 +49,7 @@ import { ActionsToTake, TokenPairPositionTracker } from "./trackers/token_pair_p
     Also, is it possible to have cron job execution on DOs?
     Or do I need to hack something together with alarms?
 */
+
 
 /* 
     Durable Object storing all open positions for a single token/vsToken pair.  
@@ -87,23 +89,36 @@ export class TokenPairPositionTrackerDO {
     }
 
     async loadStateFromStorage(storage : DurableObjectStorage) {
+        logDebug("Loading token_pair_position_tracker from storage");
+        //await storage.deleteAll();
         const entries = await storage.list();
         this.tokenAddress.initialize(entries);
         this.vsTokenAddress.initialize(entries);
         this.tokenPairPositionTracker.initialize(entries);
         this.currentPriceTracker.initialize(entries);
+        logDebug("Loaded token_pair_position_tracker from storage");
     }
 
     async flushToStorage() {
+
+        const captureError = (name : string) => async (e : any) => {
+            logError(`CRITICAL: flushToStorage - ${name} - failed!!!`, e);
+            throw e;
+        }
         await Promise.allSettled([
-            this.tokenAddress.flushToStorage(this.state.storage),
-            this.vsTokenAddress.flushToStorage(this.state.storage),
-            this.tokenPairPositionTracker.flushToStorage(this.state.storage),
-            this.currentPriceTracker.flushToStorage(this.state.storage)
-        ]);
+            await this.tokenAddress.flushToStorage(this.state.storage).catch(captureError("tokenAddress")),
+            await this.vsTokenAddress.flushToStorage(this.state.storage).catch(captureError("vsTokenAddress")),
+            await this.tokenPairPositionTracker.flushToStorage(this.state.storage).catch(captureError("tokenPairPositionTracker")),
+            await this.currentPriceTracker.flushToStorage(this.state.storage).catch(captureError("currentPriceTracker"))
+        ]).then(() => {
+            logDebug("Finished flushing tokenPairPositionTracker to storage.")
+        });
     }
 
     shouldBePolling() : boolean {
+        if (strictParseBoolean(this.env.DOWN_FOR_MAINTENANCE)) {
+            return false;
+        }
         if (!strictParseBoolean(this.env.POLLING_ON)) {
             logDebug(`${this.tokenPairID()} Price polling is turned off AND should not be price polling.`)
             return false;
@@ -126,7 +141,7 @@ export class TokenPairPositionTrackerDO {
     }
 
     async alarm() {
-        logDebug(`${this.tokenPairID()} - invoking alarm`);
+        logDebug(`Invoking alarm. ${this.tokenAddress.value}`);        
         try {
             await this._alarm();
         }
@@ -135,6 +150,7 @@ export class TokenPairPositionTrackerDO {
         }
         finally {
             await this.flushToStorage();
+            logDebug(`Finished Invoking alarm. ${this.tokenAddress.value}`);
         }
     }
 
@@ -201,6 +217,7 @@ export class TokenPairPositionTrackerDO {
 
     async fetch(request : Request) : Promise<Response> {
         const [method,body] = await this.validateFetchRequest(request);
+        logDebug(`${method} - ${this.tokenAddress.value}`);
         try {
             // ensure the token is registered with heartbeatDO
             if (!isHeartbeatRequest(body)) {
@@ -216,6 +233,7 @@ export class TokenPairPositionTrackerDO {
         }
         finally {
             await this.flushToStorage();
+            logDebug(`FINISHED ${method} - ${this.tokenAddress.value}`);
         }
         return makeSuccessResponse();
     }
@@ -276,8 +294,6 @@ export class TokenPairPositionTrackerDO {
         switch(method) {
             case TokenPairPositionTrackerDOFetchMethod.updatePrice:
                 return await this.performTriggeredPriceUpdateActions(body);
-            case TokenPairPositionTrackerDOFetchMethod.upsertPositions:
-                return await this.handleUpsertPositions(body);
             case TokenPairPositionTrackerDOFetchMethod.markPositionAsClosing:
                 return await this.handleMarkPositionAsClosing(body);
             case TokenPairPositionTrackerDOFetchMethod.markPositionAsClosed:
@@ -313,9 +329,23 @@ export class TokenPairPositionTrackerDO {
                 return await this.handleSetSellSlippagePercentOnOpenPosition(body);
             case TokenPairPositionTrackerDOFetchMethod.listClosedPositionsFromTracker:
                 return await this.handleListClosedPositionsFromTracker(body);
+            case TokenPairPositionTrackerDOFetchMethod.insertPosition:
+                return await this.handleInsertPosition(body);
+            case TokenPairPositionTrackerDOFetchMethod.updatePosition:
+                return await this.handleUpdatePosition(body);
             default:
                 assertNever(method);
         }
+    }
+
+    async handleInsertPosition(body: InsertPositionRequest) : Promise<Response> {
+        const success = this.tokenPairPositionTracker.insertPosition(body.position);
+        return makeJSONResponse<InsertPositionResponse>({ success });
+    }
+
+    async handleUpdatePosition(body: UpdatePositionRequest) : Promise<Response> {
+        const success = this.tokenPairPositionTracker.updatePosition(body.position);
+        return makeJSONResponse<UpdatePositionResponse>({ success })
     }
 
     async handleListClosedPositionsFromTracker(body : ListClosedPositionsFromTrackerRequest) : Promise<Response> {
@@ -362,7 +392,6 @@ export class TokenPairPositionTrackerDO {
                 return makeJSONResponse<AdminDeleteAllInTrackerResponse>({});
             }
             this.tokenPairPositionTracker.clearAllPositions();
-            await this.state.storage.deleteAll();
             return makeJSONResponse<AdminDeleteAllInTrackerResponse>({});
         }
         return makeJSONResponse<AdminDeleteAllInTrackerResponse>({});
@@ -482,6 +511,7 @@ export class TokenPairPositionTrackerDO {
         const responseBody : WakeupTokenPairPositionTrackerResponse = {};
          // deliberate lack of await, but still writes to storage when complete.
         this.performWakupActions().finally(async () => {
+            logDebug(`Finished wakeup. ${this.tokenAddress.value}`);
             await this.flushToStorage();
         });
         return makeJSONResponse(responseBody);
@@ -505,7 +535,7 @@ export class TokenPairPositionTrackerDO {
                 if (buyConfirmer.isTimedOut()) {
                     continue;
                 }
-                const buyConfirmPrefix = `:notify: <b>Attempting to confirm purchase of ${asTokenPrice(pos.tokenAmt)} ${pos.token.symbol}</b>: `;
+                const buyConfirmPrefix = `:notify: <b>Attempting to confirm your earlier purchase of ${asTokenPrice(pos.tokenAmt)} ${pos.token.symbol}</b>: `;
                 const channel = TGStatusMessage.createAndSend('In progress...', false, pos.chatID, this.env, 'HTML', buyConfirmPrefix);
                 const confirmedBuy = await buyConfirmer.confirmBuy(pos);
                 if (confirmedBuy === 'api-error') {
@@ -523,8 +553,9 @@ export class TokenPairPositionTrackerDO {
                     this.tokenPairPositionTracker.removePosition(pos.positionID);
                 }
                 else if ('positionID' in confirmedBuy) {
+                    // TODO: specific method just to handle changes made by confirmer.
                     TGStatusMessage.queue(channel, "We were able to confirm this purchase! It will be listed in your open positions.", true);
-                    this.tokenPairPositionTracker.upsertPositions([confirmedBuy]);
+                    this.tokenPairPositionTracker.updatePosition(confirmedBuy);
                 }
                 else {
                     assertNever(confirmedBuy);
@@ -536,28 +567,29 @@ export class TokenPairPositionTrackerDO {
                     continue;
                 }
                 const confirmedSellStatus = await sellConfirmer.confirmSell(pos);
-                const sellConfirmPrefix = `:notify: <b>Attempting to confirm sale of ${asTokenPrice(pos.tokenAmt)} $${pos.token.symbol}</b>:`;
+                const sellConfirmPrefix = `:notify: <b>Attempting to confirm the earlier sale of ${asTokenPrice(pos.tokenAmt)} $${pos.token.symbol}</b>: `;
                 const channel = TGStatusMessage.createAndSend('In progress...', false, pos.chatID, this.env, 'HTML', sellConfirmPrefix);
                 if (confirmedSellStatus === 'api-error') {
-                    TGStatusMessage.queue(channel, "Confirmation failed.", false);
+                    TGStatusMessage.queue(channel, "Confirmation not successful - we will retry soon.", false);
                     TGStatusMessage.queueRemoval(channel);
                     break;
                 }
                 else if (confirmedSellStatus === 'unconfirmed') {
-                    TGStatusMessage.queue(channel, "Confirmation failed.", false);
+                    TGStatusMessage.queue(channel, "Confirmation not successful - we will retry soon.", false);
                     TGStatusMessage.queueRemoval(channel);
                     continue;
                 }
                 else if (confirmedSellStatus === 'failed') {
-                    TGStatusMessage.queue(channel, "On confirmation, we found that the sale didn't go through.", true);                
+                    TGStatusMessage.queue(channel, "We found that the sale didn't go through.", true);                
                     this.tokenPairPositionTracker.markPositionAsOpen(pos.positionID);
                 }
                 else if (confirmedSellStatus === 'slippage-failed') {
                     if (pos.sellAutoDoubleSlippage) {
                         const maxSlippage = 100; // TODO: make a user global setting
-                        pos.sellSlippagePercent = Math.min(maxSlippage, 2 * pos.sellSlippagePercent);
-                        TGStatusMessage.queue(channel, "The sale failed due to slippage.  We have increased the slippage to ${sellSlippagePercent}% and will retry soon.", true);
-                        this.tokenPairPositionTracker.upsertPositions([pos]);
+                        const sellSlippagePercent = Math.min(maxSlippage, 2 * pos.sellSlippagePercent);
+                        TGStatusMessage.queue(channel, "The sale failed due to slippage.  We have increased the slippage to ${sellSlippagePercent}% and will retry the sale if the trigger conditions holds.", true);
+                        // TODO: only update slippage.
+                        this.tokenPairPositionTracker.updateSlippage(pos.positionID,sellSlippagePercent);
                     }
                     else {
                         TGStatusMessage.queue(channel, "The sale failed due to slippage. We will re-sell if the auto-sell trigger condition continues to hold.", true);
@@ -577,18 +609,6 @@ export class TokenPairPositionTrackerDO {
                 assertNever(type);
             }
         }
-    }
-
-
-    async handleUpsertPositions(body : UpsertPositionsRequest) {
-        this.ensureIsInitialized(body);
-
-        const responseBody : UpsertPositionsResponse = {};
-        
-        // update the positions in the tracker.
-        this.tokenPairPositionTracker.upsertPositions(body.positions);
-
-        return makeJSONResponse(responseBody);
     }
 
     async handleMarkPositionAsClosed(body: MarkPositionAsClosedRequest) : Promise<Response> {
