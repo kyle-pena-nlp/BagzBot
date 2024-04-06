@@ -207,7 +207,7 @@ export default {
 			return null;
 		}
 		else if (response.status === 'has-not-responded' || response.status === 'refused') {
-			const channel = TGStatusMessage.createAndSend(`Please agree to the Terms Of Service (see under 'Legal Agreement' under 'Menu').`,false,info.chatID,env);
+			const channel = TGStatusMessage.createAndSend(`Please agree to the <b>Terms Of Service</b> (see under 'Legal Agreement' under 'Menu').`,false,info.chatID,env);
 			TGStatusMessage.queueWait(channel, 15000);
 			TGStatusMessage.queueRemoval(channel)
 			context.waitUntil(TGStatusMessage.finalize(channel));

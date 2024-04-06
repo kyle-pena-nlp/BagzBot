@@ -386,7 +386,7 @@ export class CallbackHandler {
             case MenuCode.WelcomeScreenPart1:
                 return new WelcomeScreenPart1({ botDisplayName: this.env.TELEGRAM_BOT_DISPLAY_NAME });
             case MenuCode.LegalAgreement:
-                return new LegalAgreement(undefined);
+                return new LegalAgreement({ botDisplayName: this.env.TELEGRAM_BOT_DISPLAY_NAME });
             case MenuCode.LegalAgreementAgree:
                 await storeLegalAgreementStatus(params.getTelegramUserID('real'), params.chatID, 'agreed', this.env);
                 return new WelcomeScreenPart1({ botDisplayName: this.env.TELEGRAM_BOT_DISPLAY_NAME });
@@ -790,7 +790,7 @@ export class CallbackHandler {
             case '/welcome_screen':
                 return ['...', new WelcomeScreenPart1({ botDisplayName: this.env.TELEGRAM_BOT_DISPLAY_NAME })];
             case '/legal_agreement':
-                return ['...', new LegalAgreement(undefined)];
+                return ['...', new LegalAgreement({ botDisplayName: this.env.TELEGRAM_BOT_DISPLAY_NAME })];
             case '/faq':
                 return ['...', new MenuFAQ({ 
                     botName : env.TELEGRAM_BOT_DISPLAY_NAME, 
