@@ -1,7 +1,6 @@
-import { DecimalizedAmount, asTokenPriceDelta, toNumber } from "../decimalized/decimalized_amount";
+import { DecimalizedAmount, asTokenPriceDelta } from "../decimalized/decimalized_amount";
 import { Position } from "../positions";
 import { CallbackButton } from "../telegram";
-import { interpretPNLWithArrows } from "../telegram/emojis";
 import { CallbackData } from "./callback_data";
 import { logoHack } from "./logo_hack";
 import { Menu, MenuCapabilities } from "./menu";
@@ -10,8 +9,9 @@ import { MenuCode } from "./menu_code";
 export class MenuPNLHistory extends Menu<{ closedPositions : Position[], netPNL : DecimalizedAmount }> implements MenuCapabilities {
     renderText(): string {
         const lines : string[] = [];
-        this.addNetPNLSummary(lines);
+        this.addHeader(lines);
         lines.push("");
+
         const closedPositions = this.menuData.closedPositions;
         for (const pos of closedPositions) {
             this.addClosedPositionSummary(lines, pos);
@@ -19,6 +19,9 @@ export class MenuPNLHistory extends Menu<{ closedPositions : Position[], netPNL 
         if (this.menuData.closedPositions.length == 0) {
             lines.push("<blockquote>Your don't have any closed positions yet!  Your total earnings will show here when you do.</blockquote>");
         }
+        lines.push("");
+
+        this.addNetPNLSummary(lines);
         return lines.join("\r\n");
     }
     renderOptions(): CallbackButton[][] {
@@ -27,11 +30,11 @@ export class MenuPNLHistory extends Menu<{ closedPositions : Position[], netPNL 
         this.insertButtonNextLine(options, `:back: Back`, new CallbackData(MenuCode.Main))
         return options;
     }
+    private addHeader(lines : string[]) {
+        lines.push(`${logoHack()}<u><b>PNL History</b></u>`);        
+    }
     private addNetPNLSummary(lines : string[]) {
-        lines.push(`${logoHack()}<u><b>PNL History</b></u>`);
-        lines.push("");
-        const pnlEmoji = interpretPNLWithArrows(toNumber(this.menuData.netPNL));
-        lines.push(`<b>Total Earnings</b>: <code>${asTokenPriceDelta(this.menuData.netPNL)} SOL</code>`);
+        lines.push(`<b>Total</b>: <code>${asTokenPriceDelta(this.menuData.netPNL)} SOL</code>`);
     }
     private addClosedPositionSummary(lines : string[], position : Position) {
         if (position.netPNL == null) {

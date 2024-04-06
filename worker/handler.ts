@@ -748,6 +748,7 @@ export class CallbackHandler {
         else if (claimInviteCodeResponse.status === 'code-does-not-exist') {
             // tell user sorry, that's not a real code
             await sendMessageToTG(info.chatID, `Sorry ${info.getTelegramUserName()} - '${code}' is not a known invite code.`, env);
+            return makeSuccessResponse();
         }
         else if (claimInviteCodeResponse.status === 'you-already-claimed-different-code') {
             await sendMessageToTG(info.chatID, `You have already claimed a different beta code!`, env);

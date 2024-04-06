@@ -12,6 +12,7 @@ export class MenuEditPositionRequest extends Menu< { positionRequest: PositionRe
         
         const lines : string[] = [
             `<b>:sparkle: Create Position</b>`,
+            ``
         ];
 
         if  (this.menuData.maybeSOLBalance != null) {

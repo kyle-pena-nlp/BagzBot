@@ -108,7 +108,10 @@ export default {
 		}
 
 		// process an user's entry of a beta code
-		await this.handleBetaCodeUserEntryUserResponse(telegramWebhookInfo,callbackHandler,env);
+		response = await this.handleBetaCodeUserEntryUserResponse(telegramWebhookInfo,callbackHandler,env);
+		if (response != null) {
+			return response;
+		}
 
 		// if the user hasn't agreed to legal agreement, let them know and early out.
 		response = await this.handleLegalAgreementGating(telegramWebhookInfo,context,env);
@@ -218,11 +221,12 @@ export default {
 		}
 	},
 
-	async handleBetaCodeUserEntryUserResponse(info : TelegramWebhookInfo, handler : Handler, env : Env) : Promise<void> {
+	async handleBetaCodeUserEntryUserResponse(info : TelegramWebhookInfo, handler : Handler, env : Env) : Promise<Response|null> {
 		
 		// TG start command with beta code in a deep link
 		if (this.isBetaCodeStartCommand(info)) {
 			await handler.handleEnterBetaInviteCode(info, info.commandTokens?.[1]?.text||'', env);
+			return makeSuccessResponse();
 		}
 		
 		// see if we just sent a prompt to the user for the beta code
@@ -231,7 +235,10 @@ export default {
 		// If we did, process it.
 		if (betaCodeQuestionData != null) {
 			await handler.handleEnterBetaInviteCode(info, info.text||'', env);
+			return makeSuccessResponse();
 		}
+
+		return null;
 	},
 
 	async handleDownForMaintenance(info : TelegramWebhookInfo, env : Env) {
