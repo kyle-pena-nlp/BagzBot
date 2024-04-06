@@ -1,5 +1,5 @@
 import { dAdd, toFriendlyString } from "../decimalized";
-import { asTokenPrice } from "../decimalized/decimalized_amount";
+import { asPercentDeltaString, asTokenPrice } from "../decimalized/decimalized_amount";
 import { UserData } from "../durable_objects/user/model/user_data";
 import { CallbackButton } from "../telegram";
 import { CallbackData } from "./callback_data";
@@ -39,7 +39,7 @@ export class MenuMain extends Menu<UserData & Stuff> implements MenuCapabilities
         if (this.menuData.maybeSOLBalance != null) {
             lines.push(
                 `:wallet: <b>Wallet</b>: <code>${this.menuData.address}</code>`,
-                `<b>Unspent SOL Balance</b>: ${toFriendlyString(this.menuData.maybeSOLBalance, 4)} SOL`,
+                `<b>Wallet SOL Balance</b>: ${toFriendlyString(this.menuData.maybeSOLBalance, 4)} SOL`,
             );
         }
         else {
@@ -48,13 +48,13 @@ export class MenuMain extends Menu<UserData & Stuff> implements MenuCapabilities
 
         if (this.menuData.maybePNL != null) {
             lines.push(
-                `<b>Total Value Of Open Positions</b>: ${toFriendlyString(this.menuData.maybePNL.currentTotalValue, 4)} SOL (${toFriendlyString(this.menuData.maybePNL.PNLpercent,4, { useSubscripts: false,  addCommas: false, includePlusSign: true, maxDecimalPlaces: 2 })}%)`
+                `<b>Total Unrealized PNL</b>: ${asTokenPrice(this.menuData.maybePNL.currentTotalValue)} SOL (${asPercentDeltaString(this.menuData.maybePNL.PNLpercent)})`
             );
         }
 
         if (this.menuData.maybePNL != null && this.menuData.maybeSOLBalance != null) {
             const totalWalletValue = dAdd(this.menuData.maybeSOLBalance, this.menuData.maybePNL.currentTotalValue);
-            lines.push(`<b>Total Value of Wallet:</b> ${asTokenPrice(totalWalletValue)} SOL`)
+            lines.push(`<b>Total Value:</b> ${asTokenPrice(totalWalletValue)} SOL`)
         }
 
 

@@ -751,7 +751,7 @@ export class CallbackHandler {
             return makeSuccessResponse();
         }
         else if (claimInviteCodeResponse.status === 'you-already-claimed-different-code') {
-            await sendMessageToTG(info.chatID, `You have already claimed a different beta code!`, env);
+            await sendMessageToTG(info.chatID, `You have already claimed a different invite code!`, env);
         }
     }
 
