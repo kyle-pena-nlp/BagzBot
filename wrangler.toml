@@ -113,7 +113,7 @@ USE_METIS = "false"
 METIS_PRICE_API_URL = ""
 METIS_QUOTE_API_URL = ""
 METIS_SWAP_API_URL = "false"
-DOWN_FOR_MAINTENANCE = "false"
+DOWN_FOR_MAINTENANCE = "true"
 
 [env.dev.durable_objects]
 bindings = [

@@ -695,6 +695,9 @@ export class UserDO {
         else if (position.status === PositionStatus.Closed) {
             return makeJSONResponse<ManuallyClosePositionResponse>({ message: "Position has already been sold." });
         }
+        else if (!position.buyConfirmed) {
+            return makeJSONResponse<ManuallyClosePositionResponse>({ message: "Position's purchase has not been confirmed."});
+        }
         assertIs<PositionStatus.Open,typeof position.status>();
         const channel = TGStatusMessage.createAndSend(`Initiating sale.`, false, position.chatID, this.env, 'HTML', `<a href="${position.token.logoURI}">\u200B</a><b>Manual Sell of ${asTokenPrice(position.tokenAmt)} ${position.token.symbol}</b>: `);
         const connection = new Connection(getRPCUrl(this.env));

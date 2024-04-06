@@ -3,7 +3,7 @@ import { Wallet } from "../../crypto";
 import { DecimalizedAmount, dSub } from "../../decimalized";
 import { Env } from "../../env";
 import { MenuCode } from "../../menus";
-import { Position } from "../../positions";
+import { Position, PositionStatus } from "../../positions";
 import { getLatestValidBlockhash } from "../../rpc/rpc_blocks";
 import { signatureOf } from "../../rpc/rpc_sign_tx";
 import { ParsedSuccessfulSwapSummary, isSlippageSwapExecutionErrorParseSummary, isSuccessfulSwapSummary, isSuccessfullyParsedSwapSummary, isSwapExecutionErrorParseSummary, isUnknownTransactionParseSummary } from "../../rpc/rpc_types";
@@ -77,6 +77,7 @@ export class PositionSeller {
         // update the tracker with the sig & lastvalidBH for the sell.
         position.txSellSignature = signatureOf(signedTx);
         position.sellLastValidBlockheight = lastValidBH;
+        position.status = PositionStatus.Closing;
         await updatePosition(position, this.env);
 
         // try to do the swap.
