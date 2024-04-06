@@ -95,8 +95,8 @@ export default {
 		// if impersonated, set impersonation on the webhook info
 		await this.impersonateUserIfImpersonatingUser(telegramWebhookInfo,env);
 
-		// process a user's request to see the legal agreement. display user agreement to user if requested.
-		response = await this.handleViewLegalAgreement(telegramWebhookInfo,callbackHandler,env);
+		// process an user's entry of a beta code
+		response = await this.handleBetaCodeUserEntryUserResponse(telegramWebhookInfo,callbackHandler,env);
 		if (response != null) {
 			return response;
 		}
@@ -107,14 +107,8 @@ export default {
 			return response;
 		}
 
-		// process an user's entry of a beta code
-		response = await this.handleBetaCodeUserEntryUserResponse(telegramWebhookInfo,callbackHandler,env);
-		if (response != null) {
-			return response;
-		}
-
-		// if the user hasn't agreed to legal agreement, let them know and early out.
-		response = await this.handleLegalAgreementGating(telegramWebhookInfo,context,env);
+		// process a user's request to see the legal agreement. display user agreement to user if requested.
+		response = await this.handleViewLegalAgreement(telegramWebhookInfo,callbackHandler,env);
 		if (response != null) {
 			return response;
 		}
@@ -124,6 +118,13 @@ export default {
 		if (response != null) {
 			return response;
 		}
+
+
+		// if the user hasn't agreed to legal agreement, let them know and early out.
+		response = await this.handleLegalAgreementGating(telegramWebhookInfo,context,env);
+		if (response != null) {
+			return response;
+		}		
 
 		// We are out of special-case world.  We can let the callback handler do the rest.
 
@@ -336,7 +337,7 @@ export default {
 			if (replyQuestionData == null) {
 				return null;
 			}
-			else if (replyQuestionData.requestQuestionCode === ReplyQuestionCode.EnterBetaInviteCode) {
+			else if (replyQuestionData.replyQuestionCode === ReplyQuestionCode.EnterBetaInviteCode) {
 				return replyQuestionData;
 			}
 			else {

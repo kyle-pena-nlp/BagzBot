@@ -24,6 +24,7 @@ export class BetaInviteCodesDO {
     }
 
     async loadStateFromStorage(storage : DurableObjectStorage) {
+        await storage.deleteAll();
         const storageEntries = await storage.list();
         this.betaInviteCodesTracker.initialize(storageEntries);     
     }

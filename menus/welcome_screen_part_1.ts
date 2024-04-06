@@ -6,7 +6,8 @@ import { MenuCode } from "./menu_code";
 
 export class WelcomeScreenPart1 extends Menu<{ botDisplayName : string }> implements MenuCapabilities {
     renderText(): string {
-        return `${logoHack()}<b>Thank you for trying ${this.menuData.botDisplayName}.  
+        return `${logoHack()}<b>WECOME!
+          
 If I could have just a moment of your time.</b>
 
 ${this.menuData.botDisplayName} implements a unique feature called a <b>'Trailing Stop Loss'</b>.
