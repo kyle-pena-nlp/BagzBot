@@ -25,8 +25,12 @@ export class TokenPairPositionTracker {
     constructor() {
     }
 
-    clearAllPositions() {
-        this.pricePeaks.clearAllPositions();
+    __clearAllPositions() {
+        this.pricePeaks.__clearAllPositions();
+    }
+
+    listAllPositions() : Position[] {
+        return this.pricePeaks.listAllPositions();
     }
 
     listClosedPositionsForUser(telegramUserID : number) : Position[] {

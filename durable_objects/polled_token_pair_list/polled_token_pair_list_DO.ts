@@ -1,8 +1,11 @@
 import { DurableObjectState } from "@cloudflare/workers-types";
 import { Env, getPriceAPIURL } from "../../env";
 import { logDebug } from "../../logging";
-import { StagedTokenInfo, TokenInfo } from "../../tokens";
+import { PositionStatus } from "../../positions";
+import { SOL_ADDRESS, StagedTokenInfo, TokenInfo } from "../../tokens";
 import { assertNever, makeJSONResponse, makeSuccessResponse, maybeGetJson } from "../../util";
+import { getPositionCountsFromTracker } from "../token_pair_position_tracker/token_pair_position_tracker_do_interop";
+import { AdminCountPositionsRequest, AdminCountPositionsResponse } from "./actions/admin_count_positions";
 import { GetTokenInfoRequest, GetTokenInfoResponse } from "./actions/get_token_info";
 import { PolledTokenPairListDOFetchMethod, parsePolledTokenPairListDOFetchMethod } from "./polled_token_pair_list_DO_interop";
 import { TokenTracker } from "./trackers/token_tracker";
@@ -58,9 +61,25 @@ export class PolledTokenPairListDO {
             case PolledTokenPairListDOFetchMethod.getTokenInfo:
                 const validateTokenResponse = await this.handleValidateToken(jsonRequestBody);
                 return makeJSONResponse(validateTokenResponse);
+            case PolledTokenPairListDOFetchMethod.adminCountPositions:
+                throw new Error("");
+                // this method spun up a DO for every single jupiter token. oops.
+                //return await this.handleAdminCountPositions(jsonRequestBody);
             default:
                 assertNever(method);
         }
+    }
+
+    async handleAdminCountPositions(request: AdminCountPositionsRequest) : Promise<Response> {
+        const vsTokenAddress = SOL_ADDRESS;
+        const positionCounts : Record<string,Record<PositionStatus,number>> = {};
+        const countsByUser : Record<number,number> = {};
+        const addresses = Object.keys(this.tokenTracker.tokenInfos);
+        for (const tokenAddress of addresses) {
+            const positionCount = await getPositionCountsFromTracker(tokenAddress, vsTokenAddress, this.env);
+            positionCounts[tokenAddress] = positionCount;
+        }
+        return makeJSONResponse<AdminCountPositionsResponse>({ positionCounts });
     }
 
     async handleValidateToken(request: GetTokenInfoRequest) : Promise<GetTokenInfoResponse> {

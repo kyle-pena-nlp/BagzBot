@@ -34,9 +34,13 @@ export class PeakPricePositionTracker {
     constructor(pricePeakSessionKeyPrefix : string) {
         this.pricePeakSessionKeyPrefix = pricePeakSessionKeyPrefix;
     }
-    clearAllPositions() {
+    __clearAllPositions() {
         this._buffer.clear()
         this.itemsByPeakPrice.clear()
+    }
+
+    listAllPositions() : Position[] {
+        return this.itemsByPeakPrice.listAllPositions();
     }
 
     any() : boolean {

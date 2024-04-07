@@ -28,6 +28,18 @@ export class PositionsAssociatedWithPeakPrices extends DecimalizedAmountMap<Read
         return this.positionIDMap.size > 0;
     }
 
+    listAllPositions() : Position[] {
+        const positions : Position[] = [];
+        for (const [positionID,location] of this.positionIDMap) {
+            const [peakPrice,index] = location;
+            const position = (this.get(peakPrice)||[])[index];
+            if (position != null) {
+                positions.push(position);
+            }
+        }
+        return positions;
+    }
+
     countPositions() : number {
         let count = 0;
         for (const [key,array] of this.inner) {

@@ -17,6 +17,7 @@ import { AdminDeleteAllInTrackerRequest, AdminDeleteAllInTrackerResponse } from 
 import { EditTriggerPercentOnOpenPositionInTrackerRequest } from "./actions/edit_trigger_percent_on_open_position_in_tracker";
 import { GetPositionFromPriceTrackerRequest, GetPositionFromPriceTrackerResponse } from "./actions/get_position";
 import { GetPositionAndMaybePNLFromPriceTrackerRequest, GetPositionAndMaybePNLFromPriceTrackerResponse } from "./actions/get_position_and_maybe_pnl";
+import { GetPositionCountsFromTrackerRequest, GetPositionCountsFromTrackerResponse } from "./actions/get_position_counts_from_tracker";
 import { GetTokenPriceRequest, GetTokenPriceResponse } from "./actions/get_token_price";
 import { HasPairAddresses } from "./actions/has_pair_addresses";
 import { isHeartbeatRequest } from "./actions/heartbeat_wake_up_for_token_pair_position_tracker";
@@ -332,9 +333,30 @@ export class TokenPairPositionTrackerDO {
                 return await this.handleInsertPosition(body);
             case TokenPairPositionTrackerDOFetchMethod.updatePosition:
                 return await this.handleUpdatePosition(body);
+            case TokenPairPositionTrackerDOFetchMethod.getPositionCounts:
+                return await this.handleGetPositionCounts(body);
             default:
                 assertNever(method);
         }
+    }
+
+    async handleGetPositionCounts(body : GetPositionCountsFromTrackerRequest) : Promise<Response> {
+        const positionCounts : Record<string,number> = {};
+        const countsByUser : Record<number,number> = {};
+        const allPositions = this.tokenPairPositionTracker.listAllPositions();
+        for (const position of allPositions) {
+            if (!(position.status in positionCounts)) {
+                positionCounts[position.status] = 0;
+            }
+            positionCounts[position.status] += 1;
+
+            const userID = position.userID;
+            if (!(userID in countsByUser)) {
+                countsByUser[userID] = 0;
+            }
+            countsByUser[userID] += 1;
+        }
+        return makeJSONResponse<GetPositionCountsFromTrackerResponse>({ positionCounts, countsByUser });
     }
 
     async handleInsertPosition(body: InsertPositionRequest) : Promise<Response> {
@@ -390,7 +412,7 @@ export class TokenPairPositionTrackerDO {
             if (!isAdminOrSuperAdmin(userID,this.env)) {
                 return makeJSONResponse<AdminDeleteAllInTrackerResponse>({});
             }
-            this.tokenPairPositionTracker.clearAllPositions();
+            this.tokenPairPositionTracker.__clearAllPositions();
             return makeJSONResponse<AdminDeleteAllInTrackerResponse>({});
         }
         return makeJSONResponse<AdminDeleteAllInTrackerResponse>({});

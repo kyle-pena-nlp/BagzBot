@@ -1,7 +1,7 @@
 import { isTheSuperAdminUserID } from "../../admins";
 import { DecimalizedAmount } from "../../decimalized";
 import { Env } from "../../env";
-import { Position } from "../../positions";
+import { Position, PositionStatus } from "../../positions";
 import { makeJSONRequest, makeRequest } from "../../util";
 import { EditTriggerPercentOnOpenPositionResponse } from "../user/actions/edit_trigger_percent_on_open_position";
 import { SetSellAutoDoubleOnOpenPositionResponse } from "../user/actions/set_sell_auto_double_on_open_position";
@@ -10,6 +10,7 @@ import { AdminDeleteAllInTrackerRequest, AdminDeleteAllInTrackerResponse } from 
 import { EditTriggerPercentOnOpenPositionInTrackerRequest } from "./actions/edit_trigger_percent_on_open_position_in_tracker";
 import { GetPositionFromPriceTrackerRequest, GetPositionFromPriceTrackerResponse } from "./actions/get_position";
 import { GetPositionAndMaybePNLFromPriceTrackerRequest, GetPositionAndMaybePNLFromPriceTrackerResponse } from "./actions/get_position_and_maybe_pnl";
+import { GetPositionCountsFromTrackerRequest, GetPositionCountsFromTrackerResponse } from "./actions/get_position_counts_from_tracker";
 import { GetTokenPriceRequest, GetTokenPriceResponse } from "./actions/get_token_price";
 import { HasPairAddresses } from "./actions/has_pair_addresses";
 import { InsertPositionRequest, InsertPositionResponse } from "./actions/insert_position";
@@ -48,7 +49,15 @@ export enum TokenPairPositionTrackerDOFetchMethod {
 	setSellSlippagePercentOnOpenPosition = "setSellSlippagePercentOnOpenPosition",
 	listClosedPositionsFromTracker = "listClosedPositionsFromTracker",
 	insertPosition = "insertPosition",
-	updatePosition = "updatePosition"
+	updatePosition = "updatePosition",
+	getPositionCounts = "getPositionCounts"
+}
+
+export async function getPositionCountsFromTracker(tokenAddress : string, vsTokenAddress : string, env : Env) : Promise<Record<PositionStatus,number>> {
+	const request  : GetPositionCountsFromTrackerRequest = { tokenAddress, vsTokenAddress };
+	const method = TokenPairPositionTrackerDOFetchMethod.getPositionCounts;
+	const response = await sendJSONRequestToTokenPairPositionTracker<GetPositionCountsFromTrackerRequest,GetPositionCountsFromTrackerResponse>(method,request,tokenAddress,vsTokenAddress,env);
+	return response.positionCounts;
 }
 
 export async function listClosedPositionsFromTracker(telegramUserID : number, tokenAddress : string, vsTokenAddress : string, env : Env) : Promise<ListClosedPositionsFromTrackerResponse> {

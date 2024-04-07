@@ -5,7 +5,7 @@ import { DecimalizedAmount, fromNumber } from "../decimalized";
 import { claimInviteCode, listUnclaimedBetaInviteCodes } from "../durable_objects/beta_invite_codes/beta_invite_code_interop";
 import { doHeartbeatWakeup } from "../durable_objects/heartbeat/heartbeat_do_interop";
 import { GetTokenInfoResponse, isInvalidTokenInfoResponse, isValidTokenInfoResponse } from "../durable_objects/polled_token_pair_list/actions/get_token_info";
-import { getTokenInfo } from "../durable_objects/polled_token_pair_list/polled_token_pair_list_DO_interop";
+import { adminCountAllPositions, getTokenInfo } from "../durable_objects/polled_token_pair_list/polled_token_pair_list_DO_interop";
 import { _devOnlyFeatureUpdatePrice, adminInvokeAlarm } from "../durable_objects/token_pair_position_tracker/token_pair_position_tracker_do_interop";
 import { OpenPositionRequest } from "../durable_objects/user/actions/open_new_position";
 import { QuantityAndToken } from "../durable_objects/user/model/quantity_and_token";
@@ -22,7 +22,7 @@ import { ReplyQuestionData, replyQuestionHasNextSteps } from "../reply_question/
 import { quoteBuy } from "../rpc/jupiter_quotes";
 import { isGetQuoteFailure } from "../rpc/rpc_types";
 import { POSITION_REQUEST_STORAGE_KEY } from "../storage_keys";
-import { TelegramWebhookInfo, deleteTGMessage, sendMessageToTG, updateTGMessage } from "../telegram";
+import { TGStatusMessage, TelegramWebhookInfo, deleteTGMessage, sendMessageToTG, updateTGMessage } from "../telegram";
 import { TGMessageChannel } from "../telegram/telegram_status_message";
 import { TokenInfo, WEN_ADDRESS, getVsTokenInfo } from "../tokens";
 import { Structural, assertNever, makeFakeFailedRequestResponse, makeSuccessResponse, strictParseBoolean, strictParseFloat, strictParseInt, tryParseBoolean, tryParseFloat, tryParseInt } from "../util";
@@ -599,6 +599,10 @@ export class CallbackHandler {
                 });
             case MenuCode.ComingSoon:
                 return new MenuComingSoon(callbackData.menuArg||'');
+            case MenuCode.AdminCountPositions:
+                const positionCounts = await adminCountAllPositions(this.env);
+                await TGStatusMessage.createAndSend(JSON.stringify(positionCounts), true, params.chatID, this.env);
+                return;
             default:
                 assertNever(callbackData.menuCode);
         }
