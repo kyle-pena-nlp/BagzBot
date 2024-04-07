@@ -19,17 +19,10 @@ export class MenuFAQ extends Menu<{ botName : string, botInstance : string, botT
 <i>${botTagline}</i>
 
 <b>What is ${botName}?</b>
-${botName} is a Telegram Bot with a focus on locking in your gains.
+${botName} is a Telegram Bot with a focus on <b>locking in your gains</b> and <b>limiting your losses</b..
 ${botName} tracks the value of your token, and remembers when it hits an all-time high (a "peak" :mountain:).
 The moment the token falls 5% below the :mountain:, the trade automatically sells.
 You can customize 5% to some other percentage if you like.
-
-<b>OK, so what?</b>
-You buy a sh**coin, it's looking good.  You get tired, you fall asleep.
-The coin hits its peak at 4:30 AM, and then plummets to 10% of value by 5:30 AM.
-You wake up at 9:00 AM, you realize you missed your opportunity.  You question your life choices.
-${botName} fixes that by automatically selling when the token comes off the peak.
-This locks in your gains.
 
 <b>What Tokens Can I Trade?</b>
 You can trade any token that is supported by Jupiter.  

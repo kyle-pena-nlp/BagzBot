@@ -27,6 +27,7 @@ import { MenuTrailingStopLossTriggerPercent } from "./menu_trailing_stop_loss_tr
 import { MenuViewDecryptedWallet } from "./menu_view_decrypted_wallet";
 import { MenuViewOpenPosition } from "./menu_view_open_position";
 import { MenuWallet } from "./menu_wallet";
+import { MenuWhatIsTSL } from "./menu_what_is_TSL";
 import { PositionIDAndChoice } from "./position_id_and_choice";
 import { MenuTODO } from "./todo_menu";
 import { WelcomeScreenPart1 } from "./welcome_screen_part_1";
@@ -38,6 +39,6 @@ export {
     MenuTrailingStopLossPickVsToken,
     MenuTrailingStopLossSlippagePercent,
     MenuTrailingStopLossTriggerPercent, MenuViewDecryptedWallet, MenuViewOpenPosition,
-    MenuWallet, PositionIDAndChoice, PositionIDAndSellSlippagePercent as PositionIDAndSlippagePercent, SubmittedTriggerPctKey, WelcomeScreenPart1, logoHack
+    MenuWallet, MenuWhatIsTSL, PositionIDAndChoice, PositionIDAndSellSlippagePercent as PositionIDAndSlippagePercent, SubmittedTriggerPctKey, WelcomeScreenPart1, logoHack
 };
 

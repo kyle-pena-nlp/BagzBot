@@ -19,6 +19,7 @@ export enum MenuCode {
 	ViewPNLHistory = "ViewPNLHistory",
 	ComingSoon = "CS", // as short as possible to make room for the coming soon message
 	AdminCountPositions = "AdminCountPositions",
+	MenuWhatIsTSL = "MenuWhatIsTSL",
 
 	PosRequestChooseAutoDoubleSlippageOptions = "EPR.AutoDoubleSlip",
 	SubmitPosRequestAutoDoubleSlippageOptions = "SPR.AutoDoubleSlip",

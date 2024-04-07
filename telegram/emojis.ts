@@ -32,6 +32,7 @@ const emojis = {
     ':twisted_arrows:': '🔀',
     ':cancel:': '\u00D7',
     ':back:': '\u2190',
+    ':thinking:': '🤔',
 
 
     ':chart_up:': '📈',

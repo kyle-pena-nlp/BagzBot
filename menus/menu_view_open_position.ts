@@ -80,7 +80,7 @@ export class MenuViewOpenPosition extends Menu<PositionAndMaybePNL|BrandNewPosit
         ];
 
         lines.push("");
-        lines.push("<blockquote><b>Note</b>: All prices are listed in SOL (fiat coming soon)</blockquote>")
+        lines.push("<code><u><b>Note</b>: All prices tracking is in SOL (price tracking in fiat coming soon)</u></code>")
         lines.push("");
 
         lines.push(`<b><u>Status</u></b>:`)

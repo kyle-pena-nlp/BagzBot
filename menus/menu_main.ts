@@ -103,6 +103,7 @@ export class MenuMain extends Menu<UserData & Stuff> implements MenuCapabilities
                 this.insertButtonNextLine(options, ':love_letter: Send Feedback :love_letter:', this.menuCallback(MenuCode.BetaFeedbackQuestion));
             }
             
+            this.insertButtonNextLine(options, ":thinking: What is a TSL Position?", this.menuCallback(MenuCode.MenuWhatIsTSL));
             this.insertButtonNextLine(options, ":help: FAQ", this.menuCallback(MenuCode.FAQ));
         }
         this.insertButtonNextLine(options, ":refresh: Refresh", this.menuCallback(MenuCode.Main));
