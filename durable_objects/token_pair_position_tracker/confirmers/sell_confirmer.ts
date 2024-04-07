@@ -20,6 +20,8 @@ export class SellConfirmer {
     }    
     async confirmSell(position : Position & { sellConfirmed : false }) : Promise<'api-error'|'slippage-failed'|'failed'|'unconfirmed'|ParsedSuccessfulSwapSummary> {
         
+
+
         if (this.isTimedOut()) {
             return 'unconfirmed';
         }
@@ -30,7 +32,7 @@ export class SellConfirmer {
 
         if (position.sellLastValidBlockheight == null) {
             return 'failed';
-        }
+        }      
 
         const blockheight : number | 'api-call-error' | '429' = await this.connection.getBlockHeight('confirmed').catch(r => {
             if (is429(r)) {
@@ -107,6 +109,7 @@ export class SellConfirmer {
             return 'tx-DNE';
         }
         else if ('meta' in parsedTransaction) {
+            // WRONG SELL AMOUNT ON CONFIRM: fix here by swapping these
             const inTokenAddress = position.vsToken.address;
             const outTokenAddress = position.token.address;
             return parseParsedTransactionWithMeta(parsedTransaction, inTokenAddress, outTokenAddress, position.txSellSignature!!, position.userAddress, this.env);

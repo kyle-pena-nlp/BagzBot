@@ -56,8 +56,8 @@ at the last possible moment, and with a decryption key that is unique per-user.
 4. Administrators do not have the ability to view your private key.
 
 <b>What features do you have planned?</b>
-1. <b>Auto-Buy</b>: Automatically creates an auto-sell a token when the price dips.
-2. <b>Wave Rider</b>: Buys back in after an auto-sell when the price starts going back up.  You're riding the waves!
+1. <b>Auto-Buy</b>: Automatically creates an TSL position when the price dips by a chosen percent.
+2. <b>Wave Rider</b>: Buys back into a TSL when the price starts going back up.  You're riding the waves!
 3. <b>DCA Out</b>: Begins a DCA when the Trigger Percent condition is met.
 4. <b>Faster Trading</b>: We plan on upgrading to a dedicated RPC node for faster price streaming and lower latency on auto-sells.
 5. <b>Early Token Access</b>: Realtime access to fresh-minted coins - no waiting for Jupiter.

@@ -13,6 +13,7 @@ export class MenuPNLHistory extends Menu<{ closedPositions : Position[], netPNL 
         lines.push("");
 
         const closedPositions = this.menuData.closedPositions;
+        closedPositions.sort((a,b) => (a.txBuyAttemptTimeMS||0 - b.txBuyAttemptTimeMS||0))
         for (const pos of closedPositions) {
             this.addClosedPositionSummary(lines, pos);
         }

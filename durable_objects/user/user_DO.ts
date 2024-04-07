@@ -728,7 +728,7 @@ export class UserDO {
                 continue;
             }
             let sellPositionPromises = positionBatch.map(async position => {
-                const channel = TGStatusMessage.createAndSend(`Initiating.`, false, this.chatID.value||0, this.env, 'HTML', `:notify: <b>Auto-Sell of ${asTokenPrice(position.tokenAmt)} $${position.token.symbol}</b>: `);
+                const channel = TGStatusMessage.createAndSend(`Initiating.`, false, this.chatID.value||0, this.env, 'HTML', `:notify: <b>T.S.L of ${asTokenPrice(position.tokenAmt)} $${position.token.symbol}</b>: `);
                 channels.push(channel);
                 const positionSeller = new PositionSeller(connection, this.wallet.value!!, 'auto-sell', startTimeMS, channel, this.env);
                 // deliberate lack of await here, but still writes to storage afterwards

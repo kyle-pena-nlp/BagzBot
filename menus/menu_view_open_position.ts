@@ -37,7 +37,7 @@ export class MenuViewOpenPosition extends Menu<PositionAndMaybePNL|BrandNewPosit
             
             this.insertButtonNextLine(options, `:chart_down: ${this.menuData.position.triggerPercent}% Trigger`, new CallbackData(MenuCode.EditOpenPositionTriggerPercent, this.menuData.position.positionID));
             this.insertButtonNextLine(options, `:twisted_arrows: ${this.menuData.position.sellSlippagePercent}% Slippage`, new CallbackData(MenuCode.EditOpenPositionSellSlippagePercent, this.menuData.position.positionID));
-            this.insertButtonNextLine(options, `:brain: ${this.menuData.position.sellAutoDoubleSlippage ? '': 'Do Not'} Auto-Double Slippage If Sell Fails :brain:`, new CallbackData(MenuCode.EditOpenPositionAutoDoubleSlippage, this.menuData.position.positionID));
+            this.insertButtonNextLine(options, `:brain: ${this.menuData.position.sellAutoDoubleSlippage ? '': 'Do Not'} Auto-Double Slippage If TSL Fails :brain:`, new CallbackData(MenuCode.EditOpenPositionAutoDoubleSlippage, this.menuData.position.positionID));
         }
 
         const refreshPositionCallbackData = new CallbackData(MenuCode.ViewOpenPosition, this.menuData.position.positionID);
@@ -75,13 +75,9 @@ export class MenuViewOpenPosition extends Menu<PositionAndMaybePNL|BrandNewPosit
         const statusEmoji = this.statusEmoji();
         const refreshNonce = Math.floor(Date.now() / 60000);
         const lines = [
-            `${statusEmoji} <b>${asTokenPrice(this.position().tokenAmt)} of $${this.position().token.symbol}</b>`,
+            `${statusEmoji} <u><b>Your TSL Position</b></u> (<b>${asTokenPrice(this.position().tokenAmt)} of $${this.position().token.symbol}</b>)`,
             ` (<code>${this.position().token.address}</code>)`
         ];
-
-        if (this.isPositionWithPNL() && !this.isClosingOrClosed() && this.buyIsConfirmed() && !this.triggerConditionMet()) {
-            lines.push(`(${asPercentDeltaString(this.pnlDeltaPct())})`);
-        }
 
         lines.push("");
         lines.push("<blockquote><b>Note</b>: All prices are listed in SOL (fiat coming soon)</blockquote>")
@@ -111,6 +107,8 @@ export class MenuViewOpenPosition extends Menu<PositionAndMaybePNL|BrandNewPosit
             lines.push(`:bullet: We will be confirming the sale of this position in a moment.`);
         }
 
+        lines.push("");
+
         // brand new position - refresh again, dear user!
         if ('brandNewPosition' in this.menuData) {
             lines.push("This position is brand new! Refresh in a few moments to get more detailed information.");
@@ -127,10 +125,13 @@ export class MenuViewOpenPosition extends Menu<PositionAndMaybePNL|BrandNewPosit
         
         if (this.isPositionWithPNL() && !this.isClosingOrClosed() && !this.triggerConditionMet()) {
             const peakPriceComparison = this.lessThanPeakPrice() ? `${asPercentString(this.percentBelowPeak())} &lt;` : '=';
-            lines.push(`:bullet: <b>Current Price</b>: ${asTokenPrice(this.currentPrice())} SOL (${peakPriceComparison} Peak Price)`);
-            lines.push(`:bullet: <b>Peak Price</b>: ${asTokenPrice(this.menuData.peakPrice)} SOL`)
-            lines.push(`:bullet: <b>Trigger Percent</b>: ${this.menuData.position.triggerPercent.toFixed(1)}%`)
-            lines.push(`:bullet: <b>PNL</b>: ${asTokenPriceDelta(this.calcPNL())} SOL (${asPercentDeltaString(this.pnlDeltaPct())})`);
+            
+            lines.push("<u><b>Price Movement</b></u>:");
+            lines.push(`:bullet: <code><b>Fill Price</b>:      </code>${asTokenPrice(this.fillPrice())} SOL`);
+            lines.push(`:bullet: <code><b>Current Price</b>:   </code>${asTokenPrice(this.currentPrice())} SOL (${asPercentDeltaString(this.pnlDeltaPct())}) (${peakPriceComparison} Peak Price)`);
+            lines.push(`:bullet: <code><b>Peak Price</b>:      </code>${asTokenPrice(this.menuData.peakPrice)} SOL`)
+            lines.push(`:bullet: <code><b>Trigger Percent</b>: </code>${this.menuData.position.triggerPercent.toFixed(1)}%`)
+            lines.push(`:bullet: <code><b>PNL</b>:             </code>${asTokenPriceDelta(this.calcPNL())} SOL`);
         }
 
         if (this.buyIsConfirmed() && this.isCloseToBeingTriggered() && !this.isClosingOrClosed() && !this.triggerConditionMet() && this.buyIsConfirmed()) {
@@ -169,6 +170,10 @@ export class MenuViewOpenPosition extends Menu<PositionAndMaybePNL|BrandNewPosit
         return [
             `Support Code: <i>${this.menuData.position.positionID}</i>`
         ];
+    }
+
+    private fillPrice() : DecimalizedAmount {
+        return this.menuData.position.fillPrice;
     }
 
     private buyIsConfirmed() : boolean {

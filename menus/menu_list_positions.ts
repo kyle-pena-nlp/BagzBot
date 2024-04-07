@@ -1,5 +1,5 @@
 import { dAdd, dCompare, dDiv, dMult, fromNumber, toFriendlyString } from "../decimalized";
-import { DecimalizedAmount, MATH_DECIMAL_PLACES, asPercentDeltaString, asTokenPrice, dZero, toNumber } from "../decimalized/decimalized_amount";
+import { DecimalizedAmount, MATH_DECIMAL_PLACES, asPercentDeltaString, asPercentString, asTokenPrice, dZero, toNumber } from "../decimalized/decimalized_amount";
 import { PNL, PositionAndMaybePNL } from "../durable_objects/token_pair_position_tracker/model/position_and_PNL";
 import { Position, PositionStatus } from "../positions";
 import { CallbackButton } from "../telegram";
@@ -9,7 +9,7 @@ import { MenuCode } from "./menu_code";
 
 export class MenuListPositions extends Menu<PositionAndMaybePNL[]> implements MenuCapabilities {
     renderText(): string {
-        const lines = [ `<b>Your Open Positions</b>` ];
+        const lines = [ `<b>Your TSL Positions</b>` ];
         const maybeTotalPNL = this.maybeCalcTotalPNL();
         if (maybeTotalPNL != null) {
             let pnlLine = `<b>Total Unrealized PNL</b> ${toFriendlyString(maybeTotalPNL, 4, { useSubscripts: false, addCommas: true, includePlusSign: true })} SOL`;
@@ -127,7 +127,7 @@ export class MenuListPositions extends Menu<PositionAndMaybePNL[]> implements Me
                 return ' :mountain: At Peak Price!';
             }
             else {
-                return ` ${asPercentDeltaString(pctBelowPeak)} Below Peak`
+                return ` ${asPercentString(pctBelowPeak)} Below Peak`
             }
         }
         else {

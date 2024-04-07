@@ -67,13 +67,13 @@ export class MenuMain extends Menu<UserData & Stuff> implements MenuCapabilities
         const options = this.emptyMenu();
         const hasWallet = this.menuData.hasWallet;
         if (hasWallet) {
-            this.insertButtonNextLine(options, ':sparkle: Auto-Sell :sparkle:', this.menuCallback(MenuCode.NewPosition));
+            this.insertButtonNextLine(options, ':sparkle: New TSL Position :sparkle:', this.menuCallback(MenuCode.NewPosition));
             /*if (this.menuData.isBeta) {
                 this.insertButtonSameLine(options, ':chart_down: Auto-Buy :chart_down:', new CallbackData(MenuCode.ComingSoon, "Automatically buy the dip!"));
-                this.insertButtonSameLine(options, ':wave: Wave Rider :wave:', new CallbackData(MenuCode.ComingSoon, "Combines Auto-Buy and Auto-Sell!"));
+                this.insertButtonSameLine(options, ':wave: Wave Rider :wave:', new CallbackData(MenuCode.ComingSoon, "Combines Auto-Buy and TSL.!"));
             }*/
             this.insertButtonNextLine(options, ':briefcase: Wallet', this.menuCallback(MenuCode.Wallet));
-            this.insertButtonSameLine(options, ':chart_up: Positions', this.menuCallback(MenuCode.ListPositions));
+            this.insertButtonSameLine(options, ':chart_up: TSL Positions', this.menuCallback(MenuCode.ListPositions));
             this.insertButtonNextLine(options, ':ledger: PNL History', this.menuCallback(MenuCode.ViewPNLHistory));
             if (this.menuData.hasInviteBetaCodes) {
                 this.insertButtonNextLine(options, ":envelope: Invite Friends To Beta", this.menuCallback(MenuCode.BetaGateInviteFriends));

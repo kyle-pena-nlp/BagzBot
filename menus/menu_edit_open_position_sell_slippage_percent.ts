@@ -30,7 +30,7 @@ export class PositionIDAndSellSlippagePercent {
 
 export class MenuEditOpenPositionSellSlippagePercent extends Menu<{ positionID: string }> implements MenuCapabilities {
     renderText(): string {
-        return `Set the slippage percent used when auto-selling the position.`
+        return `Set the slippage percent used when automatically selling the position.`
     }
     renderOptions(): CallbackButton[][] {
         const positionID = this.menuData.positionID;

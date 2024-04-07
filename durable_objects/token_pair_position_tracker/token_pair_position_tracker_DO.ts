@@ -556,7 +556,7 @@ export class TokenPairPositionTrackerDO {
                 if (buyConfirmer.isTimedOut()) {
                     continue;
                 }
-                // hack to prevent confirm attempts from firing off during sale. TODO: less hacky way to do this.
+                // hack to prevent confirm attempts from firing off during buy. TODO: less hacky way to do this.
                 const tooLittleTimeHasPassedSinceBuyAttempt = pos.txBuyAttemptTimeMS != null && pos.txBuyAttemptTimeMS > (Date.now() - strictParseInt(this.env.TX_TIMEOUT_MS));
                 if (tooLittleTimeHasPassedSinceBuyAttempt) {
                     continue;
@@ -619,7 +619,7 @@ export class TokenPairPositionTrackerDO {
                         this.tokenPairPositionTracker.updateSlippage(pos.positionID,sellSlippagePercent);
                     }
                     else {
-                        TGStatusMessage.queue(channel, "The sale failed due to slippage. We will re-sell if the auto-sell trigger condition continues to hold.", true);
+                        TGStatusMessage.queue(channel, `The sale failed due to slippage. We will re-sell if the price continues to stay ${pos.triggerPercent.toFixed(1)}% below the peak.`, true);
                     }
                     this.tokenPairPositionTracker.markPositionAsOpen(pos.positionID);
                 }

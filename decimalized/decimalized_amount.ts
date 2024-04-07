@@ -55,7 +55,7 @@ export function asPercentDeltaString(x : DecimalizedAmount) : string {
 }
 
 export function asPercentString(x : DecimalizedAmount) : string {
-    return toFriendlyString(x, 4, { useSubscripts: false, maxDecimalPlaces: 4, includePlusSign: false }) + "%";
+    return toFriendlyString(x, 4, { useSubscripts: false, maxDecimalPlaces: 2, includePlusSign: false }) + "%";
 }
 
 export function asTokenPrice(x : DecimalizedAmount) : string {
