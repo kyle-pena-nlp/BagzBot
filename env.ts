@@ -1,4 +1,4 @@
-import { strictParseBoolean } from "./util"
+import { strictParseBoolean, tryParseInt } from "./util"
 
 export interface Env {
 	
@@ -76,6 +76,10 @@ export interface Env {
 	BetaInviteCodesDO : any
 	HeartbeatDO: any
 };
+
+export function isUserBetaCodeExempt(telegramUserID : number, env : Env) {
+	return env.BETA_CODE_GATE_EXCEPTIONS.split(",").map(x => tryParseInt(x)).includes(telegramUserID);
+}
 
 export function getRPCUrl(env : Env) {
 	if (strictParseBoolean(env.USE_QUICKNODE)) {

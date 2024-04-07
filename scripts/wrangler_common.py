@@ -24,6 +24,18 @@ def wrangler_whoami():
     subprocess.run(WHOAMI_COMMAND,
                    check = True,
                    shell = True)
+    
+def print_wrangler_environment_variables(env : str):
+    parsed_toml = _parse_toml_file("./wrangler.toml")
+    environment_variables = parsed_toml["env"][env]["vars"]
+    max_key_length = max(map(len,environment_variables))
+    print("")
+    print(f"===ENVIRONMENT VARIABLES for '{env}'===")
+    print("")
+    for key in sorted(environment_variables):
+        value = environment_variables[key]
+        print(f"{(key):{max_key_length+1}}: {value}")
+    
 
 def is_empty_or_none(string : Union[str,None]):
     return string is None or string.strip() == ''

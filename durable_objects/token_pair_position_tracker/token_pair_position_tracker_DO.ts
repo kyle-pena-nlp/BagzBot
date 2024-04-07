@@ -538,13 +538,11 @@ export class TokenPairPositionTrackerDO {
                 const channel = TGStatusMessage.createAndSend('In progress...', false, pos.chatID, this.env, 'HTML', buyConfirmPrefix);
                 const confirmedBuy = await buyConfirmer.confirmBuy(pos);
                 if (confirmedBuy === 'api-error') {
-                    TGStatusMessage.queue(channel, "We had a hard time confirming the purchase - sorry, we will retry confirmation again soon.", false);
-                    TGStatusMessage.queueRemoval(channel);
+                    TGStatusMessage.queue(channel, "We had a hard time confirming the purchase - sorry, we will retry confirmation again soon.", true);
                     break;
                 }
                 else if (confirmedBuy === 'unconfirmed') {
-                    TGStatusMessage.queue(channel, "We had a hard time confirming the purchase - sorry, we will retry confirmation again soon.", false);
-                    TGStatusMessage.queueRemoval(channel);
+                    TGStatusMessage.queue(channel, "We had a hard time confirming the purchase - sorry, we will retry confirmation again soon.", true);
                     continue;
                 }
                 else if (confirmedBuy === 'failed') {
@@ -574,13 +572,11 @@ export class TokenPairPositionTrackerDO {
                 const sellConfirmPrefix = `:notify: <b>Attempting to confirm the earlier sale of ${asTokenPrice(pos.tokenAmt)} $${pos.token.symbol}</b>: `;
                 const channel = TGStatusMessage.createAndSend('In progress...', false, pos.chatID, this.env, 'HTML', sellConfirmPrefix);
                 if (confirmedSellStatus === 'api-error') {
-                    TGStatusMessage.queue(channel, "Confirmation not successful - we will retry soon.", false);
-                    TGStatusMessage.queueRemoval(channel);
+                    TGStatusMessage.queue(channel, "Confirmation not successful - we will retry soon.", true);
                     break;
                 }
                 else if (confirmedSellStatus === 'unconfirmed') {
-                    TGStatusMessage.queue(channel, "Confirmation not successful - we will retry soon.", false);
-                    TGStatusMessage.queueRemoval(channel);
+                    TGStatusMessage.queue(channel, "Confirmation not successful - we will retry soon.", true);
                     continue;
                 }
                 else if (confirmedSellStatus === 'failed') {

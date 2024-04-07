@@ -1,6 +1,6 @@
-from argparse import Namespace
-import subprocess, json, shlex, os, signal, shutil
-import requests, requests_toolbelt
+from argparse import ArgumentParser
+import subprocess, json, shlex, os, shutil
+import requests
 from wrangler_common import *
 from commands import COMMANDS
 from dev.local_dev_common import *
@@ -19,8 +19,10 @@ def start_CRON_poller():
 
 def parse_args():
     # NEVER CHANGE THIS because this script takes down the bot and migratres it to the local server
-    env = "DEV" # DO NOT CHANGE!
-    return Namespace(env = env)
+    parser = ArgumentParser()
+    parser.add_argument("--skip_bot_setup", action="store_true")
+    args = parser.parse_args()
+    return args
 
 def do_it(args):
 
@@ -41,7 +43,9 @@ def do_it(args):
         print("Setting up bot locally")
         bot_token = get_secret("SECRET__TELEGRAM_BOT_TOKEN", "dev")
         bot_secret_token = get_secret("SECRET__TELEGRAM_BOT_WEBHOOK_SECRET_TOKEN", "dev")
-        migrate_and_configure_bot_for_local_server(bot_token, bot_secret_token)
+
+        if not args.skip_bot_setup:
+            migrate_and_configure_bot_for_local_server(bot_token, bot_secret_token)
 
         child_procs.append(start_CRON_poller())
 

@@ -196,7 +196,7 @@ export class PositionBuyer {
             case 'slippage-failed':
                 return 'Purchase failed due to slippage tolerance exceeded.';
             case 'unconfirmed':
-                return 'Purchase could not be confirmed due to platform usage.  We will reattempt to confirm the purchase within a few minutes.';
+                return 'Purchase could not be confirmed due to network congestion.  We will reattempt to confirm the purchase within a few minutes.';
             default:
                 assertNever(status);
         }

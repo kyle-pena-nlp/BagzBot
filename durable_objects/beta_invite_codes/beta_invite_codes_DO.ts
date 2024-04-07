@@ -1,5 +1,5 @@
 import { DurableObjectState, DurableObjectStorage } from "@cloudflare/workers-types";
-import { Env } from "../../env";
+import { Env, isUserBetaCodeExempt } from "../../env";
 import { assertNever, makeJSONResponse, maybeGetJson, strictParseInt } from "../../util";
 import { ResponseOf } from "../../util/builder_types";
 import { BetaInviteCodesMethod, ClaimInviteCodeRequest, ClaimInviteCodeResponse, HasUserClaimedBetaInviteCodeRequest, HasUserClaimedBetaInviteCodeResponse, ListUnclaimedBetaCodesRequest as ListUnsentBetaCodesRequest, ListUnclaimedBetaCodesResponse as ListUnsentBetaCodesResponse, MarkBetaInviteCodeAsSentRequest, MarkBetaInviteCodeAsSentResponse, parseBetaInviteCodeMethod } from "./beta_invite_code_interop";
@@ -84,11 +84,11 @@ export class BetaInviteCodesDO {
         // if there are less codes than allowed, generate new ones
         if (inviteCodes.length < strictParseInt(this.env.INVITE_CODES_PER_USER)) {
             const myInviteCode = this.betaInviteCodesTracker.getByClaimer(me);
-            if (myInviteCode == null) {
+            if (myInviteCode == null && !isUserBetaCodeExempt(me, this.env)) {
                 // don't generate codes for users that haven't claimed a code
                 return { success: true, data : { betaInviteCodes: [] } };
             }
-            const depth = myInviteCode.depth + 1;
+            const depth = (myInviteCode == null) ? 1 :myInviteCode.depth + 1;
             if (depth > strictParseInt(this.env.MAX_BETA_INVITE_CODE_CHAIN_DEPTH)) {
                 return { success: true, data : { betaInviteCodes: [] } };
             }

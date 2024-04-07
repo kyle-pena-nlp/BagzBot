@@ -2,7 +2,6 @@ import { dAdd, toFriendlyString } from "../decimalized";
 import { asPercentDeltaString, asTokenPrice } from "../decimalized/decimalized_amount";
 import { UserData } from "../durable_objects/user/model/user_data";
 import { CallbackButton } from "../telegram";
-import { CallbackData } from "./callback_data";
 import { logoHack } from "./logo_hack";
 import { Menu, MenuCapabilities } from "./menu";
 import { MenuCode } from "./menu_code";
@@ -69,10 +68,10 @@ export class MenuMain extends Menu<UserData & Stuff> implements MenuCapabilities
         const hasWallet = this.menuData.hasWallet;
         if (hasWallet) {
             this.insertButtonNextLine(options, ':sparkle: Auto-Sell :sparkle:', this.menuCallback(MenuCode.NewPosition));
-            if (this.menuData.isBeta) {
+            /*if (this.menuData.isBeta) {
                 this.insertButtonSameLine(options, ':chart_down: Auto-Buy :chart_down:', new CallbackData(MenuCode.ComingSoon, "Automatically buy the dip!"));
                 this.insertButtonSameLine(options, ':wave: Wave Rider :wave:', new CallbackData(MenuCode.ComingSoon, "Combines Auto-Buy and Auto-Sell!"));
-            }
+            }*/
             this.insertButtonNextLine(options, ':briefcase: Wallet', this.menuCallback(MenuCode.Wallet));
             this.insertButtonSameLine(options, ':chart_up: Positions', this.menuCallback(MenuCode.ListPositions));
             this.insertButtonNextLine(options, ':ledger: PNL History', this.menuCallback(MenuCode.ViewPNLHistory));

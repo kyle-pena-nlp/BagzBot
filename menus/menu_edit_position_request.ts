@@ -11,7 +11,7 @@ export class MenuEditPositionRequest extends Menu< { positionRequest: PositionRe
         const positionRequest = this.menuData.positionRequest;
         
         const lines : string[] = [
-            `<b>:sparkle: Create Position</b>`,
+            `<b>:sparkle: Create Auto-Sell Position</b>`,
             ``
         ];
 
