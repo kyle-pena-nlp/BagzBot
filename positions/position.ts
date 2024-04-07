@@ -51,6 +51,7 @@ export interface Position {
 	// When in Open, buyConfirmed can be true or false
 	status : PositionStatus
 
+	txBuyAttemptTimeMS : number
 	txBuySignature : string
 	buyLastValidBlockheight : number
 	buyConfirmed : boolean

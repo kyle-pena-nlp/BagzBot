@@ -108,6 +108,7 @@ export class PositionBuyer {
             userAddress: toUserAddress(this.wallet),
     
             buyConfirmed: false, // <----------
+            txBuyAttemptTimeMS: Date.now(),
             txBuySignature: signature,
             buyLastValidBlockheight: lastValidBH,
             
@@ -177,7 +178,11 @@ export class PositionBuyer {
         lastValidBH: number,
         successfulSwapParsed : ParsedSuccessfulSwapSummary) : Promise<Position & { buyConfirmed : true }> {
         
-        const newPosition = convertToConfirmedPosition(positionRequest, signature, lastValidBH, toUserAddress(this.wallet), successfulSwapParsed);
+        const newPosition = convertToConfirmedPosition(positionRequest, 
+            signature, 
+            lastValidBH, 
+            toUserAddress(this.wallet), 
+            successfulSwapParsed);
 
         // has or has not been set depending on above logic.
         return newPosition;
@@ -222,7 +227,11 @@ export class PositionBuyer {
     }    
 }
 
-function convertToConfirmedPosition(positionRequest: PositionRequest, signature : string, lastValidBH : number, userAddress : UserAddress, parsedSuccessfulSwap : ParsedSuccessfulSwapSummary) : Position & { buyConfirmed : true } {
+function convertToConfirmedPosition(positionRequest: PositionRequest, 
+    signature : string, 
+    lastValidBH : number, 
+    userAddress : UserAddress, 
+    parsedSuccessfulSwap : ParsedSuccessfulSwapSummary) : Position & { buyConfirmed : true } {
     const position : Position & { buyConfirmed : true } = {
         userID: positionRequest.userID,
         chatID : positionRequest.chatID,
@@ -233,6 +242,7 @@ function convertToConfirmedPosition(positionRequest: PositionRequest, signature 
         status: PositionStatus.Open,
 
         buyConfirmed: true, // <-------------
+        txBuyAttemptTimeMS: Date.now(), // TODO: This is wrong but will revisit.
         txBuySignature: signature,  
         buyLastValidBlockheight: lastValidBH,        
 

@@ -92,6 +92,7 @@ export class BuyConfirmer {
             status: PositionStatus.Open,
     
             buyConfirmed: true, // <-------------
+            txBuyAttemptTimeMS: unconfirmedPosition.txBuyAttemptTimeMS||0, // || for backwards compat
             txBuySignature: unconfirmedPosition.txBuySignature,  
             buyLastValidBlockheight: unconfirmedPosition.buyLastValidBlockheight,        
     

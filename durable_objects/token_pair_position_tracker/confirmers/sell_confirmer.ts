@@ -109,7 +109,7 @@ export class SellConfirmer {
         else if ('meta' in parsedTransaction) {
             const inTokenAddress = position.vsToken.address;
             const outTokenAddress = position.token.address;
-            return parseParsedTransactionWithMeta(parsedTransaction, inTokenAddress, outTokenAddress, position.txBuySignature, position.userAddress, this.env);
+            return parseParsedTransactionWithMeta(parsedTransaction, inTokenAddress, outTokenAddress, position.txSellSignature!!, position.userAddress, this.env);
         }
         else {
             assertNever(parsedTransaction);
