@@ -104,7 +104,7 @@ export class MenuViewOpenPosition extends Menu<PositionAndMaybePNL|BrandNewPosit
         }
 
         if (this.isClosing() && this.sellIsUnconfirmed()) {
-            lines.push(`:bullet: We will be confirming the sale of this position in a moment.`);
+            lines.push(`:bullet: We will be confirming the sale of this position within a few minutes.`);
         }
 
         lines.push("");

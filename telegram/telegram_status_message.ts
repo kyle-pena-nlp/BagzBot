@@ -1,3 +1,4 @@
+import { TGStatusMessage } from ".";
 import { Env } from "../env";
 import { logError } from "../logging";
 import { MenuCode } from "../menus";
@@ -89,6 +90,10 @@ export class TGMessageChannel {
         await statusMessage.promiseChain.catch(r => {
             logError(r);
         });
+    }
+    static async finalMessage(statusMessage : UpdateableMessage, finalMessage : string, dismissable : boolean|MenuCode, menuArg : string|null = null) {
+        TGStatusMessage.queue(statusMessage, finalMessage, dismissable, menuArg);
+        await TGStatusMessage.finalize(statusMessage);
     }
     static async queueWait(statusMessage : UpdateableMessage, waitMS : number) {
         statusMessage.promiseChain = statusMessage.promiseChain.then(pause(waitMS));

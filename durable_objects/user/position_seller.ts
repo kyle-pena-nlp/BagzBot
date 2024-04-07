@@ -40,7 +40,7 @@ export class PositionSeller {
         }
         catch {
             const menuCode = this.type === 'manual-sell' ? MenuCode.ViewOpenPosition : MenuCode.Close;
-            TGStatusMessage.queue(this.channel, "There was an unexpected error", menuCode, position.positionID);
+            TGStatusMessage.queue(this.channel, "There was an unexpected error.", menuCode, position.positionID);
         }
     }
 
@@ -98,7 +98,7 @@ export class PositionSeller {
             return 'unconfirmed';
         }
         else if (isSuccessfullyParsedSwapSummary(result)) {
-            const netPNL = dSub(position.vsTokenAmt, result.swapSummary.outTokenAmt)
+            const netPNL = dSub(result.swapSummary.outTokenAmt, position.vsTokenAmt);
             await this.markAsClosed(position, netPNL);
             return 'confirmed';
         }
@@ -174,7 +174,7 @@ export class PositionSeller {
                     return 'The sale failed due to slippage.'
                 }
             case 'unconfirmed':
-                return 'The sale could not be confirmed.';
+                return 'The sale could not be confirmed due to network congestion. We will reattempt confirmation within a few minutes.';
             default:
                 assertNever(status);
         }
@@ -188,7 +188,7 @@ export class PositionSeller {
             case 'already-sold':
                 return MenuCode.ListPositions;
             case 'confirmed':
-                return MenuCode.ListPositions;
+                return MenuCode.ViewPNLHistory;
             case 'failed':
                 return MenuCode.ViewOpenPosition;
             case 'slippage-failed':

@@ -1,9 +1,10 @@
 import { Connection } from "@solana/web3.js";
 import { isAdminOrSuperAdmin } from "../../admins";
 import { DecimalizedAmount, dSub } from "../../decimalized";
-import { asTokenPrice, toNumber } from "../../decimalized/decimalized_amount";
+import { asTokenPrice, asTokenPriceDelta, toNumber } from "../../decimalized/decimalized_amount";
 import { Env, getRPCUrl } from "../../env";
 import { logDebug, logError, logInfo } from "../../logging";
+import { MenuCode } from "../../menus";
 import { Position, PositionStatus } from "../../positions";
 import { isSuccessfullyParsedSwapSummary } from "../../rpc/rpc_types";
 import { TGStatusMessage } from "../../telegram";
@@ -595,38 +596,38 @@ export class TokenPairPositionTrackerDO {
                 if (tooLittleTimeHasPassedSinceSellAttempt) {
                     continue;
                 }
-                const confirmedSellStatus = await sellConfirmer.confirmSell(pos);
                 const sellConfirmPrefix = `:notify: <b>Attempting to confirm the earlier sale of ${asTokenPrice(pos.tokenAmt)} $${pos.token.symbol}</b>: `;
                 const channel = TGStatusMessage.createAndSend('In progress...', false, pos.chatID, this.env, 'HTML', sellConfirmPrefix);
+                const confirmedSellStatus = await sellConfirmer.confirmSell(pos);
                 if (confirmedSellStatus === 'api-error') {
-                    TGStatusMessage.queue(channel, "Confirmation not successful - we will retry soon.", true);
+                    await TGStatusMessage.finalMessage(channel, "Confirmation not complete - we will continue soon.", true);
                     break;
                 }
                 else if (confirmedSellStatus === 'unconfirmed') {
-                    TGStatusMessage.queue(channel, "Confirmation not successful - we will retry soon.", true);
+                    await TGStatusMessage.finalMessage(channel, "Confirmation not complete - we will continue soon.", true);
                     continue;
                 }
                 else if (confirmedSellStatus === 'failed') {
-                    TGStatusMessage.queue(channel, "We found that the sale didn't go through.", true);                
+                    await TGStatusMessage.finalMessage(channel, "We found that the sale didn't go through.", true);                
                     this.tokenPairPositionTracker.markPositionAsOpen(pos.positionID);
                 }
                 else if (confirmedSellStatus === 'slippage-failed') {
                     if (pos.sellAutoDoubleSlippage) {
                         const maxSlippage = 100; // TODO: make a user global setting
                         const sellSlippagePercent = Math.min(maxSlippage, 2 * pos.sellSlippagePercent);
-                        TGStatusMessage.queue(channel, "The sale failed due to slippage.  We have increased the slippage to ${sellSlippagePercent}% and will retry the sale if the trigger conditions holds.", true);
-                        // TODO: only update slippage.
+                        await TGStatusMessage.finalMessage(channel, "The sale failed due to slippage.  We have increased the slippage to ${sellSlippagePercent}% and will retry the sale if the trigger conditions holds.", true);
                         this.tokenPairPositionTracker.updateSlippage(pos.positionID,sellSlippagePercent);
                     }
                     else {
-                        TGStatusMessage.queue(channel, `The sale failed due to slippage. We will re-sell if the price continues to stay ${pos.triggerPercent.toFixed(1)}% below the peak.`, true);
+                        await TGStatusMessage.finalMessage(channel, `The sale failed due to slippage. We will re-sell if the price continues to stay ${pos.triggerPercent.toFixed(1)}% below the peak.`, true);
                     }
                     this.tokenPairPositionTracker.markPositionAsOpen(pos.positionID);
                 }
                 else if (isSuccessfullyParsedSwapSummary(confirmedSellStatus)) {
-                    // TODO: update with PNL
-                    const netPNL = dSub(pos.vsTokenAmt, confirmedSellStatus.swapSummary.outTokenAmt);
+                    // TODO: update with PNL               
+                    const netPNL = dSub(confirmedSellStatus.swapSummary.outTokenAmt, pos.vsTokenAmt);
                     this.tokenPairPositionTracker.closePosition(pos.positionID, netPNL);
+                    await TGStatusMessage.finalMessage(channel, `The sale was confirmed! You made ${asTokenPriceDelta(netPNL)} SOL.`, MenuCode.ViewPNLHistory); 
                 }
                 else {
                     assertNever(confirmedSellStatus);

@@ -19,8 +19,6 @@ export class SellConfirmer {
         return (Date.now() > this.startTimeMS + strictParseInt(this.env.CONFIRM_TIMEOUT_MS));
     }    
     async confirmSell(position : Position & { sellConfirmed : false }) : Promise<'api-error'|'slippage-failed'|'failed'|'unconfirmed'|ParsedSuccessfulSwapSummary> {
-        
-
 
         if (this.isTimedOut()) {
             return 'unconfirmed';
@@ -109,9 +107,8 @@ export class SellConfirmer {
             return 'tx-DNE';
         }
         else if ('meta' in parsedTransaction) {
-            // WRONG SELL AMOUNT ON CONFIRM: fix here by swapping these
-            const inTokenAddress = position.vsToken.address;
-            const outTokenAddress = position.token.address;
+            const inTokenAddress = position.token.address;
+            const outTokenAddress = position.vsToken.address;
             return parseParsedTransactionWithMeta(parsedTransaction, inTokenAddress, outTokenAddress, position.txSellSignature!!, position.userAddress, this.env);
         }
         else {
