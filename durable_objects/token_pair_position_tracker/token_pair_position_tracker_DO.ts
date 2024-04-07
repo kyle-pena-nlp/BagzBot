@@ -556,6 +556,11 @@ export class TokenPairPositionTrackerDO {
                 if (buyConfirmer.isTimedOut()) {
                     continue;
                 }
+                // hack to prevent confirm attempts from firing off during sale. TODO: less hacky way to do this.
+                const tooLittleTimeHasPassedSinceBuyAttempt = pos.txBuyAttemptTimeMS != null && pos.txBuyAttemptTimeMS > (Date.now() - strictParseInt(this.env.TX_TIMEOUT_MS));
+                if (tooLittleTimeHasPassedSinceBuyAttempt) {
+                    continue;
+                }                
                 const buyConfirmPrefix = `:notify: <b>Attempting to confirm your earlier purchase of ${asTokenPrice(pos.tokenAmt)} ${pos.token.symbol}</b>: `;
                 const channel = TGStatusMessage.createAndSend('In progress...', false, pos.chatID, this.env, 'HTML', buyConfirmPrefix);
                 const confirmedBuy = await buyConfirmer.confirmBuy(pos);
