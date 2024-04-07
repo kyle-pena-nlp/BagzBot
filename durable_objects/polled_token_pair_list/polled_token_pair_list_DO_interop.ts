@@ -1,19 +1,13 @@
 import { Env } from "../../env";
 import { makeJSONRequest, makeRequest } from "../../util";
-import { AdminCountPositionsRequest, AdminCountPositionsResponse } from "./actions/admin_count_positions";
 import { GetTokenInfoRequest, GetTokenInfoResponse } from "./actions/get_token_info";
 
 export enum PolledTokenPairListDOFetchMethod {
 	initialize = "initialize",
-    getTokenInfo = "getTokenInfo",
-	adminCountPositions = "adminCountPositions"
+    getTokenInfo = "getTokenInfo"
 }
 
-export async function adminCountAllPositions(env : Env) : Promise<AdminCountPositionsResponse> {
-	const request : AdminCountPositionsRequest = {};
-	const method = PolledTokenPairListDOFetchMethod.adminCountPositions;
-	return await sendJSONRequestToDO<AdminCountPositionsRequest,AdminCountPositionsResponse>(method,request,env);
-}
+
 
 export function parsePolledTokenPairListDOFetchMethod(value : string) : PolledTokenPairListDOFetchMethod|null {
 	return Object.values(PolledTokenPairListDOFetchMethod).find(x => x === value)||null;

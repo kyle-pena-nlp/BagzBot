@@ -1,11 +1,21 @@
 import { Env } from "../../env";
 import { makeJSONRequest } from "../../util";
+import { AdminCountPositionsRequest, AdminCountPositionsResponse } from "./actions/admin_count_positions";
 import { HeartbeatWakeupRequest, HeartbeatWakeupResponse } from "./actions/hearbeat_wake_up";
 import { RegisterTokenPairRequest, RegisterTokenPairResponse } from "./actions/register_token_pair";
 
 export enum HeartbeatDOFetchMethod {
     Wakeup = "Wakeup",
-    RegisterTokenPair = "RegisterTokenPair" 
+    RegisterTokenPair = "RegisterTokenPair",
+    adminCountPositions = "adminCountPositions"
+}
+
+// TODO: move this to heartbeat DO.
+export async function adminCountAllPositions(env : Env) : Promise<AdminCountPositionsResponse> {
+	const request : AdminCountPositionsRequest = {};
+	const method = HeartbeatDOFetchMethod.adminCountPositions;
+	const response = await sendJSONRequestToHeartbeatDO<AdminCountPositionsRequest,AdminCountPositionsResponse>(method,request,env);
+    return response;
 }
 
 export function parseHeartbeatDOFetchMethod(value : string) : HeartbeatDOFetchMethod|null {

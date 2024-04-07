@@ -1,9 +1,12 @@
 import { DurableObjectState, DurableObjectStorage } from "@cloudflare/workers-types";
 import { Env } from "../../env";
 import { logDebug, logError } from "../../logging";
+import { PositionStatus } from "../../positions";
+import { SOL_ADDRESS } from "../../tokens";
 import { MapWithStorage, assertNever, makeJSONRequest, makeJSONResponse, maybeGetJson } from "../../util";
 import { HeartbeatWakeupRequestForTokenPairPositionTracker } from "../token_pair_position_tracker/actions/heartbeat_wake_up_for_token_pair_position_tracker";
-import { TokenPairKey, TokenPairPositionTrackerDOFetchMethod } from "../token_pair_position_tracker/token_pair_position_tracker_do_interop";
+import { TokenPairKey, TokenPairPositionTrackerDOFetchMethod, getPositionCountsFromTracker } from "../token_pair_position_tracker/token_pair_position_tracker_do_interop";
+import { AdminCountPositionsRequest, AdminCountPositionsResponse } from "./actions/admin_count_positions";
 import { RegisterTokenPairRequest, RegisterTokenPairResponse } from "./actions/register_token_pair";
 import { HeartbeatDOFetchMethod, parseHeartbeatDOFetchMethod } from "./heartbeat_do_interop";
 
@@ -54,10 +57,28 @@ export class HeartbeatDO {
                 return {};
             case HeartbeatDOFetchMethod.RegisterTokenPair:
                 return await this.handleRegisterToken(jsonRequestBody);
+            case HeartbeatDOFetchMethod.adminCountPositions:
+                return await this.handleAdminCountPositions(jsonRequestBody);
             default:
                 assertNever(method);
         }
     }
+
+    async handleAdminCountPositions(request: AdminCountPositionsRequest) : Promise<Response> {
+        const vsTokenAddress = SOL_ADDRESS;
+        const positionCounts : Record<string,Record<PositionStatus,number>> = {};
+        const countsByUser : Record<number,number> = {};
+        const ids = [...this.tokenPairPositionTrackerInstances.keys()];
+        const pairs = ids.map(id => TokenPairKey.parse(id));
+        for (const pair of pairs) {
+            if (pair != null) {
+                const tokenAddress = pair.tokenAddress;
+                const positionCount = await getPositionCountsFromTracker(tokenAddress, vsTokenAddress, this.env);
+                positionCounts[tokenAddress] = positionCount;
+            }
+        }
+        return makeJSONResponse<AdminCountPositionsResponse>({ positionCounts });
+    }    
 
     async handleRegisterToken(request : RegisterTokenPairRequest) : Promise<RegisterTokenPairResponse> {
         const tokenPairKey = new TokenPairKey(request.tokenAddress, request.vsTokenAddress);

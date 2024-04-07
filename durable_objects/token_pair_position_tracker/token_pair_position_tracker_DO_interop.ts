@@ -246,6 +246,13 @@ export class TokenPairKey {
 	toString() : string {
 		return `${this.tokenAddress}:${this.vsTokenAddress}`;
 	}
+	static parse(key : string) : TokenPairKey|null {
+		const tokens = key.split(":")
+		if (tokens.length !== 2) {
+			return null;
+		}
+		return new TokenPairKey(tokens[0],tokens[1]);
+	}
 }
 
 function getTokenPairPositionTrackerDO(tokenAddress : string, vsTokenAddress : string, env : Env) {
