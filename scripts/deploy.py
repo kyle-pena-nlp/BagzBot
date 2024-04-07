@@ -42,7 +42,7 @@ def deploy(env : str):
 
     ask_to_verify_login()
 
-    ask_to_verify_settings()
+    ask_to_verify_settings(env)
 
     if do_you_want_to("Deploy wrangler worker?"):
         wrangler_deploy(env, dry = False)

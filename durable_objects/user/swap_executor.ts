@@ -39,7 +39,7 @@ export class SwapExecutor {
         // get some stuff we'll need
         const signature = bs58.encode(signedTx.signatures[0]);
         
-        TGStatusMessage.queue(this.notificationChannel, `Executing transaction... (can take a few minutes)`, false);
+        TGStatusMessage.queue(this.notificationChannel, `Executing transaction... (can take a bit)`, false);
         
         let txExecutionStatus = await executeAndConfirmSignedTx(signedTx, this.lastValidBH, this.connection, this.env, this.startTimeMS);
 
