@@ -19,7 +19,7 @@ export class MenuFAQ extends Menu<{ botName : string, botInstance : string, botT
 <i>${botTagline}</i>
 
 <b>What is ${botName}?</b>
-${botName} is a Telegram Bot with a focus on <b>locking in your gains</b> and <b>limiting your losses</b..
+${botName} is a Telegram Bot with a focus on <b>locking in your gains</b> and <b>limiting your losses</b>..
 ${botName} tracks the value of your token, and remembers when it hits an all-time high (a "peak" :mountain:).
 The moment the token falls 5% below the :mountain:, the trade automatically sells.
 You can customize 5% to some other percentage if you like.
@@ -27,14 +27,6 @@ You can customize 5% to some other percentage if you like.
 <b>What Tokens Can I Trade?</b>
 You can trade any token that is supported by Jupiter.  
 There may be a few minutes lag between Jupiter listing a coin and it becoming available on the bot.
-
-<b>Why are all prices in terms of SOL, and why does ${botName} not allow swapping to/from $USDT/$USDC, or tokens from other chains?</b>
-1 SOL = 1 SOL.
-
-<b>Why don't I have to connect to a Wallet?</b>
-${botName} automatically creates a personal wallet just for you.
-If you want to take control of the wallet yourself, you can view its private key in the "Wallet" menu.
-Please note - any transfers of non-SOL tokens are not currently synced with the bot.
 
 <b>How do I get funds into my ${botName} wallet?</b>
 View your Wallet in the Main Menu.  Click on the address to copy it.  
@@ -47,13 +39,6 @@ ALWAYS send a small test amount first before sending larger amounts of SOL.
 at the last possible moment, and with a decryption key that is unique per-user. 
 3. When private keys are sent to the user, they are sent over Telegram's secure communication channels.
 4. Administrators do not have the ability to view your private key.
-
-<b>What features do you have planned?</b>
-1. <b>Auto-Buy</b>: Automatically creates an TSL position when the price dips by a chosen percent.
-2. <b>Wave Rider</b>: Buys back into a TSL when the price starts going back up.  You're riding the waves!
-3. <b>DCA Out</b>: Begins a DCA when the Trigger Percent condition is met.
-4. <b>Faster Trading</b>: We plan on upgrading to a dedicated RPC node for faster price streaming and lower latency on auto-sells.
-5. <b>Early Token Access</b>: Realtime access to fresh-minted coins - no waiting for Jupiter.
 
 <b>Disclaimer</b>
 You use ${botName} at your own risk, without exceptions!

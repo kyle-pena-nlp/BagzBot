@@ -74,7 +74,9 @@ export class HeartbeatDO {
             if (pair != null) {
                 const tokenAddress = pair.tokenAddress;
                 const positionCount = await getPositionCountsFromTracker(tokenAddress, vsTokenAddress, this.env);
-                positionCounts[tokenAddress] = positionCount;
+                if (Object.keys(positionCount).length > 0) {
+                    positionCounts[tokenAddress] = positionCount;
+                }
             }
         }
         return makeJSONResponse<AdminCountPositionsResponse>({ positionCounts });
