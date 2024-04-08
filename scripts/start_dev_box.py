@@ -25,7 +25,7 @@ def start_token_list_rebuild_CRON_poller(token_list_rebuild_frequency : int):
 def parse_args():
     # NEVER CHANGE THIS because this script takes down the bot and migratres it to the local server
     parser = ArgumentParser()
-    parser.add_argument("--token_list_rebuild_frequency", required = False, default = 60)
+    parser.add_argument("--token_list_rebuild_frequency", required = False, default = 60*30)
     args = parser.parse_args()
     return args
 

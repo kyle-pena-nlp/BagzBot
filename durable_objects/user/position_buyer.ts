@@ -1,15 +1,16 @@
 
-import { Connection, VersionedTransaction } from "@solana/web3.js";
+import { Connection, SimulateTransactionConfig, VersionedTransaction } from "@solana/web3.js";
 import { UserAddress, Wallet, toUserAddress } from "../../crypto";
 import { fromNumber } from "../../decimalized";
 import { Env, getRPCUrl } from "../../env";
 import { MenuCode } from "../../menus";
 import { Position, PositionRequest, PositionStatus } from "../../positions";
 import { getLatestValidBlockhash } from "../../rpc/rpc_blocks";
+import { parseInstructionError } from "../../rpc/rpc_parse_instruction_error";
 import { signatureOf } from "../../rpc/rpc_sign_tx";
-import { ParsedSuccessfulSwapSummary, isSlippageSwapExecutionErrorParseSummary, isSuccessfulSwapSummary, isSwapExecutionErrorParseSummary, isUnknownTransactionParseSummary } from "../../rpc/rpc_types";
+import { ParsedSuccessfulSwapSummary, SwapExecutionError, isSlippageSwapExecutionErrorParseSummary, isSuccessfulSwapSummary, isSwapExecutionErrorParseSummary, isUnknownTransactionParseSummary } from "../../rpc/rpc_types";
 import { TGStatusMessage, UpdateableNotification } from "../../telegram";
-import { assertNever } from "../../util";
+import { assertNever, strictParseBoolean } from "../../util";
 import { insertPosition, positionExistsInTracker, removePosition, updatePosition } from "../token_pair_position_tracker/token_pair_position_tracker_do_interop";
 import { SwapExecutor } from "./swap_executor";
 import { SwapTransactionSigner } from "./swap_transaction_signer";
@@ -42,7 +43,7 @@ export class PositionBuyer {
         }
     }
 
-    async buyInternal(positionRequest : PositionRequest) : Promise<'already-processed'|'could-not-create-tx'|'failed'|'slippage-failed'|'unconfirmed'|'confirmed'> {
+    async buyInternal(positionRequest : PositionRequest) : Promise<'tx-sim-failed-other'|'tx-sim-failed-slippage'|'tx-sim-insufficient-sol'|'already-processed'|'could-not-create-tx'|'failed'|'slippage-failed'|'unconfirmed'|'confirmed'> {
 
         // RPC connection
         const connection = new Connection(getRPCUrl(this.env));
@@ -59,6 +60,13 @@ export class PositionBuyer {
         if (signedTx == null) {
             TGStatusMessage.queue(this.channel, `Unable to sign transaction.`, true);
             return 'could-not-create-tx';
+        }
+
+        if (strictParseBoolean(this.env.TX_SIM_BEFORE_BUY)) {
+            const txSimResult = await this.simulateTx(signedTx, connection);
+            if (txSimResult !== 'success') {
+                return txSimResult;
+            }
         }
 
         // get latest valid BH (tells us how long to keep trying to send tx)
@@ -95,6 +103,37 @@ export class PositionBuyer {
         else {
             assertNever(result);
         }
+    }
+
+    private async simulateTx(signedTx : VersionedTransaction, connection : Connection) : Promise<'success'|'tx-sim-failed-other'|'tx-sim-insufficient-sol'|'tx-sim-failed-slippage'> {
+        const config: SimulateTransactionConfig = {
+            sigVerify: true, // use the signature of the signedTx to verify validity of tx, rather than fetching a new blockhash
+            commitment: 'confirmed' // omitting this seems to cause simulation to fail.
+        };
+        const response = await connection.simulateTransaction(signedTx, config);
+        // TODO: we can use response + config to get detailed tx info, better than quote.
+
+        if (!response.value.err) {
+            return 'success';
+        }
+
+        const swapExecutionError =  parseInstructionError(response.value.err, this.env);
+        if (swapExecutionError === SwapExecutionError.InsufficientSOLBalance) {
+            return 'tx-sim-insufficient-sol';
+        }
+        else if (swapExecutionError === SwapExecutionError.OtherSwapExecutionError) {
+            return 'tx-sim-failed-other';
+        }
+        else if (swapExecutionError === SwapExecutionError.SlippageToleranceExceeded) {
+            return 'tx-sim-failed-slippage';
+        }
+        else if (swapExecutionError === SwapExecutionError.TokenAccountFeeNotInitialized) {
+            return 'tx-sim-failed-other';
+        }
+        else {
+            assertNever(swapExecutionError);
+        }        
+ 
     }
 
     private convertRequestToUnconfirmedPosition(positionRequest : PositionRequest, signature : string, lastValidBH : number) : Position & { buyConfirmed: false } {
@@ -188,7 +227,7 @@ export class PositionBuyer {
         return newPosition;
     }
     
-    private getFinalStatusMessage(status: 'already-processed'|'could-not-create-tx'|'failed'|'slippage-failed'|'unconfirmed'|'confirmed') : string {
+    private getFinalStatusMessage(status: 'tx-sim-failed-other'|'tx-sim-failed-slippage'|'tx-sim-insufficient-sol'|'already-processed'|'could-not-create-tx'|'failed'|'slippage-failed'|'unconfirmed'|'confirmed') : string {
         switch(status) {
             case 'already-processed':
                 return 'This purchase was already completed.';
@@ -197,7 +236,13 @@ export class PositionBuyer {
             case 'confirmed':
                 return 'Purchase was successful!';
             case 'failed':
-                return 'This purchase failed.';
+                return 'This purchase failed. You may wish to try again in a few minutes.';
+            case 'tx-sim-failed-other':
+                return 'This purchase failed. You may wish to try again in a few minutes.';
+            case 'tx-sim-failed-slippage':
+                return 'This purchase failed because the slippage percent was too low.';
+            case 'tx-sim-insufficient-sol':
+                return 'This purchase failed because of insufficient SOL in your wallet. Check you wallet balance and try again!';
             case 'slippage-failed':
                 return 'Purchase failed due to slippage tolerance exceeded.';
             case 'unconfirmed':
@@ -207,7 +252,7 @@ export class PositionBuyer {
         }
     }
 
-    private getFinalMenuCode(status: 'already-processed'|'could-not-create-tx'|'failed'|'slippage-failed'|'unconfirmed'|'confirmed') : MenuCode {
+    private getFinalMenuCode(status: 'tx-sim-failed-other'|'tx-sim-failed-slippage'|'tx-sim-insufficient-sol'|'already-processed'|'could-not-create-tx'|'failed'|'slippage-failed'|'unconfirmed'|'confirmed') : MenuCode {
         switch(status) {
             case 'already-processed':
                 return MenuCode.Main;
@@ -221,6 +266,12 @@ export class PositionBuyer {
                 return MenuCode.TrailingStopLossRequestReturnToEditorMenu;
             case 'unconfirmed':
                 return MenuCode.ListPositions;
+            case 'tx-sim-failed-other':
+                return MenuCode.TrailingStopLossRequestReturnToEditorMenu;
+            case 'tx-sim-failed-slippage':
+                return MenuCode.TrailingStopLossRequestReturnToEditorMenu;
+            case 'tx-sim-insufficient-sol':
+                return MenuCode.TrailingStopLossRequestReturnToEditorMenu;
             default:
                 assertNever(status);
         }

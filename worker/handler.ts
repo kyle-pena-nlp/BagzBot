@@ -292,7 +292,7 @@ export class CallbackHandler {
                 return triggerPctQuestion;
             case MenuCode.SubmitTriggerPct:
                 const triggerPctEntry = tryParseFloat(callbackData.menuArg!!);
-                if (!triggerPctEntry || triggerPctEntry < 0) {
+                if (!triggerPctEntry || triggerPctEntry < 0 || triggerPctEntry >= 100) {
                     return new MenuContinueMessage(
                         `Sorry - '${callbackData.menuArg||''}' is not a valid percentage`,
                         MenuCode.TrailingStopLossTriggerPercentMenu);
@@ -687,7 +687,7 @@ export class CallbackHandler {
 
     async handleCommand(telegramWebhookInfo : TelegramWebhookInfo) : Promise<Response> {
         const command = telegramWebhookInfo.command!!;
-        const tgMessage = await sendMessageToTG(telegramWebhookInfo.chatID, 'Processing command', this.env);
+        const tgMessage = await sendMessageToTG(telegramWebhookInfo.chatID, 'One moment...', this.env);
         if (!tgMessage.success) {
             return makeSuccessResponse();
         }

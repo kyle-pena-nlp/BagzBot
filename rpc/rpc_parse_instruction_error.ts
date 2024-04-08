@@ -9,10 +9,11 @@ function isInstructionError(err : any) : err is InstructionError {
 }
 
 export function parseInstructionError(err : any, env : Env) {
-    if (!isInstructionError(err)) {
+    const instructionError = err?.InstructionError;
+    if (!isInstructionError(instructionError)) {
         return SwapExecutionError.OtherSwapExecutionError;
     }
-    const [index, { Custom }] = err;
+    const  { InstructionError: [index, { Custom }] } = err;
     if (Custom === strictParseInt(env.JUPITER_SWAP_PROGRAM_FEE_ACCOUNT_NOT_INITIALIZED_ERROR_CODE)) {
         return SwapExecutionError.TokenAccountFeeNotInitialized;
     }

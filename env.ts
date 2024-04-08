@@ -69,7 +69,9 @@ export interface Env {
 	METIS_SWAP_API_URL : string
 	DOWN_FOR_MAINTENANCE : string
 	TEST_NO_ADMINS_MODE : string
+	// feature switches
 	REBUILD_TOKENS_CRON_JOB: string
+	TX_SIM_BEFORE_BUY : string
 
 	UserDO : any // i'd like to strongly type this as DurableObjectNamespace, but can't for technical reasons
 	TokenPairPositionTrackerDO : any // ditto

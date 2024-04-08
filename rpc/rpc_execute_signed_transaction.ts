@@ -5,7 +5,6 @@ import { Env } from "../env";
 import { logDebug, logError } from "../logging";
 import { assertNever, sleep, strictParseInt } from "../util";
 import { assertIs } from "../util/enums";
-import { parseInstructionError } from "./rpc_parse_instruction_error";
 import {
     SwapExecutionError,
     TransactionExecutionError,
@@ -242,22 +241,6 @@ function finalExecutionDisposition(
 function is429(e : any) {
     return (e?.message||'').includes("429");
 }
-
-function parseSwapExecutionError(err : any, rawSignedTx : VersionedTransaction, env : Env) : SwapExecutionError {
-    const instructionError = err?.InstructionError;
-    if (instructionError) {
-        try {
-            const swapExecutionError = parseInstructionError(instructionError, env);
-            return swapExecutionError;
-        }
-        catch {
-            return SwapExecutionError.OtherSwapExecutionError;
-        }
-    }
-
-    return SwapExecutionError.OtherSwapExecutionError;
-}
-
 
 function determineTxConfirmationFinalStatus(
     anyTxSent : boolean,
