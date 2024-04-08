@@ -47,7 +47,7 @@ export class MenuMain extends Menu<UserData & Stuff> implements MenuCapabilities
 
         if (this.menuData.maybePNL != null) {
             lines.push(
-                `<b>Total Unrealized PNL</b>: ${asTokenPrice(this.menuData.maybePNL.currentTotalValue)} SOL (${asPercentDeltaString(this.menuData.maybePNL.PNLpercent)})`
+                `<b>Total Value of Open Positions</b>: ${asTokenPrice(this.menuData.maybePNL.currentTotalValue)} SOL (${asPercentDeltaString(this.menuData.maybePNL.PNLpercent)})`
             );
         }
 
