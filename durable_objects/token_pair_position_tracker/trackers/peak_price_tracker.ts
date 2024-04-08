@@ -1,7 +1,7 @@
 import * as dMath from "../../../decimalized";
 import { DecimalizedAmount, DecimalizedAmountSet, MATH_DECIMAL_PLACES, dAdd, fromKey, fromNumber, toKey } from "../../../decimalized";
-import { asTokenPrice, dZero } from "../../../decimalized/decimalized_amount";
-import { logDebug, logError } from "../../../logging";
+import { asTokenPrice, dZero, toNumber } from "../../../decimalized/decimalized_amount";
+import { logDebug, logError, logInfo } from "../../../logging";
 import { Position, PositionStatus, PositionType } from "../../../positions";
 import { setDifference, setIntersection, setUnion, structuralEquals } from "../../../util";
 import { PositionAndMaybePNL } from "../model/position_and_PNL";
@@ -219,6 +219,8 @@ export class PeakPricePositionTracker {
                 if (!tradeIsTriggered) {
                     return;
                 }
+
+                logInfo(`TRIGGERED: ${asTokenPrice(position.tokenAmt)} of ${position.token.symbol}. pos.triggerPct: ${position.triggerPercent}. triggerPctFrac: ${toNumber(triggerPctFrac)} ,priceDecreaseFrac: ${toNumber(priceDecreaseFrac)}`);
 
                 // But if it is triggered, add it to the list of positions to close
                 positionsToClose.push(position);

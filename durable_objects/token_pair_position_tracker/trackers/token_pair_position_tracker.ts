@@ -80,13 +80,7 @@ export class TokenPairPositionTracker {
         // update the peak prices
         
         this.pricePeaks.update(newPrice);
-        // Note: mark them as closing, keeping them in the tracker!!!
-        // SUPER CRITICAL to mark as closing to prevent them from;
-        // 1. Being double-sold
-        // 2. To keep them being monitored in case the sell fails
-        /*for (const positionToClose of positionsToClose) {
-            positionToClose.status = PositionStatus.Closing;
-        }*/
+
     }
 
     collectPositionsToClose(newPrice : DecimalizedAmount) : Position[] {
