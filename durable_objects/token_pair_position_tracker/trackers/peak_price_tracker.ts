@@ -58,9 +58,18 @@ export class PeakPricePositionTracker {
         }
         else {
             logDebug(`Updated position with ID ${position.positionID} (${position.userID})`);
+            const currentPeakPrice = this.itemsByPeakPrice.getPeakPrice(position.positionID);
             Object.assign(existingPosition,position);
+            const FIXED = false;
+            if (FIXED && currentPeakPrice != null && dMath.dCompare(position.fillPrice,currentPeakPrice) > 0) {
+                this.movePositionToPeakPrice(position.positionID, position.fillPrice);
+            }            
             return true;
         }
+    }
+
+    private movePositionToPeakPrice(positionID : string, newPeakPrice : DecimalizedAmount) {
+        this.itemsByPeakPrice.movePositionToPeakPrice(positionID, newPeakPrice);
     }
 
     insertPosition(position : Position) : boolean {

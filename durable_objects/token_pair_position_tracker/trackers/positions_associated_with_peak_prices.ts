@@ -1,4 +1,4 @@
-import { DecimalizedAmount, DecimalizedAmountMap, MATH_DECIMAL_PLACES, dDiv, dMult, dSub } from "../../../decimalized";
+import { DecimalizedAmount, DecimalizedAmountMap, MATH_DECIMAL_PLACES, dCompare, dDiv, dMult, dSub } from "../../../decimalized";
 import { dZero } from "../../../decimalized/decimalized_amount";
 import { logError, logInfo } from "../../../logging";
 import { Position, PositionStatus } from "../../../positions";
@@ -176,6 +176,18 @@ export class PositionsAssociatedWithPeakPrices extends DecimalizedAmountMap<Read
             }
         }
         return buysToConfirm;
+    }
+
+    // move position to another peak price, if position exists
+    movePositionToPeakPrice(positionID  : string, peakPrice : DecimalizedAmount) {
+        const result = this.getPositionInternal(positionID);
+        if (result == null) {
+            return;
+        }
+        const [position,currentPeakPrice]  = result;
+        if (dCompare(currentPeakPrice,peakPrice) !== 0) {
+            return this.add(peakPrice, position);
+        }
     }
 
     // *idempotentally* add a new position to this peak price
