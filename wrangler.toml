@@ -65,6 +65,7 @@ METIS_SWAP_API_URL = "false"
 DOWN_FOR_MAINTENANCE = "false"
 # don't ever set to true.  just for dev.
 TEST_NO_ADMINS_MODE = "false"
+REBUILD_TOKENS_CRON_JOB = "true"
 
 [env.beta.vars]
 # do not change this string EVER post launch
@@ -118,6 +119,7 @@ METIS_SWAP_API_URL = "false"
 DOWN_FOR_MAINTENANCE = "false"
 # don't ever set to true.  just for dev.
 TEST_NO_ADMINS_MODE = "false"
+REBUILD_TOKENS_CRON_JOB = "false"
 
 [env.dev.durable_objects]
 bindings = [
@@ -140,5 +142,6 @@ bindings = [
 
 
 # The 'wake up!' cron trigger - keeps the price tracker tracking the prices.
+# If you update the patterns, update the index.js because it filters based on pattern.
 [triggers]
-crons = [ "* * * * *" ]
+crons = [ "* * * * *", "*/30 * * * *" ]

@@ -17,10 +17,15 @@ def start_CRON_poller():
     child_proc = subprocess.Popen(shlex.split(command), shell = True)
     return child_proc
 
+def start_token_list_rebuild_CRON_poller(token_list_rebuild_frequency : int):
+    command = START_TOKEN_LIST_REBUILD_CRON_POLLER_COMMAND.format(token_list_rebuild_frequency = token_list_rebuild_frequency)
+    child_proc = subprocess.Popen(shlex.split(command), shell = True)
+    return child_proc
+
 def parse_args():
     # NEVER CHANGE THIS because this script takes down the bot and migratres it to the local server
     parser = ArgumentParser()
-    parser.add_argument("--skip_bot_setup", action="store_true")
+    parser.add_argument("--token_list_rebuild_frequency", required = False, default = 60)
     args = parser.parse_args()
     return args
 
@@ -44,10 +49,15 @@ def do_it(args):
         bot_token = get_secret("SECRET__TELEGRAM_BOT_TOKEN", "dev")
         bot_secret_token = get_secret("SECRET__TELEGRAM_BOT_WEBHOOK_SECRET_TOKEN", "dev")
 
-        if not args.skip_bot_setup:
-            migrate_and_configure_bot_for_local_server(bot_token, bot_secret_token)
+        # this didn't work
+        #if not args.skip_bot_setup:
+        #    migrate_and_configure_bot_for_local_server(bot_token, bot_secret_token)
+
+        migrate_and_configure_bot_for_local_server(bot_token, bot_secret_token)
 
         child_procs.append(start_CRON_poller())
+
+        child_procs.append(start_token_list_rebuild_CRON_poller(args.token_list_rebuild_frequency))
 
         print("You may wish to start the wrangler debugger now.")
         print("Cloudflare worker and local bot api server ARE RUNNING!")
@@ -155,8 +165,6 @@ def configure_webhook_for_local_bot(bot_token, bot_secret_token):
     
 if __name__ == "__main__":
     args = parse_args()
-
     poll_until_port_is_unoccupied(LOCAL_CLOUDFLARE_WORKER_PORT)
     poll_until_port_is_unoccupied(LOCAL_TELEGRAM_BOT_API_SERVER_PORT)
-
     do_it(args)

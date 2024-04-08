@@ -1,10 +1,12 @@
 import { Env } from "../../env";
 import { makeJSONRequest, makeRequest } from "../../util";
+import { ForceRefreshTokensRequest as RebuildTokensListRequest, ForceRefreshTokensResponse as RebuildTokensListResponse } from "./actions/force_refresh_tokens";
 import { GetTokenInfoRequest, GetTokenInfoResponse } from "./actions/get_token_info";
 
 export enum PolledTokenPairListDOFetchMethod {
 	initialize = "initialize",
-    getTokenInfo = "getTokenInfo"
+    getTokenInfo = "getTokenInfo",
+	rebuildTokensList = "rebuildTokensList"
 }
 
 
@@ -40,6 +42,13 @@ async function sendJSONRequestToDO<TRequest,TResponse>(method : PolledTokenPairL
 
 export async function getTokenInfo(tokenAddress : string, env : Env) : Promise<GetTokenInfoResponse> {
 	const body : GetTokenInfoRequest = { tokenAddress : tokenAddress };
-	const response = sendJSONRequestToDO<GetTokenInfoRequest,GetTokenInfoResponse>(PolledTokenPairListDOFetchMethod.getTokenInfo, body, env);
+	const response = await sendJSONRequestToDO<GetTokenInfoRequest,GetTokenInfoResponse>(PolledTokenPairListDOFetchMethod.getTokenInfo, body, env);
+	return response;
+}
+
+export async function forceRebuildTokensList(env : Env) : Promise<RebuildTokensListResponse> {
+	const request : RebuildTokensListRequest = { };
+	const method = PolledTokenPairListDOFetchMethod.rebuildTokensList;
+	const response = await sendJSONRequestToDO<RebuildTokensListRequest,RebuildTokensListResponse>(method,request,env);
 	return response;
 }

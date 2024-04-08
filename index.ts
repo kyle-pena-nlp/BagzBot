@@ -40,6 +40,9 @@ export default {
 		if (event.cron === "* * * * *") {
 			context.waitUntil(handler.handleMinuteCRONJob(env));
 		}
+		else if (event.cron === "*/30 * * * *" && strictParseBoolean(env.REBUILD_TOKENS_CRON_JOB)) {
+			context.waitUntil(handler.handleRebuildTokensCRONJob(env));
+		}
 	},
 
 	// Worker fetch method (this is what the TG webhook calls)

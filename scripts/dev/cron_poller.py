@@ -9,11 +9,11 @@ def parse_args():
     return args
 
 def do_it(args):
-    url = f'http://localhost:{args.port}/__scheduled?cron=*+*+*+*+*'
+    every_minute_url = f'http://localhost:{args.port}/__scheduled?cron=*+*+*+*+*'
     while True:
         try:
             print("_scheduled invocation")
-            requests.post(url)
+            requests.post(every_minute_url)
         except Exception as e:
             print("_scheduled invocation failed: " + str(e))
         finally:

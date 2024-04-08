@@ -19,6 +19,7 @@ START_CLOUDFLARE_LOCAL_WORKER_COMMAND = f'npx wrangler dev --env=dev --port={LOC
 START_TELEGRAM_LOCAL_SERVER_COMMAND   = f'telegram-bot-api --api-id={{api_id}} --api-hash={{api_hash}} --dir={{working_dir}} --local --log=log.log --http-port={LOCAL_TELEGRAM_BOT_API_SERVER_PORT}' # --verbosity=4
 TELEGRAM_LOCAL_SERVER_WORKING_DIR = f"telegram_bot_api_working_dir" + os.sep
 START_CRON_POLLER_COMMAND = f'python scripts/dev/cron_poller.py --port={LOCAL_CLOUDFLARE_WORKER_PORT}'
+START_TOKEN_LIST_REBUILD_CRON_POLLER_COMMAND = f'python scripts/dev/token_list_rebuild_cron_poller.py --port={LOCAL_CLOUDFLARE_WORKER_PORT} --token_list_rebuild_frequency={{token_list_rebuild_frequency}}'
 
 def _wait_for_keypress_unix():
     import tty

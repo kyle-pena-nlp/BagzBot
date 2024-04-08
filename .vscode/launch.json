@@ -35,7 +35,18 @@
               "--end=${input:endValue}",
               "--limit=${input:limitValue}"
             ]
-      },        
+      }, 
+      
+      {
+        "name": "Python Debugger: Start Dev Box",
+        "type": "debugpy",
+        "request": "launch",
+        "program": "${file}",
+        "console": "integratedTerminal",
+        "args": [
+            "--token_list_rebuild_frequency=${input:tokenListRebuildFrequencyValue}"
+          ]
+    },       
 
         {
             "name": "Wrangler",
@@ -92,6 +103,12 @@
           "type": "promptString",
           "description": "Enter the limit (optional):",
           "default": ""
-        }                        
+        },
+        {
+          "id": "tokenListRebuildFrequencyValue",
+          "type": "promptString",
+          "description": "Enter the CRON seconds for token list rebuild:",
+          "default": ""          
+        }                      
     ]
 }

@@ -1,5 +1,5 @@
 import { Env } from "../../../env";
-import { logError } from "../../../logging";
+import { logDebug, logError } from "../../../logging";
 import { TokenInfo } from "../../../tokens";
 import { strictParseInt } from "../../../util";
 
@@ -54,7 +54,8 @@ export class TokenTracker {
             return false;
         }
     }
-    private async rebuildTokenList(storage : DurableObjectStorage) : Promise<void> {
+    async rebuildTokenList(storage : DurableObjectStorage) : Promise<void> {
+        // bounce requests to rebuild if already rebuilding
         if (this.isRebuilding) {
             return;
         }
@@ -65,17 +66,13 @@ export class TokenTracker {
                 if (jupTokens != null) {
                     // originally: drop tokens that drop off the list.
                     // but I changed my mind: will keep them so that people can still execute their trades
-                    /*
-                    const oldTokenAddressSet = new Set<string>(Object.values(this.tokenInfos).map(t => t.address));
-                    const newTokenAddressSet = new Set<string>(Object.values(jupTokens).map(t => t.address));
-                    const deadTokens = setDifference(oldTokenAddressSet, newTokenAddressSet, Set<string>);
-                    for (const deadToken of deadTokens) {
-                        this.deleteToken(deadToken);
-                    }*/
+                    const tokenCount = Object.keys(jupTokens).length;
+                    logDebug(`Beginning upsert of tokens.  Total tokens: ${tokenCount}`);
                     for (const tokenInfo of Object.values(jupTokens)) {
                         this.upsertToken(tokenInfo);
                     }
                     this.lastRefreshedMS = Date.now(); 
+                    logDebug(`Done upsert tokens list.  Total tokens: ${tokenCount}`);
                     await this.flushToStorage(storage);
                 }
             }
@@ -111,6 +108,7 @@ export class TokenTracker {
         if (this.deletedKeys.size == 0 && this.dirtyTracking.size == 0) {
             return;
         }
+        logDebug(`Token Tracker storage flush: ${this.dirtyTracking.size} puts.  ${this.deletedKeys.size} deletes.`);
         const putEntries : Record<string,TokenInfo> = {};
         for (const key of this.dirtyTracking) {
             putEntries[key] = this.tokenInfos[key];
@@ -121,6 +119,7 @@ export class TokenTracker {
         const deletePromise = storage.delete([...this.deletedKeys]).then(() => {
             this.deletedKeys.clear();
         });
+        
         await Promise.all([putPromise, deletePromise]);
     }
     markDirty(key : string) {

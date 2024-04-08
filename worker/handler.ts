@@ -5,7 +5,7 @@ import { DecimalizedAmount, fromNumber } from "../decimalized";
 import { claimInviteCode, listUnclaimedBetaInviteCodes } from "../durable_objects/beta_invite_codes/beta_invite_code_interop";
 import { adminCountAllPositions, doHeartbeatWakeup } from "../durable_objects/heartbeat/heartbeat_do_interop";
 import { GetTokenInfoResponse, isInvalidTokenInfoResponse, isValidTokenInfoResponse } from "../durable_objects/polled_token_pair_list/actions/get_token_info";
-import { getTokenInfo } from "../durable_objects/polled_token_pair_list/polled_token_pair_list_DO_interop";
+import { forceRebuildTokensList, getTokenInfo } from "../durable_objects/polled_token_pair_list/polled_token_pair_list_DO_interop";
 import { _devOnlyFeatureUpdatePrice, adminInvokeAlarm } from "../durable_objects/token_pair_position_tracker/token_pair_position_tracker_do_interop";
 import { OpenPositionRequest } from "../durable_objects/user/actions/open_new_position";
 import { QuantityAndToken } from "../durable_objects/user/model/quantity_and_token";
@@ -45,6 +45,10 @@ export class CallbackHandler {
 
     async handleMinuteCRONJob(env : Env) : Promise<void> {
         await doHeartbeatWakeup(env);
+    }
+
+    async handleRebuildTokensCRONJob(env : Env): Promise<void> {
+        await forceRebuildTokensList(env);
     }
 
     async listDurableObjectIDsInNamespace(namespace : DurableObjectNamespace) : Promise<string[]> {

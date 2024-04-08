@@ -1,11 +1,9 @@
 import { DurableObjectState } from "@cloudflare/workers-types";
 import { Env, getPriceAPIURL } from "../../env";
 import { logDebug } from "../../logging";
-import { PositionStatus } from "../../positions";
-import { SOL_ADDRESS, StagedTokenInfo, TokenInfo } from "../../tokens";
+import { StagedTokenInfo, TokenInfo } from "../../tokens";
 import { assertNever, makeJSONResponse, makeSuccessResponse, maybeGetJson } from "../../util";
-import { AdminCountPositionsRequest, AdminCountPositionsResponse } from "../heartbeat/actions/admin_count_positions";
-import { getPositionCountsFromTracker } from "../token_pair_position_tracker/token_pair_position_tracker_do_interop";
+import { ForceRefreshTokensRequest, ForceRefreshTokensResponse } from "./actions/force_refresh_tokens";
 import { GetTokenInfoRequest, GetTokenInfoResponse } from "./actions/get_token_info";
 import { PolledTokenPairListDOFetchMethod, parsePolledTokenPairListDOFetchMethod } from "./polled_token_pair_list_DO_interop";
 import { TokenTracker } from "./trackers/token_tracker";
@@ -61,12 +59,18 @@ export class PolledTokenPairListDO {
             case PolledTokenPairListDOFetchMethod.getTokenInfo:
                 const validateTokenResponse = await this.handleValidateToken(jsonRequestBody);
                 return makeJSONResponse(validateTokenResponse);
+            case PolledTokenPairListDOFetchMethod.rebuildTokensList:
+                const forceRefreshTokensResponse = await this.handleRebuildTokensList(jsonRequestBody);
+                return makeJSONResponse(forceRefreshTokensResponse);
             default:
                 assertNever(method);
         }
     }
 
-
+    async handleRebuildTokensList(request : ForceRefreshTokensRequest) : Promise<ForceRefreshTokensResponse> {
+        await this.tokenTracker.rebuildTokenList(this.state.storage);
+        return {};
+    }
 
     async handleValidateToken(request: GetTokenInfoRequest) : Promise<GetTokenInfoResponse> {
         
