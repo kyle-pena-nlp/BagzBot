@@ -41,6 +41,9 @@ export class UserPNLTracker {
                     if (positionWithPNL.PNL == null) {
                         return null;
                     }
+                    if (!positionWithPNL.position.buyConfirmed) {
+                        continue;
+                    }
                     originalTotalValue = dAdd(originalTotalValue, positionWithPNL.position.vsTokenAmt);
                     currentTotalValue = dAdd(currentTotalValue, positionWithPNL.PNL.currentValue);
                     PNL = dAdd(PNL, positionWithPNL.PNL.PNL)
