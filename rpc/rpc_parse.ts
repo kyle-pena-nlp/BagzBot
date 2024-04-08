@@ -156,7 +156,7 @@ function calculateTokenBalanceChange(parsedTransaction : ParsedTransactionWithMe
     positionTokenAddress : string,
     userAddress : UserAddress) : DecimalizedAmount|null {
     if (tokenAddress === SOL_ADDRESS) {
-        return calculateNetSOLBalanceChange(parsedTransaction, positionTokenAddress, userAddress);
+        return calculateNetSOLBalanceChangeExcludingFees(parsedTransaction, positionTokenAddress, userAddress);
     }
     else {
         return calculateNetTokenBalanceChange(parsedTransaction, tokenAddress, userAddress)
@@ -190,12 +190,14 @@ function calculateNetTokenBalanceChange(parsedTransaction : ParsedTransactionWit
     return dSub(postAmount,preAmount);    
 }
 
-function calculateNetSOLBalanceChange(parsedTransaction : ParsedTransactionWithMeta, tokenAddress : string, userAddress : UserAddress) : DecimalizedAmount|null {
+function calculateNetSOLBalanceChangeExcludingFees(parsedTransaction : ParsedTransactionWithMeta, tokenAddress : string, userAddress : UserAddress) : DecimalizedAmount|null {
     /* Here's the issue --- rent paid on new token accounts potentially needs to be taken into account,
     as well as fees.  So we need the position's token address to properly account for SOL balances diffs */
     const tokenAccountAddress = deriveTokenAccount(tokenAddress, userAddress).toBase58();
     const mainAccountSOLBalanceDiff = calculateSolTokenBalanceDiff(parsedTransaction, userAddress.address);
+    // rent
     const tokenAccountSOLBalanceDiff = calculateSolTokenBalanceDiff(parsedTransaction, tokenAccountAddress); 
+    // fees charged (TODO: does this include platform fees on swap out?)
     const solFees = parsedTransaction.meta?.fee||0;
     const netSOLDifference = mainAccountSOLBalanceDiff + tokenAccountSOLBalanceDiff + solFees;
     return {
