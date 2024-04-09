@@ -85,7 +85,7 @@ function makeTelegramSendQuestionRequest(chatID : number, question : string, env
         parse_mode: parseMode,
         reply_markup: {
             force_reply: true,
-            input_field_placeholder: "Enter beta invite code"
+            input_field_placeholder: "Enter your response here..."
         }           
     };        
     const request = makeJSONRequest(url, body);

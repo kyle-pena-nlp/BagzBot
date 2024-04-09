@@ -22,8 +22,8 @@ export class MenuEditPositionRequest extends Menu< { positionRequest: PositionRe
         lines.push(...[
             renderTrailingStopLossRequestMarkdown(positionRequest),
             "",
-            ...this.englishDescriptionOfPosition(),
-            "",
+            //...this.englishDescriptionOfPosition(),
+            //"",
             '<i>Click on any setting below to edit before Submitting</i>'
         ]);
         
