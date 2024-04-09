@@ -42,19 +42,18 @@ export class HeartbeatDO {
     }
 
     async fetch(request : Request) : Promise<Response> {
-        const responseBody = await this._fetch(request);
-        const response = makeJSONResponse(responseBody);
+        const response = await this._fetch(request);
         await this.flushToStorage();
         return response;
     }
 
-    async _fetch(request : Request) : Promise<any> {
+    async _fetch(request : Request) : Promise<Response> {
         const [method,jsonRequestBody] = await this.validateFetchRequest(request);
         switch(method) {
             case HeartbeatDOFetchMethod.Wakeup:
                 // deliberate fire-and-forget here.
                 this.handleWakeup(jsonRequestBody);
-                return {};
+                return makeJSONResponse<{}>({});
             case HeartbeatDOFetchMethod.RegisterTokenPair:
                 return await this.handleRegisterToken(jsonRequestBody);
             case HeartbeatDOFetchMethod.adminCountPositions:
@@ -82,18 +81,22 @@ export class HeartbeatDO {
         return makeJSONResponse<AdminCountPositionsResponse>({ positionCounts });
     }    
 
-    async handleRegisterToken(request : RegisterTokenPairRequest) : Promise<RegisterTokenPairResponse> {
+    // Token pair position trackers register themselves
+    async handleRegisterToken(request : RegisterTokenPairRequest) : Promise<Response> {
         const tokenPairKey = new TokenPairKey(request.tokenAddress, request.vsTokenAddress);
         this.tokenPairPositionTrackerInstances.set(tokenPairKey.toString(), true);
         const response : RegisterTokenPairResponse = {};
-        return response;
+        return makeJSONResponse<RegisterTokenPairResponse>(response);
     }
 
+    // This method keeps the alarms scheduled for the token pair position trackers.
+    // Invoking any method on the tracker causes it to check if it should be scheduling an alarm
     async handleWakeup(request : HeartbeatWakeupRequestForTokenPairPositionTracker) : Promise<void> {
         this.processing = true;
         try {
             const namespace = this.env.TokenPairPositionTrackerDO;
-            const tokenPairIDs = this.tokenPairPositionTrackerInstances.keys();
+            // What should we do if this list gets too long and can't complete? Should I add in a shuffle or something?
+            const tokenPairIDs = [...this.tokenPairPositionTrackerInstances.keys()];
             let any : boolean = false;
             for (const tokenPairID of tokenPairIDs) {
                 any = true;

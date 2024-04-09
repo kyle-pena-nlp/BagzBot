@@ -1,6 +1,6 @@
 import { strictParseBoolean, tryParseBoolean } from "./booleans";
 import { ChangeTrackedValue } from "./change_tracked_value";
-import { groupIntoBatches, groupIntoMap, groupIntoRecord } from "./collections";
+import { groupIntoBatches, groupIntoMap, groupIntoRecord, shuffle } from "./collections";
 import { assertNever, isEnumValue } from "./enums";
 import {
     makeFailureResponse,
@@ -31,8 +31,7 @@ export {
     maybeGetJson, pause, safe,
     setDifference,
     setIntersection,
-    setUnion,
-    sleep, strictParseBoolean, strictParseFloat, strictParseInt, structuralEquals, tryParseBoolean, tryParseFloat,
+    setUnion, shuffle, sleep, strictParseBoolean, strictParseFloat, strictParseInt, structuralEquals, tryParseBoolean, tryParseFloat,
     tryParseInt, tryReadResponseBody
 };
 

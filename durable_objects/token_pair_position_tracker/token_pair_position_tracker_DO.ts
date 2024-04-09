@@ -77,7 +77,9 @@ export class TokenPairPositionTrackerDO {
 
     // when the DO loads up, it registers itself with HeartbeatDO
     // (which later sends heartbeat requests to keep the DO awake)
-    needsToEnsureIsRegistered : boolean = true // deliberately not change tracker
+
+    // deliberately not change tracked, so we can register with heartbeat on cold start.
+    needsToEnsureIsRegistered : boolean = true 
     isPolling : boolean = false; // deliberately not change tracked.
 
     env : Env;

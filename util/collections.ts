@@ -40,3 +40,10 @@ export function groupIntoMap<T,TKey>(items : Iterable<T>, keySelector : (t : T) 
     }
     return grouped;
 }
+
+export function shuffle<T>(array :T[]) : T[] {
+    return array
+        .map(value => ({ value, sort: Math.random() }))
+        .sort((a, b) => a.sort - b.sort)
+        .map(({ value }) => value);
+}
