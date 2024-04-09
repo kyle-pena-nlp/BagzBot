@@ -133,10 +133,13 @@ export class PositionBuyer {
         else {
             assertNever(swapExecutionError);
         }        
- 
     }
 
     private convertRequestToUnconfirmedPosition(positionRequest : PositionRequest, signature : string, lastValidBH : number) : Position & { buyConfirmed: false } {
+        
+        const autoDoubleFeatureSwitchOff = !strictParseBoolean(this.env.ALLOW_CHOOSE_AUTO_DOUBLE_SLIPPAGE);
+        const autoDouble = autoDoubleFeatureSwitchOff ? false : positionRequest.sellAutoDoubleSlippage;
+        
         const position : Position & { buyConfirmed : false } = {
             userID: positionRequest.userID,
             chatID : positionRequest.chatID,
@@ -163,7 +166,7 @@ export class PositionBuyer {
     
             sellSlippagePercent: positionRequest.slippagePercent,
             triggerPercent : positionRequest.triggerPercent,
-            sellAutoDoubleSlippage : positionRequest.sellAutoDoubleSlippage,
+            sellAutoDoubleSlippage : autoDouble,
             fillPrice: positionRequest.quote.fillPrice,
             fillPriceMS : positionRequest.quote.quoteTimeMS,
             netPNL: null // to be set when position is closed

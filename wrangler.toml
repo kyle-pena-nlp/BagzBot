@@ -68,7 +68,7 @@ TEST_NO_ADMINS_MODE = "true"
 # feature switches
 REBUILD_TOKENS_CRON_JOB = "true"
 TX_SIM_BEFORE_BUY = "true"
-ALLOW_CHOOSE_AUTO_DOUBLE_SLIPPAGE = "true"
+ALLOW_CHOOSE_AUTO_DOUBLE_SLIPPAGE = "false"
 
 [env.beta.vars]
 # do not change this string EVER post launch
