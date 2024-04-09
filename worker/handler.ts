@@ -195,7 +195,7 @@ export class CallbackHandler {
                 }
                 const request = convertPreRequestToRequest(newPrerequest, quote, tokenInfoResponse.tokenInfo);
                 await storeSessionObj<PositionRequest>(params.getTelegramUserID(), params.chatID, messageID, request, POSITION_REQUEST_STORAGE_KEY, this.env);
-                return new MenuEditPositionRequest({ positionRequest: request, maybeSOLBalance });
+                return new MenuEditPositionRequest({ positionRequest: request, maybeSOLBalance, allowChooseAutoDoubleSlippage: this.allowChooseAutoDouble() });
             case MenuCode.Error:
                 return new MenuError(undefined);
             case MenuCode.ViewDecryptedWallet:
@@ -222,7 +222,7 @@ export class CallbackHandler {
                 if (positionAndMaybePNL == null) {
                     return new MenuContinueMessage('Sorry - this position no longer exists!', MenuCode.Main);
                 }
-                return new MenuViewOpenPosition({ data: positionAndMaybePNL, allowChooseAutoDoubleSlippage: strictParseBoolean(this.env.ALLOW_CHOOSE_AUTO_DOUBLE_SLIPPAGE) });
+                return new MenuViewOpenPosition({ data: positionAndMaybePNL, allowChooseAutoDoubleSlippage: this.allowChooseAutoDouble() });
             case MenuCode.ClosePositionManuallyAction:
                 const closePositionID = callbackData.menuArg;
                 if (closePositionID != null) {
@@ -372,7 +372,7 @@ export class CallbackHandler {
                 }
                 const positionRequest = await readSessionObj<PositionRequest>(params.getTelegramUserID(), params.chatID, messageID, POSITION_REQUEST_STORAGE_KEY, this.env);
                 if (positionRequest.token.address === newTokenAddress) {
-                    return new MenuEditPositionRequest({ positionRequest: positionRequest, maybeSOLBalance });
+                    return new MenuEditPositionRequest({ positionRequest: positionRequest, maybeSOLBalance, allowChooseAutoDoubleSlippage: this.allowChooseAutoDouble() });
                 }                
                 const tokenValidationInfo = await getTokenInfo(newTokenAddress, this.env);
                 if (isInvalidTokenInfoResponse(tokenValidationInfo)) {
@@ -386,7 +386,7 @@ export class CallbackHandler {
                 }
                 positionRequest.quote = maybeQuote;
                 await storeSessionObj<PositionRequest>(params.getTelegramUserID(), params.chatID, messageID, positionRequest, POSITION_REQUEST_STORAGE_KEY, this.env);
-                return new MenuEditPositionRequest({ positionRequest, maybeSOLBalance });
+                return new MenuEditPositionRequest({ positionRequest, maybeSOLBalance, allowChooseAutoDoubleSlippage: this.allowChooseAutoDouble() });
             case MenuCode.WelcomeScreenPart1:
                 return new WelcomeScreenPart1({ botDisplayName: this.env.TELEGRAM_BOT_DISPLAY_NAME });
             case MenuCode.LegalAgreement:
@@ -504,7 +504,7 @@ export class CallbackHandler {
                     return new MenuContinueMessage(`Sorry - please choose a percent greater than zero and less than 100`, MenuCode.ViewOpenPosition, 'HTML', parsedCallbackData.positionID);
                 }
                 else {
-                    return new MenuViewOpenPosition( { data: editTriggerPercentResult, allowChooseAutoDoubleSlippage: strictParseBoolean(this.env.ALLOW_CHOOSE_AUTO_DOUBLE_SLIPPAGE) });
+                    return new MenuViewOpenPosition( { data: editTriggerPercentResult, allowChooseAutoDoubleSlippage: this.allowChooseAutoDouble() });
                 }
             case MenuCode.EditOpenPositionAutoDoubleSlippage:
                 return new MenuEditOpenPositionSellAutoDoubleSlippage(callbackData.menuArg||'');
@@ -544,7 +544,7 @@ export class CallbackHandler {
                         params.messageID, 
                         POSITION_REQUEST_STORAGE_KEY, 
                         this.env);
-                    return new MenuEditPositionRequest({ positionRequest: pr, maybeSOLBalance });
+                    return new MenuEditPositionRequest({ positionRequest: pr, maybeSOLBalance, allowChooseAutoDoubleSlippage: this.allowChooseAutoDouble() });
                 }
             case MenuCode.AdminInvokeAlarm:
                 return new ReplyQuestion('Enter token address', ReplyQuestionCode.AdminInvokeAlarm, this.context, { callback: { linkedMessageID: params.messageID, nextMenuCode: MenuCode.SubmitAdminInvokeAlarm }});
@@ -574,7 +574,7 @@ export class CallbackHandler {
                 if (updatedPosition.positionAndMaybePNL == null) {
                     return this.sorryError();
                 }
-                return new MenuViewOpenPosition({ data: updatedPosition.positionAndMaybePNL, allowChooseAutoDoubleSlippage: strictParseBoolean(this.env.ALLOW_CHOOSE_AUTO_DOUBLE_SLIPPAGE) });
+                return new MenuViewOpenPosition({ data: updatedPosition.positionAndMaybePNL, allowChooseAutoDoubleSlippage: this.allowChooseAutoDouble() });
             case MenuCode.AdminSendUserMessage:
                 return new ReplyQuestion("Enter userID|message", ReplyQuestionCode.AdminSendUserMessage, this.context, {
                     callback: {
@@ -623,7 +623,7 @@ export class CallbackHandler {
         if (positionAndMaybePNL == null) {
             return this.sorryError();
         }
-        return new MenuViewOpenPosition({ data: positionAndMaybePNL, allowChooseAutoDoubleSlippage: strictParseBoolean(this.env.ALLOW_CHOOSE_AUTO_DOUBLE_SLIPPAGE) });
+        return new MenuViewOpenPosition({ data: positionAndMaybePNL, allowChooseAutoDoubleSlippage: this.allowChooseAutoDouble() });
     }
 
     private async sendBetaFeedbackToSuperAdmin(feedback : string, myUserName : string, myUserID : number) : Promise<void> {
@@ -677,7 +677,7 @@ export class CallbackHandler {
 
     private async makeStopLossRequestEditorMenu(positionRequest : PositionRequest, maybeSOLBalance : DecimalizedAmount|null, env : Env) : Promise<BaseMenu> {
         await this.refreshQuote(positionRequest, env);
-        return new MenuEditPositionRequest({ positionRequest, maybeSOLBalance });
+        return new MenuEditPositionRequest({ positionRequest, maybeSOLBalance, allowChooseAutoDoubleSlippage: this.allowChooseAutoDouble() });
     }
 
     private async handleManuallyClosePosition(telegramUserID : number, chatID : number, positionID : string, env : Env) : Promise<Response> {
@@ -829,7 +829,7 @@ export class CallbackHandler {
 
                 const maybeSOLBalance = await getUserWalletSOLBalance(positionRequest.userID, positionRequest.chatID, this.env);
 
-                return ['...', new MenuEditPositionRequest({ positionRequest, maybeSOLBalance }), storeObjectRequest];
+                return ['...', new MenuEditPositionRequest({ positionRequest, maybeSOLBalance, allowChooseAutoDoubleSlippage: this.allowChooseAutoDouble() }), storeObjectRequest];
             default:
                 throw new Error(`Unrecognized command: ${command}`);
         }
@@ -842,5 +842,9 @@ export class CallbackHandler {
         }
         positionRequest.quote = quote;
         return true;
+    }
+
+    private allowChooseAutoDouble() : boolean {
+        return strictParseBoolean(this.env.ALLOW_CHOOSE_AUTO_DOUBLE_SLIPPAGE);
     }
 }

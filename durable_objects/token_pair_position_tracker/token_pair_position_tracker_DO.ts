@@ -612,7 +612,7 @@ export class TokenPairPositionTrackerDO {
                     this.tokenPairPositionTracker.markPositionAsOpen(pos.positionID);
                 }
                 else if (confirmedSellStatus === 'slippage-failed') {
-                    if (pos.sellAutoDoubleSlippage) {
+                    if (pos.sellAutoDoubleSlippage && strictParseBoolean(this.env.ALLOW_CHOOSE_AUTO_DOUBLE_SLIPPAGE)) {
                         const maxSlippage = 100; // TODO: make a user global setting
                         const sellSlippagePercent = Math.min(maxSlippage, 2 * pos.sellSlippagePercent);
                         await TGStatusMessage.finalMessage(channel, "The sale failed due to slippage.  We have increased the slippage to ${sellSlippagePercent}% and will retry the sale if the trigger conditions holds.", true);

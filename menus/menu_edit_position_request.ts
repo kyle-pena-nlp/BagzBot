@@ -6,7 +6,7 @@ import { Menu, MenuCapabilities } from "./menu";
 import { MenuCode } from "./menu_code";
 import { renderTrailingStopLossRequestMarkdown } from "./trailing_stop_loss_helpers";
 
-export class MenuEditPositionRequest extends Menu< { positionRequest: PositionRequest, maybeSOLBalance : DecimalizedAmount|null }> implements MenuCapabilities {
+export class MenuEditPositionRequest extends Menu< { positionRequest: PositionRequest, maybeSOLBalance : DecimalizedAmount|null, allowChooseAutoDoubleSlippage : boolean }> implements MenuCapabilities {
     renderText(): string {
         const positionRequest = this.menuData.positionRequest;
         
@@ -37,7 +37,9 @@ export class MenuEditPositionRequest extends Menu< { positionRequest: PositionRe
         this.insertButtonNextLine(options, `:dollars: ${positionRequest.vsTokenAmt} ${positionRequest.vsToken.symbol}`, new CallbackData(MenuCode.TrailingStopLossEntryBuyQuantityMenu, positionRequest.vsTokenAmt.toString()));
         this.insertButtonSameLine(options, `:chart_down: ${positionRequest.triggerPercent}% Trigger`, new CallbackData(MenuCode.TrailingStopLossTriggerPercentMenu, positionRequest.triggerPercent.toString()));
         this.insertButtonSameLine(options, `:twisted_arrows: ${positionRequest.slippagePercent}% Slippage`, new CallbackData(MenuCode.TrailingStopLossSlippagePctMenu, positionRequest.slippagePercent.toString()));
-        this.insertButtonNextLine(options, `:brain: ${positionRequest.sellAutoDoubleSlippage ? 'Sell: Auto-Double Slippage': 'Sell: No Auto-Double Slippage'} :brain:`, new CallbackData(MenuCode.PosRequestChooseAutoDoubleSlippageOptions));
+        if (this.menuData.allowChooseAutoDoubleSlippage) {
+            this.insertButtonNextLine(options, `:brain: ${positionRequest.sellAutoDoubleSlippage ? 'Sell: Auto-Double Slippage': 'Sell: No Auto-Double Slippage'} :brain:`, new CallbackData(MenuCode.PosRequestChooseAutoDoubleSlippageOptions));
+        }
         this.insertButtonNextLine(options, `:refresh: Refresh Quote`, new CallbackData(MenuCode.TrailingStopLossRequestReturnToEditorMenu));
         this.insertButtonSameLine(options, `:cancel: Cancel`, new CallbackData(MenuCode.Main));
         //this.insertButtonSameLine(options, ':help: Help', new CallbackData(MenuCode.EditPositionHelp));

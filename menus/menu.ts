@@ -144,10 +144,13 @@ export abstract class BaseMenu {
     }
 }
 
+// export EnvWithNoSecrets
+
 export abstract class Menu<T> extends BaseMenu {
 
     menuData   : T;
 
+    // ENV with no secrets as parameter.
     constructor(miscData : T) {
         super();
         this.menuData = miscData;

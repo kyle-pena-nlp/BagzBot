@@ -59,7 +59,7 @@ const DEFAULT_POSITION_PREREQUEST : PositionPreRequest = {
     vsTokenAmt : 1.0,
     slippagePercent : 5.0,
     triggerPercent : 5,
-    sellAutoDoubleSlippage : true            
+    sellAutoDoubleSlippage : false            
 };
 
 /* Durable Object storing state of user */
