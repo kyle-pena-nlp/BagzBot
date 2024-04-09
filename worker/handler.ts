@@ -222,7 +222,7 @@ export class CallbackHandler {
                 if (positionAndMaybePNL == null) {
                     return new MenuContinueMessage('Sorry - this position no longer exists!', MenuCode.Main);
                 }
-                return new MenuViewOpenPosition(positionAndMaybePNL);
+                return new MenuViewOpenPosition({ data: positionAndMaybePNL, allowChooseAutoDoubleSlippage: strictParseBoolean(this.env.ALLOW_CHOOSE_AUTO_DOUBLE_SLIPPAGE) });
             case MenuCode.ClosePositionManuallyAction:
                 const closePositionID = callbackData.menuArg;
                 if (closePositionID != null) {
@@ -504,7 +504,7 @@ export class CallbackHandler {
                     return new MenuContinueMessage(`Sorry - please choose a percent greater than zero and less than 100`, MenuCode.ViewOpenPosition, 'HTML', parsedCallbackData.positionID);
                 }
                 else {
-                    return new MenuViewOpenPosition(editTriggerPercentResult);
+                    return new MenuViewOpenPosition( { data: editTriggerPercentResult, allowChooseAutoDoubleSlippage: strictParseBoolean(this.env.ALLOW_CHOOSE_AUTO_DOUBLE_SLIPPAGE) });
                 }
             case MenuCode.EditOpenPositionAutoDoubleSlippage:
                 return new MenuEditOpenPositionSellAutoDoubleSlippage(callbackData.menuArg||'');
@@ -574,7 +574,7 @@ export class CallbackHandler {
                 if (updatedPosition.positionAndMaybePNL == null) {
                     return this.sorryError();
                 }
-                return new MenuViewOpenPosition(updatedPosition.positionAndMaybePNL);
+                return new MenuViewOpenPosition({ data: updatedPosition.positionAndMaybePNL, allowChooseAutoDoubleSlippage: strictParseBoolean(this.env.ALLOW_CHOOSE_AUTO_DOUBLE_SLIPPAGE) });
             case MenuCode.AdminSendUserMessage:
                 return new ReplyQuestion("Enter userID|message", ReplyQuestionCode.AdminSendUserMessage, this.context, {
                     callback: {
@@ -623,14 +623,14 @@ export class CallbackHandler {
         if (positionAndMaybePNL == null) {
             return this.sorryError();
         }
-        return new MenuViewOpenPosition(positionAndMaybePNL);
+        return new MenuViewOpenPosition({ data: positionAndMaybePNL, allowChooseAutoDoubleSlippage: strictParseBoolean(this.env.ALLOW_CHOOSE_AUTO_DOUBLE_SLIPPAGE) });
     }
 
     private async sendBetaFeedbackToSuperAdmin(feedback : string, myUserName : string, myUserID : number) : Promise<void> {
         await sendMessageToUser(strictParseInt(this.env.SUPER_ADMIN_USER_ID), myUserName, myUserID,feedback, this.env);
     }
 
-    private async createMainMenu(info : CallbackHandlerParams, env : Env) : Promise<BaseMenu> {
+    private async createMainMenu(info : CallbackHandlerParams | TelegramWebhookInfo, env : Env) : Promise<BaseMenu> {
         const userData = await getUserData(info.getTelegramUserID(), info.chatID, info.messageID, false, env);
         return new MenuMain({ ...userData, 
             isAdminOrSuperAdmin: info.isAdminOrSuperAdmin(env), 
@@ -774,30 +774,11 @@ export class CallbackHandler {
         switch(command) {
             case '/start':
                 const userData = await getUserData(info.getTelegramUserID(), info.chatID, info.messageID, false, env);
-                return ["...", new MenuMain({ 
-                    ...userData, 
-                    isAdminOrSuperAdmin: info.isAdminOrSuperAdmin(env), 
-                    isImpersonatingUser : info.isImpersonatingAUser(), 
-                    impersonatedUserID: info.isImpersonatingAUser() ? info.getTelegramUserID() : undefined,
-                    botName : this.getBotName(env),
-                    botTagline: env.TELEGRAM_BOT_TAGLINE,
-                    isBeta: env.ENVIRONMENT === 'beta',
-                    isDev : env.ENVIRONMENT === 'dev',
-                    isInviteCodeGated : strictParseBoolean(env.IS_BETA_CODE_GATED)
-                })];
+                const mainMenuStart = await this.createMainMenu(info, env);
+                return ["...", mainMenuStart];
             case '/menu':
-                const menuUserData = await getUserData(info.getTelegramUserID(), info.chatID, info.messageID, false, env);
-                return ['...', new MenuMain({ 
-                    ...menuUserData, 
-                    isAdminOrSuperAdmin : info.isAdminOrSuperAdmin(env), 
-                    isImpersonatingUser: info.isImpersonatingAUser(), 
-                    impersonatedUserID: info.isImpersonatingAUser() ? info.getTelegramUserID() : undefined,
-                    botName : this.getBotName(env),
-                    botTagline: env.TELEGRAM_BOT_TAGLINE,
-                    isBeta : env.ENVIRONMENT === 'beta',
-                    isDev : env.ENVIRONMENT === 'dev',
-                    isInviteCodeGated : strictParseBoolean(env.IS_BETA_CODE_GATED)
-                })];
+                const menuMain = await this.createMainMenu(info, env);
+                return ['...', menuMain];
             case '/welcome_screen':
                 return ['...', new WelcomeScreenPart1({ botDisplayName: this.env.TELEGRAM_BOT_DISPLAY_NAME })];
             case '/legal_agreement':

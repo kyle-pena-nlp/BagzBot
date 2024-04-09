@@ -10,7 +10,7 @@ import { MenuCode } from "./menu_code";
 
 type BrandNewPosition = { brandNewPosition : true, position : Position };
 
-export class MenuViewOpenPosition extends Menu<PositionAndMaybePNL|BrandNewPosition> implements MenuCapabilities {
+export class MenuViewOpenPosition extends Menu< { allowChooseAutoDoubleSlippage : boolean, data: (PositionAndMaybePNL|BrandNewPosition) }> implements MenuCapabilities {
     renderText(): string {
         const lines = [];
         lines.push(...this.headerLines());
@@ -27,20 +27,22 @@ export class MenuViewOpenPosition extends Menu<PositionAndMaybePNL|BrandNewPosit
         if (this.isClosingOrClosed()) {
             // no-op
         }
-        else if (this.menuData.position.status === PositionStatus.Open && !this.triggerConditionMet()) {
+        else if (this.position().status === PositionStatus.Open && !this.triggerConditionMet()) {
 
-            const closePositionCallbackData = new CallbackData(MenuCode.ClosePositionManuallyAction, this.menuData.position.positionID);
+            const closePositionCallbackData = new CallbackData(MenuCode.ClosePositionManuallyAction, this.position().positionID);
             
             if (this.buyIsConfirmed()) {
                 this.insertButtonNextLine(options, ":cancel: Stop Monitoring And Sell Now", closePositionCallbackData);
             }
             
-            this.insertButtonNextLine(options, `:chart_down: ${this.menuData.position.triggerPercent}% Trigger`, new CallbackData(MenuCode.EditOpenPositionTriggerPercent, this.menuData.position.positionID));
-            this.insertButtonNextLine(options, `:twisted_arrows: ${this.menuData.position.sellSlippagePercent}% Slippage`, new CallbackData(MenuCode.EditOpenPositionSellSlippagePercent, this.menuData.position.positionID));
-            this.insertButtonNextLine(options, `:brain: ${this.menuData.position.sellAutoDoubleSlippage ? '': 'Do Not'} Auto-Double Slippage If TSL Fails :brain:`, new CallbackData(MenuCode.EditOpenPositionAutoDoubleSlippage, this.menuData.position.positionID));
+            this.insertButtonNextLine(options, `:chart_down: ${this.position().triggerPercent}% Trigger`, new CallbackData(MenuCode.EditOpenPositionTriggerPercent, this.position().positionID));
+            this.insertButtonNextLine(options, `:twisted_arrows: ${this.position().sellSlippagePercent}% Slippage`, new CallbackData(MenuCode.EditOpenPositionSellSlippagePercent, this.position().positionID));
+            if (this.menuData.allowChooseAutoDoubleSlippage) {
+                this.insertButtonNextLine(options, `:brain: ${this.position().sellAutoDoubleSlippage ? '': 'Do Not'} Auto-Double Slippage If TSL Fails :brain:`, new CallbackData(MenuCode.EditOpenPositionAutoDoubleSlippage, this.position().positionID));
+            }
         }
 
-        const refreshPositionCallbackData = new CallbackData(MenuCode.ViewOpenPosition, this.menuData.position.positionID);
+        const refreshPositionCallbackData = new CallbackData(MenuCode.ViewOpenPosition, this.position().positionID);
         this.insertButtonNextLine(options, ":refresh: Refresh", refreshPositionCallbackData);
         this.insertButtonNextLine(options, ":back: Back", this.menuCallback(MenuCode.ListPositions));
 
@@ -146,7 +148,7 @@ export class MenuViewOpenPosition extends Menu<PositionAndMaybePNL|BrandNewPosit
     }
 
     private position() : Position {
-        return this.menuData.position;
+        return this.menuData.data.position;
     }
 
     private pricePercentDelta(this : { menuData : { PNL : PNL, position : Position }}) : DecimalizedAmount {
@@ -168,32 +170,32 @@ export class MenuViewOpenPosition extends Menu<PositionAndMaybePNL|BrandNewPosit
 
     private footerLines() : string[] {
         return [
-            `Support Code: <i>${this.menuData.position.positionID}</i>`
+            `Support Code: <i>${this.position().positionID}</i>`
         ];
     }
 
     private fillPrice() : DecimalizedAmount {
-        return this.menuData.position.fillPrice;
+        return this.position().fillPrice;
     }
 
     private buyIsConfirmed() : boolean {
-        return this.menuData.position.buyConfirmed;
+        return this.position().buyConfirmed;
     }
 
     private isOpen() : boolean {
-        return this.menuData.position.status === PositionStatus.Open;
+        return this.position().status === PositionStatus.Open;
     }
 
     private isClosing() : boolean {
-        return this.menuData.position.status === PositionStatus.Closing;
+        return this.position().status === PositionStatus.Closing;
     }
 
     private isClosed() : boolean {
-        return this.menuData.position.status === PositionStatus.Closed;
+        return this.position().status === PositionStatus.Closed;
     }
 
     private sellIsUnconfirmed() : boolean {
-        return this.menuData.position.sellConfirmed === false; // triple eq deliberate
+        return this.position().sellConfirmed === false; // triple eq deliberate
     }
 
     private pnlDeltaPct(this : { menuData : PositionAndMaybePNL & { PNL : PNL } }) : DecimalizedAmount {
@@ -226,7 +228,7 @@ export class MenuViewOpenPosition extends Menu<PositionAndMaybePNL|BrandNewPosit
     }
 
     private isClosingOrClosed() : this is { menuData : { position : { status : PositionStatus.Closing|PositionStatus.Closed }}} {
-        const status = this.menuData.position.status;
+        const status = this.position().status;
         return status === PositionStatus.Closing || status === PositionStatus.Closed;
     }
 
