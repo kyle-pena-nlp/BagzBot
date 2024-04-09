@@ -15,6 +15,7 @@ import { SetSellAutoDoubleOnOpenPositionResponse } from "../user/actions/set_sel
 import { SellSellSlippagePercentageOnOpenPositionResponse } from "../user/actions/set_sell_slippage_percent_on_open_position";
 import { sendClosePositionOrdersToUserDOs } from "../user/userDO_interop";
 import { AdminDeleteAllInTrackerRequest, AdminDeleteAllInTrackerResponse } from "./actions/admin_delete_all_positions_in_tracker";
+import { AdminDeleteClosedPositionsForUserInTrackerRequest, AdminDeleteClosedPositionsForUserInTrackerResponse } from "./actions/admin_delete_closed_positions_for_user_in_tracker";
 import { EditTriggerPercentOnOpenPositionInTrackerRequest } from "./actions/edit_trigger_percent_on_open_position_in_tracker";
 import { GetPositionFromPriceTrackerRequest, GetPositionFromPriceTrackerResponse } from "./actions/get_position";
 import { GetPositionAndMaybePNLFromPriceTrackerRequest, GetPositionAndMaybePNLFromPriceTrackerResponse } from "./actions/get_position_and_maybe_pnl";
@@ -336,9 +337,17 @@ export class TokenPairPositionTrackerDO {
                 return await this.handleUpdatePosition(body);
             case TokenPairPositionTrackerDOFetchMethod.getPositionCounts:
                 return await this.handleGetPositionCounts(body);
+            case TokenPairPositionTrackerDOFetchMethod.adminDeleteClosedPositionsForUser:
+                return await this.handleAdminDeleteClosedPositionsForUser(body);
             default:
                 assertNever(method);
         }
+    }
+
+    async handleAdminDeleteClosedPositionsForUser(userAction: AdminDeleteClosedPositionsForUserInTrackerRequest) : Promise<Response> {
+        this.tokenPairPositionTracker.deleteClosedPositionsForUser(userAction.telegramUserID);
+        const response : AdminDeleteClosedPositionsForUserInTrackerResponse = {};
+        return makeJSONResponse<AdminDeleteClosedPositionsForUserInTrackerResponse>(response);
     }
 
     async handleGetPositionCounts(body : GetPositionCountsFromTrackerRequest) : Promise<Response> {

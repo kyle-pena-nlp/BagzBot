@@ -5,6 +5,8 @@ import { TokenInfo } from "../../tokens";
 import { Structural, groupIntoBatches, groupIntoMap, makeJSONRequest, makeRequest } from "../../util";
 import { PositionAndMaybePNL } from "../token_pair_position_tracker/model/position_and_PNL";
 import { AdminDeleteAllPositionsRequest, AdminDeleteAllPositionsResponse } from "./actions/admin_delete_all_positions";
+import { AdminDeleteClosedPositionsRequest, AdminDeleteClosedPositionsResponse } from "./actions/admin_delete_closed_positions";
+import { AdminResetDefaultPositionRequest, AdminResetDefaultPositionResponse } from "./actions/admin_reset_default_position_request";
 import { AutomaticallyClosePositionsRequest, AutomaticallyClosePositionsResponse } from "./actions/automatically_close_positions";
 import { DeleteSessionRequest } from "./actions/delete_session";
 import { EditTriggerPercentOnOpenPositionRequest, EditTriggerPercentOnOpenPositionResponse } from "./actions/edit_trigger_percent_on_open_position";
@@ -54,7 +56,23 @@ export enum UserDOFetchMethod {
 	adminDeleteAllPositions = "adminDeleteAllPositions",
 	setSellSlippagePercentOnOpenPosition = "setSellSlippagePercentOnOpenPosition",
 	getUserWalletSOLBalance = "getUserSOLBalance",
-	getClosedPositionsAndPNLSummary = "getClosedPositionsAndPNLSummary"
+	getClosedPositionsAndPNLSummary = "getClosedPositionsAndPNLSummary",
+	adminDeleteClosedPositions = "adminDeleteClosedPositions",
+	adminResetDefaultPositionRequest = "adminResetDefaultPositionRequest"
+}
+
+export async function adminDeleteClosedPositions(telegramUserID : number, chatID : number, env : Env) : Promise<AdminDeleteClosedPositionsResponse> {
+	const request : AdminDeleteClosedPositionsRequest = { telegramUserID, chatID };
+	const method = UserDOFetchMethod.adminDeleteClosedPositions;
+	const response = await sendJSONRequestToUserDO<AdminDeleteClosedPositionsRequest,AdminDeleteClosedPositionsResponse>(telegramUserID, method, request, env);
+	return response;
+}
+
+export async function adminResetDefaultPositionRequest(telegramUserID : number, chatID : number, env : Env) : Promise<AdminResetDefaultPositionResponse> {
+	const request: AdminResetDefaultPositionRequest = { telegramUserID, chatID };
+	const method = UserDOFetchMethod.adminResetDefaultPositionRequest;
+	const response = await sendJSONRequestToUserDO<AdminResetDefaultPositionRequest,AdminResetDefaultPositionResponse>(telegramUserID, method, request, env);
+	return response;
 }
 
 export async function getClosedPositionsAndPNLSummary(telegramUserID : number, chatID : number, env : Env) : Promise<GetClosedPositionsAndPNLSummaryResponse> {

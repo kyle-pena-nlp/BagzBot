@@ -12,8 +12,10 @@ import { ChangeTrackedValue, Structural, assertNever, groupIntoBatches, makeFail
 import { assertIs } from "../../util/enums";
 import { listUnclaimedBetaInviteCodes } from "../beta_invite_codes/beta_invite_code_interop";
 import { PositionAndMaybePNL } from "../token_pair_position_tracker/model/position_and_PNL";
-import { editTriggerPercentOnOpenPositionInTracker, getPositionAndMaybePNL, listClosedPositionsFromTracker, listPositionsByUser, removePosition, setSellAutoDoubleOnOpenPositionInPositionTracker, setSellSlippagePercentOnOpenPositionInTracker } from "../token_pair_position_tracker/token_pair_position_tracker_do_interop";
+import { adminDeleteClosedPositionsForUser, editTriggerPercentOnOpenPositionInTracker, getPositionAndMaybePNL, listClosedPositionsFromTracker, listPositionsByUser, removePosition, setSellAutoDoubleOnOpenPositionInPositionTracker, setSellSlippagePercentOnOpenPositionInTracker } from "../token_pair_position_tracker/token_pair_position_tracker_do_interop";
 import { AdminDeleteAllPositionsRequest, AdminDeleteAllPositionsResponse } from "./actions/admin_delete_all_positions";
+import { AdminDeleteClosedPositionsRequest } from "./actions/admin_delete_closed_positions";
+import { AdminResetDefaultPositionRequest, AdminResetDefaultPositionResponse } from "./actions/admin_reset_default_position_request";
 import { AutomaticallyClosePositionsRequest, AutomaticallyClosePositionsResponse } from "./actions/automatically_close_positions";
 import { BaseUserDORequest, isBaseUserDORequest } from "./actions/base_user_do_request";
 import { DeleteSessionRequest, DeleteSessionResponse } from "./actions/delete_session";
@@ -307,11 +309,32 @@ export class UserDO {
             case UserDOFetchMethod.getClosedPositionsAndPNLSummary:
                 response = await this.handleGetClosedPositionsAndPNLSummary(userAction);
                 break;
+            case UserDOFetchMethod.adminDeleteClosedPositions:
+                response = await this.handleDeleteClosedPositions(userAction);
+                break;
+            case UserDOFetchMethod.adminResetDefaultPositionRequest:
+                response = await this.handleResetDefaultPositionRequest(userAction);
+                break;
             default:
                 assertNever(method);
         }
 
         return [method,userAction,response];
+    }
+
+    async handleDeleteClosedPositions(userAction : AdminDeleteClosedPositionsRequest) : Promise<Response> {
+        const uniqueTokenPairs = this.tokenPairsForPositionIDsTracker.listUniqueTokenPairs();
+        for (const pair of uniqueTokenPairs) {
+            await adminDeleteClosedPositionsForUser(userAction.telegramUserID, pair.tokenAddress, pair.vsTokenAddress, this.env);
+        }
+        const response : AdminDeleteAllPositionsResponse = {};
+        return makeJSONResponse<AdminDeleteAllPositionsResponse>(response);
+    }
+
+    async handleResetDefaultPositionRequest(userAction: AdminResetDefaultPositionRequest) : Promise<Response> {
+        this.defaultTrailingStopLossRequest.value = structuredClone(DEFAULT_POSITION_PREREQUEST);
+        const response : AdminResetDefaultPositionResponse = {};
+        return makeJSONResponse<AdminResetDefaultPositionResponse>(response);
     }
 
     async handleGetClosedPositionsAndPNLSummary(userAction : GetClosedPositionsAndPNLSummaryRequest) : Promise<Response> {

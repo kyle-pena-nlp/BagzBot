@@ -29,14 +29,27 @@ export class TokenPairPositionTracker {
         this.pricePeaks.__clearAllPositions();
     }
 
+    deleteClosedPositionsForUser(telegramUserID : number) {
+        // TODO: make 2-level lookup by user.
+        const closedPositions = [...this.closedPositions.values()]
+        for (const closedPosition of closedPositions) {
+            if (closedPosition.userID === telegramUserID) {
+                this.closedPositions.delete(closedPosition.positionID);
+            }
+        }
+    }
+
     listAllPositions() : Position[] {
         return this.pricePeaks.listAllPositions();
     }
 
     listClosedPositionsForUser(telegramUserID : number) : Position[] {
         const result : Position[] = [];
+        // TODO: do a 2-level lookup by user. This won't scale.
         for (const closedPosition of this.closedPositions.values()) {
-            result.push(closedPosition);
+            if (closedPosition.userID === telegramUserID) {
+                result.push(closedPosition);
+            }
         }
         return result;
     }

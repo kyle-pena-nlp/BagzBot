@@ -7,6 +7,7 @@ import { EditTriggerPercentOnOpenPositionResponse } from "../user/actions/edit_t
 import { SetSellAutoDoubleOnOpenPositionResponse } from "../user/actions/set_sell_auto_double_on_open_position";
 import { SellSellSlippagePercentageOnOpenPositionResponse } from "../user/actions/set_sell_slippage_percent_on_open_position";
 import { AdminDeleteAllInTrackerRequest, AdminDeleteAllInTrackerResponse } from "./actions/admin_delete_all_positions_in_tracker";
+import { AdminDeleteClosedPositionsForUserInTrackerRequest, AdminDeleteClosedPositionsForUserInTrackerResponse } from "./actions/admin_delete_closed_positions_for_user_in_tracker";
 import { EditTriggerPercentOnOpenPositionInTrackerRequest } from "./actions/edit_trigger_percent_on_open_position_in_tracker";
 import { GetPositionFromPriceTrackerRequest, GetPositionFromPriceTrackerResponse } from "./actions/get_position";
 import { GetPositionAndMaybePNLFromPriceTrackerRequest, GetPositionAndMaybePNLFromPriceTrackerResponse } from "./actions/get_position_and_maybe_pnl";
@@ -50,7 +51,15 @@ export enum TokenPairPositionTrackerDOFetchMethod {
 	listClosedPositionsFromTracker = "listClosedPositionsFromTracker",
 	insertPosition = "insertPosition",
 	updatePosition = "updatePosition",
-	getPositionCounts = "getPositionCounts"
+	getPositionCounts = "getPositionCounts",
+	adminDeleteClosedPositionsForUser = "adminDeleteClosedPositionsForUser"
+}
+
+export async function adminDeleteClosedPositionsForUser(telegramUserID : number, tokenAddress : string, vsTokenAddress : string,  env:Env) : Promise<AdminDeleteClosedPositionsForUserInTrackerResponse> {
+	const request : AdminDeleteClosedPositionsForUserInTrackerRequest = { telegramUserID, tokenAddress, vsTokenAddress };
+	const method = TokenPairPositionTrackerDOFetchMethod.adminDeleteClosedPositionsForUser;
+	const response = await sendJSONRequestToTokenPairPositionTracker<AdminDeleteClosedPositionsForUserInTrackerRequest,AdminDeleteClosedPositionsForUserInTrackerResponse>(method, request, tokenAddress, vsTokenAddress, env);
+	return response;
 }
 
 export async function getPositionCountsFromTracker(tokenAddress : string, vsTokenAddress : string, env : Env) : Promise<Record<PositionStatus,number>> {

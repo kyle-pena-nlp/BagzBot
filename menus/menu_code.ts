@@ -20,6 +20,8 @@ export enum MenuCode {
 	ComingSoon = "CS", // as short as possible to make room for the coming soon message
 	AdminCountPositions = "AdminCountPositions",
 	MenuWhatIsTSL = "MenuWhatIsTSL",
+	AdminResetPositionRequestDefaults = "AdminResetPositionRequestDefaults",
+	AdminDeleteClosedPositions = "AdminDeleteClosedPositions",
 
 	PosRequestChooseAutoDoubleSlippageOptions = "EPR.AutoDoubleSlip",
 	SubmitPosRequestAutoDoubleSlippageOptions = "SPR.AutoDoubleSlip",
