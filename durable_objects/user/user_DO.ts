@@ -132,7 +132,7 @@ export class UserDO {
         this.tokenPairsForPositionIDsTracker.initialize(storage);
         this.userPNLTracker.initialize(storage);
         this.chatID.initialize(storage);
-        logInfo("Loaded userDO from storage: ", this.telegramUserID.value);
+        //logInfo("Loaded userDO from storage: ", this.telegramUserID.value);
     }
 
     async flushToStorage() {
@@ -151,7 +151,7 @@ export class UserDO {
     }
 
     async alarm() {
-        logDebug(`Invoking alarm for ${this.telegramUserID.value}`);
+        //logDebug(`Invoking alarm for ${this.telegramUserID.value}`);
         try {
             await this.state.storage.deleteAlarm();
             await this.maybeScheduleAlarm();

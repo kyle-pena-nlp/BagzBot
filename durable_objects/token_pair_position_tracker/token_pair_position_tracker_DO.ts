@@ -94,13 +94,13 @@ export class TokenPairPositionTrackerDO {
     }
 
     async loadStateFromStorage(storage : DurableObjectStorage) {
-        logDebug("Loading token_pair_position_tracker from storage");
+        //logDebug("Loading token_pair_position_tracker from storage");
         const entries = await storage.list();
         this.tokenAddress.initialize(entries);
         this.vsTokenAddress.initialize(entries);
         this.tokenPairPositionTracker.initialize(entries);
         this.currentPriceTracker.initialize(entries);
-        logDebug("Loaded token_pair_position_tracker from storage");
+        //logDebug("Loaded token_pair_position_tracker from storage");
     }
 
     async flushToStorage() {
@@ -115,7 +115,7 @@ export class TokenPairPositionTrackerDO {
             await this.tokenPairPositionTracker.flushToStorage(this.state.storage).catch(captureError("tokenPairPositionTracker")),
             await this.currentPriceTracker.flushToStorage(this.state.storage).catch(captureError("currentPriceTracker"))
         ]).then(() => {
-            logDebug("Finished flushing tokenPairPositionTracker to storage.")
+            //logDebug("Finished flushing tokenPairPositionTracker to storage.")
         });
     }
 
@@ -145,7 +145,7 @@ export class TokenPairPositionTrackerDO {
     }
 
     async alarm() {
-        logDebug(`Invoking alarm. ${this.tokenAddress.value}`);        
+        //logDebug(`Invoking alarm. ${this.tokenAddress.value}`);        
         try {
             await this._alarm();
         }
@@ -154,7 +154,7 @@ export class TokenPairPositionTrackerDO {
         }
         finally {
             await this.flushToStorage();
-            logDebug(`Finished Invoking alarm. ${this.tokenAddress.value}`);
+            //logDebug(`Finished Invoking alarm. ${this.tokenAddress.value}`);
         }
     }
 

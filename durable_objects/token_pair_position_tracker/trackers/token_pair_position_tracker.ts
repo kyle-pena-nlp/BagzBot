@@ -153,7 +153,6 @@ export class TokenPairPositionTracker {
             logError("Flushing to storage failed for TokenPairPositionTracker", this);
             return;
         }).then(() => {
-            logDebug("Done flushing to storage");
             return;
         });
     }
