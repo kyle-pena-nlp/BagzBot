@@ -126,9 +126,9 @@ DOWN_FOR_MAINTENANCE = "false"
 # don't ever set to true.  just for dev.
 TEST_NO_ADMINS_MODE = "false"
 REBUILD_TOKENS_CRON_JOB = "false"
-TX_SIM_BEFORE_BUY = "false"
+TX_SIM_BEFORE_BUY = "true"
 ALLOW_CHOOSE_AUTO_DOUBLE_SLIPPAGE = "false"
-JUP_QUOTE_RESTRICT_INTERMEDIATE_TOKENS = "false"
+JUP_QUOTE_RESTRICT_INTERMEDIATE_TOKENS = "true"
 
 [env.dev.durable_objects]
 bindings = [
