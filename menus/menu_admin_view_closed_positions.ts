@@ -15,6 +15,7 @@ export class MenuAdminViewClosedPositions extends Menu<Position[]> implements Me
             const closedPositionDescription = `${asTokenPrice(position.tokenAmt)} of ${position.token.symbol}`;
             this.insertButtonNextLine(options, closedPositionDescription, new CallbackData(MenuCode.AdminViewClosedPosition, position.positionID));
         }
+        this.insertButtonNextLine(options, ':back: Back', this.menuCallback(MenuCode.Main));
         return options;
     }
     

@@ -624,7 +624,7 @@ export class CallbackHandler {
             case MenuCode.AdminViewClosedPosition:
                 const closedPositions = (await getClosedPositionsAndPNLSummary(params.getTelegramUserID(), params.chatID, this.env)).closedPositions;
                 const closedPosition = closedPositions.filter(p => p.positionID === callbackData.menuArg||'')[0];
-                return new MenuViewObj({ data: closedPosition, isAdmin: isAdminOrSuperAdmin(params.getTelegramUserID(), this.env)});
+                return new MenuViewObj({ data: closedPosition, isAdmin: isAdminOrSuperAdmin(params.getTelegramUserID('real'), this.env)});
             default:
                 assertNever(callbackData.menuCode);
         }
