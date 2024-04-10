@@ -14,6 +14,8 @@ name = "sol-sentry-bot-beta"
 tag = "v1" # Should be unique for each entry
 new_classes = ["UserDO","TokenPairPositionTrackerDO","PolledTokenPairListDO","BetaInviteCodesDO","HeartbeatDO"]
 
+# 1632540473
+
 [env.dev.vars]
 # do not change this string EVER post launch
 MAX_BETA_INVITE_CODE_CHAIN_DEPTH = "1"

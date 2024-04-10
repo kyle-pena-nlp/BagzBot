@@ -220,11 +220,10 @@ export class PeakPricePositionTracker {
                     return;
                 }
 
-                logInfo(`TRIGGERED: ${asTokenPrice(position.tokenAmt)} of ${position.token.symbol}. pos.triggerPct: ${position.triggerPercent}. triggerPctFrac: ${toNumber(triggerPctFrac)} ,priceDecreaseFrac: ${toNumber(priceDecreaseFrac)}`);
+                logInfo(`::TRIGGERED:: ${position.token.address} pos ID ${position.positionID}: currentPrice: ${asTokenPrice(newPrice)}, peakPrice: ${asTokenPrice(peakPrice)}, ${asTokenPrice(position.tokenAmt)} of ${position.token.symbol}. pos.triggerPct: ${position.triggerPercent}%. triggerPctFrac: ${toNumber(triggerPctFrac)} ,priceDecreaseFrac: ${toNumber(priceDecreaseFrac)}`);
 
                 // But if it is triggered, add it to the list of positions to close
                 positionsToClose.push(position);
-                
             });
         }
 

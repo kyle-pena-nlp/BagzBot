@@ -22,6 +22,8 @@ export enum MenuCode {
 	MenuWhatIsTSL = "MenuWhatIsTSL",
 	AdminResetPositionRequestDefaults = "AdminResetPositionRequestDefaults",
 	AdminDeleteClosedPositions = "AdminDeleteClosedPositions",
+	AdminViewClosedPositions = "AdminViewClosedPositions",
+	AdminViewClosedPosition = "AdminViewClosedPosition",
 
 	PosRequestChooseAutoDoubleSlippageOptions = "EPR.AutoDoubleSlip",
 	SubmitPosRequestAutoDoubleSlippageOptions = "SPR.AutoDoubleSlip",

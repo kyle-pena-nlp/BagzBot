@@ -2,6 +2,7 @@ import { LegalAgreement } from "./legal_agreement";
 import { logoHack } from "./logo_hack";
 import { BaseMenu } from "./menu";
 import { MenuPNLHistory } from "./menu_PNL_history";
+import { MenuAdminViewClosedPositions } from "./menu_admin_view_closed_positions";
 import { MenuBetaInviteFriends } from "./menu_beta_invite_friends";
 import { MenuCode } from "./menu_code";
 import { MenuComingSoon } from "./menu_coming_soon";
@@ -33,7 +34,7 @@ import { MenuTODO } from "./todo_menu";
 import { WelcomeScreenPart1 } from "./welcome_screen_part_1";
 
 export {
-    BaseMenu, LegalAgreement, MenuBetaInviteFriends, MenuCode, MenuComingSoon, MenuContinueMessage, MenuEditOpenPositionSellAutoDoubleSlippage, MenuEditOpenPositionSellSlippagePercent, MenuEditOpenPositionTriggerPercent, MenuEditPositionHelp, MenuEditPositionRequest, MenuEditPositionRequestSellAutoDoubleSlippage, MenuError, MenuFAQ,
+    BaseMenu, LegalAgreement, MenuAdminViewClosedPositions, MenuBetaInviteFriends, MenuCode, MenuComingSoon, MenuContinueMessage, MenuEditOpenPositionSellAutoDoubleSlippage, MenuEditOpenPositionSellSlippagePercent, MenuEditOpenPositionTriggerPercent, MenuEditPositionHelp, MenuEditPositionRequest, MenuEditPositionRequestSellAutoDoubleSlippage, MenuError, MenuFAQ,
     MenuListPositions, MenuMain, MenuOKClose, MenuPNLHistory, MenuRetryBuy, MenuRetryBuySlippageError, MenuRetryManualSell, MenuTODO,
     MenuTrailingStopLossEntryBuyQuantity,
     MenuTrailingStopLossPickVsToken,

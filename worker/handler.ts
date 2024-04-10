@@ -1,5 +1,6 @@
 import { DurableObjectNamespace } from "@cloudflare/workers-types";
 import { randomUUID } from "node:crypto";
+import { isAdminOrSuperAdmin } from "../admins";
 import { decryptPrivateKey } from "../crypto";
 import { DecimalizedAmount, fromNumber } from "../decimalized";
 import { claimInviteCode, listUnclaimedBetaInviteCodes } from "../durable_objects/beta_invite_codes/beta_invite_code_interop";
@@ -13,7 +14,8 @@ import { TokenSymbolAndAddress } from "../durable_objects/user/model/token_name_
 import { adminDeleteAllPositions, adminDeleteClosedPositions, adminResetDefaultPositionRequest, editTriggerPercentOnOpenPositionFromUserDO, getClosedPositionsAndPNLSummary, getDefaultTrailingStopLoss, getPositionFromUserDO, getUserData, getUserWalletSOLBalance, getWalletData, impersonateUser, listPositionsFromUserDO, manuallyClosePosition, maybeReadSessionObj, readSessionObj, requestNewPosition, sendMessageToUser, setSellAutoDoubleOnOpenPosition, setSellSlippagePercentOnOpenPosition, storeLegalAgreementStatus, storeSessionObj, storeSessionObjProperty, storeSessionValues, unimpersonateUser } from "../durable_objects/user/userDO_interop";
 import { Env } from "../env";
 import { logDebug, logError } from "../logging";
-import { BaseMenu, LegalAgreement, MenuBetaInviteFriends, MenuCode, MenuComingSoon, MenuContinueMessage, MenuEditOpenPositionSellAutoDoubleSlippage, MenuEditOpenPositionSellSlippagePercent, MenuEditOpenPositionTriggerPercent, MenuEditPositionHelp, MenuEditPositionRequestSellAutoDoubleSlippage, MenuError, MenuFAQ, MenuListPositions, MenuMain, MenuOKClose, MenuPNLHistory, MenuTODO, MenuTrailingStopLossEntryBuyQuantity, MenuTrailingStopLossPickVsToken, MenuTrailingStopLossSlippagePercent, MenuTrailingStopLossTriggerPercent, MenuViewDecryptedWallet, MenuViewOpenPosition, MenuWallet, MenuWhatIsTSL, PositionIDAndChoice, SubmittedTriggerPctKey, WelcomeScreenPart1 } from "../menus";
+import { BaseMenu, LegalAgreement, MenuAdminViewClosedPositions, MenuBetaInviteFriends, MenuCode, MenuComingSoon, MenuContinueMessage, MenuEditOpenPositionSellAutoDoubleSlippage, MenuEditOpenPositionSellSlippagePercent, MenuEditOpenPositionTriggerPercent, MenuEditPositionHelp, MenuEditPositionRequestSellAutoDoubleSlippage, MenuError, MenuFAQ, MenuListPositions, MenuMain, MenuOKClose, MenuPNLHistory, MenuTODO, MenuTrailingStopLossEntryBuyQuantity, MenuTrailingStopLossPickVsToken, MenuTrailingStopLossSlippagePercent, MenuTrailingStopLossTriggerPercent, MenuViewDecryptedWallet, MenuViewOpenPosition, MenuWallet, MenuWhatIsTSL, PositionIDAndChoice, SubmittedTriggerPctKey, WelcomeScreenPart1 } from "../menus";
+import { MenuViewObj } from "../menus/menu_admin_view_obj";
 import { PositionIDAndSellSlippagePercent } from "../menus/menu_edit_open_position_sell_slippage_percent";
 import { MenuEditPositionRequest } from "../menus/menu_edit_position_request";
 import { PositionPreRequest, PositionRequest, convertPreRequestToRequest } from "../positions";
@@ -615,6 +617,13 @@ export class CallbackHandler {
             case MenuCode.AdminResetPositionRequestDefaults:
                 await adminResetDefaultPositionRequest(params.getTelegramUserID(), params.chatID, this.env);
                 return await this.createMainMenu(params, this.env);
+            case MenuCode.AdminViewClosedPositions:
+                const closedPos = await getClosedPositionsAndPNLSummary(params.getTelegramUserID(), params.chatID, this.env);
+                return new MenuAdminViewClosedPositions(closedPos.closedPositions);
+            case MenuCode.AdminViewClosedPosition:
+                const closedPositions = (await getClosedPositionsAndPNLSummary(params.getTelegramUserID(), params.chatID, this.env)).closedPositions;
+                const closedPosition = closedPositions.filter(p => p.positionID === callbackData.menuArg||'')[0];
+                return new MenuViewObj({ data: closedPosition, isAdmin: isAdminOrSuperAdmin(params.getTelegramUserID(), this.env)});
             default:
                 assertNever(callbackData.menuCode);
         }

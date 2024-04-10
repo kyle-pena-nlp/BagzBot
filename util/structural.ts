@@ -1,3 +1,5 @@
+import { DecimalizedAmount, toNumber } from "../decimalized/decimalized_amount";
+
 export type Structural = undefined|null|boolean|number|string|{ readonly [key : string] : Structural };
 
 export class StructuralSet<T extends Exclude<Structural,undefined>> {
@@ -25,7 +27,46 @@ export class StructuralSet<T extends Exclude<Structural,undefined>> {
     }
 }
 
+export function writeIndentedToString(x : (Structural|Structural[])) : string {
+    const lines : string[] = [];
+    recIndentedToString(x, lines, 0);
+    return lines.join("\r\n");
+}
 
+function recIndentedToString(x : (Structural|Structural[]), lines : string[], indents : number) {
+    const prefix = "   ".repeat(indents||0);
+    if (x === null) {
+        lines.push(`${prefix}null`); 
+    }
+    else if (x === undefined) {
+        lines.push(`${prefix}undefined`);
+    }
+    else if (typeof x === 'string' || typeof x === 'number' || typeof x === 'boolean') {
+        lines.push(`${prefix}${x.toString()}`);
+    }
+    else if (Array.isArray(x)) {
+        x.forEach((value,index) => {
+            lines.push(`${prefix}${index.toString()}::`)
+            recIndentedToString(value, lines, indents + 1);
+        })
+    }
+    else {
+        for (const key of Object.keys(x)) {
+            const value = x[key];
+            if (isDecimalizedAmount(value)) {
+                lines.push(`${prefix}${key} (${toNumber(value)})`);
+            }
+            else {
+                lines.push(`${prefix}${key}`);
+            }
+            recIndentedToString(value, lines, indents+1);
+        }
+    }
+}
+
+function isDecimalizedAmount(x : Structural) : x is DecimalizedAmount {
+    return x != null && typeof x === 'object' && 'tokenAmount' in x && 'decimals' in x;
+}
 
 export function structuralEquals(x : Structural, y : Structural) : boolean {
     if (x == null || typeof x === 'string' || typeof x === 'number' || typeof x === 'boolean') {

@@ -18,7 +18,7 @@ import { Result } from "./result";
 import { safe } from "./safe";
 import { setDifference, setIntersection, setUnion } from "./set_operations";
 import { pause, sleep } from "./sleep";
-import { Structural, structuralEquals } from "./structural";
+import { Structural, structuralEquals, writeIndentedToString } from "./structural";
 
 export {
     ChangeTrackedValue, MapWithStorage, Result, Structural, assertNever, groupIntoBatches, groupIntoMap,
@@ -32,6 +32,6 @@ export {
     setDifference,
     setIntersection,
     setUnion, shuffle, sleep, strictParseBoolean, strictParseFloat, strictParseInt, structuralEquals, tryParseBoolean, tryParseFloat,
-    tryParseInt, tryReadResponseBody
+    tryParseInt, tryReadResponseBody, writeIndentedToString
 };
 
