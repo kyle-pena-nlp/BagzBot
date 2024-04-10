@@ -108,7 +108,7 @@ export class TokenTracker {
         if (this.deletedKeys.size == 0 && this.dirtyTracking.size == 0) {
             return;
         }
-        logDebug(`Token Tracker storage flush: ${this.dirtyTracking.size} puts.  ${this.deletedKeys.size} deletes.`);
+        //logDebug(`Token Tracker storage flush: ${this.dirtyTracking.size} puts.  ${this.deletedKeys.size} deletes.`);
         const putEntries : Record<string,TokenInfo> = {};
         for (const key of this.dirtyTracking) {
             putEntries[key] = this.tokenInfos[key];

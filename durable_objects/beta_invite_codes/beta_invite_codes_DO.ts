@@ -5,6 +5,7 @@ import { ResponseOf } from "../../util/builder_types";
 import { BetaInviteCodesMethod, ClaimInviteCodeRequest, ClaimInviteCodeResponse, HasUserClaimedBetaInviteCodeRequest, HasUserClaimedBetaInviteCodeResponse, ListUnclaimedBetaCodesRequest as ListUnsentBetaCodesRequest, ListUnclaimedBetaCodesResponse as ListUnsentBetaCodesResponse, MarkBetaInviteCodeAsSentRequest, MarkBetaInviteCodeAsSentResponse, parseBetaInviteCodeMethod } from "./beta_invite_code_interop";
 import { BetaInviteCode } from "./model/beta_invite_code";
 import { BetaInviteCodesTracker } from "./trackers/beta_invite_code_tracker";
+import { logDebug } from "../../logging";
 
 export class BetaInviteCodesDO {
     /*
@@ -43,6 +44,7 @@ export class BetaInviteCodesDO {
 
     async _fetch(request : Request) : Promise<any> {
         const [method,jsonRequestBody] = await this.validateFetchRequest(request);
+        logDebug(`[[${method}]] :: beta_invite_codes_DO`);
         switch(method) {
             case BetaInviteCodesMethod.Claim:
                 return await this.handleClaimBetaInviteCode(jsonRequestBody);

@@ -49,6 +49,7 @@ export class HeartbeatDO {
 
     async _fetch(request : Request) : Promise<Response> {
         const [method,jsonRequestBody] = await this.validateFetchRequest(request);
+        logDebug(`[[${method}]] :: heartbeat_do`);
         switch(method) {
             case HeartbeatDOFetchMethod.Wakeup:
                 // deliberate fire-and-forget here.
@@ -128,7 +129,6 @@ export class HeartbeatDO {
             logError(errorMsg);
             throw new Error(errorMsg);
         }
-        logDebug(`Invoking ${method.toString()} on HeartbeatDO`);
         return [method,jsonBody];
     }
 }

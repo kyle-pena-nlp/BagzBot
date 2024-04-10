@@ -2,7 +2,6 @@ import { Env } from "../env";
 import { CallbackData } from "./callback_data";
 import { MenuCode } from "./menu_code";
 
-import { logDebug } from "../logging";
 import { CallbackButton, escapeTGText, makeTelegramBotUrl, subInEmojis, subInEmojisOnButtons } from "../telegram";
 import { makeJSONRequest } from "../util";
 import { fetchAndReadResponse as safeFetchAndReadResponse } from "../util/http_helpers";
@@ -62,7 +61,7 @@ export abstract class BaseMenu {
 
         await this.maybeSendPhoto(response.body, env);
 
-        logDebug(`Sent menu requests in ${Date.now() - startMS}ms`);
+        //logDebug(`Sent menu requests in ${Date.now() - startMS}ms`);
         return true;
     }
 

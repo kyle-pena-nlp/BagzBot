@@ -230,6 +230,9 @@ export class UserDO {
     async _fetch(request : Request) : Promise<[UserDOFetchMethod,any,Response]> {
 
         const [method,userAction] = await this.validateFetchRequest(request);
+
+        logDebug(`[[${method}]] :: user_DO :: ${this.telegramUserID.value}`);
+
         let response : Response|null = null;
 
         switch(method) {

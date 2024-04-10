@@ -260,7 +260,7 @@ export class PeakPricePositionTracker {
         const [putEntries,deletedKeys] = this.generateDiffFromItemsBuffer();        
         const putPromise = storage.put(putEntries);
         const deletePromise = storage.delete([...deletedKeys]);
-        logDebug(`${Object.keys(putEntries).length} puts.  ${deletedKeys.size} deletes.`)
+        //logDebug(`${Object.keys(putEntries).length} puts.  ${deletedKeys.size} deletes.`)
         await Promise.all([putPromise,deletePromise])
         .catch(r => {
             logError(`failed to flush peak price tracker to storage`, r);

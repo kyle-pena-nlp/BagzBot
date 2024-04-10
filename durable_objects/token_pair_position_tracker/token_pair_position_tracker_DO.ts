@@ -124,16 +124,16 @@ export class TokenPairPositionTrackerDO {
             return false;
         }
         if (!strictParseBoolean(this.env.POLLING_ON)) {
-            logDebug(`${this.tokenPairID()} Price polling is turned off AND should not be price polling.`)
+            //logDebug(`${this.tokenPairID()} Price polling is turned off AND should not be price polling.`)
             return false;
         }
         if (!this.initialized()) {
-            logDebug(`${this.tokenPairID()} not initialized AND should not be price polling.`)
+            //logDebug(`${this.tokenPairID()} not initialized AND should not be price polling.`)
             return false;
         }
         const anyPositionsToTrack = this.tokenPairPositionTracker.any();
         if (!anyPositionsToTrack) {
-            logDebug(`${this.tokenPairID()} - No positions to track AND should not be price polling.`);
+            //logDebug(`${this.tokenPairID()} - No positions to track AND should not be price polling.`);
             return false;
         }
         return true;
@@ -221,7 +221,7 @@ export class TokenPairPositionTrackerDO {
 
     async fetch(request : Request) : Promise<Response> {
         const [method,body] = await this.validateFetchRequest(request);
-        logDebug(`${method} - ${this.tokenAddress.value}`);
+        logDebug(`[[${method}]] :: tracker :: ${(this.tokenAddress.value||'').slice(0,10)}`);
         try {
             // ensure the token is registered with heartbeatDO
             if (!isHeartbeatRequest(body)) {
@@ -237,7 +237,7 @@ export class TokenPairPositionTrackerDO {
         }
         finally {
             await this.flushToStorage();
-            logDebug(`FINISHED ${method} - ${this.tokenAddress.value}`);
+            //logDebug(`FINISHED ${method} - ${this.tokenAddress.value}`);
         }
         return makeSuccessResponse();
     }
@@ -286,10 +286,10 @@ export class TokenPairPositionTrackerDO {
                 logError(`Could not register ${this.tokenPairID()} with heartBeat - vsTokenAddress was null`);
                 return;
             }
-            logDebug(`Registering token pair ${this.tokenPairID()}`);
+            //logDebug(`Registering token pair ${this.tokenPairID()}`);
             await ensureTokenPairIsRegistered(tokenAddress, vsTokenAddress, this.env).then(() => {
                 this.needsToEnsureIsRegistered = false;
-                logDebug(`Token pair ${tokenAddress}:${vsTokenAddress} is now registered with heartbeat!`);
+                //logDebug(`Token pair ${tokenAddress}:${vsTokenAddress} is now registered with heartbeat!`);
             })
         }
     }
@@ -692,7 +692,6 @@ export class TokenPairPositionTrackerDO {
             this.tokenAddress.value = tokenAddress;
             this.vsTokenAddress.value = vsTokenAddress;
         }
-        logDebug(`TokenPairPositionTrackerDO ${this.tokenPairID()} - executing ${method}: ${jsonBody}`);
         return [method,jsonBody];
     }
 

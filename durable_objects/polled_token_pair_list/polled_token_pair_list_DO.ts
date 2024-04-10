@@ -53,6 +53,7 @@ export class PolledTokenPairListDO {
 
     async _fetch(request : Request) : Promise<Response> {
         const [method,jsonRequestBody] = await this.validateFetchRequest(request);
+        logDebug(`[[${method}]] :: polled_token_pair_list`);
         switch(method) {
             case PolledTokenPairListDOFetchMethod.initialize:
                 return makeSuccessResponse();
