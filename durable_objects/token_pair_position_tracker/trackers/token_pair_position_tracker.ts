@@ -1,5 +1,5 @@
 import { DecimalizedAmount } from "../../../decimalized";
-import { logDebug, logError } from "../../../logging";
+import { logError } from "../../../logging";
 import { Position, PositionStatus } from "../../../positions";
 import { MapWithStorage } from "../../../util";
 import { PositionAndMaybePNL } from "../model/position_and_PNL";
@@ -80,8 +80,8 @@ export class TokenPairPositionTracker {
         return this.pricePeaks.updatePosition(position);
     }
 
-    insertPosition(position : Position) : boolean {
-        return this.pricePeaks.insertPosition(position);
+    insertPosition(position : Position, currentPrice : DecimalizedAmount) : boolean {
+        return this.pricePeaks.insertPosition(position, currentPrice);
     }
 
     updateSlippage(positionID : string, sellSlippagePercent : number) : boolean {

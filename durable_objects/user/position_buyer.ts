@@ -78,10 +78,14 @@ export class PositionBuyer {
             return 'could-not-create-tx';
         }
 
-        // upsert as an unconfirmed position. 
-        // tracker will periodically attempts to reconfirm unconfirmed positions
+        // import position into the tracker as unconfirmed.
+        // edge-case: trigger condition met between here and tx execution.
+        // can we back-date tracker activity? this is tricky.  to be revisited.
         const unconfirmedPosition = this.convertRequestToUnconfirmedPosition(positionRequest, signatureOf(signedTx), lastValidBH);
-        await insertPosition(unconfirmedPosition, this.env);
+        const insertPositionResponse = await insertPosition(unconfirmedPosition, this.env);
+        if(!insertPositionResponse.success) {
+            return 'could-not-create-tx'; // TODO: more appropriate code.
+        }
 
         // try to do the swap.
         const result = await this.executeAndParseSwap(positionRequest, signedTx, lastValidBH, connection);

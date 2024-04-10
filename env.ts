@@ -73,6 +73,7 @@ export interface Env {
 	REBUILD_TOKENS_CRON_JOB: string
 	TX_SIM_BEFORE_BUY : string
 	ALLOW_CHOOSE_AUTO_DOUBLE_SLIPPAGE : string
+	JUP_QUOTE_RESTRICT_INTERMEDIATE_TOKENS : string
 
 	UserDO : any // i'd like to strongly type this as DurableObjectNamespace, but can't for technical reasons
 	TokenPairPositionTrackerDO : any // ditto

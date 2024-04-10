@@ -384,7 +384,11 @@ export class TokenPairPositionTrackerDO {
     }
 
     async handleInsertPosition(body: InsertPositionRequest) : Promise<Response> {
-        const success = this.tokenPairPositionTracker.insertPosition(body.position);
+        const currentPrice = await this.getPrice();
+        if (currentPrice == null) {
+            return makeJSONResponse<InsertPositionResponse>({ success: false });
+        }
+        const success = this.tokenPairPositionTracker.insertPosition(body.position, currentPrice);
         return makeJSONResponse<InsertPositionResponse>({ success });
     }
 

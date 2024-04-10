@@ -4,6 +4,7 @@ import { dZero } from "../decimalized/decimalized_amount";
 import { Env, getQuoteAPIURL } from "../env";
 import { Position, PositionPreRequest, PositionRequest, Quote } from "../positions";
 import { TokenInfo, getVsTokenDecimalsMultiplier, getVsTokenInfo } from "../tokens";
+import { strictParseBoolean } from "../util";
 import { JupiterQuoteAPIParams, SwapRoute } from "./jupiter_types";
 import { GetQuoteFailure, isGetQuoteFailure } from "./rpc_types";
 
@@ -132,13 +133,15 @@ function makeJupiterQuoteAPIURL(params : JupiterQuoteAPIParams,
     env : Env) {
     // https://station.jup.ag/api-v6/get-quote
     const hasPlatformFee = params.platformFeeBps && params.platformFeeBps > 0;
+    const restrictIntermediaTokens = strictParseBoolean(env.JUP_QUOTE_RESTRICT_INTERMEDIATE_TOKENS);
     const parts = [
         `${getQuoteAPIURL(env)}?inputMint=${params.inputTokenAddress}`,
         `&outputMint=${params.outputTokenAddress}`,
         `&amount=${params.decimalizedAmount}`,
         `&slippageBps=${params.slippageBps}`,
         hasPlatformFee ? `&platformFeeBps=${params.platformFeeBps}` : '',
+        restrictIntermediaTokens ? `&restrictIntermediateTokens=true` : '',
         `&swapMode=${params.swapMode}`
     ];
-    return parts.join('');
+    return parts.join(''); // only join with '' to avoid empty spaces around '' entries in array
 }

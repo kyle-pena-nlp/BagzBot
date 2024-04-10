@@ -689,7 +689,7 @@ export class UserDO {
             positionRequest.chatID, 
             this.env,
             'HTML',
-            `<a href="${positionRequest.token.logoURI}">\u200B</a><b>Purchase of ${asTokenPrice(positionRequest.quote.outTokenAmt)} $${positionRequest.token.symbol}</b>: `);        
+            `<a href="${positionRequest.token.logoURI}">\u200B</a><b>${positionRequest.vsTokenAmt} SOL purchase of $${positionRequest.token.symbol}</b>: `);        
         /*
             This is deliberately not awaited.
             Durable Objects will continue processing requests for up to 30 seconds

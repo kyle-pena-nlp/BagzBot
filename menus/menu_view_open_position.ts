@@ -1,5 +1,5 @@
-import { dClamp, dCompare, dDiv, dMult, dSub, fromNumber } from "../decimalized";
-import { DecimalizedAmount, MATH_DECIMAL_PLACES, asPercentDeltaString, asPercentString, asTokenPrice, asTokenPriceDelta, dZero, toNumber } from "../decimalized/decimalized_amount";
+import { dClamp, dCompare, dMult, fromNumber } from "../decimalized";
+import { DecimalizedAmount, asPercentDeltaString, asPercentString, asTokenPrice, asTokenPriceDelta, toNumber } from "../decimalized/decimalized_amount";
 import { PNL, PositionAndMaybePNL } from "../durable_objects/token_pair_position_tracker/model/position_and_PNL";
 import { Position, PositionStatus } from "../positions";
 import { CallbackButton } from "../telegram";
@@ -9,8 +9,14 @@ import { Menu, MenuCapabilities } from "./menu";
 import { MenuCode } from "./menu_code";
 
 type BrandNewPosition = { brandNewPosition : true, position : Position };
+type MenuData = { allowChooseAutoDoubleSlippage : boolean, data: (PositionAndMaybePNL|BrandNewPosition) };
+type ThisType = { menuData : MenuData }
+type ThisTypeMaybeHasPNL = ThisType & { menuData: { data: PositionAndMaybePNL } };
+type ThisTypeHasPNL = ThisType & { menuData: { data : PositionAndMaybePNL & { PNL : PNL }  } };
+type ThisTypeIsBrandNewPosition = ThisType & { menuData: { data : BrandNewPosition } };
+type ThisTypeIsClosingOrClosedPosition = ThisType & { menuData : { data : { position : { status : PositionStatus.Closing | PositionStatus.Closed } } } }
 
-export class MenuViewOpenPosition extends Menu< { allowChooseAutoDoubleSlippage : boolean, data: (PositionAndMaybePNL|BrandNewPosition) }> implements MenuCapabilities {
+export class MenuViewOpenPosition extends Menu<MenuData> implements MenuCapabilities {
     renderText(): string {
         const lines = [];
         lines.push(...this.headerLines());
@@ -37,7 +43,7 @@ export class MenuViewOpenPosition extends Menu< { allowChooseAutoDoubleSlippage 
             
             this.insertButtonNextLine(options, `:chart_down: ${this.position().triggerPercent}% Trigger`, new CallbackData(MenuCode.EditOpenPositionTriggerPercent, this.position().positionID));
             this.insertButtonNextLine(options, `:twisted_arrows: ${this.position().sellSlippagePercent}% Slippage`, new CallbackData(MenuCode.EditOpenPositionSellSlippagePercent, this.position().positionID));
-            if (this.menuData.allowChooseAutoDoubleSlippage) {
+            if (this.allowChooseAutoDoubleSlippage()) {
                 this.insertButtonNextLine(options, `:brain: ${this.position().sellAutoDoubleSlippage ? '': 'Do Not'} Auto-Double Slippage If TSL Fails :brain:`, new CallbackData(MenuCode.EditOpenPositionAutoDoubleSlippage, this.position().positionID));
             }
         }
@@ -47,6 +53,10 @@ export class MenuViewOpenPosition extends Menu< { allowChooseAutoDoubleSlippage 
         this.insertButtonNextLine(options, ":back: Back", this.menuCallback(MenuCode.ListPositions));
 
         return options;
+    }
+
+    private allowChooseAutoDoubleSlippage() : boolean {
+        return this.menuData.allowChooseAutoDoubleSlippage;
     }
 
     private statusEmoji() : string {
@@ -112,7 +122,7 @@ export class MenuViewOpenPosition extends Menu< { allowChooseAutoDoubleSlippage 
         lines.push("");
 
         // brand new position - refresh again, dear user!
-        if ('brandNewPosition' in this.menuData) {
+        if (this.isBrandNewPosition()) {
             lines.push("This position is brand new! Refresh in a few moments to get more detailed information.");
             return lines;
         }
@@ -129,11 +139,11 @@ export class MenuViewOpenPosition extends Menu< { allowChooseAutoDoubleSlippage 
             const peakPriceComparison = this.lessThanPeakPrice() ? `${asPercentString(this.percentBelowPeak())} &lt;` : '=';
             
             lines.push("<u><b>Price Movement</b></u>:");
-            lines.push(`:bullet: <code><b>Fill Price</b>:      </code>${asTokenPrice(this.fillPrice())} SOL`);
+            lines.push(`:bullet: <code><b>Fill Price</b>:      </code>${asTokenPrice(this.position().fillPrice)} SOL`);
             lines.push(`:bullet: <code><b>Current Price</b>:   </code>${asTokenPrice(this.currentPrice())} SOL (${asPercentDeltaString(this.pnlDeltaPct())}) (${peakPriceComparison} Peak Price)`);
-            lines.push(`:bullet: <code><b>Peak Price</b>:      </code>${asTokenPrice(this.menuData.peakPrice)} SOL`)
-            lines.push(`:bullet: <code><b>Trigger Percent</b>: </code>${this.menuData.position.triggerPercent.toFixed(1)}%`)
-            lines.push(`:bullet: <code><b>PNL</b>:             </code>${asTokenPriceDelta(this.calcPNL())} SOL`);
+            lines.push(`:bullet: <code><b>Peak Price</b>:      </code>${asTokenPrice(this.menuData.data.peakPrice)} SOL`)
+            lines.push(`:bullet: <code><b>Trigger Percent</b>: </code>${this.position().triggerPercent.toFixed(1)}%`)
+            lines.push(`:bullet: <code><b>PNL</b>:             </code>${asTokenPriceDelta(this.PNL().PNL)} SOL`);
         }
 
         if (this.buyIsConfirmed() && this.isCloseToBeingTriggered() && !this.isClosingOrClosed() && !this.triggerConditionMet() && this.buyIsConfirmed()) {
@@ -143,25 +153,37 @@ export class MenuViewOpenPosition extends Menu< { allowChooseAutoDoubleSlippage 
         return lines;
     }
 
-    private lessThanPeakPrice(this : { menuData : { PNL : PNL, position : Position }}) : boolean {
-        return toNumber(this.menuData.PNL.fracBelowPeak) >= 1e-4;
+    private isBrandNewPosition() : this is this & ThisTypeIsBrandNewPosition {
+        return 'brandNewPosition' in this.menuData.data;
+    }
+
+    private isPositionAndMaybePNL() : this is this & ThisTypeMaybeHasPNL {
+        return 'PNL' in this.menuData.data;
+    }
+
+    private isPositionWithPNL() : this is this & ThisTypeHasPNL {
+        return this.isPositionAndMaybePNL() && this.menuData.data.PNL != null;
+    }
+
+    private isClosingOrClosed() : this is this & ThisTypeIsClosingOrClosedPosition {
+        const status = this.position().status;
+        return (status === PositionStatus.Closing) || (status === PositionStatus.Closed);
+    }
+
+    private lessThanPeakPrice(this : this & ThisTypeHasPNL) : boolean {
+        return toNumber(this.PNL().fracBelowPeak) >= 1e-4;
     }
 
     private position() : Position {
         return this.menuData.data.position;
     }
 
-    private pricePercentDelta(this : { menuData : { PNL : PNL, position : Position }}) : DecimalizedAmount {
-        const priceDelta = dSub(this.menuData.PNL.currentPrice, this.menuData.position.fillPrice);
-        return dDiv(priceDelta, this.menuData.position.fillPrice, MATH_DECIMAL_PLACES)||dZero();
+    private PNL(this : this & ThisTypeHasPNL) : PNL {
+        return this.menuData.data.PNL;
     }
 
-    private calcPNL(this : { menuData : { PNL : PNL, position : Position }}) : DecimalizedAmount {
-        return this.menuData.PNL.PNL;
-    }
-
-    private percentBelowPeak(this : { menuData : { PNL : PNL }}) : DecimalizedAmount {
-        return dClamp(dMult(fromNumber(100),this.menuData.PNL.fracBelowPeak), fromNumber(0), undefined);
+    private percentBelowPeak(this : this & ThisTypeHasPNL) : DecimalizedAmount {
+        return dClamp(dMult(fromNumber(100),this.PNL().fracBelowPeak), fromNumber(0), undefined);
     }
 
     private bodyLines() : string[] {
@@ -198,39 +220,22 @@ export class MenuViewOpenPosition extends Menu< { allowChooseAutoDoubleSlippage 
         return this.position().sellConfirmed === false; // triple eq deliberate
     }
 
-    private pnlDeltaPct(this : { menuData : PositionAndMaybePNL & { PNL : PNL } }) : DecimalizedAmount {
-        return dMult(fromNumber(100), this.menuData.PNL.PNLfrac);
+    private pnlDeltaPct(this : this & ThisTypeHasPNL) : DecimalizedAmount {
+        return dMult(fromNumber(100), this.PNL().PNLfrac);
     }
 
-    private isBrandNewPosition() : this is { menuData: BrandNewPosition } {
-        return 'brandNewPosition' in this.menuData;
-    }
-
-    private isPositionAndMaybePNL() : this is { menuData : PositionAndMaybePNL } {
-        return 'PNL' in this.menuData;
-    }
-
-    private isPositionWithNoPNL() : this is { menuData : PositionAndMaybePNL & { PNL : undefined } } {
-        return this.isPositionAndMaybePNL() && this.menuData.PNL == null;
-    }
+ 
 
     private triggerConditionMet() {
         if (this.isPositionWithPNL()) {
-            return dCompare(this.menuData.PNL.fracBelowPeak, fromNumber(this.menuData.position.triggerPercent / 100)) >= 0;
+            return dCompare(this.PNL().fracBelowPeak, fromNumber(this.position().triggerPercent / 100)) >= 0;
         }
         else {
             return false;
         }
     }
 
-    private isPositionWithPNL() : this is { menuData : PositionAndMaybePNL & { PNL : PNL } } {
-        return this.isPositionAndMaybePNL() && this.menuData.PNL != null;
-    }
 
-    private isClosingOrClosed() : this is { menuData : { position : { status : PositionStatus.Closing|PositionStatus.Closed }}} {
-        const status = this.position().status;
-        return status === PositionStatus.Closing || status === PositionStatus.Closed;
-    }
 
     private isCloseToBeingTriggered() {
         if (!this.isPositionWithPNL()) {
@@ -239,13 +244,13 @@ export class MenuViewOpenPosition extends Menu< { allowChooseAutoDoubleSlippage 
         if (this.isClosingOrClosed()) {
             return false;
         }
-        const triggerPercent = this.menuData.position.triggerPercent;
-        const pctBelowPeak = dMult(fromNumber(100), this.menuData.PNL.fracBelowPeak);
+        const triggerPercent = this.position().triggerPercent;
+        const pctBelowPeak = dMult(fromNumber(100), this.PNL().fracBelowPeak);
         const willTriggerSoon = (triggerPercent - toNumber(pctBelowPeak)) < 1.0;
         return willTriggerSoon;
     }
 
-    private currentPrice(this: { menuData : { PNL : PNL }}) : DecimalizedAmount {
-        return this.menuData.PNL.currentPrice;
+    private currentPrice(this: this & ThisTypeHasPNL) : DecimalizedAmount {
+        return this.menuData.data.PNL.currentPrice;
     }
 }
