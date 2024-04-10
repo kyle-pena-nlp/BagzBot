@@ -79,7 +79,10 @@ export class TokenPairPositionTrackerDO {
     // (which later sends heartbeat requests to keep the DO awake)
 
     // deliberately not change tracked, so we can register with heartbeat on cold start.
-    needsToEnsureIsRegistered : boolean = true 
+    //needsToEnsureIsRegistered : boolean = true 
+    
+    lastTimeMSRegisteredWithHeartbeat : ChangeTrackedValue<number> = new ChangeTrackedValue<number>("lastTimeMSRegisteredWithHeartbeat",0);
+    
     isPolling : boolean = false; // deliberately not change tracked.
 
     env : Env;
@@ -275,7 +278,7 @@ export class TokenPairPositionTrackerDO {
     }
 
     async tryToEnsureTokenPairIsRegistered() {
-        if (this.needsToEnsureIsRegistered) {
+        if (this.needsToEnsureIsRegistered()) {
             const tokenAddress = this.tokenAddress.value;
             const vsTokenAddress = this.vsTokenAddress.value;
             if (tokenAddress == null) {
@@ -288,10 +291,19 @@ export class TokenPairPositionTrackerDO {
             }
             //logDebug(`Registering token pair ${this.tokenPairID()}`);
             await ensureTokenPairIsRegistered(tokenAddress, vsTokenAddress, this.env).then(() => {
-                this.needsToEnsureIsRegistered = false;
+                //this.needsToEnsureIsRegistered = false;
+                this.lastTimeMSRegisteredWithHeartbeat.value = Date.now();
                 //logDebug(`Token pair ${tokenAddress}:${vsTokenAddress} is now registered with heartbeat!`);
             })
         }
+    }
+
+    needsToEnsureIsRegistered() : boolean {
+        // Only need to ensure registered with heartbeat if haven't done so in 1 min
+        // heartbeat touches the tracker to make sure it is scheduling alarms if it needs to
+        // if only DO's had CRON jobs :(
+        // TODO: configurable?
+        return (Date.now() - this.lastTimeMSRegisteredWithHeartbeat.value) > 60000;
     }
 
     async _fetch(method : TokenPairPositionTrackerDOFetchMethod, body : any) : Promise<Response> {
