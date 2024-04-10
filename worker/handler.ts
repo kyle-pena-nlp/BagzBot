@@ -176,6 +176,7 @@ export class CallbackHandler {
         logDebug(`Invoking callback with ${callbackData.toString()}`);
         const maybeSOLBalance = await getUserWalletSOLBalance(params.getTelegramUserID(), params.chatID, this.env);
         // TODO: factor this giant state machine switch statement into handlers (chain-of-responsibility-esque?)
+        logDebug(":::USER-CLICKED:::", callbackData.menuCode, callbackData.menuArg, params.getTelegramUserID());
         switch(callbackData.menuCode) {
             case MenuCode.Main:
                 return this.createMainMenu(params, this.env);
