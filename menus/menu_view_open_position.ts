@@ -101,7 +101,7 @@ export class MenuViewOpenPosition extends Menu<MenuData> implements MenuCapabili
         }         
 
 
-        lines.push("<code><u><b>Note</b>: All prices tracking is in SOL (price tracking in fiat coming soon)</u></code>")
+        lines.push("<code><u><b>Note</b>: All price tracking is in SOL (price tracking in fiat coming soon)</u></code>")
         lines.push("");
 
         lines.push(`<b><u>Status</u></b>:`)

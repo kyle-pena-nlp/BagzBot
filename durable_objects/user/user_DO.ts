@@ -217,10 +217,14 @@ export class UserDO {
         }
 
         // make sure the user certainly has no wallet (even if init of UserDO fails)
-        // if initialization was attempted and the wallet was not initialized...
-
+        // certainlyHasNoStoredValue means initialization was attempted and no stored value was found.
         if (this.wallet.certainlyHasNoStoredValue()) {
-            this.wallet.value = await this.generateWallet();
+            if (this.wallet.value == null) {
+                this.wallet.value = await this.generateWallet();
+            }
+            else {
+                logError("CRITICAL: Tried to overwrite non-null wallet.")
+            }
         }
 
         // set most recent chat ID.

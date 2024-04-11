@@ -56,7 +56,7 @@ export class CurrentPriceTracker {
         const responseBody : any = (await response.json());
         // If the token gets delisted by jupiter this can happen.
         // TODO: put rugged tokens in 'dead letter' state
-        if (!('tokenAddress' in responseBody.data)) {
+        if (!(tokenAddress in responseBody.data)) {
             return undefined;
         }
         const price = responseBody.data[tokenAddress].price;
