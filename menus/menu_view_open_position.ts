@@ -91,14 +91,16 @@ export class MenuViewOpenPosition extends Menu<MenuData> implements MenuCapabili
         const statusEmoji = this.statusEmoji();
         const lines = [
             `${statusEmoji} <u><b>Your TSL Position</b></u> (<b>${asTokenPrice(this.position().tokenAmt)} of $${this.position().token.symbol}</b>)`,
-            ` (<code>${this.position().token.address}</code>)`
+            ` (<code>${this.position().token.address}</code>)`,
+            ""
         ];
 
         if (this.isPositionWithNoPNL()) {
             lines.push(`<i>We had trouble retrieving price data on $${this.position().token.symbol}.</i>`);
+            return lines;
         }         
 
-        lines.push("");
+
         lines.push("<code><u><b>Note</b>: All prices tracking is in SOL (price tracking in fiat coming soon)</u></code>")
         lines.push("");
 

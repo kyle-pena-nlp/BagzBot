@@ -215,9 +215,11 @@ export class UserDO {
         else if (this.telegramUserID.value != null && this.telegramUserID.value != userAction.telegramUserID) {
             throw new Error(`telegram user IDs didn't match (request: ${userAction.telegramUserID}, state: ${this.telegramUserID.value})`);
         }
+
         // make sure the user certainly has no wallet (even if init of UserDO fails)
         // if initialization was attempted and the wallet was not initialized...
-        if (this.wallet.initializationAttempted && !this.wallet.initialized) {
+
+        if (this.wallet.certainlyHasNoStoredValue()) {
             this.wallet.value = await this.generateWallet();
         }
 

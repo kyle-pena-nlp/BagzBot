@@ -3,45 +3,49 @@ import { Structural, structuralEquals } from "./structural";
 export class ChangeTrackedValue<T extends Exclude<Structural,undefined>> {
     storageKey : string;
     _buffer : T;
-    value  : T;
+    _value  : T;
     recordAllWriteEvents : boolean;
-    initializationAttempted : boolean = false;
-    initialized : boolean = false;    
+    ranInitialize : boolean = false;
+    foundValueFromStorage : boolean = false;    
     constructor(storageKey : string, value : T, recordAllWriteEvents : boolean = false) {
         this.storageKey = storageKey;
         this._buffer = structuredClone(value);
-        this.value = value;
+        this._value = value;
         this.recordAllWriteEvents = recordAllWriteEvents;
     }
-    setValue(value : T) {
-        this.value = value;
+    set value(value : T) {
+        this.foundValueFromStorage = true;
+        this._value = value;
     }
-    getValue() : T {
-        return this.value;
+    get value() : T {
+        return this._value;
     }
     initialize(entries : Map<string,any>) {
-        this.initializationAttempted = true;
         if (entries.has(this.storageKey)) {
             const storageValue = entries.get(this.storageKey) as T;
             this._buffer = structuredClone(storageValue);
-            this.value = storageValue;
-            this.initialized = true;
+            this._value = storageValue;
+            this.foundValueFromStorage = true;
         }
         else {
-            this.initialized = false;
+            this.foundValueFromStorage = false;
         }
+        this.ranInitialize = true;
     }
     async flushToStorage(storage : DurableObjectStorage, ledger : boolean = false) {
-        if (!structuralEquals(this._buffer, this.value)) {
-            await storage.put(this.storageKey, this.value).then(() => {
-                this._buffer = structuredClone(this.value);
+        if (!structuralEquals(this._buffer, this._value)) {
+            await storage.put(this.storageKey, this._value).then(() => {
+                this._buffer = structuredClone(this._value);
             });
             if (this.recordAllWriteEvents) {
                 // TODO: write to alternative storage mechanism with all writes.
-                /*await ledger.write(this.value).catch(r => {
+                /*await ledger.write(this._value).catch(r => {
                     logError("Could not write write event", this);
                 });*/
             }
         }
+    }
+    certainlyHasNoStoredValue() : boolean {
+        return this.ranInitialize && !this.foundValueFromStorage;
     }
 }
