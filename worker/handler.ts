@@ -626,6 +626,14 @@ export class CallbackHandler {
                 const closedPositions = (await getClosedPositionsAndPNLSummary(params.getTelegramUserID(), params.chatID, this.env)).closedPositions;
                 const closedPosition = closedPositions.filter(p => p.positionID === callbackData.menuArg||'')[0];
                 return new MenuViewObj({ data: closedPosition, isAdmin: isAdminOrSuperAdmin(params.getTelegramUserID('real'), this.env)});
+            case MenuCode.AdminDeletePositionByID:
+                const positionIDtoDelete = callbackData.menuArg||'';
+                if (!isAdminOrSuperAdmin(params.getTelegramUserID('real'), this.env)) {
+                    return new MenuContinueMessage("You do not have permission to do that", MenuCode.Main);
+                }
+                const adminDeletePositionResponse = await adminDeletePositionByID();
+                const adminDeletePositionByIDMsg = adminDeletePositionResponse.success ? `Position with ID ${positionIDtoDelete} was deleted` : `Position with ID ${positionIDtoDelete} could not be deleted (might already not exist)`;
+                return new MenuContinueMessage(adminDeletePositionByIDMsg, MenuCode.Main);
             default:
                 assertNever(callbackData.menuCode);
         }

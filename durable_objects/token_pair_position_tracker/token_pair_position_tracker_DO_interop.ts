@@ -8,6 +8,7 @@ import { SetSellAutoDoubleOnOpenPositionResponse } from "../user/actions/set_sel
 import { SellSellSlippagePercentageOnOpenPositionResponse } from "../user/actions/set_sell_slippage_percent_on_open_position";
 import { AdminDeleteAllInTrackerRequest, AdminDeleteAllInTrackerResponse } from "./actions/admin_delete_all_positions_in_tracker";
 import { AdminDeleteClosedPositionsForUserInTrackerRequest, AdminDeleteClosedPositionsForUserInTrackerResponse } from "./actions/admin_delete_closed_positions_for_user_in_tracker";
+import { AdminDeletePositionByIDFromTrackerRequest, AdminDeletePositionByIDFromTrackerResponse } from "./actions/admin_delete_position_by_id_from_tracker";
 import { EditTriggerPercentOnOpenPositionInTrackerRequest } from "./actions/edit_trigger_percent_on_open_position_in_tracker";
 import { GetPositionFromPriceTrackerRequest, GetPositionFromPriceTrackerResponse } from "./actions/get_position";
 import { GetPositionAndMaybePNLFromPriceTrackerRequest, GetPositionAndMaybePNLFromPriceTrackerResponse } from "./actions/get_position_and_maybe_pnl";
@@ -52,7 +53,15 @@ export enum TokenPairPositionTrackerDOFetchMethod {
 	insertPosition = "insertPosition",
 	updatePosition = "updatePosition",
 	getPositionCounts = "getPositionCounts",
-	adminDeleteClosedPositionsForUser = "adminDeleteClosedPositionsForUser"
+	adminDeleteClosedPositionsForUser = "adminDeleteClosedPositionsForUser",
+	adminDeletePositionByIDFromTracker = "adminDeletePositionByIDFromTracker"
+}
+
+export async function adminDeletePositionByIDFromTracker(positionID : string, tokenAddress : string, vsTokenAddress : string, env : Env) : Promise<AdminDeletePositionByIDFromTrackerResponse> {
+	const request : AdminDeletePositionByIDFromTrackerRequest = { positionID, tokenAddress, vsTokenAddress };
+	const method = TokenPairPositionTrackerDOFetchMethod.adminDeletePositionByIDFromTracker;
+	const response = await sendJSONRequestToTokenPairPositionTracker<AdminDeletePositionByIDFromTrackerRequest,AdminDeletePositionByIDFromTrackerResponse>(method, request, tokenAddress, vsTokenAddress, env);
+	return response;
 }
 
 export async function adminDeleteClosedPositionsForUser(telegramUserID : number, tokenAddress : string, vsTokenAddress : string,  env:Env) : Promise<AdminDeleteClosedPositionsForUserInTrackerResponse> {

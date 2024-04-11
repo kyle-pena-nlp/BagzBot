@@ -6,6 +6,7 @@ import { Structural, groupIntoBatches, groupIntoMap, makeJSONRequest, makeReques
 import { PositionAndMaybePNL } from "../token_pair_position_tracker/model/position_and_PNL";
 import { AdminDeleteAllPositionsRequest, AdminDeleteAllPositionsResponse } from "./actions/admin_delete_all_positions";
 import { AdminDeleteClosedPositionsRequest, AdminDeleteClosedPositionsResponse } from "./actions/admin_delete_closed_positions";
+import { AdminDeletePositionByIDRequest, AdminDeletePositionByIDResponse } from "./actions/admin_delete_position_by_id";
 import { AdminResetDefaultPositionRequest, AdminResetDefaultPositionResponse } from "./actions/admin_reset_default_position_request";
 import { AutomaticallyClosePositionsRequest, AutomaticallyClosePositionsResponse } from "./actions/automatically_close_positions";
 import { DeleteSessionRequest } from "./actions/delete_session";
@@ -58,7 +59,15 @@ export enum UserDOFetchMethod {
 	getUserWalletSOLBalance = "getUserSOLBalance",
 	getClosedPositionsAndPNLSummary = "getClosedPositionsAndPNLSummary",
 	adminDeleteClosedPositions = "adminDeleteClosedPositions",
-	adminResetDefaultPositionRequest = "adminResetDefaultPositionRequest"
+	adminResetDefaultPositionRequest = "adminResetDefaultPositionRequest",
+	adminDeletePositionByID = "adminDeletePositionByID"
+}
+
+export async function adminDeletePositionByID(telegramUserID : number, chatID : number, positionID : string, env : Env) : Promise<AdminDeletePositionByIDResponse> {
+	const request : AdminDeletePositionByIDRequest = { telegramUserID, chatID, positionID };
+	const method = UserDOFetchMethod.adminDeletePositionByID;
+	const response = await sendJSONRequestToUserDO<AdminDeletePositionByIDRequest,AdminDeletePositionByIDResponse>(telegramUserID, method, request, env);
+	return response;
 }
 
 export async function adminDeleteClosedPositions(telegramUserID : number, chatID : number, env : Env) : Promise<AdminDeleteClosedPositionsResponse> {

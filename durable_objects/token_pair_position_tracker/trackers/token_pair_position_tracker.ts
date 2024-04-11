@@ -131,8 +131,8 @@ export class TokenPairPositionTracker {
     }
 
     // idempotentially remove position.
-    removePosition(positionID : string) {
-        this.pricePeaks.remove(positionID);
+    removePosition(positionID : string) : Position|undefined {
+        return this.pricePeaks.remove(positionID);
     }
 
     initialize(entries : Map<string,any>) {

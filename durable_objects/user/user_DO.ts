@@ -12,9 +12,10 @@ import { ChangeTrackedValue, Structural, assertNever, groupIntoBatches, makeFail
 import { assertIs } from "../../util/enums";
 import { listUnclaimedBetaInviteCodes } from "../beta_invite_codes/beta_invite_code_interop";
 import { PositionAndMaybePNL } from "../token_pair_position_tracker/model/position_and_PNL";
-import { adminDeleteClosedPositionsForUser, editTriggerPercentOnOpenPositionInTracker, getPositionAndMaybePNL, listClosedPositionsFromTracker, listPositionsByUser, removePosition, setSellAutoDoubleOnOpenPositionInPositionTracker, setSellSlippagePercentOnOpenPositionInTracker } from "../token_pair_position_tracker/token_pair_position_tracker_do_interop";
+import { adminDeleteClosedPositionsForUser, adminDeletePositionByIDFromTracker, editTriggerPercentOnOpenPositionInTracker, getPositionAndMaybePNL, listClosedPositionsFromTracker, listPositionsByUser, removePosition, setSellAutoDoubleOnOpenPositionInPositionTracker, setSellSlippagePercentOnOpenPositionInTracker } from "../token_pair_position_tracker/token_pair_position_tracker_do_interop";
 import { AdminDeleteAllPositionsRequest, AdminDeleteAllPositionsResponse } from "./actions/admin_delete_all_positions";
 import { AdminDeleteClosedPositionsRequest } from "./actions/admin_delete_closed_positions";
+import { AdminDeletePositionByIDRequest, AdminDeletePositionByIDResponse } from "./actions/admin_delete_position_by_id";
 import { AdminResetDefaultPositionRequest, AdminResetDefaultPositionResponse } from "./actions/admin_reset_default_position_request";
 import { AutomaticallyClosePositionsRequest, AutomaticallyClosePositionsResponse } from "./actions/automatically_close_positions";
 import { BaseUserDORequest, isBaseUserDORequest } from "./actions/base_user_do_request";
@@ -324,11 +325,26 @@ export class UserDO {
             case UserDOFetchMethod.adminResetDefaultPositionRequest:
                 response = await this.handleResetDefaultPositionRequest(userAction);
                 break;
+            case UserDOFetchMethod.adminDeletePositionByID:
+                response = await this.handleAdminDeletePositionByID(userAction);
+                break;
             default:
                 assertNever(method);
         }
 
         return [method,userAction,response];
+    }
+
+    async handleAdminDeletePositionByID(userAction: AdminDeletePositionByIDRequest) : Promise<Response> {
+        const positionID = userAction.positionID;
+        const tokenPair = this.tokenPairsForPositionIDsTracker.getPositionPair(positionID);
+        if (tokenPair == null) {
+            return makeJSONResponse<AdminDeletePositionByIDResponse>({ success : false });
+        }
+        const tokenAddress = tokenPair.token.address;
+        const vsTokenAddress = tokenPair.vsToken.address;
+        const response = await adminDeletePositionByIDFromTracker(positionID, tokenAddress, vsTokenAddress, this.env);
+        return makeJSONResponse<AdminDeletePositionByIDResponse>({ success: response.success });
     }
 
     async handleDeleteClosedPositions(userAction : AdminDeleteClosedPositionsRequest) : Promise<Response> {

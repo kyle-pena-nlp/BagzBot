@@ -16,6 +16,7 @@ import { SellSellSlippagePercentageOnOpenPositionResponse } from "../user/action
 import { sendClosePositionOrdersToUserDOs } from "../user/userDO_interop";
 import { AdminDeleteAllInTrackerRequest, AdminDeleteAllInTrackerResponse } from "./actions/admin_delete_all_positions_in_tracker";
 import { AdminDeleteClosedPositionsForUserInTrackerRequest, AdminDeleteClosedPositionsForUserInTrackerResponse } from "./actions/admin_delete_closed_positions_for_user_in_tracker";
+import { AdminDeletePositionByIDFromTrackerRequest, AdminDeletePositionByIDFromTrackerResponse } from "./actions/admin_delete_position_by_id_from_tracker";
 import { EditTriggerPercentOnOpenPositionInTrackerRequest } from "./actions/edit_trigger_percent_on_open_position_in_tracker";
 import { GetPositionFromPriceTrackerRequest, GetPositionFromPriceTrackerResponse } from "./actions/get_position";
 import { GetPositionAndMaybePNLFromPriceTrackerRequest, GetPositionAndMaybePNLFromPriceTrackerResponse } from "./actions/get_position_and_maybe_pnl";
@@ -353,8 +354,20 @@ export class TokenPairPositionTrackerDO {
                 return await this.handleGetPositionCounts(body);
             case TokenPairPositionTrackerDOFetchMethod.adminDeleteClosedPositionsForUser:
                 return await this.handleAdminDeleteClosedPositionsForUser(body);
+            case TokenPairPositionTrackerDOFetchMethod.adminDeletePositionByIDFromTracker:
+                return await this.handleAdminDeletePositionByID(body);
             default:
                 assertNever(method);
+        }
+    }
+
+    async handleAdminDeletePositionByID(body : AdminDeletePositionByIDFromTrackerRequest) : Promise<Response> {
+        const removedPosition = this.tokenPairPositionTracker.removePosition(body.positionID);
+        if (removedPosition != null) {
+            return makeJSONResponse<AdminDeletePositionByIDFromTrackerResponse>({ success : true })
+        }
+        else {
+            return makeJSONResponse<AdminDeletePositionByIDFromTrackerResponse>({ success: false })
         }
     }
 

@@ -32,3 +32,4 @@ archive/
 **/.*
 **/*.db
 *.db
+automation/

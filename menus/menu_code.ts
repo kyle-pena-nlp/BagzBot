@@ -24,6 +24,7 @@ export enum MenuCode {
 	AdminDeleteClosedPositions = "AdminDeleteClosedPositions",
 	AdminViewClosedPositions = "AdminViewClosedPositions",
 	AdminViewClosedPosition = "AdminViewClosedPosition",
+	AdminDeletePositionByID = "AdminDeletePositionByID",
 
 	PosRequestChooseAutoDoubleSlippageOptions = "EPR.AutoDoubleSlip",
 	SubmitPosRequestAutoDoubleSlippageOptions = "SPR.AutoDoubleSlip",
