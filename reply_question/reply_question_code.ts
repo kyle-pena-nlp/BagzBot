@@ -12,6 +12,7 @@ export enum ReplyQuestionCode {
     SendBetaFeedback = "SendBetaFeedback",
     AdminDevSetPrice = "AdminDevSetPrice",
     AdminInvokeAlarm = "AdminInvokeAlarm",
-    AdminSendUserMessage = "AdminSendUserMessage"
+    AdminSendUserMessage = "AdminSendUserMessage",
+    AdminDeletePositionByID = "AdminDeletePositionByID"
     
 }

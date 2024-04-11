@@ -11,7 +11,7 @@ import { _devOnlyFeatureUpdatePrice, adminInvokeAlarm } from "../durable_objects
 import { OpenPositionRequest } from "../durable_objects/user/actions/open_new_position";
 import { QuantityAndToken } from "../durable_objects/user/model/quantity_and_token";
 import { TokenSymbolAndAddress } from "../durable_objects/user/model/token_name_and_address";
-import { adminDeleteAllPositions, adminDeleteClosedPositions, adminResetDefaultPositionRequest, editTriggerPercentOnOpenPositionFromUserDO, getClosedPositionsAndPNLSummary, getDefaultTrailingStopLoss, getPositionFromUserDO, getUserData, getUserWalletSOLBalance, getWalletData, impersonateUser, listPositionsFromUserDO, manuallyClosePosition, maybeReadSessionObj, readSessionObj, requestNewPosition, sendMessageToUser, setSellAutoDoubleOnOpenPosition, setSellSlippagePercentOnOpenPosition, storeLegalAgreementStatus, storeSessionObj, storeSessionObjProperty, storeSessionValues, unimpersonateUser } from "../durable_objects/user/userDO_interop";
+import { adminDeleteAllPositions, adminDeleteClosedPositions, adminDeletePositionByID, adminResetDefaultPositionRequest, editTriggerPercentOnOpenPositionFromUserDO, getClosedPositionsAndPNLSummary, getDefaultTrailingStopLoss, getPositionFromUserDO, getUserData, getUserWalletSOLBalance, getWalletData, impersonateUser, listPositionsFromUserDO, manuallyClosePosition, maybeReadSessionObj, readSessionObj, requestNewPosition, sendMessageToUser, setSellAutoDoubleOnOpenPosition, setSellSlippagePercentOnOpenPosition, storeLegalAgreementStatus, storeSessionObj, storeSessionObjProperty, storeSessionValues, unimpersonateUser } from "../durable_objects/user/userDO_interop";
 import { Env } from "../env";
 import { logDebug, logError } from "../logging";
 import { BaseMenu, LegalAgreement, MenuAdminViewClosedPositions, MenuBetaInviteFriends, MenuCode, MenuComingSoon, MenuContinueMessage, MenuEditOpenPositionSellAutoDoubleSlippage, MenuEditOpenPositionSellSlippagePercent, MenuEditOpenPositionTriggerPercent, MenuEditPositionHelp, MenuEditPositionRequestSellAutoDoubleSlippage, MenuError, MenuFAQ, MenuListPositions, MenuMain, MenuOKClose, MenuPNLHistory, MenuTODO, MenuTrailingStopLossEntryBuyQuantity, MenuTrailingStopLossPickVsToken, MenuTrailingStopLossSlippagePercent, MenuTrailingStopLossTriggerPercent, MenuViewDecryptedWallet, MenuViewOpenPosition, MenuWallet, MenuWhatIsTSL, PositionIDAndChoice, SubmittedTriggerPctKey, WelcomeScreenPart1 } from "../menus";
@@ -627,11 +627,19 @@ export class CallbackHandler {
                 const closedPosition = closedPositions.filter(p => p.positionID === callbackData.menuArg||'')[0];
                 return new MenuViewObj({ data: closedPosition, isAdmin: isAdminOrSuperAdmin(params.getTelegramUserID('real'), this.env)});
             case MenuCode.AdminDeletePositionByID:
+                return new ReplyQuestion('Enter position ID to delete', ReplyQuestionCode.AdminDeletePositionByID, this.context, {
+                    callback: {
+                        linkedMessageID: params.messageID,
+                        nextMenuCode: MenuCode.SubmitAdminDeletePositionByID
+                    },
+                    timeoutMS: 60000
+                });
+            case MenuCode.SubmitAdminDeletePositionByID:
                 const positionIDtoDelete = callbackData.menuArg||'';
                 if (!isAdminOrSuperAdmin(params.getTelegramUserID('real'), this.env)) {
                     return new MenuContinueMessage("You do not have permission to do that", MenuCode.Main);
                 }
-                const adminDeletePositionResponse = await adminDeletePositionByID();
+                const adminDeletePositionResponse = await adminDeletePositionByID(params.getTelegramUserID(), params.chatID, positionIDtoDelete, this.env);
                 const adminDeletePositionByIDMsg = adminDeletePositionResponse.success ? `Position with ID ${positionIDtoDelete} was deleted` : `Position with ID ${positionIDtoDelete} could not be deleted (might already not exist)`;
                 return new MenuContinueMessage(adminDeletePositionByIDMsg, MenuCode.Main);
             default:
