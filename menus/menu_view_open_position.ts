@@ -13,6 +13,7 @@ type MenuData = { allowChooseAutoDoubleSlippage : boolean, data: (PositionAndMay
 type ThisType = { menuData : MenuData }
 type ThisTypeMaybeHasPNL = ThisType & { menuData: { data: PositionAndMaybePNL } };
 type ThisTypeHasPNL = ThisType & { menuData: { data : PositionAndMaybePNL & { PNL : PNL }  } };
+type ThisTypeHasNoPNL = ThisType & { menuData: { data : PositionAndMaybePNL & { PNL : undefined } } };
 type ThisTypeIsBrandNewPosition = ThisType & { menuData: { data : BrandNewPosition } };
 type ThisTypeIsClosingOrClosedPosition = ThisType & { menuData : { data : { position : { status : PositionStatus.Closing | PositionStatus.Closed } } } }
 
@@ -61,7 +62,10 @@ export class MenuViewOpenPosition extends Menu<MenuData> implements MenuCapabili
 
     private statusEmoji() : string {
         const status = this.position().status;
-        if (status === PositionStatus.Open && !this.position().buyConfirmed) {
+        if (this.isPositionWithNoPNL()) {
+            return ':purple:';
+        }
+        else if (status === PositionStatus.Open && !this.position().buyConfirmed) {
             return ':hollow:';
         }
         else if (status === PositionStatus.Open && this.triggerConditionMet()) {
@@ -85,11 +89,14 @@ export class MenuViewOpenPosition extends Menu<MenuData> implements MenuCapabili
 
         // name and amount of position, and token address
         const statusEmoji = this.statusEmoji();
-        const refreshNonce = Math.floor(Date.now() / 60000);
         const lines = [
             `${statusEmoji} <u><b>Your TSL Position</b></u> (<b>${asTokenPrice(this.position().tokenAmt)} of $${this.position().token.symbol}</b>)`,
             ` (<code>${this.position().token.address}</code>)`
         ];
+
+        if (this.isPositionWithNoPNL()) {
+            lines.push(`<i>We had trouble retrieving price data on $${this.position().token.symbol}.</i>`);
+        }         
 
         lines.push("");
         lines.push("<code><u><b>Note</b>: All prices tracking is in SOL (price tracking in fiat coming soon)</u></code>")
@@ -131,7 +138,7 @@ export class MenuViewOpenPosition extends Menu<MenuData> implements MenuCapabili
         if (this.position().status === PositionStatus.Closed) {
             lines.push("This position has been closed.");
             return lines;
-        }
+        }   
     
         // closing position.
         
@@ -146,7 +153,7 @@ export class MenuViewOpenPosition extends Menu<MenuData> implements MenuCapabili
             lines.push(`:bullet: <code><b>PNL</b>:             </code>${asTokenPriceDelta(this.PNL().PNL)} SOL`);
         }
 
-        if (this.buyIsConfirmed() && this.isCloseToBeingTriggered() && !this.isClosingOrClosed() && !this.triggerConditionMet() && this.buyIsConfirmed()) {
+        if (this.buyIsConfirmed() && this.isCloseToBeingTriggered() && !this.isClosingOrClosed() && !this.triggerConditionMet()) {
             lines.push(":eyes: This position is close to being triggered! :eyes:");
         }
 
@@ -163,6 +170,10 @@ export class MenuViewOpenPosition extends Menu<MenuData> implements MenuCapabili
 
     private isPositionWithPNL() : this is this & ThisTypeHasPNL {
         return this.isPositionAndMaybePNL() && this.menuData.data.PNL != null;
+    }
+
+    private isPositionWithNoPNL() : this is this & ThisTypeHasNoPNL {
+        return this.isPositionAndMaybePNL() && this.menuData.data.PNL == null;
     }
 
     private isClosingOrClosed() : this is this & ThisTypeIsClosingOrClosedPosition {
@@ -194,10 +205,6 @@ export class MenuViewOpenPosition extends Menu<MenuData> implements MenuCapabili
         return [
             `Support Code: <i>${this.position().positionID}</i>`
         ];
-    }
-
-    private fillPrice() : DecimalizedAmount {
-        return this.position().fillPrice;
     }
 
     private buyIsConfirmed() : boolean {

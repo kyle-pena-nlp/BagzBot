@@ -617,7 +617,7 @@ export class TokenPairPositionTrackerDO {
                     this.tokenPairPositionTracker.removePosition(pos.positionID);
                 }
                 else if (confirmedBuy === 'token-fee-account-not-initialized') {
-                    TGStatusMessage.queue(channel, `After checking, we found tha that the purchase didn't complete.`, true);
+                    TGStatusMessage.queue(channel, `After checking, we found that the purchase didn't complete.`, true);
                     this.tokenPairPositionTracker.removePosition(pos.positionID);
                 }
                 else if ('positionID' in confirmedBuy) {

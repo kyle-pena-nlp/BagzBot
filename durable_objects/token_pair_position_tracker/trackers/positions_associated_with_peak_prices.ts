@@ -122,7 +122,8 @@ export class PositionsAssociatedWithPeakPrices extends DecimalizedAmountMap<Read
         if (currentPrice == null) {
             return {
                 position: position,
-                peakPrice: peakPrice
+                peakPrice: peakPrice,
+                PNL: null
             };
         }
         const originalValue = position.vsTokenAmt;

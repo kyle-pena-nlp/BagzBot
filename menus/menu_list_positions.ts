@@ -72,7 +72,7 @@ export class MenuListPositions extends Menu<PositionAndMaybePNL[]> implements Me
 
     makePositionLabelIcon(p : PositionAndMaybePNL) {
         if (p.PNL == null) {
-            return ':red:';
+            return ':purple:';
         }
         else {
             const position = p.position;
@@ -111,6 +111,9 @@ export class MenuListPositions extends Menu<PositionAndMaybePNL[]> implements Me
 
     makePositionLabelFootnote(p : PositionAndMaybePNL) : string {
         const position = p.position;
+        if (p.PNL == null) {
+            return '(No price data)';
+        }
         if (position.status === PositionStatus.Closing) {
             return '(Attempting sale)';
         }

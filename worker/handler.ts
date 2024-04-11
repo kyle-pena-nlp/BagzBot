@@ -193,6 +193,7 @@ export class CallbackHandler {
                 }
                 const quote = await quoteBuy(newPrerequest, tokenInfoResponse.tokenInfo, this.env);
                 const tokenInfo = tokenInfoResponse.tokenInfo;
+                // TODO: default back to WEN so this button isn't perma-broken for a banned token
                 if (isGetQuoteFailure(quote)) {
                     return new MenuContinueMessage(`Could not get a quote for ${tokenInfo.symbol}. Please try again soon.`, MenuCode.Main);
                 }
@@ -830,6 +831,7 @@ export class CallbackHandler {
                 assertIs<TokenInfo,typeof tokenInfo>();
                 const quote = await quoteBuy(prerequest, tokenInfo, this.env);
 
+                // TODO: default back to WEN so new_position command isn't perma-broken
                 // if getting the quote fails, early-out
                 if (isGetQuoteFailure(quote)) {
                     return ['...', new MenuOKClose(`Sorry - couldn't create a new position at this time`)];

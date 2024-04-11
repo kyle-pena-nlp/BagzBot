@@ -54,6 +54,11 @@ export class CurrentPriceTracker {
             return;
         }
         const responseBody : any = (await response.json());
+        // If the token gets delisted by jupiter this can happen.
+        // TODO: put rugged tokens in 'dead letter' state
+        if (!('tokenAddress' in responseBody.data)) {
+            return undefined;
+        }
         const price = responseBody.data[tokenAddress].price;
         const decimalizedPrice = fromNumber(price, MATH_DECIMAL_PLACES);
         return decimalizedPrice;

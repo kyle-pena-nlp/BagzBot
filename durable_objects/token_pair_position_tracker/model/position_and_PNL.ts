@@ -12,5 +12,5 @@ export interface PNL {
 export interface PositionAndMaybePNL {
     position : Position,
     peakPrice : DecimalizedAmount
-    PNL ?: PNL
+    PNL : PNL|null
 }

@@ -1,7 +1,7 @@
 import { DurableObjectStorage } from "@cloudflare/workers-types";
 import { DecimalizedAmount } from "../../../decimalized";
 import { Env } from "../../../env";
-import { logDebug } from "../../../logging";
+import { logDebug, logError } from "../../../logging";
 import { getSOLBalance } from "../../../rpc/rpc_wallet";
 import { getVsTokenInfo } from "../../../tokens";
 import { ChangeTrackedValue, strictParseFloat } from "../../../util";
@@ -51,7 +51,10 @@ export class SOLBalanceTracker {
     }
 
     private async getBalanceFromRPC(address : string, env : Env) : Promise<DecimalizedAmount|undefined> {
-        const solLamportsBalance = await getSOLBalance(address, env).catch(r => undefined);
+        const solLamportsBalance = await getSOLBalance(address, env).catch(r => {
+            logError(`Retrieving SOL balance failed, address: ${address}`, r);
+            return undefined;
+        });
         if (solLamportsBalance == null) {
             return;
         }

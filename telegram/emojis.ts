@@ -20,6 +20,7 @@ const emojis = {
     ':orange:': '🟠',
     ':green:': '🟢',
     ':hollow:': '⚪',
+    ':purple:': '🟣',
 
     ':down:': '🔻',
     ':up:': '💰', // irritating, but no green triangle up in emojis.

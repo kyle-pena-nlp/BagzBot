@@ -109,8 +109,8 @@ export class PeakPricePositionTracker {
         let totalPNL = dZero();
         for (const pos of positionsWithMaybePNL) {
             if (pos.PNL == null) {
-                logError(`Couldn't calculate total PNL b/c didn't have measured PNL: ${userID}, ${pos.position.positionID}`);
-                return;
+                //logError(`Couldn't calculate total PNL b/c didn't have measured PNL: ${userID}, ${pos.position.positionID}`);
+                continue;
             }
             totalPNL = dAdd(totalPNL, pos.PNL.PNL);
         }
