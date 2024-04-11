@@ -6,7 +6,6 @@ import { logDebug, logError } from "../logging";
 import { assertNever, sleep, strictParseInt } from "../util";
 import { assertIs } from "../util/enums";
 import {
-    SwapExecutionError,
     TransactionExecutionError,
     TransactionExecutionErrorCouldntConfirm
 } from "./rpc_types";
@@ -240,58 +239,4 @@ function finalExecutionDisposition(
 
 function is429(e : any) {
     return (e?.message||'').includes("429");
-}
-
-function determineTxConfirmationFinalStatus(
-    anyTxSent : boolean,
-    sendStatus : TransactionExecutionError|undefined, 
-    confirmStatus : TransactionExecutionError|'timed-out'|TransactionExecutionErrorCouldntConfirm|SwapExecutionError|'transaction-confirmed'|undefined) : 
-    SwapExecutionError | TransactionExecutionError | TransactionExecutionErrorCouldntConfirm | 'transaction-confirmed' {
-    
-    // no tx sent whatsoever... a severe form of failure
-    if (!anyTxSent) {
-        return TransactionExecutionError.TransactionFailedOtherReason
-    }
-
-    assertIs<true, typeof anyTxSent>();
-
-    if (confirmStatus == 'timed-out') {
-        return TransactionExecutionErrorCouldntConfirm.TimeoutCouldNotConfirm;
-    }
-
-    if (confirmStatus != null) {
-        return confirmStatus;
-    }
-    else if (sendStatus != null) {
-        return sendStatus;
-    }
-    else {
-        return TransactionExecutionErrorCouldntConfirm.UnknownCouldNotConfirm;
-    }
-}
-
-function interpretTxSignatureStatus(status : SignatureStatus) : 'failed'|'unconfirmed'|'succeeded' {
-                
-    // If the status has an err object, failed!
-    const err = status.err;
-    if (err) {
-        return 'failed';
-    }
-    
-    // If the transaction itself was confirmed or finalized, (but no error), success!
-    const confirmationStatus = status.confirmationStatus;
-    if (confirmationStatus === 'confirmed' || confirmationStatus === 'finalized') {
-        return 'succeeded';
-    }
-
-    // I think having at least 1 confirmation is too optimistic and getParsed will fail.
-    // If the tx has at least one confirmation (but no error), success!
-    /*const hasConfirmations = (status.confirmations || 0) > 0;
-    if (hasConfirmations) {
-        return 'succeeded';
-    }*/
-
-    // otherwise, no error, but no confirmations or confirmationStatus in (confirmed,finalized)
-    // ...that means unconfirmed.
-    return 'unconfirmed';
 }

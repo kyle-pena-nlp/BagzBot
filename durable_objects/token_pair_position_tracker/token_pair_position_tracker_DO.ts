@@ -6,7 +6,7 @@ import { Env, getRPCUrl } from "../../env";
 import { logDebug, logError, logInfo } from "../../logging";
 import { MenuCode } from "../../menus";
 import { Position, PositionStatus } from "../../positions";
-import { isSuccessfullyParsedSwapSummary } from "../../rpc/rpc_types";
+import { isSuccessfullyParsedSwapSummary } from "../../rpc/rpc_swap_parse_result_types";
 import { TGStatusMessage } from "../../telegram";
 import { ChangeTrackedValue, assertNever, makeJSONResponse, makeSuccessResponse, strictParseBoolean, strictParseInt } from "../../util";
 import { ensureTokenPairIsRegistered } from "../heartbeat/heartbeat_do_interop";
@@ -604,6 +604,22 @@ export class TokenPairPositionTrackerDO {
                     TGStatusMessage.queue(channel, "After checking, we found that the purchase didn't go through.", true);
                     this.tokenPairPositionTracker.removePosition(pos.positionID);
                 }
+                else if (confirmedBuy === 'frozen-token-account') {
+                    TGStatusMessage.queue(channel, `After checking, we found that the purchase didn't go through because $${pos.token.symbol} has been frozen due to suspicious activity.`, true);
+                    this.tokenPairPositionTracker.removePosition(pos.positionID);
+                }
+                else if (confirmedBuy === 'insufficient-sol') {
+                    TGStatusMessage.queue(channel, `After checking, we found that the purchase didn't go through because there wasn't enough SOL in your account to cover the purchase`, true);
+                    this.tokenPairPositionTracker.removePosition(pos.positionID);
+                }
+                else if (confirmedBuy === 'slippage-failed') {
+                    TGStatusMessage.queue(channel, `After checking, we found that the purchase didn't go through because the slippage tolerance was exceeded`, true);
+                    this.tokenPairPositionTracker.removePosition(pos.positionID);
+                }
+                else if (confirmedBuy === 'token-fee-account-not-initialized') {
+                    TGStatusMessage.queue(channel, `After checking, we found tha that the purchase didn't complete.`, true);
+                    this.tokenPairPositionTracker.removePosition(pos.positionID);
+                }
                 else if ('positionID' in confirmedBuy) {
                     // TODO: specific method just to handle changes made by confirmer.
                     TGStatusMessage.queue(channel, "We were able to confirm this purchase! It will be listed in your open positions.", true);
@@ -648,6 +664,18 @@ export class TokenPairPositionTrackerDO {
                     else {
                         await TGStatusMessage.finalMessage(channel, `The sale failed due to slippage. We will re-sell if the price continues to stay ${pos.triggerPercent.toFixed(1)}% below the peak.`, true);
                     }
+                    this.tokenPairPositionTracker.markPositionAsOpen(pos.positionID);
+                }
+                else if (confirmedSellStatus === 'frozen-token-account') {
+                    await TGStatusMessage.finalMessage(channel, "We found that the sale didn't go through because the slippage tolerance was exceeded", true);
+                    this.tokenPairPositionTracker.markPositionAsOpen(pos.positionID);
+                }
+                else if (confirmedSellStatus === 'insufficient-sol') {
+                    await TGStatusMessage.finalMessage(channel, "We found that the sale didn't go through because there wasn't enough SOL in your wallet to cover transaction fees.", true);
+                    this.tokenPairPositionTracker.markPositionAsOpen(pos.positionID);
+                }
+                else if (confirmedSellStatus === 'token-fee-account-not-initialized') {
+                    await TGStatusMessage.finalMessage(channel, "We found that the sale didn't go through because of an error on our platform", true);
                     this.tokenPairPositionTracker.markPositionAsOpen(pos.positionID);
                 }
                 else if (isSuccessfullyParsedSwapSummary(confirmedSellStatus)) {

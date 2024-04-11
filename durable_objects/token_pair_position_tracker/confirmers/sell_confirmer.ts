@@ -3,7 +3,7 @@ import { Env } from "../../../env";
 import { logDebug, logError } from "../../../logging";
 import { Position } from "../../../positions";
 import { parseParsedTransactionWithMeta } from "../../../rpc/rpc_parse";
-import { NonSlippageSwapExecutionErrorParseSummary, ParsedSuccessfulSwapSummary, SlippageSwapExecutionErrorParseSummary, isNonSlippageExecutionErrorParseSummary, isSlippageSwapExecutionErrorParseSummary, isSuccessfulSwapSummary } from "../../../rpc/rpc_types";
+import { ParsedSuccessfulSwapSummary, ParsedSwapSummary, UnknownTransactionParseSummary, isFrozenTokenAccountSwapExecutionErrorParseSummary, isInsufficientNativeTokensSwapExecutionErrorParseSummary, isOtherKindOfSwapExecutionError, isSlippageSwapExecutionErrorParseSummary, isSuccessfulSwapSummary, isTokenFeeAccountNotInitializedSwapExecutionErrorParseSummary } from "../../../rpc/rpc_swap_parse_result_types";
 import { assertNever, strictParseInt } from "../../../util";
 
 export class SellConfirmer {
@@ -18,7 +18,15 @@ export class SellConfirmer {
     isTimedOut() : boolean {
         return (Date.now() > this.startTimeMS + strictParseInt(this.env.CONFIRM_TIMEOUT_MS));
     }    
-    async confirmSell(position : Position & { sellConfirmed : false }) : Promise<'api-error'|'slippage-failed'|'failed'|'unconfirmed'|ParsedSuccessfulSwapSummary> {
+    async confirmSell(position : Position & { sellConfirmed : false }) : Promise<
+        'api-error'|
+        'slippage-failed'|
+        'failed'|
+        'unconfirmed'|
+        'token-fee-account-not-initialized'|
+        'frozen-token-account'|
+        'insufficient-sol'|
+        ParsedSuccessfulSwapSummary> {
 
         if (this.isTimedOut()) {
             return 'unconfirmed';
@@ -57,7 +65,14 @@ export class SellConfirmer {
         }
     }
 
-    private async attemptConfirmation(unconfirmedPosition : Position & { sellConfirmed : false }, blockheight : number) : Promise<ParsedSuccessfulSwapSummary|'slippage-failed'|'failed'|'unconfirmed'> {
+    private async attemptConfirmation(unconfirmedPosition : Position & { sellConfirmed : false }, blockheight : number) : Promise<
+        ParsedSuccessfulSwapSummary|
+        'slippage-failed'|
+        'failed'|
+        'unconfirmed'|
+        'frozen-token-account'|
+        'token-fee-account-not-initialized'|
+        'insufficient-sol'> {
         
         const parsedTx = await this.getParsedTransaction(unconfirmedPosition);
         
@@ -75,7 +90,16 @@ export class SellConfirmer {
         else if (isSlippageSwapExecutionErrorParseSummary(parsedTx)) {
             return 'slippage-failed';
         }
-        else if (isNonSlippageExecutionErrorParseSummary(parsedTx)) {
+        else if (isFrozenTokenAccountSwapExecutionErrorParseSummary(parsedTx)) {
+            return 'frozen-token-account';
+        }
+        else if (isInsufficientNativeTokensSwapExecutionErrorParseSummary(parsedTx)) {
+            return 'insufficient-sol';
+        }
+        else if (isTokenFeeAccountNotInitializedSwapExecutionErrorParseSummary(parsedTx)) {
+            return 'token-fee-account-not-initialized';
+        }
+        else if (isOtherKindOfSwapExecutionError(parsedTx)) {
             return 'failed';
         }
         else if (isSuccessfulSwapSummary(parsedTx)) {
@@ -86,7 +110,7 @@ export class SellConfirmer {
         }
     }    
 
-    private async getParsedTransaction(position : Position) : Promise<'api-error'|'tx-DNE'|ParsedSuccessfulSwapSummary|NonSlippageSwapExecutionErrorParseSummary|SlippageSwapExecutionErrorParseSummary> {
+    private async getParsedTransaction(position : Position) : Promise<'api-error'|'tx-DNE'|Exclude<ParsedSwapSummary,UnknownTransactionParseSummary>> {
         const parsedTransaction : 'api-error'|ParsedTransactionWithMeta|null = await this.connection.getParsedTransaction(position.txSellSignature!!, {
             maxSupportedTransactionVersion: 0,
             commitment: 'confirmed'

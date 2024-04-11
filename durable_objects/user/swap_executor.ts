@@ -1,12 +1,12 @@
 import { Connection, GetVersionedTransactionConfig, ParsedTransactionWithMeta, VersionedTransaction } from "@solana/web3.js";
 import * as bs58 from "bs58";
-import { UserAddress, Wallet, toUserAddress } from "../../crypto";
+import { Wallet, toUserAddress } from "../../crypto";
 import { Env } from "../../env";
 import { logDebug, logError } from "../../logging";
-import { Swappable, getSwapOfXDescription, isPosition, isPositionRequest } from "../../positions";
+import { Swappable } from "../../positions";
 import { executeAndConfirmSignedTx } from "../../rpc/rpc_execute_signed_transaction";
-import { parseBuySwapTransaction, parseParsedTransactionWithMeta, parseSellSwapTransaction } from "../../rpc/rpc_parse";
-import { ParsedSwapSummary, PreparseConfirmedSwapResult, SwapExecutionError, TransactionExecutionError, TransactionExecutionErrorCouldntConfirm, UnknownTransactionParseSummary } from "../../rpc/rpc_types";
+import { parseParsedTransactionWithMeta } from "../../rpc/rpc_parse";
+import { ParsedSwapSummary } from "../../rpc/rpc_swap_parse_result_types";
 import { TGStatusMessage, UpdateableNotification } from "../../telegram";
 import { assertNever, sleep, strictParseInt } from "../../util";
 
@@ -127,88 +127,6 @@ export class SwapExecutor {
 
 function is429(e: any) : boolean {
     return (e?.message||'').includes("429");
-}
-
-function parseSwapTransaction(s : Swappable, confirmedTx : PreparseConfirmedSwapResult, userAddress : UserAddress, connection : Connection, env : Env) : Promise<ParsedSwapSummary> {
-    if (isPositionRequest(s)) {
-        return parseBuySwapTransaction(s, confirmedTx, userAddress, connection, env);
-    }
-    else if (isPosition(s)) {
-        return parseSellSwapTransaction(s, confirmedTx, userAddress, connection, env);
-    }
-    else {
-        throw new Error("Programmer error.");
-    }
-}
-
-function makeTxNotFoundMessage(unknownTxParseSwapSummary : UnknownTransactionParseSummary, s : Swappable) : string {
-    const purchaseOfX = getSwapOfXDescription(s, true);
-    return `${purchaseOfX} failed.`;
-}
-
-function makeSwapSummaryFailedMessage(status : SwapExecutionError, s: Swappable) : string {
-    const swapOfX = getSwapOfXDescription(s, true);
-    switch(status) {
-        case SwapExecutionError.InsufficientSOLBalance:
-            return `${swapOfX} was not executed due to insufficient SOL.`;
-        case SwapExecutionError.InsufficientTokenBalance:
-            return `${swapOfX} was not executed due to insufficient balance.`;
-        case SwapExecutionError.SlippageToleranceExceeded:
-            return `${swapOfX} was not executed.  The slippage tolerance was exceeded (price moved too fast).`;
-        case SwapExecutionError.OtherSwapExecutionError:
-            return `${swapOfX} failed.`;
-        case SwapExecutionError.TokenAccountFeeNotInitialized:
-            return `${swapOfX} failed.`;
-        default:
-            assertNever(status);
-    }
-}
-
-
-
-function makeTransactionFailedErrorMessage(s: Swappable, status : TransactionExecutionError) {
-    const swapOfX = getSwapOfXDescription(s, true);
-    switch(status) {
-        case TransactionExecutionError.BlockheightExceeded:
-            return `${swapOfX} could not be completed due to network traffic.`;
-        case TransactionExecutionError.CouldNotPollBlockheightNoTxSent:
-            return `${swapOfX} failed due to error with 3rd party.`;
-        case TransactionExecutionError.InsufficientFundsError:
-            return `${swapOfX} failed due to insufficient funds.`;
-        case TransactionExecutionError.InsufficientNativeTokensError:
-            return `${swapOfX} failed because there was not enough SOL in your wallet to cover transaction fees.`;
-        case TransactionExecutionError.SlippageToleranceExceeded:
-            return `${swapOfX} failed because slippage tolerance was exceeded (the price moved too fast).`;
-        case TransactionExecutionError.TransactionDropped:
-            return `${swapOfX} failed because the order was dropped by a 3rd party.`;
-        case TransactionExecutionError.TransactionFailedOtherReason:
-            return `${swapOfX} failed.`;
-        case TransactionExecutionError.CouldNotDetermineMaxBlockheight:
-            return `${swapOfX} failed because a 3rd party service is down.`;
-        case TransactionExecutionError.TokenFeeAccountNotInitialized:
-            return `${swapOfX} failed because of a configuration problemwith the bot.`;
-        default:
-            assertNever(status);
-    }
-}
-
-function makeTransactionUnconfirmedMessage(s: Swappable, status: TransactionExecutionErrorCouldntConfirm | undefined | null) {
-    const swapOfX = getSwapOfXDescription(s);
-    const swapOfXCaps = getSwapOfXDescription(s, true);
-    const weWillRetry = `We will retry confirming your ${swapOfX}`;
-    if (status == null) {
-        return `${swapOfXCaps} could not be confirmed.  ${weWillRetry}.`;
-    }
-    switch(status) {
-        case TransactionExecutionErrorCouldntConfirm.CouldNotConfirmTooManyExceptions:
-            return `${swapOfXCaps} could not be confirmed.  ${weWillRetry}.`;
-        case TransactionExecutionErrorCouldntConfirm.TimeoutCouldNotConfirm:
-            return `${swapOfXCaps} could not be confirmed within time limit. ${weWillRetry}.`;
-        case TransactionExecutionErrorCouldntConfirm.UnknownCouldNotConfirm:
-            return `Something went wrong and ${swapOfX} could not be confirmed.  ${weWillRetry}.`;
-        default:
-            assertNever(status);
-    }
 }
 
 

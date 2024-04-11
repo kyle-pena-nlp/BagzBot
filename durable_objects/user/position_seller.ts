@@ -6,7 +6,7 @@ import { MenuCode } from "../../menus";
 import { Position, PositionStatus } from "../../positions";
 import { getLatestValidBlockhash } from "../../rpc/rpc_blocks";
 import { signatureOf } from "../../rpc/rpc_sign_tx";
-import { ParsedSuccessfulSwapSummary, isSlippageSwapExecutionErrorParseSummary, isSuccessfulSwapSummary, isSuccessfullyParsedSwapSummary, isSwapExecutionErrorParseSummary, isUnknownTransactionParseSummary } from "../../rpc/rpc_types";
+import { ParsedSuccessfulSwapSummary, isFrozenTokenAccountSwapExecutionErrorParseSummary, isInsufficientNativeTokensSwapExecutionErrorParseSummary, isOtherKindOfSwapExecutionError, isSlippageSwapExecutionErrorParseSummary, isSuccessfulSwapSummary, isSuccessfullyParsedSwapSummary, isTokenFeeAccountNotInitializedSwapExecutionErrorParseSummary, isUnknownTransactionParseSummary } from "../../rpc/rpc_swap_parse_result_types";
 import { TGStatusMessage, UpdateableNotification } from "../../telegram";
 import { assertNever, strictParseInt } from "../../util";
 import { markAsClosed, markAsOpen, positionExistsInTracker, updatePosition } from "../token_pair_position_tracker/token_pair_position_tracker_do_interop";
@@ -134,7 +134,16 @@ export class PositionSeller {
         else if (isSlippageSwapExecutionErrorParseSummary(parsedSwapSummary)) {
             return 'slippage-failed';
         }
-        else if (isSwapExecutionErrorParseSummary(parsedSwapSummary)) {
+        else if (isTokenFeeAccountNotInitializedSwapExecutionErrorParseSummary(parsedSwapSummary)) {
+            return 'failed';
+        }
+        else if (isInsufficientNativeTokensSwapExecutionErrorParseSummary(parsedSwapSummary)) {
+            return 'failed';
+        }
+        else if (isFrozenTokenAccountSwapExecutionErrorParseSummary(parsedSwapSummary)) {
+            return 'failed';
+        }
+        else if (isOtherKindOfSwapExecutionError(parsedSwapSummary)) {
             return 'failed';
         }        
         else if (isSuccessfulSwapSummary(parsedSwapSummary)) {
