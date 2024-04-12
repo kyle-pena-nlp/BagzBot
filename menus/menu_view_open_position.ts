@@ -50,7 +50,7 @@ export class MenuViewOpenPosition extends Menu<MenuData> implements MenuCapabili
         }
 
         if (this.canBeFrozen()) {
-            this.insertButtonNextLine(options, ':blue: Freeze Position', new CallbackData(MenuCode.FreezePosition, this.position().positionID));
+            this.insertButtonNextLine(options, ':ice: Freeze Position', new CallbackData(MenuCode.FreezePosition, this.position().positionID));
         }
 
         const refreshPositionCallbackData = new CallbackData(MenuCode.ViewOpenPosition, this.position().positionID);

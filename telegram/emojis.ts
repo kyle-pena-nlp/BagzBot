@@ -14,6 +14,7 @@ const emojis = {
     ':mountain:': '🏔️',
     ':wave:': '🌊',
     ':cart:': '🛒',
+    ':ice:': '🧊',
 
     ':red:': '🔴',
     ':yellow:': '🟡',
@@ -21,6 +22,7 @@ const emojis = {
     ':green:': '🟢',
     ':hollow:': '⚪',
     ':purple:': '🟣',
+    ':blue:': '🔵',
 
     ':down:': '🔻',
     ':up:': '💰', // irritating, but no green triangle up in emojis.
