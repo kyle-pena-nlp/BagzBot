@@ -422,4 +422,3 @@ function convertToConfirmedPosition(positionRequest: PositionRequest,
     };
     return position;
 }
-

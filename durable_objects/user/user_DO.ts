@@ -13,7 +13,7 @@ import { ChangeTrackedValue, Structural, assertNever, groupIntoBatches, sleep, s
 import { assertIs } from "../../util/enums";
 import { listUnclaimedBetaInviteCodes } from "../beta_invite_codes/beta_invite_code_interop";
 import { PositionAndMaybePNL } from "../token_pair_position_tracker/model/position_and_PNL";
-import { adminDeleteClosedPositionsForUser, adminDeletePositionByIDFromTracker, editTriggerPercentOnOpenPositionInTracker, freezePositionInTracker, getFrozenPositionFromTracker, getPositionAndMaybePNL, listClosedPositionsFromTracker, listFrozenPositionsInTracker, listPositionsByUser, removePosition, setSellAutoDoubleOnOpenPositionInPositionTracker, setSellSlippagePercentOnOpenPositionInTracker, unfreezePositionInTracker } from "../token_pair_position_tracker/token_pair_position_tracker_do_interop";
+import { adminDeleteClosedPositionsForUser, adminDeletePositionByIDFromTracker, deactivatePositionInTracker, editTriggerPercentOnOpenPositionInTracker, getFrozenPositionFromTracker, getPositionAndMaybePNL, listClosedPositionsFromTracker, listFrozenPositionsInTracker, listPositionsByUser, reactivatePositionInTracker, removePosition, setSellAutoDoubleOnOpenPositionInPositionTracker, setSellSlippagePercentOnOpenPositionInTracker } from "../token_pair_position_tracker/token_pair_position_tracker_do_interop";
 import { AdminDeleteAllPositionsRequest, AdminDeleteAllPositionsResponse } from "./actions/admin_delete_all_positions";
 import { AdminDeleteClosedPositionsRequest } from "./actions/admin_delete_closed_positions";
 import { AdminDeletePositionByIDRequest, AdminDeletePositionByIDResponse } from "./actions/admin_delete_position_by_id";
@@ -22,7 +22,7 @@ import { AutomaticallyClosePositionsRequest, AutomaticallyClosePositionsResponse
 import { BaseUserDORequest, isBaseUserDORequest } from "./actions/base_user_do_request";
 import { DeleteSessionRequest, DeleteSessionResponse } from "./actions/delete_session";
 import { EditTriggerPercentOnOpenPositionRequest, EditTriggerPercentOnOpenPositionResponse } from "./actions/edit_trigger_percent_on_open_position";
-import { FreezePositionRequest, FreezePositionResponse } from "./actions/freeze_position";
+import { DeactivatePositionRequest, DeactivatePositionResponse } from "./actions/freeze_position";
 import { GetClosedPositionsAndPNLSummaryRequest, GetClosedPositionsAndPNLSummaryResponse } from "./actions/get_closed_positions_and_pnl_summary";
 import { GetFrozenPositionRequest, GetFrozenPositionResponse } from "./actions/get_frozen_position";
 import { GetImpersonatedUserIDRequest, GetImpersonatedUserIDResponse } from "./actions/get_impersonated_user_id";
@@ -43,7 +43,7 @@ import { SetSellAutoDoubleOnOpenPositionRequest, SetSellAutoDoubleOnOpenPosition
 import { SellSellSlippagePercentageOnOpenPositionRequest, SellSellSlippagePercentageOnOpenPositionResponse } from "./actions/set_sell_slippage_percent_on_open_position";
 import { StoreLegalAgreementStatusRequest, StoreLegalAgreementStatusResponse } from "./actions/store_legal_agreement_status";
 import { StoreSessionValuesRequest, StoreSessionValuesResponse } from "./actions/store_session_values";
-import { UnfreezePositionRequest, UnfreezePositionResponse } from "./actions/unfreeze_position";
+import { ReactivatePositionRequest, ReactivatePositionResponse } from "./actions/unfreeze_position";
 import { UnimpersonateUserRequest, UnimpersonateUserResponse } from "./actions/unimpersonate_user";
 import { ClosedPositionPNLSummarizer } from "./aggregators/closed_positions_pnl_summarizer";
 import { TokenPair } from "./model/token_pair";
@@ -336,11 +336,11 @@ export class UserDO {
             case UserDOFetchMethod.listFrozenPositions:
                 response = await this.handleListFrozenPositions(userAction);
                 break;
-            case UserDOFetchMethod.freezePosition:
-                response = await this.handleFreezePosition(userAction);
+            case UserDOFetchMethod.deactivatePosition:
+                response = await this.handleDeactivatePosition(userAction);
                 break;
-            case UserDOFetchMethod.unfreezePosition:
-                response = await this.handleUnfreezePosition(userAction);
+            case UserDOFetchMethod.reactivatePosition:
+                response = await this.handleReactivatePosition(userAction);
                 break;
             case UserDOFetchMethod.getFrozenPosition:
                 response = await this.handleGetFrozenPosition(userAction);
@@ -386,35 +386,35 @@ export class UserDO {
         return { frozenPositions : allFrozenPositions };
     }
 
-    async handleFreezePosition(userAction : FreezePositionRequest) : Promise<Response> {
-        const response = await this.handleFreezePositionInternal(userAction);
-        return makeJSONResponse<FreezePositionResponse>(response);
+    async handleDeactivatePosition(userAction : DeactivatePositionRequest) : Promise<Response> {
+        const response = await this.handleDeactivatePositionInternal(userAction);
+        return makeJSONResponse<DeactivatePositionResponse>(response);
     }    
 
-    async handleFreezePositionInternal(userAction : FreezePositionRequest) : Promise<FreezePositionResponse> {
+    async handleDeactivatePositionInternal(userAction : DeactivatePositionRequest) : Promise<DeactivatePositionResponse> {
         const tokenPair = this.tokenPairsForPositionIDsTracker.getPositionPair(userAction.positionID);
         if (tokenPair == null) {
             return { success: false };
         }
         const tokenAddress = tokenPair.token.address;
         const vsTokenAddress = tokenPair.vsToken.address;
-        const response = await freezePositionInTracker(userAction.positionID, tokenAddress, vsTokenAddress, this.env);
+        const response = await deactivatePositionInTracker(userAction.positionID, tokenAddress, vsTokenAddress, this.env);
         return { success : response.success };
     }
 
-    async handleUnfreezePosition(userAction : UnfreezePositionRequest) : Promise<Response> {
-        const response = await this.handleUnfreezePositionInternal(userAction);
-        return makeJSONResponse<UnfreezePositionResponse>(response);
+    async handleReactivatePosition(userAction : ReactivatePositionRequest) : Promise<Response> {
+        const response = await this.handleReactivatePositionInternal(userAction);
+        return makeJSONResponse<ReactivatePositionResponse>(response);
     }        
 
-    async handleUnfreezePositionInternal(userAction : UnfreezePositionRequest) : Promise<UnfreezePositionResponse> {
+    async handleReactivatePositionInternal(userAction : ReactivatePositionRequest) : Promise<ReactivatePositionResponse> {
         const tokenPair = this.tokenPairsForPositionIDsTracker.getPositionPair(userAction.positionID);
         if (tokenPair == null) {
             return { success : false };
         }
         const tokenAddress = tokenPair.token.address;
         const vsTokenAddress = tokenPair.vsToken.address;
-        const response = await unfreezePositionInTracker(userAction.telegramUserID, userAction.positionID, tokenAddress, vsTokenAddress, this.env);
+        const response = await reactivatePositionInTracker(userAction.telegramUserID, userAction.positionID, tokenAddress, vsTokenAddress, this.env);
         return { success : response.success };
     }
 

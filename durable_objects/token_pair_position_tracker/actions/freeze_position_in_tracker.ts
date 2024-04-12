@@ -1,9 +1,9 @@
 import { HasPairAddresses } from "./has_pair_addresses";
 
-export interface FreezePositionInTrackerRequest extends HasPairAddresses {
+export interface DeactivatePositionInTrackerRequest extends HasPairAddresses {
     positionID : string
 }
 
-export interface FreezePositionInTrackerResponse {
+export interface DeactivatePositionInTrackerResponse {
     success: boolean
 }

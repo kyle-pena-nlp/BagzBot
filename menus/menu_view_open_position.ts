@@ -49,8 +49,8 @@ export class MenuViewOpenPosition extends Menu<MenuData> implements MenuCapabili
             }
         }
 
-        if (this.canBeFrozen()) {
-            this.insertButtonNextLine(options, ':ice: Freeze Position', new CallbackData(MenuCode.FreezePosition, this.position().positionID));
+        if (this.canBeDeactivated()) {
+            this.insertButtonNextLine(options, ':deactivated: Deactivate Position', new CallbackData(MenuCode.DeactivatePosition, this.position().positionID));
         }
 
         const refreshPositionCallbackData = new CallbackData(MenuCode.ViewOpenPosition, this.position().positionID);
@@ -218,7 +218,7 @@ export class MenuViewOpenPosition extends Menu<MenuData> implements MenuCapabili
         return this.position().buyConfirmed;
     }
 
-    private canBeFrozen() : boolean {
+    private canBeDeactivated() : boolean {
         return this.buyIsConfirmed() && this.isOpen() &&  !this.triggerConditionMet();
     }
 

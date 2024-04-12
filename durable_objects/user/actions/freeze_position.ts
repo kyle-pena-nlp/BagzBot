@@ -1,9 +1,9 @@
 import { BaseUserDORequest } from "./base_user_do_request";
 
-export interface FreezePositionRequest extends BaseUserDORequest {
+export interface DeactivatePositionRequest extends BaseUserDORequest {
     positionID : string
 }
 
-export interface FreezePositionResponse {
+export interface DeactivatePositionResponse {
     success : boolean
 }

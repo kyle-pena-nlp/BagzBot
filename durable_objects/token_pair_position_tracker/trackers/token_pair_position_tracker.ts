@@ -149,14 +149,14 @@ export class TokenPairPositionTracker {
         return this.pricePeaks.remove(positionID);
     }
 
-    freezePosition(positionID : string) : boolean {
+    deactivatePosition(positionID : string) : boolean {
         const position = this.getPosition(positionID);
         if (position == null) {
             return false;
         }
-        // can't freeze position whose buy isn't confirmed, and whose status is Closing or Closed
-        // (TODO: will this make it hard for users to freeze if stuck in a sell loop?)
-        // (answer: yes, but if we have a max sell attempts we can auto-freeze)          
+        // can't deactivat position whose buy isn't confirmed, and whose status is Closing or Closed
+        // (TODO: will this make it hard for users to deactivate if stuck in a sell loop?)
+        // (answer: yes, but if we have a max sell attempts we can auto-deactivate)          
         if (!position.buyConfirmed || position.status !== PositionStatus.Open) {
             return false;
         }
@@ -165,7 +165,7 @@ export class TokenPairPositionTracker {
         return true;
     }
 
-    unfreezePosition(userID : number, positionID : string, currentPrice : DecimalizedAmount) : boolean {
+    reactivatePosition(userID : number, positionID : string, currentPrice : DecimalizedAmount) : boolean {
         const position = this.frozenPositions.get(userID, positionID);
         if (position == null) {
             return false;

@@ -12,7 +12,7 @@ import { AdminResetDefaultPositionRequest, AdminResetDefaultPositionResponse } f
 import { AutomaticallyClosePositionsRequest, AutomaticallyClosePositionsResponse } from "./actions/automatically_close_positions";
 import { DeleteSessionRequest } from "./actions/delete_session";
 import { EditTriggerPercentOnOpenPositionRequest, EditTriggerPercentOnOpenPositionResponse } from "./actions/edit_trigger_percent_on_open_position";
-import { FreezePositionRequest, FreezePositionResponse } from "./actions/freeze_position";
+import { DeactivatePositionRequest, DeactivatePositionResponse } from "./actions/freeze_position";
 import { GetClosedPositionsAndPNLSummaryRequest, GetClosedPositionsAndPNLSummaryResponse } from "./actions/get_closed_positions_and_pnl_summary";
 import { GetFrozenPositionRequest, GetFrozenPositionResponse } from "./actions/get_frozen_position";
 import { GetImpersonatedUserIDRequest, GetImpersonatedUserIDResponse } from "./actions/get_impersonated_user_id";
@@ -33,7 +33,7 @@ import { SetSellAutoDoubleOnOpenPositionRequest, SetSellAutoDoubleOnOpenPosition
 import { SellSellSlippagePercentageOnOpenPositionRequest, SellSellSlippagePercentageOnOpenPositionResponse } from "./actions/set_sell_slippage_percent_on_open_position";
 import { StoreLegalAgreementStatusRequest, StoreLegalAgreementStatusResponse } from "./actions/store_legal_agreement_status";
 import { StoreSessionValuesRequest, StoreSessionValuesResponse } from "./actions/store_session_values";
-import { UnfreezePositionRequest, UnfreezePositionResponse } from "./actions/unfreeze_position";
+import { ReactivatePositionRequest, ReactivatePositionResponse } from "./actions/unfreeze_position";
 import { UnimpersonateUserRequest, UnimpersonateUserResponse } from "./actions/unimpersonate_user";
 import { SessionKey } from "./model/session";
 import { UserData } from "./model/user_data";
@@ -67,8 +67,8 @@ export enum UserDOFetchMethod {
 	adminResetDefaultPositionRequest = "adminResetDefaultPositionRequest",
 	adminDeletePositionByID = "adminDeletePositionByID",
 	listFrozenPositions = "listFrozenPositions",
-	freezePosition = "freezePosition",
-	unfreezePosition = "unfreezePosition",
+	deactivatePosition = "deactivatePosition",
+	reactivatePosition = "reactivatePosition",
 	getFrozenPosition = "getFrozenPosition"
 }
 
@@ -79,17 +79,17 @@ export async function getFrozenPosition(telegramUserID : number, chatID : number
 	return response.frozenPosition;
 }
 
-export async function freezePosition(telegramUserID : number, chatID : number, positionID : string, env : Env) : Promise<FreezePositionResponse> {
-	const request : FreezePositionRequest = { telegramUserID, chatID, positionID };
-	const method = UserDOFetchMethod.freezePosition;
-	const response = await sendJSONRequestToUserDO<FreezePositionRequest,FreezePositionResponse>(telegramUserID,method,request,env);
+export async function deactivatePosition(telegramUserID : number, chatID : number, positionID : string, env : Env) : Promise<DeactivatePositionResponse> {
+	const request : DeactivatePositionRequest = { telegramUserID, chatID, positionID };
+	const method = UserDOFetchMethod.deactivatePosition;
+	const response = await sendJSONRequestToUserDO<DeactivatePositionRequest,DeactivatePositionResponse>(telegramUserID,method,request,env);
 	return response;
 }
 
-export async function unfreezePosition(telegramUserID : number, chatID : number, positionID : string, env : Env) : Promise<UnfreezePositionResponse> {
-	const request : UnfreezePositionRequest = { telegramUserID, chatID, positionID };
-	const method = UserDOFetchMethod.unfreezePosition;
-	const response = await sendJSONRequestToUserDO<UnfreezePositionRequest,UnfreezePositionResponse>(telegramUserID,method,request,env);
+export async function reactivatePosition(telegramUserID : number, chatID : number, positionID : string, env : Env) : Promise<ReactivatePositionResponse> {
+	const request : ReactivatePositionRequest = { telegramUserID, chatID, positionID };
+	const method = UserDOFetchMethod.reactivatePosition;
+	const response = await sendJSONRequestToUserDO<ReactivatePositionRequest,ReactivatePositionResponse>(telegramUserID,method,request,env);
 	return response;
 }
 

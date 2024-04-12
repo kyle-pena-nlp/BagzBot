@@ -11,7 +11,7 @@ import { _devOnlyFeatureUpdatePrice, adminInvokeAlarm } from "../durable_objects
 import { OpenPositionRequest } from "../durable_objects/user/actions/open_new_position";
 import { QuantityAndToken } from "../durable_objects/user/model/quantity_and_token";
 import { TokenSymbolAndAddress } from "../durable_objects/user/model/token_name_and_address";
-import { adminDeleteAllPositions, adminDeleteClosedPositions, adminDeletePositionByID, adminResetDefaultPositionRequest, editTriggerPercentOnOpenPositionFromUserDO, freezePosition, getClosedPositionsAndPNLSummary, getDefaultTrailingStopLoss, getFrozenPosition, getPositionFromUserDO, getUserData, getUserWalletSOLBalance, getWalletData, impersonateUser, listFrozenPositions, listPositionsFromUserDO, manuallyClosePosition, maybeReadSessionObj, readSessionObj, requestNewPosition, sendMessageToUser, setSellAutoDoubleOnOpenPosition, setSellSlippagePercentOnOpenPosition, storeLegalAgreementStatus, storeSessionObj, storeSessionObjProperty, storeSessionValues, unfreezePosition, unimpersonateUser } from "../durable_objects/user/userDO_interop";
+import { adminDeleteAllPositions, adminDeleteClosedPositions, adminDeletePositionByID, adminResetDefaultPositionRequest, deactivatePosition, editTriggerPercentOnOpenPositionFromUserDO, getClosedPositionsAndPNLSummary, getDefaultTrailingStopLoss, getFrozenPosition, getPositionFromUserDO, getUserData, getUserWalletSOLBalance, getWalletData, impersonateUser, listFrozenPositions, listPositionsFromUserDO, manuallyClosePosition, maybeReadSessionObj, reactivatePosition, readSessionObj, requestNewPosition, sendMessageToUser, setSellAutoDoubleOnOpenPosition, setSellSlippagePercentOnOpenPosition, storeLegalAgreementStatus, storeSessionObj, storeSessionObjProperty, storeSessionValues, unimpersonateUser } from "../durable_objects/user/userDO_interop";
 import { Env } from "../env";
 import { makeFakeFailedRequestResponse, makeSuccessResponse } from "../http";
 import { logDebug, logError } from "../logging";
@@ -645,26 +645,26 @@ export class CallbackHandler {
                 const adminDeletePositionResponse = await adminDeletePositionByID(params.getTelegramUserID(), params.chatID, positionIDtoDelete, this.env);
                 const adminDeletePositionByIDMsg = adminDeletePositionResponse.success ? `Position with ID ${positionIDtoDelete} was deleted` : `Position with ID ${positionIDtoDelete} could not be deleted (might already not exist)`;
                 return new MenuContinueMessage(adminDeletePositionByIDMsg, MenuCode.Main);
-            case MenuCode.FreezePosition:
-                const freezePositionResponse = await freezePosition(params.getTelegramUserID(), params.chatID, callbackData.menuArg||'', this.env);
-                if (freezePositionResponse.success) {
-                    return new MenuContinueMessage("This position has been frozen and will no longer be price monitored", MenuCode.ViewFrozenPositions);
+            case MenuCode.DeactivatePosition:
+                const deactivatePositionResponse = await deactivatePosition(params.getTelegramUserID(), params.chatID, callbackData.menuArg||'', this.env);
+                if (deactivatePositionResponse.success) {
+                    return new MenuContinueMessage("This position has been deactivated and will no longer be price monitored", MenuCode.ViewFrozenPositions);
                 }
                 else {
-                    return new MenuContinueMessage("This position could not be frozen", MenuCode.ViewOpenPosition, 'HTML', callbackData.menuArg);
+                    return new MenuContinueMessage("This position could not be deactivated", MenuCode.ViewOpenPosition, 'HTML', callbackData.menuArg);
                 }
-            case MenuCode.UnfreezePosition:
-                const unfreezePositionResponse = await unfreezePosition(params.getTelegramUserID(), params.chatID, callbackData.menuArg||'', this.env);
-                if (unfreezePositionResponse.success) {
+            case MenuCode.ReactivatePosition:
+                const reactivatePositionResponse = await reactivatePosition(params.getTelegramUserID(), params.chatID, callbackData.menuArg||'', this.env);
+                if (reactivatePositionResponse.success) {
                     return new MenuContinueMessage("This position will now be price monitored", MenuCode.ListPositions);
                 }
                 else {
-                    return new MenuContinueMessage("This position could not be unfrozen", MenuCode.ViewFrozenPosition, 'HTML', callbackData.menuArg);
+                    return new MenuContinueMessage("This position could not be activated", MenuCode.ViewFrozenPosition, 'HTML', callbackData.menuArg);
                 }
             case MenuCode.ViewFrozenPosition:
                 const frozenPosition = await getFrozenPosition(params.getTelegramUserID(), params.chatID, callbackData.menuArg||'', this.env);
                 if (frozenPosition == null) {
-                    return new MenuContinueMessage("Sorry - this position is no longer frozen or was removed", MenuCode.ViewFrozenPositions);
+                    return new MenuContinueMessage("Sorry - this position is no longer deactivated or was removed", MenuCode.ViewFrozenPositions);
                 }
                 else {
                     return new MenuViewFrozenPosition(frozenPosition);

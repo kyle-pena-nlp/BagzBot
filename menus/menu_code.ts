@@ -28,8 +28,8 @@ export enum MenuCode {
 	SubmitAdminDeletePositionByID = "SubmitAdminDeletePositionByID",
 	PosRequestChooseAutoDoubleSlippageOptions = "EPR.AutoDoubleSlip",
 	SubmitPosRequestAutoDoubleSlippageOptions = "SPR.AutoDoubleSlip",
-	UnfreezePosition = "UnfreezePosition",
-	FreezePosition = "FreezePosition",
+	ReactivatePosition = "ReactivatePosition",
+	DeactivatePosition = "DeactivatePosition",
 	ViewFrozenPositions = "ListFrozenPositions",
 	ViewFrozenPosition = "ViewFrozenPosition", 
 	//This needs a bigger refactor because the PositionSeller assumes the position is being tracked.

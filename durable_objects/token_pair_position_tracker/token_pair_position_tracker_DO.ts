@@ -19,7 +19,7 @@ import { AdminDeleteAllInTrackerRequest, AdminDeleteAllInTrackerResponse } from 
 import { AdminDeleteClosedPositionsForUserInTrackerRequest, AdminDeleteClosedPositionsForUserInTrackerResponse } from "./actions/admin_delete_closed_positions_for_user_in_tracker";
 import { AdminDeletePositionByIDFromTrackerRequest, AdminDeletePositionByIDFromTrackerResponse } from "./actions/admin_delete_position_by_id_from_tracker";
 import { EditTriggerPercentOnOpenPositionInTrackerRequest } from "./actions/edit_trigger_percent_on_open_position_in_tracker";
-import { FreezePositionInTrackerRequest, FreezePositionInTrackerResponse } from "./actions/freeze_position_in_tracker";
+import { DeactivatePositionInTrackerRequest, DeactivatePositionInTrackerResponse } from "./actions/freeze_position_in_tracker";
 import { GetFrozenPositionFromTrackerRequest, GetFrozenPositionFromTrackerResponse } from "./actions/get_frozen_position";
 import { GetPositionFromPriceTrackerRequest, GetPositionFromPriceTrackerResponse } from "./actions/get_position";
 import { GetPositionAndMaybePNLFromPriceTrackerRequest, GetPositionAndMaybePNLFromPriceTrackerResponse } from "./actions/get_position_and_maybe_pnl";
@@ -40,7 +40,7 @@ import { PositionExistsInTrackerRequest, PositionExistsInTrackerResponse } from 
 import { RemovePositionRequest, RemovePositionResponse } from "./actions/remove_position";
 import { SetSellAutoDoubleOnOpenPositionInTrackerRequest } from "./actions/set_sell_auto_double_on_open_position_in_tracker";
 import { SetSellSlippagePercentOnOpenPositionTrackerRequest } from "./actions/set_sell_slippage_percent_on_open_position";
-import { UnfreezePositionInTrackerRequest, UnfreezePositionInTrackerResponse } from "./actions/unfreeze_position_in_tracker";
+import { ReactivatePositionInTrackerRequest, ReactivatePositionInTrackerResponse } from "./actions/unfreeze_position_in_tracker";
 import { UpdatePositionRequest, UpdatePositionResponse } from "./actions/update_position";
 import { UpdatePriceRequest, UpdatePriceResponse } from "./actions/update_price";
 import { WakeupTokenPairPositionTrackerRequest, WakeupTokenPairPositionTrackerResponse } from "./actions/wake_up";
@@ -362,10 +362,10 @@ export class TokenPairPositionTrackerDO {
                 return await this.handleAdminDeleteClosedPositionsForUser(body);
             case TokenPairPositionTrackerDOFetchMethod.adminDeletePositionByIDFromTracker:
                 return await this.handleAdminDeletePositionByID(body);
-            case TokenPairPositionTrackerDOFetchMethod.freezePosition:
-                return await this.handleFreezePosition(body);
-            case TokenPairPositionTrackerDOFetchMethod.unfreezePosition:
-                return await this.handleUnfreezePosition(body);
+            case TokenPairPositionTrackerDOFetchMethod.deactivatePosition:
+                return await this.handleDeactivatePosition(body);
+            case TokenPairPositionTrackerDOFetchMethod.reactivatePosition:
+                return await this.handleReactivatePosition(body);
             case TokenPairPositionTrackerDOFetchMethod.listFrozenPositions:
                 return await this.handleListFrozenPositions(body);
             case TokenPairPositionTrackerDOFetchMethod.getFrozenPosition:
@@ -387,18 +387,18 @@ export class TokenPairPositionTrackerDO {
         return makeJSONResponse<GetFrozenPositionFromTrackerResponse>({ frozenPosition });
     }
 
-    async handleFreezePosition(body: FreezePositionInTrackerRequest) : Promise<Response> {
-        const success = this.tokenPairPositionTracker.freezePosition(body.positionID);
-        return makeJSONResponse<FreezePositionInTrackerResponse>({ success });
+    async handleDeactivatePosition(body: DeactivatePositionInTrackerRequest) : Promise<Response> {
+        const success = this.tokenPairPositionTracker.deactivatePosition(body.positionID);
+        return makeJSONResponse<DeactivatePositionInTrackerResponse>({ success });
     }
 
-    async handleUnfreezePosition(body: UnfreezePositionInTrackerRequest): Promise<Response> {
+    async handleReactivatePosition(body: ReactivatePositionInTrackerRequest): Promise<Response> {
         const currentPrice = await this.getPrice();
         if (currentPrice == null) {
-            return makeJSONResponse<UnfreezePositionInTrackerResponse>({ success: false })
+            return makeJSONResponse<ReactivatePositionInTrackerResponse>({ success: false })
         }
-        const success = this.tokenPairPositionTracker.unfreezePosition(body.userID, body.positionID, currentPrice);
-        return makeJSONResponse<UnfreezePositionInTrackerResponse>({ success });
+        const success = this.tokenPairPositionTracker.reactivatePosition(body.userID, body.positionID, currentPrice);
+        return makeJSONResponse<ReactivatePositionInTrackerResponse>({ success });
     }
 
     async handleListFrozenPositions(body: ListFrozenPositionsInTrackerRequest) : Promise<Response> {
@@ -736,15 +736,15 @@ export class TokenPairPositionTrackerDO {
                 }
                 else if (confirmedSellStatus === 'frozen-token-account') {
                     await TGStatusMessage.finalMessage(channel, "The sale didn't go through because this token has been frozen (most likely it was rugged).  Auto-Sell has been deactivated.", true);
-                    this.tokenPairPositionTracker.freezePosition(pos.positionID);
+                    this.tokenPairPositionTracker.deactivatePosition(pos.positionID);
                 }
                 else if (confirmedSellStatus === 'insufficient-sol') {
                     await TGStatusMessage.finalMessage(channel, "We found that the sale didn't go through because there wasn't enough SOL in your wallet to cover transaction fees. Auto-Sell has been deactivated.", true);
-                    this.tokenPairPositionTracker.freezePosition(pos.positionID);
+                    this.tokenPairPositionTracker.deactivatePosition(pos.positionID);
                 }
                 else if (confirmedSellStatus === 'token-fee-account-not-initialized') {
                     await TGStatusMessage.finalMessage(channel, "We found that the sale didn't go through because of an error on our platform. Auto-Sell has been deactivated.", true);
-                    this.tokenPairPositionTracker.freezePosition(pos.positionID);
+                    this.tokenPairPositionTracker.deactivatePosition(pos.positionID);
                 }
                 else if (isSuccessfullyParsedSwapSummary(confirmedSellStatus)) {
                     // TODO: update with PNL               

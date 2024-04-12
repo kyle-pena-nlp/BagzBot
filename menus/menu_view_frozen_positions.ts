@@ -7,11 +7,12 @@ import { MenuCode } from "./menu_code";
 
 export class MenuViewFrozenPositions extends Menu<Position[]>  implements MenuCapabilities {
     renderText(): string {
-        const lines = [`<b><u>Frozen Positions</u></b>
-These positions have been frozen and will not automatically sell.`];
+        const lines = [`<b><u>Deactivated Positions</u></b>
+:bullet: Deactivated positions are not price monitored and will not be automatically sold. 
+:bullet: You can reactivate a position by opening it and clicking 'Reactivate'.`];
         if (this.menuData.length == 0) {
             lines.push("");
-            lines.push("You have 0 frozen positions.");
+            lines.push("You have 0 deactivated positions.");
         }
         return lines.join("\r\n");
     }
@@ -20,11 +21,12 @@ These positions have been frozen and will not automatically sell.`];
         for (const position of this.menuData) {
             this.insertViewFrozenPositionButton(options, position);
         }
+        this.insertButtonNextLine(options, ':refresh: Refresh', this.menuCallback(MenuCode.ViewFrozenPositions));
         this.insertButtonNextLine(options, ':back: Back', this.menuCallback(MenuCode.Main));
         return options;
     }
 
     private insertViewFrozenPositionButton(options : CallbackButton[][], position : Position) {
-        this.insertButtonNextLine(options, `:ice: ${asTokenPrice(position.tokenAmt)} of $${position.token.symbol}`, new CallbackData(MenuCode.ViewFrozenPosition, position.positionID));
+        this.insertButtonNextLine(options, `:deactivated: ${asTokenPrice(position.tokenAmt)} of $${position.token.symbol}`, new CallbackData(MenuCode.ViewFrozenPosition, position.positionID));
     }
 }

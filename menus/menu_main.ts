@@ -74,7 +74,7 @@ export class MenuMain extends Menu<UserData & Stuff> implements MenuCapabilities
             }*/
             this.insertButtonNextLine(options, ':briefcase: Wallet', this.menuCallback(MenuCode.Wallet));
             this.insertButtonSameLine(options, ':chart_up: TSL Positions', this.menuCallback(MenuCode.ListPositions));
-            this.insertButtonNextLine(options, ':ice: Frozen TSL Positions', this.menuCallback(MenuCode.ViewFrozenPositions));
+            this.insertButtonNextLine(options, ':deactivated: Deactivated TSL Positions', this.menuCallback(MenuCode.ViewFrozenPositions));
             this.insertButtonNextLine(options, ':ledger: PNL History', this.menuCallback(MenuCode.ViewPNLHistory));
             if (this.menuData.hasInviteBetaCodes) {
                 this.insertButtonNextLine(options, ":envelope: Invite Friends To Beta", this.menuCallback(MenuCode.BetaGateInviteFriends));
