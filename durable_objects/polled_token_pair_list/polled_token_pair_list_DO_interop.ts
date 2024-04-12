@@ -1,5 +1,5 @@
 import { Env } from "../../env";
-import { makeJSONRequest, makeRequest } from "../../util";
+import { makeJSONRequest, makeRequest } from "../../http";
 import { ForceRefreshTokensRequest as RebuildTokensListRequest, ForceRefreshTokensResponse as RebuildTokensListResponse } from "./actions/force_refresh_tokens";
 import { GetTokenInfoRequest, GetTokenInfoResponse } from "./actions/get_token_info";
 

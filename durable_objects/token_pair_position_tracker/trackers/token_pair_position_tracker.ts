@@ -1,7 +1,7 @@
 import { DecimalizedAmount } from "../../../decimalized";
 import { logError } from "../../../logging";
 import { Position, PositionStatus } from "../../../positions";
-import { MapWithStorage } from "../../../util";
+import { Integer, MapWithStorage, TwoLevelMapWithStorage } from "../../../util";
 import { PositionAndMaybePNL } from "../model/position_and_PNL";
 import { PeakPricePositionTracker } from "./peak_price_tracker";
 

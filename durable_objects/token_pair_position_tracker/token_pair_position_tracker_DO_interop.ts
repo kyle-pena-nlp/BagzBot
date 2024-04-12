@@ -1,8 +1,8 @@
 import { isTheSuperAdminUserID } from "../../admins";
 import { DecimalizedAmount } from "../../decimalized";
 import { Env } from "../../env";
+import { makeJSONRequest, makeRequest } from "../../http";
 import { Position, PositionStatus } from "../../positions";
-import { makeJSONRequest, makeRequest } from "../../util";
 import { EditTriggerPercentOnOpenPositionResponse } from "../user/actions/edit_trigger_percent_on_open_position";
 import { SetSellAutoDoubleOnOpenPositionResponse } from "../user/actions/set_sell_auto_double_on_open_position";
 import { SellSellSlippagePercentageOnOpenPositionResponse } from "../user/actions/set_sell_slippage_percent_on_open_position";

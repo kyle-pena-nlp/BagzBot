@@ -1,8 +1,9 @@
 import { Env } from "../env";
+import { makeFakeFailedRequestResponse, makeJSONRequest, makeSuccessResponse } from "../http";
 import { logError } from "../logging";
 import { MenuCode } from "../menus";
 import { CallbackData } from "../menus/callback_data";
-import { makeFakeFailedRequestResponse, makeJSONRequest, makeSuccessResponse, sleep } from "../util";
+import { sleep } from "../util";
 import { CallbackButton } from "./callback_button";
 import { subInEmojis } from "./emojis";
 

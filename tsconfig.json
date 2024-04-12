@@ -11,7 +11,11 @@
       "sourceMap": true,
       "preserveConstEnums": true,
       "importHelpers": true,
-      "types": ["@cloudflare/workers-types/2023-07-01", "node"]
+      "types": [
+        "@cloudflare/workers-types/2023-07-01", 
+        "node", 
+        "@types/jest"
+      ]
     },
     "include": [
       
@@ -20,13 +24,5 @@
       "./node_modules/@cloudflare/workers-types/*.ts"
    ],
    "exclude": [
-    "test/"
-   ],
-   "jest": {
-    "globals": {
-      "ts-jest": {
-        "tsconfig": "test/jest.tsconfig.json"
-      }
-    }
-  }
+   ]
 }

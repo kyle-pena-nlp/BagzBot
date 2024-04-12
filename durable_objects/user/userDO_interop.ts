@@ -1,8 +1,9 @@
 import { DecimalizedAmount } from "../../decimalized";
 import { Env } from "../../env";
+import { makeJSONRequest, makeRequest } from "../../http";
 import { Position } from "../../positions";
 import { TokenInfo } from "../../tokens";
-import { Structural, groupIntoBatches, groupIntoMap, makeJSONRequest, makeRequest } from "../../util";
+import { Structural, groupIntoBatches, groupIntoMap } from "../../util";
 import { PositionAndMaybePNL } from "../token_pair_position_tracker/model/position_and_PNL";
 import { AdminDeleteAllPositionsRequest, AdminDeleteAllPositionsResponse } from "./actions/admin_delete_all_positions";
 import { AdminDeleteClosedPositionsRequest, AdminDeleteClosedPositionsResponse } from "./actions/admin_delete_closed_positions";

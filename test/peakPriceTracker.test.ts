@@ -1,7 +1,13 @@
 import { DecimalizedAmount, dMult } from "../decimalized";
+import { dZero } from "../decimalized/decimalized_amount";
 import { PeakPricePositionTracker } from "../durable_objects/token_pair_position_tracker/trackers/peak_price_tracker";
 import { Position, PositionStatus, PositionType } from "../positions";
 import { TokenInfo, getVsTokenInfo } from "../tokens";
+
+function updateTrackerAndCollectClosers(tracker : PeakPricePositionTracker, price : DecimalizedAmount) : Position[] {
+    tracker.update(price);
+    return tracker.collectPositionsToClose(price);
+}
 
 test("tracker_stores_position", () => {
     const triggerPct = 10;
@@ -17,16 +23,18 @@ test("tracker_does_not_trigger_small_price_drop", () => {
     const tracker = new PeakPricePositionTracker(prefix());
     const pos = posWithPriceAndTrigger(d(250,0), triggerPct);
     tracker.add(pos.fillPrice, pos);
-    const triggeredPositions = tracker.update(d(249,0));
+    const triggeredPositions = updateTrackerAndCollectClosers(tracker, d(249,0));
     expect(triggeredPositions).toHaveLength(0);
 });
+
+
 
 test("tracker_does_not_trigger_price_same", () => {
     const triggerPct = 10;
     const tracker = new PeakPricePositionTracker(prefix());
     const pos = posWithPriceAndTrigger(d(250,0), triggerPct);
     tracker.add(pos.fillPrice, pos);
-    const triggeredPositions = tracker.update(d(250,0));
+    const triggeredPositions = updateTrackerAndCollectClosers(tracker, d(250,0));
     expect(triggeredPositions).toHaveLength(0);
 });
 
@@ -35,7 +43,7 @@ test("tracker_does_not_trigger_price_increase", () => {
     const tracker = new PeakPricePositionTracker(prefix());
     const pos = posWithPriceAndTrigger(d(250,0), triggerPct);
     tracker.add(pos.fillPrice, pos);
-    const triggeredPositions = tracker.update(d(260,0));
+    const triggeredPositions = updateTrackerAndCollectClosers(tracker, d(260,0));
     expect(triggeredPositions).toHaveLength(0);
 });
 
@@ -45,7 +53,7 @@ test("tracker_triggers_big_price_drop", () => {
     const tracker = new PeakPricePositionTracker(prefix());
     const pos = posWithPriceAndTrigger(d(250,0), triggerPct);
     tracker.add(pos.fillPrice, pos);
-    const triggeredPositions = tracker.update(d(225,0));
+    const triggeredPositions = updateTrackerAndCollectClosers(tracker, d(225,0));
     expect(triggeredPositions).toHaveLength(1);
 });
 
@@ -54,9 +62,9 @@ test("tracker_triggers_price_drop_after_peak", () => {
     const tracker = new PeakPricePositionTracker(prefix());
     const pos = posWithPriceAndTrigger(d(250,0), triggerPct);
     tracker.add(pos.fillPrice, pos);
-    const triggeredPositions1 = tracker.update(d(300,0));
+    const triggeredPositions1 = updateTrackerAndCollectClosers(tracker, d(300,0));
     expect(triggeredPositions1).toHaveLength(0);
-    const triggeredPositions2 = tracker.update(d(270,0));
+    const triggeredPositions2 = updateTrackerAndCollectClosers(tracker, d(270,0));
     expect(triggeredPositions2).toHaveLength(1);
 });
 
@@ -70,7 +78,8 @@ test("tracker_triggers_one_position_but_not_other", () => {
     const pos2 = posWithPriceAndTrigger(d(300,0), triggerPct, "B");
     tracker.add(pos2.fillPrice, pos2);
     
-    const triggeredPositions = tracker.update(d(270,0));
+    tracker.update(d(270,0));
+    const triggeredPositions = tracker.collectPositionsToClose(d(270,0));
     expect(triggeredPositions).toHaveLength(1);
     expect(triggeredPositions[0].positionID).toEqual("B");
 })
@@ -85,10 +94,10 @@ test("tracker_triggers_both_positions_after_peak_consolidation", () => {
     const pos2 = posWithPriceAndTrigger(d(290,0), triggerPct, "B");
     tracker.add(pos2.fillPrice, pos2);
     
-    const triggeredPositions1 = tracker.update(d(300,0));
+    const triggeredPositions1 = updateTrackerAndCollectClosers(tracker, d(300,0));
     expect(triggeredPositions1).toHaveLength(0);
 
-    const triggeredPositions2 = tracker.update(d(270,0));
+    const triggeredPositions2 = updateTrackerAndCollectClosers(tracker, d(270,0));
     expect(triggeredPositions2).toHaveLength(2);    
 })
 
@@ -123,7 +132,19 @@ function posWithPrice(initPrice : DecimalizedAmount) : Position {
         fillPrice : initPrice,
         sellSlippagePercent: 2,
         triggerPercent: 5,
-        retrySellIfSlippageExceeded: true
+        retrySellIfSlippageExceeded: true,
+        txBuyAttemptTimeMS: 0,
+        txSellAttemptTimeMS: 0,
+        fillPriceMS: 0,
+        userAddress: { address: '' },
+        txBuySignature: '',
+        txSellSignature: '',
+        sellAutoDoubleSlippage: false,
+        sellConfirmed: false,
+        buyLastValidBlockheight: 0,
+        sellLastValidBlockheight: 0,
+        buyConfirmed: true,
+        netPNL : dZero()
     }
 }
 

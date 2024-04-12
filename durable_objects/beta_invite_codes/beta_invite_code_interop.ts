@@ -1,5 +1,6 @@
 import { Env } from "../../env";
-import { makeJSONRequest, tryParseInt } from "../../util";
+import { makeJSONRequest } from "../../http";
+import { tryParseInt } from "../../util";
 import { ResponseOf, WithMethod, WithUserID } from "../../util/builder_types";
 
 export enum BetaInviteCodesMethod {

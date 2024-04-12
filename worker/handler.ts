@@ -27,10 +27,11 @@ import { POSITION_REQUEST_STORAGE_KEY } from "../storage_keys";
 import { TGStatusMessage, TelegramWebhookInfo, deleteTGMessage, sendMessageToTG, updateTGMessage } from "../telegram";
 import { TGMessageChannel } from "../telegram/telegram_status_message";
 import { TokenInfo, WEN_ADDRESS, getVsTokenInfo } from "../tokens";
-import { Structural, assertNever, makeFakeFailedRequestResponse, makeSuccessResponse, strictParseBoolean, strictParseFloat, strictParseInt, tryParseBoolean, tryParseFloat, tryParseInt } from "../util";
+import { Structural, assertNever, strictParseBoolean, strictParseFloat, strictParseInt, tryParseBoolean, tryParseFloat, tryParseInt } from "../util";
 import { assertIs } from "../util/enums";
 import { CallbackHandlerParams } from "./model/callback_handler_params";
 import { TokenAddressExtractor } from "./token_address_extractor";
+import { makeFakeFailedRequestResponse, makeSuccessResponse } from "../http";
 
 // TODO: -> CF environment variable.
 const QUESTION_TIMEOUT_MS = 10000

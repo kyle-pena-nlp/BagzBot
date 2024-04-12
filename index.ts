@@ -1,7 +1,7 @@
 
 import { Env } from "./env";
 import { TGStatusMessage, TelegramWebhookInfo, sendMessageToTG } from "./telegram";
-import { assertNever, makeFakeFailedRequestResponse, makeSuccessResponse, strictParseBoolean } from "./util";
+import { assertNever, strictParseBoolean } from "./util";
 import { CallbackHandler as Handler } from "./worker/handler";
 
 /* Durable Objects */
@@ -18,6 +18,7 @@ import { MenuCode, logoHack } from "./menus";
 import { ReplyQuestion, ReplyQuestionCode } from "./reply_question";
 import { ReplyQuestionData } from "./reply_question/reply_question_data";
 import { CallbackHandlerParams } from "./worker/model/callback_handler_params";
+import { makeFakeFailedRequestResponse, makeSuccessResponse } from "./http";
 
 /* CF requires export of any imported durable objects */
 export { BetaInviteCodesDO, HeartbeatDO, PolledTokenPairListDO, TokenPairPositionTrackerDO, UserDO };

@@ -1,9 +1,10 @@
 import { Buffer } from "node:buffer";
 import { Env, getSwapAPIUrl } from "../env";
 import { deriveFeeAccount } from "../tokens";
-import { makeJSONRequest, strictParseBoolean as parseBoolStrict, tryReadResponseBody } from "../util";
+import { strictParseBoolean as parseBoolStrict } from "../util";
 import { SwapRoute } from "./jupiter_types";
 import { TransactionPreparationFailure, isTransactionPreparationFailure } from "./rpc_types";
+import { makeJSONRequest, tryReadResponseBody } from "../http";
 
 export async function serializeSwapRouteTransaction(swapRoute : SwapRoute|TransactionPreparationFailure, 
     publicKey : string, 

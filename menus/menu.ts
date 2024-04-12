@@ -2,9 +2,9 @@ import { Env } from "../env";
 import { CallbackData } from "./callback_data";
 import { MenuCode } from "./menu_code";
 
+import { makeJSONRequest } from "../http";
+import { fetchAndReadResponse as safeFetchAndReadResponse } from "../http/http_helpers";
 import { CallbackButton, escapeTGText, makeTelegramBotUrl, subInEmojis, subInEmojisOnButtons } from "../telegram";
-import { makeJSONRequest } from "../util";
-import { fetchAndReadResponse as safeFetchAndReadResponse } from "../util/http_helpers";
 
 export enum MenuDisplayMode {
 	UpdateMenu,

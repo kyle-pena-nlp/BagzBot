@@ -1,3 +1,10 @@
+export type Integer = number;
+
+// this doesn't give compile-time type safety but expresses intent.
+export function isInteger(x : number) : x is Integer {
+    return Number.isInteger(x);
+}
+
 export function tryParseFloat(x : string|null|undefined) : number|null {
     if (x == null) {
         return null;

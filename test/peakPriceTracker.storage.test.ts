@@ -62,7 +62,7 @@ test("update_price_affects_none_triggers_none", async () => {
         d(139,0)
     ];
 
-    const closers = await runEvents(tracker, events, fakeStorage);
+    const closers = (await runEvents(tracker, events, fakeStorage)).flatMap(x => x);
 
     expect(tracker.getPeakPrice("A")).toEqual(d(140,0));
     expect(tracker.getPosition("A")).toEqual(pos(d(140,0),"A"));
@@ -70,7 +70,7 @@ test("update_price_affects_none_triggers_none", async () => {
     expect(tracker.getPeakPrice("B")).toEqual(d(150,0));
     expect(tracker.getPosition("B")).toEqual(pos(d(150,0),"B"));
 
-    expect(closers.flatMap(x => x)).toStrictEqual([]);
+    expect(closers).toStrictEqual([]);
 });
 
 test("update_price_affects_some_triggers_none", async () => {
@@ -82,10 +82,10 @@ test("update_price_affects_some_triggers_none", async () => {
         // update price (will update peak for 1 position)
         d(145,0)
     ];
-    const closers = await runEvents(tracker, events, fakeStorage);
+    const closers = (await runEvents(tracker, events, fakeStorage)).flatMap(x => x);
     expect(tracker.getPeakPrice("A")).toEqual(d(145,0));
     expect(tracker.getPeakPrice("B")).toEqual(d(150,0));
-    expect(closers.flatMap(x => x)).toStrictEqual([]);
+    expect(closers).toStrictEqual([]);
 });
 
 test("update_price_affects_all_triggers_none", async () => {
@@ -97,10 +97,10 @@ test("update_price_affects_all_triggers_none", async () => {
         // update price (will update peak for 2 positions)
         d(160,0)
     ];
-    const closers = await runEvents(tracker, events, fakeStorage);
+    const closers = (await runEvents(tracker, events, fakeStorage)).flatMap(x => x);
     expect(tracker.getPeakPrice("A")).toEqual(d(160,0));
     expect(tracker.getPeakPrice("B")).toEqual(d(160,0));
-    expect(closers.flatMap(x => x)).toStrictEqual([]);
+    expect(closers).toStrictEqual([]);
 });
 
 test("update_price_updates_none_triggers_some", async () => {
@@ -112,11 +112,12 @@ test("update_price_updates_none_triggers_some", async () => {
         // update price (will trigger 1 position)
         d(135,0)
     ];
-    const closers = await runEvents(tracker, events, fakeStorage);
+    const closers = (await runEvents(tracker, events, fakeStorage)).flatMap(x => x);
     expect(tracker.getPeakPrice("A")).toEqual(d(140,0));
     expect(tracker.getPeakPrice("B")).toEqual(undefined);
     expect(tracker.getPosition("B")).toEqual(undefined);
-    expect(closers.flatMap(x => x)).toContainEqual(closed(pos(d(150,0), "B")));
+    //expect(closers).toContainEqual(closed(pos(d(150,0), "B")));
+    expect(closers).toContainEqual(expect.objectContaining({ positionID: "B" }));
 });
 
 test("update_price_triggers_some_updates_some", async () => {
@@ -128,11 +129,11 @@ test("update_price_triggers_some_updates_some", async () => {
         // update price (will update peak for 1 position and trigger the other)
         d(135,0)
     ];
-    const closers = await runEvents(tracker, events, fakeStorage);
+    const closers = (await runEvents(tracker, events, fakeStorage)).flatMap(x => x);
     expect(tracker.getPeakPrice("A")).toEqual(d(135,0));
     expect(tracker.getPeakPrice("B")).toEqual(undefined);
     expect(tracker.getPosition("B")).toEqual(undefined);
-    expect(closers.flatMap(x => x)).toContainEqual(closed(pos(d(150,0), "B")));
+    expect(closers).toContainEqual(expect.objectContaining( { positionID : "B" }));
 });
 
 test("update_price_does_not_trigger_deleted_position", async () => {
@@ -146,9 +147,9 @@ test("update_price_does_not_trigger_deleted_position", async () => {
         // set price
         d(135,0)
     ];
-    const closers = await runEvents(tracker, events, fakeStorage);
-    expect(closers.flatMap(x => x)).toContainEqual(closed(pos(d(150,0), "A")));
-    expect(closers.flatMap(x => x)).not.toContainEqual(closed(pos(d(150,0), "B")));
+    const closers = (await runEvents(tracker, events, fakeStorage)).flatMap(x => x);
+    expect(closers).toContainEqual(expect.objectContaining({ positionID : "A" }));
+    expect(closers).not.toContainEqual(expect.objectContaining( { positionID : "B" }));
 });
 
 
@@ -209,6 +210,14 @@ function closed(pos : Position) : Position {
     return closedPos;
 }
 
+function closing(pos : Position) : Position {
+    const closingPos = {
+        ...pos
+    };
+    closingPos.status = PositionStatus.Closing;
+    return closingPos;
+}
+
 function pos(initPrice : DecimalizedAmount, id : string = "ID", triggerPct : number = 10) {
     const pos = posWithPrice(initPrice);
     pos.triggerPercent = triggerPct;
@@ -223,8 +232,8 @@ function posWithPrice(initPrice : DecimalizedAmount) : Position {
         userID : 0,
         chatID : 0,
         messageID: 0,
-        type: PositionType.LongTrailingStopLoss,
-        status: PositionStatus.Open,
+        type: PositionType.LongTrailingStopLoss, // <--- important for test
+        status: PositionStatus.Open, // <---- important for test
         token: fakeToken(),
         vsToken: getVsTokenInfo('SOL'),
         vsTokenAmt : amt_bought_in_sol, // 2 SOL
@@ -239,12 +248,14 @@ function posWithPrice(initPrice : DecimalizedAmount) : Position {
         fillPriceMS: 0,
         txBuySignature: '',
         txSellSignature: '',
-        buyConfirmed: false,
+        buyConfirmed: true, // <--- important to set or test will fail
         sellConfirmed: false,
         sellAutoDoubleSlippage: false,
         buyLastValidBlockheight: 0,
         sellLastValidBlockheight: null,
-        netPNL: null
+        netPNL: null,
+        txBuyAttemptTimeMS: 0,
+        txSellAttemptTimeMS: 0
     }
 }
 

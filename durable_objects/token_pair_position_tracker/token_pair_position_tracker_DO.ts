@@ -8,7 +8,7 @@ import { MenuCode } from "../../menus";
 import { Position, PositionStatus } from "../../positions";
 import { isSuccessfullyParsedSwapSummary } from "../../rpc/rpc_swap_parse_result_types";
 import { TGStatusMessage } from "../../telegram";
-import { ChangeTrackedValue, assertNever, makeJSONResponse, makeSuccessResponse, strictParseBoolean, strictParseInt } from "../../util";
+import { ChangeTrackedValue, assertNever, strictParseBoolean, strictParseInt } from "../../util";
 import { ensureTokenPairIsRegistered } from "../heartbeat/heartbeat_do_interop";
 import { EditTriggerPercentOnOpenPositionResponse } from "../user/actions/edit_trigger_percent_on_open_position";
 import { SetSellAutoDoubleOnOpenPositionResponse } from "../user/actions/set_sell_auto_double_on_open_position";
@@ -44,6 +44,7 @@ import { PositionAndMaybePNL } from "./model/position_and_PNL";
 import { TokenPairPositionTrackerDOFetchMethod, parseTokenPairPositionTrackerDOFetchMethod } from "./token_pair_position_tracker_do_interop";
 import { CurrentPriceTracker } from "./trackers/current_price_tracker";
 import { ActionsToTake, TokenPairPositionTracker } from "./trackers/token_pair_position_tracker";
+import { makeJSONResponse, makeSuccessResponse } from "../../http";
 /*
     Big TODO: How do we limit concurrent outgoing requests when a dip happens?
     This is a big burst and may trip limits.

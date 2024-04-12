@@ -1,6 +1,5 @@
 import { Env } from "../../env";
-import { logError } from "../../logging";
-import { makeJSONRequest } from "../../util";
+import { makeJSONRequest } from "../../http";
 import { AdminCountPositionsRequest, AdminCountPositionsResponse } from "./actions/admin_count_positions";
 import { HeartbeatWakeupRequest, HeartbeatWakeupResponse } from "./actions/hearbeat_wake_up";
 import { RegisterTokenPairRequest, RegisterTokenPairResponse } from "./actions/register_token_pair";

@@ -8,7 +8,7 @@ import { PositionPreRequest, PositionStatus, PositionType } from "../../position
 import { POSITION_REQUEST_STORAGE_KEY } from "../../storage_keys";
 import { TGStatusMessage, UpdateableNotification, sendMessageToTG } from "../../telegram";
 import { WEN_ADDRESS, getVsTokenInfo } from "../../tokens";
-import { ChangeTrackedValue, Structural, assertNever, groupIntoBatches, makeFailureResponse, makeJSONResponse, makeSuccessResponse, maybeGetJson, sleep, strictParseBoolean, strictParseInt } from "../../util";
+import { ChangeTrackedValue, Structural, assertNever, groupIntoBatches, sleep, strictParseBoolean, strictParseInt } from "../../util";
 import { assertIs } from "../../util/enums";
 import { listUnclaimedBetaInviteCodes } from "../beta_invite_codes/beta_invite_code_interop";
 import { PositionAndMaybePNL } from "../token_pair_position_tracker/model/position_and_PNL";
@@ -50,6 +50,7 @@ import { SOLBalanceTracker } from "./trackers/sol_balance_tracker";
 import { TokenPairsForPositionIDsTracker } from "./trackers/token_pairs_for_position_ids_tracker";
 import { UserPNLTracker } from "./trackers/user_pnl_tracker";
 import { UserDOFetchMethod, parseUserDOFetchMethod } from "./userDO_interop";
+import { makeFailureResponse, makeJSONResponse, makeSuccessResponse, maybeGetJson } from "../../http";
 
 const DEFAULT_POSITION_PREREQUEST : PositionPreRequest = {
     userID: -1,
