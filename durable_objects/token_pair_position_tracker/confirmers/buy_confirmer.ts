@@ -138,7 +138,8 @@ export class BuyConfirmer {
             fillPrice: parsedSuccessfulSwap.swapSummary.fillPrice,
             fillPriceMS : parsedSuccessfulSwap.swapSummary.swapTimeMS,
             txSellAttemptTimeMS: null,
-            netPNL: null // to be set on sell
+            netPNL: null, // to be set on sell
+            otherSellFailureCount: 0
         };
         return confirmedPosition;
     }

@@ -17,6 +17,7 @@ import { GetPositionAndMaybePNLFromPriceTrackerRequest, GetPositionAndMaybePNLFr
 import { GetPositionCountsFromTrackerRequest, GetPositionCountsFromTrackerResponse } from "./actions/get_position_counts_from_tracker";
 import { GetTokenPriceRequest, GetTokenPriceResponse } from "./actions/get_token_price";
 import { HasPairAddresses } from "./actions/has_pair_addresses";
+import { IncrementOtherSellFailureCountInTrackerRequest, IncrementOtherSellFailureCountInTrackerResponse } from "./actions/increment_other_sell_failure_count_in_tracker";
 import { InsertPositionRequest, InsertPositionResponse } from "./actions/insert_position";
 import { ListClosedPositionsFromTrackerRequest, ListClosedPositionsFromTrackerResponse } from "./actions/list_closed_positions_from_tracker";
 import { ListFrozenPositionsInTrackerRequest, ListFrozenPositionsInTrackerResponse } from "./actions/list_frozen_positions_in_tracker";
@@ -62,7 +63,15 @@ export enum TokenPairPositionTrackerDOFetchMethod {
 	freezePosition = "freezePosition",
 	unfreezePosition = "unfreezePosition",
 	listFrozenPositions = "listFrozenPositions",
-	getFrozenPosition = "getFrozenPosition"
+	getFrozenPosition = "getFrozenPosition",
+	incrementOtherSellFailureCount = "incrementOtherSellFailureCount"
+}
+
+export async function incrementOtherSellFailureCountInTracker(positionID : string, tokenAddress : string, vsTokenAddress : string, env : Env) : Promise<IncrementOtherSellFailureCountInTrackerResponse> {
+	const request : IncrementOtherSellFailureCountInTrackerRequest = { positionID, tokenAddress, vsTokenAddress };
+	const method = TokenPairPositionTrackerDOFetchMethod.incrementOtherSellFailureCount;
+	const response = await sendJSONRequestToTokenPairPositionTracker<IncrementOtherSellFailureCountInTrackerRequest,IncrementOtherSellFailureCountInTrackerResponse>(method,request,tokenAddress,vsTokenAddress,env);
+	return response;
 }
 
 export async function getFrozenPositionFromTracker(telegramUserID : number, positionID : string, tokenAddress : string, vsTokenAddress : string, env : Env) : Promise<GetFrozenPositionFromTrackerResponse> {

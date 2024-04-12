@@ -144,7 +144,8 @@ function posWithPrice(initPrice : DecimalizedAmount) : Position {
         buyLastValidBlockheight: 0,
         sellLastValidBlockheight: 0,
         buyConfirmed: true,
-        netPNL : dZero()
+        netPNL : dZero(),
+        otherSellFailureCount: 0
     }
 }
 

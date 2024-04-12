@@ -27,6 +27,7 @@ import { GetPositionCountsFromTrackerRequest, GetPositionCountsFromTrackerRespon
 import { GetTokenPriceRequest, GetTokenPriceResponse } from "./actions/get_token_price";
 import { HasPairAddresses } from "./actions/has_pair_addresses";
 import { isHeartbeatRequest } from "./actions/heartbeat_wake_up_for_token_pair_position_tracker";
+import { IncrementOtherSellFailureCountInTrackerRequest, IncrementOtherSellFailureCountInTrackerResponse } from "./actions/increment_other_sell_failure_count_in_tracker";
 import { InsertPositionRequest, InsertPositionResponse } from "./actions/insert_position";
 import { ListClosedPositionsFromTrackerRequest, ListClosedPositionsFromTrackerResponse } from "./actions/list_closed_positions_from_tracker";
 import { ListFrozenPositionsInTrackerRequest, ListFrozenPositionsInTrackerResponse } from "./actions/list_frozen_positions_in_tracker";
@@ -369,9 +370,16 @@ export class TokenPairPositionTrackerDO {
                 return await this.handleListFrozenPositions(body);
             case TokenPairPositionTrackerDOFetchMethod.getFrozenPosition:
                 return await this.handleGetFrozenPosition(body);
+            case TokenPairPositionTrackerDOFetchMethod.incrementOtherSellFailureCount:
+                return await this.handleIncrementOtherSellFailureCount(body);
             default:
                 assertNever(method);
         }
+    }
+
+    async handleIncrementOtherSellFailureCount(body : IncrementOtherSellFailureCountInTrackerRequest) : Promise<Response> {
+        const result = this.tokenPairPositionTracker.incrementOtherSellFailureCount(body.positionID);
+        return makeJSONResponse<IncrementOtherSellFailureCountInTrackerResponse>(result)
     }
 
     async handleGetFrozenPosition(body: GetFrozenPositionFromTrackerRequest) : Promise<Response> {
@@ -380,7 +388,7 @@ export class TokenPairPositionTrackerDO {
     }
 
     async handleFreezePosition(body: FreezePositionInTrackerRequest) : Promise<Response> {
-        const success = this.tokenPairPositionTracker.userFreezesPosition(body.positionID);
+        const success = this.tokenPairPositionTracker.freezePosition(body.positionID);
         return makeJSONResponse<FreezePositionInTrackerResponse>({ success });
     }
 
@@ -629,6 +637,8 @@ export class TokenPairPositionTrackerDO {
         const buyConfirmer = new BuyConfirmer(connection, startTimeMS, this.env);
         const sellConfirmer = new SellConfirmer(connection, startTimeMS, this.env);
 
+        // TODO: put this case-by-case logic into the confirmer or a separate handler class
+
         for (const { type, pos } of allThingsToDo) {
             if (type === 'buy') {
                 if (buyConfirmer.isTimedOut()) {
@@ -694,14 +704,21 @@ export class TokenPairPositionTrackerDO {
                 const confirmedSellStatus = await sellConfirmer.confirmSell(pos);
                 if (confirmedSellStatus === 'api-error') {
                     await TGStatusMessage.finalMessage(channel, "Confirmation not complete - we will continue soon.", true);
+                    // no action on position in tracker because could not complete confirmation
                     break;
                 }
                 else if (confirmedSellStatus === 'unconfirmed') {
                     await TGStatusMessage.finalMessage(channel, "Confirmation not complete - we will continue soon.", true);
+                    // no action on position in tracker because could not confirm outcome
                     continue;
                 }
-                else if (confirmedSellStatus === 'failed') {
+                else if (confirmedSellStatus === 'tx-was-dropped') {
+                    await TGStatusMessage.finalMessage(channel, "We found that the sale didn't go through.", true);
+                    this.tokenPairPositionTracker.markPositionAsOpen(pos.positionID);                
+                }
+                else if (confirmedSellStatus === 'other-failed') {
                     await TGStatusMessage.finalMessage(channel, "We found that the sale didn't go through.", true);                
+                    this.tokenPairPositionTracker.incrementOtherSellFailureCount(pos.positionID);
                     this.tokenPairPositionTracker.markPositionAsOpen(pos.positionID);
                 }
                 else if (confirmedSellStatus === 'slippage-failed') {
@@ -710,23 +727,24 @@ export class TokenPairPositionTrackerDO {
                         const sellSlippagePercent = Math.min(maxSlippage, 2 * pos.sellSlippagePercent);
                         await TGStatusMessage.finalMessage(channel, "The sale failed due to slippage.  We have increased the slippage to ${sellSlippagePercent}% and will retry the sale if the trigger conditions holds.", true);
                         this.tokenPairPositionTracker.updateSlippage(pos.positionID,sellSlippagePercent);
+                        this.tokenPairPositionTracker.markPositionAsOpen(pos.positionID);
                     }
                     else {
                         await TGStatusMessage.finalMessage(channel, `The sale failed due to slippage. We will re-sell if the price continues to stay ${pos.triggerPercent.toFixed(1)}% below the peak.`, true);
+                        this.tokenPairPositionTracker.markPositionAsOpen(pos.positionID);
                     }
-                    this.tokenPairPositionTracker.markPositionAsOpen(pos.positionID);
                 }
                 else if (confirmedSellStatus === 'frozen-token-account') {
-                    await TGStatusMessage.finalMessage(channel, "We found that the sale didn't go through because the slippage tolerance was exceeded", true);
-                    this.tokenPairPositionTracker.markPositionAsOpen(pos.positionID);
+                    await TGStatusMessage.finalMessage(channel, "The sale didn't go through because this token has been frozen (most likely it was rugged).  Auto-Sell has been deactivated.", true);
+                    this.tokenPairPositionTracker.freezePosition(pos.positionID);
                 }
                 else if (confirmedSellStatus === 'insufficient-sol') {
-                    await TGStatusMessage.finalMessage(channel, "We found that the sale didn't go through because there wasn't enough SOL in your wallet to cover transaction fees.", true);
-                    this.tokenPairPositionTracker.markPositionAsOpen(pos.positionID);
+                    await TGStatusMessage.finalMessage(channel, "We found that the sale didn't go through because there wasn't enough SOL in your wallet to cover transaction fees. Auto-Sell has been deactivated.", true);
+                    this.tokenPairPositionTracker.freezePosition(pos.positionID);
                 }
                 else if (confirmedSellStatus === 'token-fee-account-not-initialized') {
-                    await TGStatusMessage.finalMessage(channel, "We found that the sale didn't go through because of an error on our platform", true);
-                    this.tokenPairPositionTracker.markPositionAsOpen(pos.positionID);
+                    await TGStatusMessage.finalMessage(channel, "We found that the sale didn't go through because of an error on our platform. Auto-Sell has been deactivated.", true);
+                    this.tokenPairPositionTracker.freezePosition(pos.positionID);
                 }
                 else if (isSuccessfullyParsedSwapSummary(confirmedSellStatus)) {
                     // TODO: update with PNL               

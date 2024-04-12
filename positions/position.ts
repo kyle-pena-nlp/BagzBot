@@ -62,6 +62,7 @@ export interface Position {
 	sellLastValidBlockheight : number|null
 	sellConfirmed : boolean
 	netPNL : DecimalizedAmount|null
+	otherSellFailureCount : number|null // null for backwards compat
 };
 
 interface BasePositionRequest {

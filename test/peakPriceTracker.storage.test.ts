@@ -255,7 +255,8 @@ function posWithPrice(initPrice : DecimalizedAmount) : Position {
         sellLastValidBlockheight: null,
         netPNL: null,
         txBuyAttemptTimeMS: 0,
-        txSellAttemptTimeMS: 0
+        txSellAttemptTimeMS: 0,
+        otherSellFailureCount: 0
     }
 }
 

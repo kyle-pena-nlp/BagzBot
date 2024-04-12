@@ -9,9 +9,14 @@ import { signatureOf } from "../../rpc/rpc_sign_tx";
 import { ParsedSuccessfulSwapSummary, isFrozenTokenAccountSwapExecutionErrorParseSummary, isInsufficientNativeTokensSwapExecutionErrorParseSummary, isOtherKindOfSwapExecutionError, isSlippageSwapExecutionErrorParseSummary, isSuccessfulSwapSummary, isSuccessfullyParsedSwapSummary, isTokenFeeAccountNotInitializedSwapExecutionErrorParseSummary, isUnknownTransactionParseSummary } from "../../rpc/rpc_swap_parse_result_types";
 import { TGStatusMessage, UpdateableNotification } from "../../telegram";
 import { assertNever, strictParseInt } from "../../util";
-import { markAsClosed, markAsOpen, positionExistsInTracker, updatePosition } from "../token_pair_position_tracker/token_pair_position_tracker_do_interop";
+import { freezePositionInTracker, incrementOtherSellFailureCountInTracker, markAsClosed, markAsOpen, positionExistsInTracker, updatePosition } from "../token_pair_position_tracker/token_pair_position_tracker_do_interop";
 import { SwapExecutor } from "./swap_executor";
 import { SwapTransactionSigner } from "./swap_transaction_signer";
+
+type TxPreparationFailure = 'timed-out'|'already-sold'|'could-not-create-tx'|'could-not-retrieve-blockheight';
+type TxExecutionFailure = 'tx-failed'|'unconfirmed'|'slippage-failed'|'insufficient-sol'|'frozen-token-account'|'token-fee-account-not-initialized'|'other-failed';
+
+// See also SellConfirmer in sell_confirmer.ts for a full picture of the sell lifecycle
 
 export class PositionSeller {
     connection : Connection
@@ -44,11 +49,11 @@ export class PositionSeller {
         }
     }
 
-    private async sellInternal(position : Position) : Promise<'already-sold'|'failed'|'slippage-failed'|'unconfirmed'|'confirmed'> {
+    private async sellInternal(position : Position) : Promise<TxPreparationFailure|TxExecutionFailure|'confirmed'> {
         
         if (this.isTimedOut()) {
             await this.markAsOpen(position);
-            return 'failed';
+            return 'timed-out';
         }
 
         // TODO: how do I avoid double-sells if the request to this DO is re-fired
@@ -62,7 +67,7 @@ export class PositionSeller {
 
         if (signedTx == null) {
             await this.markAsOpen(position);
-            return 'failed';
+            return 'could-not-create-tx';
         }
 
         // get latest valid BH (tells us how long to keep trying to send tx)
@@ -71,10 +76,11 @@ export class PositionSeller {
         // if failed, can't proceed.
         if (lastValidBH == null) {
             await this.markAsOpen(position);
-            return 'failed';
+            return 'could-not-retrieve-blockheight';
         }
 
-        // update the tracker with the sig & lastvalidBH for the sell.
+        // update the tracker with Closing status, the sig & lastvalidBH for the sell.
+        // this puts the Position into an 'Attempting Sale' state
         position.txSellSignature = signatureOf(signedTx);
         position.sellLastValidBlockheight = lastValidBH;
         position.status = PositionStatus.Closing;
@@ -86,25 +92,46 @@ export class PositionSeller {
 
         // no guarantees that anything after this point executes... CF may drop it.
 
-        if (result === 'failed') {
+        await this.performTrackerActionBasedOnExecutionResult(position, result);
+
+        if (isSuccessfullyParsedSwapSummary(result)) {
+            return 'confirmed';
+        }
+        else {
+            return result;
+        }       
+    }
+
+    private async performTrackerActionBasedOnExecutionResult(position: Position, result : TxExecutionFailure|ParsedSuccessfulSwapSummary) {
+        if (result === 'tx-failed') {
             await this.markAsOpen(position);
-            return 'failed';
         }
         else if (result === 'slippage-failed') {
             await this.markAsOpen(position);
-            return 'slippage-failed';
+        }
+        else if (result === 'frozen-token-account') {
+            await this.markAsFrozen(position);
+        }
+        else if (result === 'insufficient-sol') {
+            await this.markAsFrozen(position);
+        }
+        else if (result === 'token-fee-account-not-initialized') {
+            await this.markAsFrozen(position);
+        }
+        else if (result === 'other-failed') {
+            await this.incrementOtherSellFailureCountInTracker(position);
+            await this.markAsOpen(position);
         }
         else if (result === 'unconfirmed') {
-            return 'unconfirmed';
+            // no-op --- sellConfirmer will pick it up on next CRON job execution.
         }
         else if (isSuccessfullyParsedSwapSummary(result)) {
             const netPNL = dSub(result.swapSummary.outTokenAmt, position.vsTokenAmt);
             await this.markAsClosed(position, netPNL);
-            return 'confirmed';
         }
         else {
             assertNever(result);
-        }        
+        }         
     }
   
     private async createSignedTx(position : Position) : Promise<VersionedTransaction|undefined> {
@@ -113,7 +140,15 @@ export class PositionSeller {
         return signedTx;
     }
 
-    private async executeAndParseSwap(position : Position, signedTx : VersionedTransaction, lastValidBH : number) : Promise<'failed'|'slippage-failed'|'unconfirmed'|ParsedSuccessfulSwapSummary> {
+    private async markAsFrozen(position : Position) {
+        await freezePositionInTracker(position.positionID, position.token.address, position.vsToken.address, this.env);
+    }
+
+    private async incrementOtherSellFailureCountInTracker(position : Position) {
+        await incrementOtherSellFailureCountInTracker(position.positionID, position.token.address, position.vsToken.address, this.env);
+    }
+
+    private async executeAndParseSwap(position : Position, signedTx : VersionedTransaction, lastValidBH : number) : Promise<'tx-failed'|'other-failed'|'slippage-failed'|'unconfirmed'|'frozen-token-account'|'insufficient-sol'|'token-fee-account-not-initialized'|ParsedSuccessfulSwapSummary> {
         
         // create a time-limited tx executor and confirmer
         const swapExecutor = new SwapExecutor(this.wallet, 'sell', this.env, this.channel, this.connection, lastValidBH, this.startTimeMS);
@@ -123,7 +158,7 @@ export class PositionSeller {
 
         // convert the tx execution result to a position, if possible
         if (parsedSwapSummary === 'tx-failed') {
-            return 'failed';
+            return 'tx-failed';
         }
         else if (parsedSwapSummary === 'unconfirmed') {
             return 'unconfirmed';
@@ -135,16 +170,16 @@ export class PositionSeller {
             return 'slippage-failed';
         }
         else if (isTokenFeeAccountNotInitializedSwapExecutionErrorParseSummary(parsedSwapSummary)) {
-            return 'failed';
+            return 'token-fee-account-not-initialized';
         }
         else if (isInsufficientNativeTokensSwapExecutionErrorParseSummary(parsedSwapSummary)) {
-            return 'failed';
+            return 'insufficient-sol';
         }
         else if (isFrozenTokenAccountSwapExecutionErrorParseSummary(parsedSwapSummary)) {
-            return 'failed';
+            return 'frozen-token-account';
         }
         else if (isOtherKindOfSwapExecutionError(parsedSwapSummary)) {
-            return 'failed';
+            return 'other-failed';
         }        
         else if (isSuccessfulSwapSummary(parsedSwapSummary)) {
             return parsedSwapSummary;
@@ -167,14 +202,28 @@ export class PositionSeller {
     }
 
 
-    private makeFinalStatusMessage(position : Position, status : 'already-sold' | 'failed' | 'slippage-failed' | 'unconfirmed' | 'confirmed') : string {
+    private makeFinalStatusMessage(position : Position, status : TxPreparationFailure|TxExecutionFailure|'confirmed') : string {
         switch(status) {
             case 'already-sold':
                 return 'The position was already sold.';
             case 'confirmed':
                 return 'The sale was successful!';
-            case 'failed':
+            case 'other-failed':
                 return 'The sale failed.';
+            case 'could-not-create-tx':
+                return 'We could not create a transaction';
+            case 'could-not-retrieve-blockheight':
+                return 'We had trouble due to network congestion';
+            case 'frozen-token-account':
+                return 'This token has been frozen (most likely a rug) and the position has been deactivated.';
+            case 'insufficient-sol':
+                return 'There was not enough SOL in your account to cover transaction fees.  As a result, this position has been deactivated.  When you have deposited enough SOL to cover transaction fees you can reactivate the position.'
+            case 'timed-out':
+                return 'The transaction ran out of time to execute.';
+            case 'token-fee-account-not-initialized':
+                return 'There was an error executing the transaction.'
+            case 'tx-failed':
+                return 'There was an error executing the transaction.'
             case 'slippage-failed':
                 if (position.sellAutoDoubleSlippage) {
                     return 'The sale failed due to slippage - the sale will be reattempted with doubled slippage up until 100%.';
@@ -189,7 +238,7 @@ export class PositionSeller {
         }
     }
 
-    private makeFinalMenuCode(status : 'already-sold' | 'failed' | 'slippage-failed' | 'unconfirmed' | 'confirmed') : MenuCode {
+    private makeFinalMenuCode(status : TxPreparationFailure|TxExecutionFailure|'confirmed') : MenuCode {
         if (this.type === 'auto-sell') {
             return MenuCode.Close;
         }
@@ -198,11 +247,25 @@ export class PositionSeller {
                 return MenuCode.ListPositions;
             case 'confirmed':
                 return MenuCode.ViewPNLHistory;
-            case 'failed':
+            case 'other-failed':
                 return MenuCode.ViewOpenPosition;
             case 'slippage-failed':
                 return MenuCode.ViewOpenPosition;
             case 'unconfirmed':
+                return MenuCode.ViewOpenPosition;
+            case 'could-not-create-tx':
+                return MenuCode.ViewOpenPosition;
+            case 'could-not-retrieve-blockheight':
+                return MenuCode.ViewOpenPosition;
+            case 'frozen-token-account':
+                return MenuCode.ViewFrozenPosition;
+            case 'insufficient-sol':
+                return MenuCode.ViewFrozenPosition;
+            case 'timed-out':
+                return MenuCode.ViewOpenPosition;
+            case 'token-fee-account-not-initialized':
+                return MenuCode.ViewOpenPosition;
+            case 'tx-failed':
                 return MenuCode.ViewOpenPosition;
             default:
                 assertNever(status);

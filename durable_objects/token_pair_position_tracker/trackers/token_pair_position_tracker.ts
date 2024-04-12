@@ -31,6 +31,18 @@ export class TokenPairPositionTracker {
         this.pricePeaks.__clearAllPositions();
     }
 
+    incrementOtherSellFailureCount(positionID : string) : { success : true, newCount: number }|{ success : false } {
+        const position = this.getPosition(positionID);
+        if (position == null) {
+            return { success : false }
+        }
+        else {
+            const newCount = (position.otherSellFailureCount||0)+1; // || for backwards compat with older objects
+            position.otherSellFailureCount = newCount;
+            return { success : true, newCount }
+        }
+    }
+
     deleteClosedPositionsForUser(telegramUserID : number) {
         // TODO: make 2-level lookup by user.
         const closedPositions = [...this.closedPositions.values()]
@@ -137,7 +149,7 @@ export class TokenPairPositionTracker {
         return this.pricePeaks.remove(positionID);
     }
 
-    userFreezesPosition(positionID : string) : boolean {
+    freezePosition(positionID : string) : boolean {
         const position = this.getPosition(positionID);
         if (position == null) {
             return false;

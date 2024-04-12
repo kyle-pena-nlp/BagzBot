@@ -197,7 +197,8 @@ export class PositionBuyer {
             sellAutoDoubleSlippage : autoDouble,
             fillPrice: positionRequest.quote.fillPrice,
             fillPriceMS : positionRequest.quote.quoteTimeMS,
-            netPNL: null // to be set when position is closed
+            netPNL: null, // to be set when position is closed
+            otherSellFailureCount: 0
         };
         return position;
     }

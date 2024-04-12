@@ -20,8 +20,9 @@ export class SellConfirmer {
     }    
     async confirmSell(position : Position & { sellConfirmed : false }) : Promise<
         'api-error'|
+        'tx-was-dropped'|
         'slippage-failed'|
-        'failed'|
+        'other-failed'|
         'unconfirmed'|
         'token-fee-account-not-initialized'|
         'frozen-token-account'|
@@ -33,11 +34,11 @@ export class SellConfirmer {
         }
 
         if (position.txSellSignature == null) {
-            return 'failed';
+            return 'other-failed';
         }
 
         if (position.sellLastValidBlockheight == null) {
-            return 'failed';
+            return 'other-failed';
         }      
 
         const blockheight : number | 'api-call-error' | '429' = await this.connection.getBlockHeight('confirmed').catch(r => {
@@ -67,8 +68,9 @@ export class SellConfirmer {
 
     private async attemptConfirmation(unconfirmedPosition : Position & { sellConfirmed : false }, blockheight : number) : Promise<
         ParsedSuccessfulSwapSummary|
+        'tx-was-dropped'|
         'slippage-failed'|
-        'failed'|
+        'other-failed'|
         'unconfirmed'|
         'frozen-token-account'|
         'token-fee-account-not-initialized'|
@@ -76,11 +78,15 @@ export class SellConfirmer {
         
         const parsedTx = await this.getParsedTransaction(unconfirmedPosition);
         
+        // if we couldn't find the TX
         if (parsedTx === 'tx-DNE') {
+            // and the blockhash was finalized (as determined via blockheight)
             if (blockheight > unconfirmedPosition.sellLastValidBlockheight!!) {
-                return 'failed';
+                // the tx never happened.
+                return 'tx-was-dropped';
             }
             else {
+                // otherwise, who knows? we have to try again later.
                 return 'unconfirmed';
             }
         }
@@ -100,7 +106,7 @@ export class SellConfirmer {
             return 'token-fee-account-not-initialized';
         }
         else if (isOtherKindOfSwapExecutionError(parsedTx)) {
-            return 'failed';
+            return 'other-failed';
         }
         else if (isSuccessfulSwapSummary(parsedTx)) {
             return parsedTx;
