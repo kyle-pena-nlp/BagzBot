@@ -28,6 +28,10 @@ export enum MenuCode {
 	SubmitAdminDeletePositionByID = "SubmitAdminDeletePositionByID",
 	PosRequestChooseAutoDoubleSlippageOptions = "EPR.AutoDoubleSlip",
 	SubmitPosRequestAutoDoubleSlippageOptions = "SPR.AutoDoubleSlip",
+	UnfreezePosition = "UnfreezePosition",
+	FreezePosition = "FreezePosition",
+	ViewFrozenPositions = "ListFrozenPositions",
+	ViewFrozenPosition = "ViewFrozenPosition", 
 
 	EditOpenPositionAutoDoubleSlippage = "EOP.AutoDoubleSlip",
 	SubmitOpenPositionAutoDoubleSlippage = "SOP.AutoDoubleSlip",

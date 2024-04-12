@@ -11,6 +11,7 @@ import { AdminDeleteClosedPositionsForUserInTrackerRequest, AdminDeleteClosedPos
 import { AdminDeletePositionByIDFromTrackerRequest, AdminDeletePositionByIDFromTrackerResponse } from "./actions/admin_delete_position_by_id_from_tracker";
 import { EditTriggerPercentOnOpenPositionInTrackerRequest } from "./actions/edit_trigger_percent_on_open_position_in_tracker";
 import { FreezePositionInTrackerRequest, FreezePositionInTrackerResponse } from "./actions/freeze_position_in_tracker";
+import { GetFrozenPositionFromTrackerRequest, GetFrozenPositionFromTrackerResponse } from "./actions/get_frozen_position";
 import { GetPositionFromPriceTrackerRequest, GetPositionFromPriceTrackerResponse } from "./actions/get_position";
 import { GetPositionAndMaybePNLFromPriceTrackerRequest, GetPositionAndMaybePNLFromPriceTrackerResponse } from "./actions/get_position_and_maybe_pnl";
 import { GetPositionCountsFromTrackerRequest, GetPositionCountsFromTrackerResponse } from "./actions/get_position_counts_from_tracker";
@@ -60,7 +61,14 @@ export enum TokenPairPositionTrackerDOFetchMethod {
 	adminDeletePositionByIDFromTracker = "adminDeletePositionByIDFromTracker",
 	freezePosition = "freezePosition",
 	unfreezePosition = "unfreezePosition",
-	listFrozenPositions = "listFrozenPositions"
+	listFrozenPositions = "listFrozenPositions",
+	getFrozenPosition = "getFrozenPosition"
+}
+
+export async function getFrozenPositionFromTracker(telegramUserID : number, positionID : string, tokenAddress : string, vsTokenAddress : string, env : Env) : Promise<GetFrozenPositionFromTrackerResponse> {
+	const request : GetFrozenPositionFromTrackerRequest = { telegramUserID, positionID, tokenAddress, vsTokenAddress };
+	const method = TokenPairPositionTrackerDOFetchMethod.getFrozenPosition;
+	return await sendJSONRequestToTokenPairPositionTracker<GetFrozenPositionFromTrackerRequest,GetFrozenPositionFromTrackerResponse>(method,request,tokenAddress,vsTokenAddress,env);
 }
 
 export async function freezePositionInTracker(positionID : string, tokenAddress : string, vsTokenAddress : string, env : Env) : Promise<FreezePositionInTrackerResponse> {

@@ -20,6 +20,7 @@ import { AdminDeleteClosedPositionsForUserInTrackerRequest, AdminDeleteClosedPos
 import { AdminDeletePositionByIDFromTrackerRequest, AdminDeletePositionByIDFromTrackerResponse } from "./actions/admin_delete_position_by_id_from_tracker";
 import { EditTriggerPercentOnOpenPositionInTrackerRequest } from "./actions/edit_trigger_percent_on_open_position_in_tracker";
 import { FreezePositionInTrackerRequest, FreezePositionInTrackerResponse } from "./actions/freeze_position_in_tracker";
+import { GetFrozenPositionFromTrackerRequest, GetFrozenPositionFromTrackerResponse } from "./actions/get_frozen_position";
 import { GetPositionFromPriceTrackerRequest, GetPositionFromPriceTrackerResponse } from "./actions/get_position";
 import { GetPositionAndMaybePNLFromPriceTrackerRequest, GetPositionAndMaybePNLFromPriceTrackerResponse } from "./actions/get_position_and_maybe_pnl";
 import { GetPositionCountsFromTrackerRequest, GetPositionCountsFromTrackerResponse } from "./actions/get_position_counts_from_tracker";
@@ -366,13 +367,20 @@ export class TokenPairPositionTrackerDO {
                 return await this.handleUnfreezePosition(body);
             case TokenPairPositionTrackerDOFetchMethod.listFrozenPositions:
                 return await this.handleListFrozenPositions(body);
+            case TokenPairPositionTrackerDOFetchMethod.getFrozenPosition:
+                return await this.handleGetFrozenPosition(body);
             default:
                 assertNever(method);
         }
     }
 
+    async handleGetFrozenPosition(body: GetFrozenPositionFromTrackerRequest) : Promise<Response> {
+        const frozenPosition = this.tokenPairPositionTracker.getFrozenPosition(body.telegramUserID, body.positionID);
+        return makeJSONResponse<GetFrozenPositionFromTrackerResponse>({ frozenPosition });
+    }
+
     async handleFreezePosition(body: FreezePositionInTrackerRequest) : Promise<Response> {
-        const success = this.tokenPairPositionTracker.freezePosition(body.positionID);
+        const success = this.tokenPairPositionTracker.userFreezesPosition(body.positionID);
         return makeJSONResponse<FreezePositionInTrackerResponse>({ success });
     }
 

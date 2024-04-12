@@ -13,7 +13,7 @@ import { ChangeTrackedValue, Structural, assertNever, groupIntoBatches, sleep, s
 import { assertIs } from "../../util/enums";
 import { listUnclaimedBetaInviteCodes } from "../beta_invite_codes/beta_invite_code_interop";
 import { PositionAndMaybePNL } from "../token_pair_position_tracker/model/position_and_PNL";
-import { adminDeleteClosedPositionsForUser, adminDeletePositionByIDFromTracker, editTriggerPercentOnOpenPositionInTracker, freezePositionInTracker, getPositionAndMaybePNL, listClosedPositionsFromTracker, listFrozenPositionsInTracker, listPositionsByUser, removePosition, setSellAutoDoubleOnOpenPositionInPositionTracker, setSellSlippagePercentOnOpenPositionInTracker, unfreezePositionInTracker } from "../token_pair_position_tracker/token_pair_position_tracker_do_interop";
+import { adminDeleteClosedPositionsForUser, adminDeletePositionByIDFromTracker, editTriggerPercentOnOpenPositionInTracker, freezePositionInTracker, getFrozenPositionFromTracker, getPositionAndMaybePNL, listClosedPositionsFromTracker, listFrozenPositionsInTracker, listPositionsByUser, removePosition, setSellAutoDoubleOnOpenPositionInPositionTracker, setSellSlippagePercentOnOpenPositionInTracker, unfreezePositionInTracker } from "../token_pair_position_tracker/token_pair_position_tracker_do_interop";
 import { AdminDeleteAllPositionsRequest, AdminDeleteAllPositionsResponse } from "./actions/admin_delete_all_positions";
 import { AdminDeleteClosedPositionsRequest } from "./actions/admin_delete_closed_positions";
 import { AdminDeletePositionByIDRequest, AdminDeletePositionByIDResponse } from "./actions/admin_delete_position_by_id";
@@ -24,6 +24,7 @@ import { DeleteSessionRequest, DeleteSessionResponse } from "./actions/delete_se
 import { EditTriggerPercentOnOpenPositionRequest, EditTriggerPercentOnOpenPositionResponse } from "./actions/edit_trigger_percent_on_open_position";
 import { FreezePositionRequest, FreezePositionResponse } from "./actions/freeze_position";
 import { GetClosedPositionsAndPNLSummaryRequest, GetClosedPositionsAndPNLSummaryResponse } from "./actions/get_closed_positions_and_pnl_summary";
+import { GetFrozenPositionRequest, GetFrozenPositionResponse } from "./actions/get_frozen_position";
 import { GetImpersonatedUserIDRequest, GetImpersonatedUserIDResponse } from "./actions/get_impersonated_user_id";
 import { GetLegalAgreementStatusRequest, GetLegalAgreementStatusResponse } from "./actions/get_legal_agreement_status";
 import { GetPositionFromUserDORequest, GetPositionFromUserDOResponse } from "./actions/get_position_from_user_do";
@@ -341,11 +342,30 @@ export class UserDO {
             case UserDOFetchMethod.unfreezePosition:
                 response = await this.handleUnfreezePosition(userAction);
                 break;
+            case UserDOFetchMethod.getFrozenPosition:
+                response = await this.handleGetFrozenPosition(userAction);
+                break;
             default:
                 assertNever(method);
         }
 
         return [method,userAction,response];
+    }
+
+    async handleGetFrozenPosition(userAction : GetFrozenPositionRequest) : Promise<Response> {
+        const response = await this.handleGetFrozenPositionInternal(userAction);
+        return makeJSONResponse<GetFrozenPositionResponse>(response);
+    }
+
+    async handleGetFrozenPositionInternal(userAction : GetFrozenPositionRequest) : Promise<GetFrozenPositionResponse> {
+        const tokenPair = this.tokenPairsForPositionIDsTracker.getPositionPair(userAction.positionID);
+        if (tokenPair == null) {
+            return { frozenPosition : undefined };
+        }
+        const tokenAddress = tokenPair.token.address;
+        const vsTokenAddress = tokenPair.vsToken.address;
+        const frozenPositionResponse = await getFrozenPositionFromTracker(userAction.telegramUserID, userAction.positionID, tokenAddress, vsTokenAddress, this.env);
+        return { frozenPosition : frozenPositionResponse.frozenPosition };
     }
 
     async handleListFrozenPositions(userAction : ListFrozenPositionsRequest) : Promise<Response> {

@@ -11,13 +11,16 @@ import { _devOnlyFeatureUpdatePrice, adminInvokeAlarm } from "../durable_objects
 import { OpenPositionRequest } from "../durable_objects/user/actions/open_new_position";
 import { QuantityAndToken } from "../durable_objects/user/model/quantity_and_token";
 import { TokenSymbolAndAddress } from "../durable_objects/user/model/token_name_and_address";
-import { adminDeleteAllPositions, adminDeleteClosedPositions, adminDeletePositionByID, adminResetDefaultPositionRequest, editTriggerPercentOnOpenPositionFromUserDO, getClosedPositionsAndPNLSummary, getDefaultTrailingStopLoss, getPositionFromUserDO, getUserData, getUserWalletSOLBalance, getWalletData, impersonateUser, listPositionsFromUserDO, manuallyClosePosition, maybeReadSessionObj, readSessionObj, requestNewPosition, sendMessageToUser, setSellAutoDoubleOnOpenPosition, setSellSlippagePercentOnOpenPosition, storeLegalAgreementStatus, storeSessionObj, storeSessionObjProperty, storeSessionValues, unimpersonateUser } from "../durable_objects/user/userDO_interop";
+import { adminDeleteAllPositions, adminDeleteClosedPositions, adminDeletePositionByID, adminResetDefaultPositionRequest, editTriggerPercentOnOpenPositionFromUserDO, freezePosition, getClosedPositionsAndPNLSummary, getDefaultTrailingStopLoss, getPositionFromUserDO, getUserData, getUserWalletSOLBalance, getWalletData, impersonateUser, listFrozenPositions, listPositionsFromUserDO, manuallyClosePosition, maybeReadSessionObj, readSessionObj, requestNewPosition, sendMessageToUser, setSellAutoDoubleOnOpenPosition, setSellSlippagePercentOnOpenPosition, storeLegalAgreementStatus, storeSessionObj, storeSessionObjProperty, storeSessionValues, unfreezePosition, unimpersonateUser } from "../durable_objects/user/userDO_interop";
 import { Env } from "../env";
+import { makeFakeFailedRequestResponse, makeSuccessResponse } from "../http";
 import { logDebug, logError } from "../logging";
 import { BaseMenu, LegalAgreement, MenuAdminViewClosedPositions, MenuBetaInviteFriends, MenuCode, MenuComingSoon, MenuContinueMessage, MenuEditOpenPositionSellAutoDoubleSlippage, MenuEditOpenPositionSellSlippagePercent, MenuEditOpenPositionTriggerPercent, MenuEditPositionHelp, MenuEditPositionRequestSellAutoDoubleSlippage, MenuError, MenuFAQ, MenuListPositions, MenuMain, MenuOKClose, MenuPNLHistory, MenuTODO, MenuTrailingStopLossEntryBuyQuantity, MenuTrailingStopLossPickVsToken, MenuTrailingStopLossSlippagePercent, MenuTrailingStopLossTriggerPercent, MenuViewDecryptedWallet, MenuViewOpenPosition, MenuWallet, MenuWhatIsTSL, PositionIDAndChoice, SubmittedTriggerPctKey, WelcomeScreenPart1 } from "../menus";
 import { MenuViewObj } from "../menus/menu_admin_view_obj";
 import { PositionIDAndSellSlippagePercent } from "../menus/menu_edit_open_position_sell_slippage_percent";
 import { MenuEditPositionRequest } from "../menus/menu_edit_position_request";
+import { MenuViewFrozenPosition } from "../menus/menu_view_frozen_position";
+import { MenuViewFrozenPositions } from "../menus/menu_view_frozen_positions";
 import { PositionPreRequest, PositionRequest, convertPreRequestToRequest } from "../positions";
 import { ReplyQuestion, ReplyQuestionCode } from "../reply_question";
 import { ReplyQuestionData, replyQuestionHasNextSteps } from "../reply_question/reply_question_data";
@@ -31,7 +34,6 @@ import { Structural, assertNever, strictParseBoolean, strictParseFloat, strictPa
 import { assertIs } from "../util/enums";
 import { CallbackHandlerParams } from "./model/callback_handler_params";
 import { TokenAddressExtractor } from "./token_address_extractor";
-import { makeFakeFailedRequestResponse, makeSuccessResponse } from "../http";
 
 // TODO: -> CF environment variable.
 const QUESTION_TIMEOUT_MS = 10000
@@ -643,6 +645,33 @@ export class CallbackHandler {
                 const adminDeletePositionResponse = await adminDeletePositionByID(params.getTelegramUserID(), params.chatID, positionIDtoDelete, this.env);
                 const adminDeletePositionByIDMsg = adminDeletePositionResponse.success ? `Position with ID ${positionIDtoDelete} was deleted` : `Position with ID ${positionIDtoDelete} could not be deleted (might already not exist)`;
                 return new MenuContinueMessage(adminDeletePositionByIDMsg, MenuCode.Main);
+            case MenuCode.FreezePosition:
+                const freezePositionResponse = await freezePosition(params.getTelegramUserID(), params.chatID, callbackData.menuArg||'', this.env);
+                if (freezePositionResponse.success) {
+                    return new MenuContinueMessage("This position has been frozen and will no longer be price monitored", MenuCode.ViewFrozenPositions);
+                }
+                else {
+                    return new MenuContinueMessage("This position could not be frozen", MenuCode.ViewOpenPosition, 'HTML', callbackData.menuArg);
+                }
+            case MenuCode.UnfreezePosition:
+                const unfreezePositionResponse = await unfreezePosition(params.getTelegramUserID(), params.chatID, callbackData.menuArg||'', this.env);
+                if (unfreezePositionResponse.success) {
+                    return new MenuContinueMessage("This position will now be price monitored", MenuCode.ListPositions);
+                }
+                else {
+                    return new MenuContinueMessage("This position could not be unfrozen", MenuCode.ViewFrozenPosition, 'HTML', callbackData.menuArg);
+                }
+            case MenuCode.ViewFrozenPosition:
+                const frozenPosition = await getFrozenPosition(params.getTelegramUserID(), params.chatID, callbackData.menuArg||'');
+                if (frozenPosition == null) {
+                    return new MenuContinueMessage("Sorry - this position is no longer frozen or was removed", MenuCode.ViewFrozenPositions);
+                }
+                else {
+                    return new MenuViewFrozenPosition(frozenPosition);
+                }
+            case MenuCode.ViewFrozenPositions:
+                const listFrozenPositionsResponse = await listFrozenPositions(params.getTelegramUserID(), params.chatID, this.env);
+                return new MenuViewFrozenPositions(listFrozenPositionsResponse.frozenPositions);
             default:
                 assertNever(callbackData.menuCode);
         }

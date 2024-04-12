@@ -137,11 +137,18 @@ export class TokenPairPositionTracker {
         return this.pricePeaks.remove(positionID);
     }
 
-    freezePosition(positionID : string) : boolean {
-        const position = this.removePosition(positionID);
+    userFreezesPosition(positionID : string) : boolean {
+        const position = this.getPosition(positionID);
         if (position == null) {
             return false;
         }
+        // can't freeze position whose buy isn't confirmed, and whose status is Closing or Closed
+        // (TODO: will this make it hard for users to freeze if stuck in a sell loop?)
+        // (answer: yes, but if we have a max sell attempts we can auto-freeze)          
+        if (!position.buyConfirmed || position.status !== PositionStatus.Open) {
+            return false;
+        }
+        this.removePosition(positionID);
         this.frozenPositions.insert(position.userID, position.positionID, position);
         return true;
     }
@@ -157,6 +164,10 @@ export class TokenPairPositionTracker {
 
     listFrozenPositionsByUser(userID : number) : Position[] {
         return this.frozenPositions.list(userID);
+    }
+
+    getFrozenPosition(userID : number, positionID : string) : Position|undefined {
+        return this.frozenPositions.get(userID, positionID);
     }
 
     initialize(entries : Map<string,any>) {
