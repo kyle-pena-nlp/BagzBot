@@ -160,6 +160,7 @@ export class MenuViewOpenPosition extends Menu<MenuData> implements MenuCapabili
         }
 
         if (this.buyIsConfirmed() && this.isCloseToBeingTriggered() && !this.isClosingOrClosed() && !this.triggerConditionMet()) {
+            lines.push("");
             lines.push(":eyes: This position is close to being triggered! :eyes:");
         }
 
@@ -209,7 +210,7 @@ export class MenuViewOpenPosition extends Menu<MenuData> implements MenuCapabili
 
     private footerLines() : string[] {
         return [
-            `Support Code: <i>${this.position().positionID}</i>`
+            `Support Code: <i><code>${this.position().positionID}</code></i>`
         ];
     }
 
@@ -218,7 +219,7 @@ export class MenuViewOpenPosition extends Menu<MenuData> implements MenuCapabili
     }
 
     private canBeFrozen() : boolean {
-        return this.buyIsConfirmed() && this.isOpen();
+        return this.buyIsConfirmed() && this.isOpen() &&  !this.triggerConditionMet();
     }
 
     private isOpen() : boolean {

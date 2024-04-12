@@ -227,7 +227,7 @@ export class CallbackHandler {
                 const viewPositionID = callbackData.menuArg!!;
                 const positionAndMaybePNL = await getPositionFromUserDO(params.getTelegramUserID(), params.chatID, viewPositionID, this.env);
                 if (positionAndMaybePNL == null) {
-                    return new MenuContinueMessage('Sorry - this position no longer exists!', MenuCode.Main);
+                    return new MenuContinueMessage('Sorry - this position is no longer being price monitored!', MenuCode.Main);
                 }
                 return new MenuViewOpenPosition({ data: positionAndMaybePNL, allowChooseAutoDoubleSlippage: this.allowChooseAutoDouble() });
             case MenuCode.ClosePositionManuallyAction:
