@@ -11,6 +11,8 @@ export interface ActionsToTake {
     sellsToConfirm : Position[]
 }
 
+type DeactivatedPosition = Position & { peakPrice : DecimalizedAmount };
+
 // This class is really the heart of the whole application.
 // It tracks prices, and automatically dispatches requests to update positions
 // Point being, you can screw the whole app by messing this one up.
@@ -22,7 +24,7 @@ export class TokenPairPositionTracker {
     // positions confirmed as closed - may be resurrected under unusual circumstances
     closedPositions : MapWithStorage<Position> = new MapWithStorage<Position>("closedPositions");
 
-    deactivatedPositions : TwoLevelMapWithStorage<number,string,Position> = new TwoLevelMapWithStorage<number,string,Position>("deactivatedPositions", 'Integer', 'string');
+    deactivatedPositions : TwoLevelMapWithStorage<number,string,DeactivatedPosition> = new TwoLevelMapWithStorage<number,string,DeactivatedPosition>("deactivatedPositions", 'Integer', 'string');
     
     constructor() {
     }
@@ -154,6 +156,10 @@ export class TokenPairPositionTracker {
         if (position == null) {
             return false;
         }
+        const peakPrice = this.pricePeaks.getPeakPrice(positionID);
+        if (peakPrice == null) {
+            return false;
+        }
         // can't deactivat position whose buy isn't confirmed, and whose status is Closing or Closed
         // (TODO: will this make it hard for users to deactivate if stuck in a sell loop?)
         // (answer: yes, but if we have a max sell attempts we can auto-deactivate)          
@@ -161,16 +167,17 @@ export class TokenPairPositionTracker {
             return false;
         }
         this.removePosition(positionID);
-        this.deactivatedPositions.insert(position.userID, position.positionID, position);
+        this.deactivatedPositions.insert(position.userID, position.positionID, { ...position, peakPrice : peakPrice });
         return true;
     }
 
     reactivatePosition(userID : number, positionID : string, currentPrice : DecimalizedAmount) : boolean {
-        const position = this.deactivatedPositions.get(userID, positionID);
-        if (position == null) {
+        const deactivatedPosition = this.deactivatedPositions.get(userID, positionID);
+        if (deactivatedPosition == null) {
             return false;
         }
-        this.insertPosition(position, currentPrice);
+        const peakPrice = deactivatedPosition.peakPrice;
+        this.insertPosition(deactivatedPosition, peakPrice);
         this.deactivatedPositions.delete(userID, positionID);
         return true;
     }

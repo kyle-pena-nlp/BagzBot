@@ -14,7 +14,7 @@ const emojis = {
     ':mountain:': '🏔️',
     ':wave:': '🌊',
     ':cart:': '🛒',
-    ':deactivated:': '⚪',
+    ':deactivated:': '🧊',
 
     ':red:': '🔴',
     ':yellow:': '🟡',

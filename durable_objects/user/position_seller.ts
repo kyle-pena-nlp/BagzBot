@@ -225,11 +225,14 @@ export class PositionSeller {
             case 'tx-failed':
                 return 'There was an error executing the transaction.'
             case 'slippage-failed':
-                if (position.sellAutoDoubleSlippage) {
-                    return 'The sale failed due to slippage - the sale will be reattempted with doubled slippage up until 100%.';
+                if (this.type === 'auto-sell' && position.sellAutoDoubleSlippage) {
+                    return `The sale failed due to slippage - the sale will be reattempted with slippage of ${Math.min(100,position.sellSlippagePercent * 2).toFixed(1)}.`;
+                }
+                else if (this.type === 'auto-sell') {
+                    return 'The sale failed due to slippage. If the trigger condition holds the sale will be reattempted automatically.'
                 }
                 else {
-                    return 'The sale failed due to slippage.'
+                    return 'The sale failed due to slippage tolerance being exceeded.'
                 }
             case 'unconfirmed':
                 return 'The sale could not be confirmed due to network congestion. We will reattempt confirmation within a few minutes.';

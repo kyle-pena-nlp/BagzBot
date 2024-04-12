@@ -72,11 +72,11 @@ export class PeakPricePositionTracker {
         this.itemsByPeakPrice.movePositionToPeakPrice(positionID, newPeakPrice);
     }
 
-    insertPosition(position : Position, currentPrice : DecimalizedAmount) : boolean {
+    insertPosition(position : Position, peakPrice : DecimalizedAmount) : boolean {
         const existingPosition = this.getPosition(position.positionID);
         if (existingPosition == null) {
-            this.add(currentPrice, position);
-            logDebug(`Inserted position with ID ${position.positionID} and price ${asTokenPrice(currentPrice)} (${position.userID})`);
+            this.add(peakPrice, position);
+            logDebug(`Inserted position with ID ${position.positionID} and price ${asTokenPrice(peakPrice)} (${position.userID})`);
             return true;
         }
         else {
@@ -97,8 +97,8 @@ export class PeakPricePositionTracker {
         }
     }
 
-    add(price : DecimalizedAmount, position : Position) {
-        this.itemsByPeakPrice.add(price, position);
+    add(peakPrice : DecimalizedAmount, position : Position) {
+        this.itemsByPeakPrice.add(peakPrice, position);
     }
     listByUser(userID : number, currentPrice : DecimalizedAmount|null) : PositionAndMaybePNL[] {
         const positionsAndMaybePNLs = this.itemsByPeakPrice.listByUser(userID, currentPrice);
