@@ -10,6 +10,7 @@ import { AdminDeleteAllInTrackerRequest, AdminDeleteAllInTrackerResponse } from 
 import { AdminDeleteClosedPositionsForUserInTrackerRequest, AdminDeleteClosedPositionsForUserInTrackerResponse } from "./actions/admin_delete_closed_positions_for_user_in_tracker";
 import { AdminDeletePositionByIDFromTrackerRequest, AdminDeletePositionByIDFromTrackerResponse } from "./actions/admin_delete_position_by_id_from_tracker";
 import { EditTriggerPercentOnOpenPositionInTrackerRequest } from "./actions/edit_trigger_percent_on_open_position_in_tracker";
+import { FreezePositionInTrackerRequest, FreezePositionInTrackerResponse } from "./actions/freeze_position_in_tracker";
 import { GetPositionFromPriceTrackerRequest, GetPositionFromPriceTrackerResponse } from "./actions/get_position";
 import { GetPositionAndMaybePNLFromPriceTrackerRequest, GetPositionAndMaybePNLFromPriceTrackerResponse } from "./actions/get_position_and_maybe_pnl";
 import { GetPositionCountsFromTrackerRequest, GetPositionCountsFromTrackerResponse } from "./actions/get_position_counts_from_tracker";
@@ -17,6 +18,7 @@ import { GetTokenPriceRequest, GetTokenPriceResponse } from "./actions/get_token
 import { HasPairAddresses } from "./actions/has_pair_addresses";
 import { InsertPositionRequest, InsertPositionResponse } from "./actions/insert_position";
 import { ListClosedPositionsFromTrackerRequest, ListClosedPositionsFromTrackerResponse } from "./actions/list_closed_positions_from_tracker";
+import { ListFrozenPositionsInTrackerRequest, ListFrozenPositionsInTrackerResponse } from "./actions/list_frozen_positions_in_tracker";
 import { ListPositionsByUserRequest, ListPositionsByUserResponse } from "./actions/list_positions_by_user";
 import { MarkBuyAsConfirmedRequest, MarkBuyAsConfirmedResponse } from "./actions/mark_buy_as_confirmed";
 import { MarkPositionAsClosedRequest, MarkPositionAsClosedResponse } from "./actions/mark_position_as_closed";
@@ -26,6 +28,7 @@ import { PositionExistsInTrackerRequest, PositionExistsInTrackerResponse } from 
 import { RemovePositionRequest, RemovePositionResponse } from "./actions/remove_position";
 import { SetSellAutoDoubleOnOpenPositionInTrackerRequest } from "./actions/set_sell_auto_double_on_open_position_in_tracker";
 import { SetSellSlippagePercentOnOpenPositionTrackerRequest } from "./actions/set_sell_slippage_percent_on_open_position";
+import { UnfreezePositionInTrackerRequest, UnfreezePositionInTrackerResponse } from "./actions/unfreeze_position_in_tracker";
 import { UpdatePositionRequest, UpdatePositionResponse } from "./actions/update_position";
 import { UpdatePriceRequest, UpdatePriceResponse } from "./actions/update_price";
 import { WakeupTokenPairPositionTrackerRequest, WakeupTokenPairPositionTrackerResponse } from "./actions/wake_up";
@@ -54,7 +57,28 @@ export enum TokenPairPositionTrackerDOFetchMethod {
 	updatePosition = "updatePosition",
 	getPositionCounts = "getPositionCounts",
 	adminDeleteClosedPositionsForUser = "adminDeleteClosedPositionsForUser",
-	adminDeletePositionByIDFromTracker = "adminDeletePositionByIDFromTracker"
+	adminDeletePositionByIDFromTracker = "adminDeletePositionByIDFromTracker",
+	freezePosition = "freezePosition",
+	unfreezePosition = "unfreezePosition",
+	listFrozenPositions = "listFrozenPositions"
+}
+
+export async function freezePositionInTracker(positionID : string, tokenAddress : string, vsTokenAddress : string, env : Env) : Promise<FreezePositionInTrackerResponse> {
+	const request : FreezePositionInTrackerRequest = { positionID, tokenAddress, vsTokenAddress };
+	const method = TokenPairPositionTrackerDOFetchMethod.freezePosition;
+	return await sendJSONRequestToTokenPairPositionTracker<FreezePositionInTrackerRequest,FreezePositionInTrackerResponse>(method,request,tokenAddress,vsTokenAddress,env);
+}
+
+export async function unfreezePositionInTracker(userID : number, positionID : string, tokenAddress : string, vsTokenAddress : string, env : Env) : Promise<UnfreezePositionInTrackerResponse> {
+	const request : UnfreezePositionInTrackerRequest = { userID, positionID, tokenAddress, vsTokenAddress };
+	const method = TokenPairPositionTrackerDOFetchMethod.unfreezePosition;
+	return await sendJSONRequestToTokenPairPositionTracker<UnfreezePositionInTrackerRequest,UnfreezePositionInTrackerResponse>(method,request,tokenAddress,vsTokenAddress,env);
+}
+
+export async function listFrozenPositionsInTracker(userID : number, tokenAddress : string, vsTokenAddress : string, env : Env) : Promise<ListFrozenPositionsInTrackerResponse> {
+	const request : ListFrozenPositionsInTrackerRequest = { userID, tokenAddress, vsTokenAddress };
+	const method = TokenPairPositionTrackerDOFetchMethod.listFrozenPositions;
+	return await sendJSONRequestToTokenPairPositionTracker<ListFrozenPositionsInTrackerRequest,ListFrozenPositionsInTrackerResponse>(method,request,tokenAddress,vsTokenAddress,env);
 }
 
 export async function adminDeletePositionByIDFromTracker(positionID : string, tokenAddress : string, vsTokenAddress : string, env : Env) : Promise<AdminDeletePositionByIDFromTrackerResponse> {

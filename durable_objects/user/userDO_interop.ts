@@ -61,7 +61,10 @@ export enum UserDOFetchMethod {
 	getClosedPositionsAndPNLSummary = "getClosedPositionsAndPNLSummary",
 	adminDeleteClosedPositions = "adminDeleteClosedPositions",
 	adminResetDefaultPositionRequest = "adminResetDefaultPositionRequest",
-	adminDeletePositionByID = "adminDeletePositionByID"
+	adminDeletePositionByID = "adminDeletePositionByID",
+	listFrozenPositions = "listFrozenPositions",
+	freezePosition = "freezePosition",
+	unfreezePosition = "unfreezePosition"
 }
 
 export async function adminDeletePositionByID(telegramUserID : number, chatID : number, positionID : string, env : Env) : Promise<AdminDeletePositionByIDResponse> {

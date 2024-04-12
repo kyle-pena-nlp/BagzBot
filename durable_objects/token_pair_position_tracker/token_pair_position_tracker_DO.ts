@@ -3,6 +3,7 @@ import { isAdminOrSuperAdmin } from "../../admins";
 import { DecimalizedAmount, dSub } from "../../decimalized";
 import { asTokenPrice, asTokenPriceDelta, toNumber } from "../../decimalized/decimalized_amount";
 import { Env, getRPCUrl } from "../../env";
+import { makeJSONResponse, makeSuccessResponse } from "../../http";
 import { logDebug, logError, logInfo } from "../../logging";
 import { MenuCode } from "../../menus";
 import { Position, PositionStatus } from "../../positions";
@@ -18,6 +19,7 @@ import { AdminDeleteAllInTrackerRequest, AdminDeleteAllInTrackerResponse } from 
 import { AdminDeleteClosedPositionsForUserInTrackerRequest, AdminDeleteClosedPositionsForUserInTrackerResponse } from "./actions/admin_delete_closed_positions_for_user_in_tracker";
 import { AdminDeletePositionByIDFromTrackerRequest, AdminDeletePositionByIDFromTrackerResponse } from "./actions/admin_delete_position_by_id_from_tracker";
 import { EditTriggerPercentOnOpenPositionInTrackerRequest } from "./actions/edit_trigger_percent_on_open_position_in_tracker";
+import { FreezePositionInTrackerRequest, FreezePositionInTrackerResponse } from "./actions/freeze_position_in_tracker";
 import { GetPositionFromPriceTrackerRequest, GetPositionFromPriceTrackerResponse } from "./actions/get_position";
 import { GetPositionAndMaybePNLFromPriceTrackerRequest, GetPositionAndMaybePNLFromPriceTrackerResponse } from "./actions/get_position_and_maybe_pnl";
 import { GetPositionCountsFromTrackerRequest, GetPositionCountsFromTrackerResponse } from "./actions/get_position_counts_from_tracker";
@@ -26,6 +28,7 @@ import { HasPairAddresses } from "./actions/has_pair_addresses";
 import { isHeartbeatRequest } from "./actions/heartbeat_wake_up_for_token_pair_position_tracker";
 import { InsertPositionRequest, InsertPositionResponse } from "./actions/insert_position";
 import { ListClosedPositionsFromTrackerRequest, ListClosedPositionsFromTrackerResponse } from "./actions/list_closed_positions_from_tracker";
+import { ListFrozenPositionsInTrackerRequest, ListFrozenPositionsInTrackerResponse } from "./actions/list_frozen_positions_in_tracker";
 import { ListPositionsByUserRequest, ListPositionsByUserResponse } from "./actions/list_positions_by_user";
 import { MarkBuyAsConfirmedRequest, MarkBuyAsConfirmedResponse } from "./actions/mark_buy_as_confirmed";
 import { MarkPositionAsClosedRequest, MarkPositionAsClosedResponse } from "./actions/mark_position_as_closed";
@@ -35,6 +38,7 @@ import { PositionExistsInTrackerRequest, PositionExistsInTrackerResponse } from 
 import { RemovePositionRequest, RemovePositionResponse } from "./actions/remove_position";
 import { SetSellAutoDoubleOnOpenPositionInTrackerRequest } from "./actions/set_sell_auto_double_on_open_position_in_tracker";
 import { SetSellSlippagePercentOnOpenPositionTrackerRequest } from "./actions/set_sell_slippage_percent_on_open_position";
+import { UnfreezePositionInTrackerRequest, UnfreezePositionInTrackerResponse } from "./actions/unfreeze_position_in_tracker";
 import { UpdatePositionRequest, UpdatePositionResponse } from "./actions/update_position";
 import { UpdatePriceRequest, UpdatePriceResponse } from "./actions/update_price";
 import { WakeupTokenPairPositionTrackerRequest, WakeupTokenPairPositionTrackerResponse } from "./actions/wake_up";
@@ -44,7 +48,6 @@ import { PositionAndMaybePNL } from "./model/position_and_PNL";
 import { TokenPairPositionTrackerDOFetchMethod, parseTokenPairPositionTrackerDOFetchMethod } from "./token_pair_position_tracker_do_interop";
 import { CurrentPriceTracker } from "./trackers/current_price_tracker";
 import { ActionsToTake, TokenPairPositionTracker } from "./trackers/token_pair_position_tracker";
-import { makeJSONResponse, makeSuccessResponse } from "../../http";
 /*
     Big TODO: How do we limit concurrent outgoing requests when a dip happens?
     This is a big burst and may trip limits.
@@ -357,9 +360,34 @@ export class TokenPairPositionTrackerDO {
                 return await this.handleAdminDeleteClosedPositionsForUser(body);
             case TokenPairPositionTrackerDOFetchMethod.adminDeletePositionByIDFromTracker:
                 return await this.handleAdminDeletePositionByID(body);
+            case TokenPairPositionTrackerDOFetchMethod.freezePosition:
+                return await this.handleFreezePosition(body);
+            case TokenPairPositionTrackerDOFetchMethod.unfreezePosition:
+                return await this.handleUnfreezePosition(body);
+            case TokenPairPositionTrackerDOFetchMethod.listFrozenPositions:
+                return await this.handleListFrozenPositions(body);
             default:
                 assertNever(method);
         }
+    }
+
+    async handleFreezePosition(body: FreezePositionInTrackerRequest) : Promise<Response> {
+        const success = this.tokenPairPositionTracker.freezePosition(body.positionID);
+        return makeJSONResponse<FreezePositionInTrackerResponse>({ success });
+    }
+
+    async handleUnfreezePosition(body: UnfreezePositionInTrackerRequest): Promise<Response> {
+        const currentPrice = await this.getPrice();
+        if (currentPrice == null) {
+            return makeJSONResponse<UnfreezePositionInTrackerResponse>({ success: false })
+        }
+        const success = this.tokenPairPositionTracker.unfreezePosition(body.userID, body.positionID, currentPrice);
+        return makeJSONResponse<UnfreezePositionInTrackerResponse>({ success });
+    }
+
+    async handleListFrozenPositions(body: ListFrozenPositionsInTrackerRequest) : Promise<Response> {
+        const frozenPositions = this.tokenPairPositionTracker.listFrozenPositionsByUser(body.userID);
+        return makeJSONResponse<ListFrozenPositionsInTrackerResponse>({ frozenPositions });
     }
 
     async handleAdminDeletePositionByID(body : AdminDeletePositionByIDFromTrackerRequest) : Promise<Response> {

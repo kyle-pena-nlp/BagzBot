@@ -1,7 +1,7 @@
 import { DecimalizedAmount } from "../../../decimalized";
 import { logError } from "../../../logging";
 import { Position, PositionStatus } from "../../../positions";
-import { Integer, MapWithStorage, TwoLevelMapWithStorage } from "../../../util";
+import { MapWithStorage, TwoLevelMapWithStorage } from "../../../util";
 import { PositionAndMaybePNL } from "../model/position_and_PNL";
 import { PeakPricePositionTracker } from "./peak_price_tracker";
 
@@ -22,6 +22,8 @@ export class TokenPairPositionTracker {
     // positions confirmed as closed - may be resurrected under unusual circumstances
     closedPositions : MapWithStorage<Position> = new MapWithStorage<Position>("closedPositions");
 
+    frozenPositions : TwoLevelMapWithStorage<number,string,Position> = new TwoLevelMapWithStorage<number,string,Position>("frozenPositions", 'Integer', 'string');
+    
     constructor() {
     }
 
@@ -135,10 +137,33 @@ export class TokenPairPositionTracker {
         return this.pricePeaks.remove(positionID);
     }
 
+    freezePosition(positionID : string) : boolean {
+        const position = this.removePosition(positionID);
+        if (position == null) {
+            return false;
+        }
+        this.frozenPositions.insert(position.userID, position.positionID, position);
+        return true;
+    }
+
+    unfreezePosition(userID : number, positionID : string, currentPrice : DecimalizedAmount) : boolean {
+        const position = this.frozenPositions.get(userID, positionID);
+        if (position == null) {
+            return false;
+        }
+        this.insertPosition(position, currentPrice);
+        return true;
+    }
+
+    listFrozenPositionsByUser(userID : number) : Position[] {
+        return this.frozenPositions.list(userID);
+    }
+
     initialize(entries : Map<string,any>) {
         try {
             this.pricePeaks.initialize(entries);
             this.closedPositions.initialize(entries);
+            this.frozenPositions.initialize(entries);
         }
         catch(e) {
             logError(`Error initializing token_pair_position_tracker`, e);
@@ -148,7 +173,8 @@ export class TokenPairPositionTracker {
     async flushToStorage(storage : DurableObjectStorage) : Promise<void> {
         return Promise.all([
             this.pricePeaks.flushToStorage(storage),
-            this.closedPositions.flushToStorage(storage)
+            this.closedPositions.flushToStorage(storage),
+            this.frozenPositions.flushToStorage(storage)
         ]).catch(() => {
             logError("Flushing to storage failed for TokenPairPositionTracker", this);
             return;
