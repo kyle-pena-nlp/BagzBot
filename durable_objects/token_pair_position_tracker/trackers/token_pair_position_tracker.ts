@@ -159,6 +159,7 @@ export class TokenPairPositionTracker {
             return false;
         }
         this.insertPosition(position, currentPrice);
+        this.frozenPositions.delete(userID, positionID);
         return true;
     }
 

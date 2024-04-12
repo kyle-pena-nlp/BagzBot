@@ -4,6 +4,11 @@ export interface ManuallyClosePositionRequest  extends BaseUserDORequest {
 	positionID : string
 }
 
-export interface ManuallyClosePositionResponse {
-	message: string
-}
+export type ManuallyClosePositionResponse = 
+	{ success: null, reason: 'attempting-sale' } |
+	{ success: false, reason: 'position-closed'|
+		'position-closing'|
+		'buy-unconfirmed'|
+		'no-token-pair'|
+		'position-DNE' 
+	};

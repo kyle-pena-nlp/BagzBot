@@ -807,40 +807,51 @@ export class UserDO {
         });
         return makeJSONResponse<OpenPositionResponse>({});
     }
-    
+
     async handleManuallyClosePositionRequest(manuallyClosePositionRequest : ManuallyClosePositionRequest) : Promise<Response> {
+        const response = await this.handleManuallyClosePositionRequestInternal(manuallyClosePositionRequest);
+        return makeJSONResponse<ManuallyClosePositionResponse>(response);
+    }
+    
+    async handleManuallyClosePositionRequestInternal(manuallyClosePositionRequest : ManuallyClosePositionRequest) : Promise<ManuallyClosePositionResponse> {
         const startTimeMS = Date.now();
         const positionID = manuallyClosePositionRequest.positionID;
         const tokenPair = this.tokenPairsForPositionIDsTracker.getPositionPair(positionID);
         if (tokenPair == null) {
             logError(`Could not find tokenPair for position ID ${positionID}`, this.telegramUserID);
-            return makeJSONResponse<ManuallyClosePositionResponse>({ message: 'Could not find token pair for position' });
+            return { success: false, reason: 'no-token-pair' };
         }
         const tokenAddress = tokenPair.token.address;
         const vsTokenAddress = tokenPair.vsToken.address;
         const positionAndMaybePNL = await getPositionAndMaybePNL(positionID, tokenAddress, vsTokenAddress, this.env);
         if (positionAndMaybePNL == null) {
-            return makeJSONResponse<ManuallyClosePositionResponse>({ message: "Position did not exist" });
+            return { success: false, reason: "position-DNE" };
         }
         const position = positionAndMaybePNL.position;
+        const result = await this.manuallyClosePosition(position, startTimeMS);
+        return { success: null, reason: 'attempting-sale' };
+    }
+
+    async manuallyClosePosition(position : Position, startTimeMS : number) : Promise<{ success: false, reason: 'position-closing'|'position-closed'|'buy-unconfirmed' }|{ success: null, reason: 'attempting-sale' }> {
         if (position.status == PositionStatus.Closing) {
-            return makeJSONResponse<ManuallyClosePositionResponse>({ message: "Position is already being sold." });
+            return { success: false, reason: 'position-closing' };
         }
         else if (position.status === PositionStatus.Closed) {
-            return makeJSONResponse<ManuallyClosePositionResponse>({ message: "Position has already been sold." });
+            return { success: false, reason: 'position-closed' };
         }
         else if (!position.buyConfirmed) {
-            return makeJSONResponse<ManuallyClosePositionResponse>({ message: "Position's purchase has not been confirmed."});
+            return { success: false, reason: 'buy-unconfirmed' };
         }
         assertIs<PositionStatus.Open,typeof position.status>();
-        const channel = TGStatusMessage.createAndSend(`Initiating sale.`, false, position.chatID, this.env, 'HTML', `<a href="${position.token.logoURI}">\u200B</a><b>Manual Sell of ${asTokenPrice(position.tokenAmt)} ${position.token.symbol}</b>: `);
+        const channel = TGStatusMessage.createAndSend(`Initiating sale.`, false, position.chatID, this.env, 'HTML', `<a href="${position.token.logoURI}">\u200B</a><b>Manual Sale of ${asTokenPrice(position.tokenAmt)} ${position.token.symbol}</b>: `);
         const connection = new Connection(getRPCUrl(this.env));
         const positionSeller = new PositionSeller(connection, this.wallet.value!!, 'manual-sell', startTimeMS, channel, this.env);
         // deliberate lack of await here (fire-and-forget). But still writes to storage.
         positionSeller.sell(position).finally(async () => {
             await this.flushToStorage();
         });
-        return makeJSONResponse<ManuallyClosePositionResponse>({ message: 'Position will now be closed. '});
+        // success is indeterminate (by design) (explanation: depends on what happens with the positionSeller.sell, which is unawaited.)
+        return { success: null, reason: 'attempting-sale' };
     }
 
     async handleAutomaticallyClosePositionsRequest(closePositionsRequest : AutomaticallyClosePositionsRequest) : Promise<Response> {

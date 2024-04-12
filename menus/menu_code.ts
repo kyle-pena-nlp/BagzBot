@@ -32,6 +32,8 @@ export enum MenuCode {
 	FreezePosition = "FreezePosition",
 	ViewFrozenPositions = "ListFrozenPositions",
 	ViewFrozenPosition = "ViewFrozenPosition", 
+	//This needs a bigger refactor because the PositionSeller assumes the position is being tracked.
+	//CloseFrozenPositionManually = "CloseFrozenPositionManually",
 
 	EditOpenPositionAutoDoubleSlippage = "EOP.AutoDoubleSlip",
 	SubmitOpenPositionAutoDoubleSlippage = "SOP.AutoDoubleSlip",
