@@ -417,7 +417,8 @@ function convertToConfirmedPosition(positionRequest: PositionRequest,
         tokenAmt: parsedSuccessfulSwap.swapSummary.outTokenAmt,        
         fillPrice: parsedSuccessfulSwap.swapSummary.fillPrice,
         fillPriceMS : parsedSuccessfulSwap.swapSummary.swapTimeMS,
-        netPNL: null // to be set when position is sold
+        netPNL: null, // to be set when position is sold
+        otherSellFailureCount: 0
     };
     return position;
 }
