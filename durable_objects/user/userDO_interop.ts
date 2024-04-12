@@ -10,11 +10,11 @@ import { AdminDeleteClosedPositionsRequest, AdminDeleteClosedPositionsResponse }
 import { AdminDeletePositionByIDRequest, AdminDeletePositionByIDResponse } from "./actions/admin_delete_position_by_id";
 import { AdminResetDefaultPositionRequest, AdminResetDefaultPositionResponse } from "./actions/admin_reset_default_position_request";
 import { AutomaticallyClosePositionsRequest, AutomaticallyClosePositionsResponse } from "./actions/automatically_close_positions";
+import { DeactivatePositionRequest, DeactivatePositionResponse } from "./actions/deactivate_position";
 import { DeleteSessionRequest } from "./actions/delete_session";
 import { EditTriggerPercentOnOpenPositionRequest, EditTriggerPercentOnOpenPositionResponse } from "./actions/edit_trigger_percent_on_open_position";
-import { DeactivatePositionRequest, DeactivatePositionResponse } from "./actions/freeze_position";
 import { GetClosedPositionsAndPNLSummaryRequest, GetClosedPositionsAndPNLSummaryResponse } from "./actions/get_closed_positions_and_pnl_summary";
-import { GetFrozenPositionRequest, GetFrozenPositionResponse } from "./actions/get_frozen_position";
+import { GetDeactivatedPositionRequest, GetDeactivatedPositionResponse } from "./actions/get_frozen_position";
 import { GetImpersonatedUserIDRequest, GetImpersonatedUserIDResponse } from "./actions/get_impersonated_user_id";
 import { GetLegalAgreementStatusRequest, GetLegalAgreementStatusResponse } from "./actions/get_legal_agreement_status";
 import { GetPositionFromUserDORequest, GetPositionFromUserDOResponse } from "./actions/get_position_from_user_do";
@@ -23,17 +23,17 @@ import { GetUserDataRequest } from "./actions/get_user_data";
 import { GetUserWalletSOLBalanceRequest, GetUserWalletSOLBalanceResponse } from "./actions/get_user_wallet_balance";
 import { GetWalletDataRequest, GetWalletDataResponse } from "./actions/get_wallet_data";
 import { ImpersonateUserRequest, ImpersonateUserResponse } from "./actions/impersonate_user";
-import { ListFrozenPositionsRequest, ListFrozenPositionsResponse } from "./actions/list_frozen_positions";
+import { ListDeactivatedPositionsRequest, ListDeactivatedPositionsResponse } from "./actions/list_frozen_positions";
 import { ListPositionsFromUserDORequest, ListPositionsFromUserDOResponse } from "./actions/list_positions_from_user_do";
 import { ManuallyClosePositionRequest, ManuallyClosePositionResponse } from "./actions/manually_close_position";
 import { OpenPositionRequest, OpenPositionResponse } from "./actions/open_new_position";
+import { ReactivatePositionRequest, ReactivatePositionResponse } from "./actions/reactivate_position";
 import { DefaultTrailingStopLossRequestRequest, DefaultTrailingStopLossRequestResponse } from "./actions/request_default_position_request";
 import { SendMessageToUserRequest, SendMessageToUserResponse } from "./actions/send_message_to_user";
 import { SetSellAutoDoubleOnOpenPositionRequest, SetSellAutoDoubleOnOpenPositionResponse } from "./actions/set_sell_auto_double_on_open_position";
 import { SellSellSlippagePercentageOnOpenPositionRequest, SellSellSlippagePercentageOnOpenPositionResponse } from "./actions/set_sell_slippage_percent_on_open_position";
 import { StoreLegalAgreementStatusRequest, StoreLegalAgreementStatusResponse } from "./actions/store_legal_agreement_status";
 import { StoreSessionValuesRequest, StoreSessionValuesResponse } from "./actions/store_session_values";
-import { ReactivatePositionRequest, ReactivatePositionResponse } from "./actions/unfreeze_position";
 import { UnimpersonateUserRequest, UnimpersonateUserResponse } from "./actions/unimpersonate_user";
 import { SessionKey } from "./model/session";
 import { UserData } from "./model/user_data";
@@ -66,17 +66,17 @@ export enum UserDOFetchMethod {
 	adminDeleteClosedPositions = "adminDeleteClosedPositions",
 	adminResetDefaultPositionRequest = "adminResetDefaultPositionRequest",
 	adminDeletePositionByID = "adminDeletePositionByID",
-	listFrozenPositions = "listFrozenPositions",
+	listDeactivatedPositions = "listDeactivatedPositions",
 	deactivatePosition = "deactivatePosition",
 	reactivatePosition = "reactivatePosition",
-	getFrozenPosition = "getFrozenPosition"
+	getDeactivatedPosition = "getDeactivatedPosition"
 }
 
-export async function getFrozenPosition(telegramUserID : number, chatID : number, positionID : string, env : Env) : Promise<Position|undefined> {
-	const request : GetFrozenPositionRequest = { telegramUserID, chatID, positionID };
-	const method = UserDOFetchMethod.getFrozenPosition;
-	const response = await sendJSONRequestToUserDO<GetFrozenPositionRequest,GetFrozenPositionResponse>(telegramUserID, method, request, env);
-	return response.frozenPosition;
+export async function getDeactivatedPosition(telegramUserID : number, chatID : number, positionID : string, env : Env) : Promise<Position|undefined> {
+	const request : GetDeactivatedPositionRequest = { telegramUserID, chatID, positionID };
+	const method = UserDOFetchMethod.getDeactivatedPosition;
+	const response = await sendJSONRequestToUserDO<GetDeactivatedPositionRequest,GetDeactivatedPositionResponse>(telegramUserID, method, request, env);
+	return response.deactivatedPosition;
 }
 
 export async function deactivatePosition(telegramUserID : number, chatID : number, positionID : string, env : Env) : Promise<DeactivatePositionResponse> {
@@ -93,10 +93,10 @@ export async function reactivatePosition(telegramUserID : number, chatID : numbe
 	return response;
 }
 
-export async function listFrozenPositions(telegramUserID : number, chatID : number, env : Env) : Promise<ListFrozenPositionsResponse> {
-	const request : ListFrozenPositionsRequest = { telegramUserID, chatID };
-	const method = UserDOFetchMethod.listFrozenPositions;
-	const response = await sendJSONRequestToUserDO<ListFrozenPositionsRequest,ListFrozenPositionsResponse>(telegramUserID, method, request, env);
+export async function listDeactivatedPositions(telegramUserID : number, chatID : number, env : Env) : Promise<ListDeactivatedPositionsResponse> {
+	const request : ListDeactivatedPositionsRequest = { telegramUserID, chatID };
+	const method = UserDOFetchMethod.listDeactivatedPositions;
+	const response = await sendJSONRequestToUserDO<ListDeactivatedPositionsRequest,ListDeactivatedPositionsResponse>(telegramUserID, method, request, env);
 	return response;
 }
 

@@ -6,12 +6,13 @@ import { Position, PositionStatus } from "../../positions";
 import { EditTriggerPercentOnOpenPositionResponse } from "../user/actions/edit_trigger_percent_on_open_position";
 import { SetSellAutoDoubleOnOpenPositionResponse } from "../user/actions/set_sell_auto_double_on_open_position";
 import { SellSellSlippagePercentageOnOpenPositionResponse } from "../user/actions/set_sell_slippage_percent_on_open_position";
+import { ReactivatePositionInTrackerRequest, ReactivatePositionInTrackerResponse } from "./actions/activate_position_in_tracker";
 import { AdminDeleteAllInTrackerRequest, AdminDeleteAllInTrackerResponse } from "./actions/admin_delete_all_positions_in_tracker";
 import { AdminDeleteClosedPositionsForUserInTrackerRequest, AdminDeleteClosedPositionsForUserInTrackerResponse } from "./actions/admin_delete_closed_positions_for_user_in_tracker";
 import { AdminDeletePositionByIDFromTrackerRequest, AdminDeletePositionByIDFromTrackerResponse } from "./actions/admin_delete_position_by_id_from_tracker";
+import { DeactivatePositionInTrackerRequest, DeactivatePositionInTrackerResponse } from "./actions/deactivate_position_in_tracker";
 import { EditTriggerPercentOnOpenPositionInTrackerRequest } from "./actions/edit_trigger_percent_on_open_position_in_tracker";
-import { DeactivatePositionInTrackerRequest, DeactivatePositionInTrackerResponse } from "./actions/freeze_position_in_tracker";
-import { GetFrozenPositionFromTrackerRequest, GetFrozenPositionFromTrackerResponse } from "./actions/get_frozen_position";
+import { GetDeactivatedPositionFromTrackerRequest, GetDeactivatedPositionFromTrackerResponse } from "./actions/get_frozen_position";
 import { GetPositionFromPriceTrackerRequest, GetPositionFromPriceTrackerResponse } from "./actions/get_position";
 import { GetPositionAndMaybePNLFromPriceTrackerRequest, GetPositionAndMaybePNLFromPriceTrackerResponse } from "./actions/get_position_and_maybe_pnl";
 import { GetPositionCountsFromTrackerRequest, GetPositionCountsFromTrackerResponse } from "./actions/get_position_counts_from_tracker";
@@ -20,7 +21,7 @@ import { HasPairAddresses } from "./actions/has_pair_addresses";
 import { IncrementOtherSellFailureCountInTrackerRequest, IncrementOtherSellFailureCountInTrackerResponse } from "./actions/increment_other_sell_failure_count_in_tracker";
 import { InsertPositionRequest, InsertPositionResponse } from "./actions/insert_position";
 import { ListClosedPositionsFromTrackerRequest, ListClosedPositionsFromTrackerResponse } from "./actions/list_closed_positions_from_tracker";
-import { ListFrozenPositionsInTrackerRequest, ListFrozenPositionsInTrackerResponse } from "./actions/list_frozen_positions_in_tracker";
+import { ListDeactivatedPositionsInTrackerRequest, ListDeactivatedPositionsInTrackerResponse } from "./actions/list_frozen_positions_in_tracker";
 import { ListPositionsByUserRequest, ListPositionsByUserResponse } from "./actions/list_positions_by_user";
 import { MarkBuyAsConfirmedRequest, MarkBuyAsConfirmedResponse } from "./actions/mark_buy_as_confirmed";
 import { MarkPositionAsClosedRequest, MarkPositionAsClosedResponse } from "./actions/mark_position_as_closed";
@@ -30,7 +31,6 @@ import { PositionExistsInTrackerRequest, PositionExistsInTrackerResponse } from 
 import { RemovePositionRequest, RemovePositionResponse } from "./actions/remove_position";
 import { SetSellAutoDoubleOnOpenPositionInTrackerRequest } from "./actions/set_sell_auto_double_on_open_position_in_tracker";
 import { SetSellSlippagePercentOnOpenPositionTrackerRequest } from "./actions/set_sell_slippage_percent_on_open_position";
-import { ReactivatePositionInTrackerRequest, ReactivatePositionInTrackerResponse } from "./actions/unfreeze_position_in_tracker";
 import { UpdatePositionRequest, UpdatePositionResponse } from "./actions/update_position";
 import { UpdatePriceRequest, UpdatePriceResponse } from "./actions/update_price";
 import { WakeupTokenPairPositionTrackerRequest, WakeupTokenPairPositionTrackerResponse } from "./actions/wake_up";
@@ -62,8 +62,8 @@ export enum TokenPairPositionTrackerDOFetchMethod {
 	adminDeletePositionByIDFromTracker = "adminDeletePositionByIDFromTracker",
 	deactivatePosition = "deactivatePosition",
 	reactivatePosition = "reactivatePosition",
-	listFrozenPositions = "listFrozenPositions",
-	getFrozenPosition = "getFrozenPosition",
+	listDeactivatedPositions = "listDeactivatedPositions",
+	getDeactivatedPosition = "getDeactivatedPosition",
 	incrementOtherSellFailureCount = "incrementOtherSellFailureCount"
 }
 
@@ -74,10 +74,10 @@ export async function incrementOtherSellFailureCountInTracker(positionID : strin
 	return response;
 }
 
-export async function getFrozenPositionFromTracker(telegramUserID : number, positionID : string, tokenAddress : string, vsTokenAddress : string, env : Env) : Promise<GetFrozenPositionFromTrackerResponse> {
-	const request : GetFrozenPositionFromTrackerRequest = { telegramUserID, positionID, tokenAddress, vsTokenAddress };
-	const method = TokenPairPositionTrackerDOFetchMethod.getFrozenPosition;
-	return await sendJSONRequestToTokenPairPositionTracker<GetFrozenPositionFromTrackerRequest,GetFrozenPositionFromTrackerResponse>(method,request,tokenAddress,vsTokenAddress,env);
+export async function getDeactivatedPositionFromTracker(telegramUserID : number, positionID : string, tokenAddress : string, vsTokenAddress : string, env : Env) : Promise<GetDeactivatedPositionFromTrackerResponse> {
+	const request : GetDeactivatedPositionFromTrackerRequest = { telegramUserID, positionID, tokenAddress, vsTokenAddress };
+	const method = TokenPairPositionTrackerDOFetchMethod.getDeactivatedPosition;
+	return await sendJSONRequestToTokenPairPositionTracker<GetDeactivatedPositionFromTrackerRequest,GetDeactivatedPositionFromTrackerResponse>(method,request,tokenAddress,vsTokenAddress,env);
 }
 
 export async function deactivatePositionInTracker(positionID : string, tokenAddress : string, vsTokenAddress : string, env : Env) : Promise<DeactivatePositionInTrackerResponse> {
@@ -92,10 +92,10 @@ export async function reactivatePositionInTracker(userID : number, positionID : 
 	return await sendJSONRequestToTokenPairPositionTracker<ReactivatePositionInTrackerRequest,ReactivatePositionInTrackerResponse>(method,request,tokenAddress,vsTokenAddress,env);
 }
 
-export async function listFrozenPositionsInTracker(userID : number, tokenAddress : string, vsTokenAddress : string, env : Env) : Promise<ListFrozenPositionsInTrackerResponse> {
-	const request : ListFrozenPositionsInTrackerRequest = { userID, tokenAddress, vsTokenAddress };
-	const method = TokenPairPositionTrackerDOFetchMethod.listFrozenPositions;
-	return await sendJSONRequestToTokenPairPositionTracker<ListFrozenPositionsInTrackerRequest,ListFrozenPositionsInTrackerResponse>(method,request,tokenAddress,vsTokenAddress,env);
+export async function listDeactivatedPositionsInTracker(userID : number, tokenAddress : string, vsTokenAddress : string, env : Env) : Promise<ListDeactivatedPositionsInTrackerResponse> {
+	const request : ListDeactivatedPositionsInTrackerRequest = { userID, tokenAddress, vsTokenAddress };
+	const method = TokenPairPositionTrackerDOFetchMethod.listDeactivatedPositions;
+	return await sendJSONRequestToTokenPairPositionTracker<ListDeactivatedPositionsInTrackerRequest,ListDeactivatedPositionsInTrackerResponse>(method,request,tokenAddress,vsTokenAddress,env);
 }
 
 export async function adminDeletePositionByIDFromTracker(positionID : string, tokenAddress : string, vsTokenAddress : string, env : Env) : Promise<AdminDeletePositionByIDFromTrackerResponse> {

@@ -22,7 +22,7 @@ export class TokenPairPositionTracker {
     // positions confirmed as closed - may be resurrected under unusual circumstances
     closedPositions : MapWithStorage<Position> = new MapWithStorage<Position>("closedPositions");
 
-    frozenPositions : TwoLevelMapWithStorage<number,string,Position> = new TwoLevelMapWithStorage<number,string,Position>("frozenPositions", 'Integer', 'string');
+    deactivatedPositions : TwoLevelMapWithStorage<number,string,Position> = new TwoLevelMapWithStorage<number,string,Position>("deactivatedPositions", 'Integer', 'string');
     
     constructor() {
     }
@@ -161,33 +161,33 @@ export class TokenPairPositionTracker {
             return false;
         }
         this.removePosition(positionID);
-        this.frozenPositions.insert(position.userID, position.positionID, position);
+        this.deactivatedPositions.insert(position.userID, position.positionID, position);
         return true;
     }
 
     reactivatePosition(userID : number, positionID : string, currentPrice : DecimalizedAmount) : boolean {
-        const position = this.frozenPositions.get(userID, positionID);
+        const position = this.deactivatedPositions.get(userID, positionID);
         if (position == null) {
             return false;
         }
         this.insertPosition(position, currentPrice);
-        this.frozenPositions.delete(userID, positionID);
+        this.deactivatedPositions.delete(userID, positionID);
         return true;
     }
 
-    listFrozenPositionsByUser(userID : number) : Position[] {
-        return this.frozenPositions.list(userID);
+    listDeactivatedPositionsByUser(userID : number) : Position[] {
+        return this.deactivatedPositions.list(userID);
     }
 
-    getFrozenPosition(userID : number, positionID : string) : Position|undefined {
-        return this.frozenPositions.get(userID, positionID);
+    getDeactivatedPosition(userID : number, positionID : string) : Position|undefined {
+        return this.deactivatedPositions.get(userID, positionID);
     }
 
     initialize(entries : Map<string,any>) {
         try {
             this.pricePeaks.initialize(entries);
             this.closedPositions.initialize(entries);
-            this.frozenPositions.initialize(entries);
+            this.deactivatedPositions.initialize(entries);
         }
         catch(e) {
             logError(`Error initializing token_pair_position_tracker`, e);
@@ -198,7 +198,7 @@ export class TokenPairPositionTracker {
         return Promise.all([
             this.pricePeaks.flushToStorage(storage),
             this.closedPositions.flushToStorage(storage),
-            this.frozenPositions.flushToStorage(storage)
+            this.deactivatedPositions.flushToStorage(storage)
         ]).catch(() => {
             logError("Flushing to storage failed for TokenPairPositionTracker", this);
             return;

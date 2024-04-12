@@ -1,10 +1,10 @@
 import { Position } from "../../../positions";
 import { HasPairAddresses } from "./has_pair_addresses";
 
-export interface ListFrozenPositionsInTrackerRequest extends HasPairAddresses {
+export interface ListDeactivatedPositionsInTrackerRequest extends HasPairAddresses {
     userID : number
 }
 
-export interface ListFrozenPositionsInTrackerResponse {
-    frozenPositions : Position[]
+export interface ListDeactivatedPositionsInTrackerResponse {
+    deactivatedPositions : Position[]
 }

@@ -13,18 +13,18 @@ import { ChangeTrackedValue, Structural, assertNever, groupIntoBatches, sleep, s
 import { assertIs } from "../../util/enums";
 import { listUnclaimedBetaInviteCodes } from "../beta_invite_codes/beta_invite_code_interop";
 import { PositionAndMaybePNL } from "../token_pair_position_tracker/model/position_and_PNL";
-import { adminDeleteClosedPositionsForUser, adminDeletePositionByIDFromTracker, deactivatePositionInTracker, editTriggerPercentOnOpenPositionInTracker, getFrozenPositionFromTracker, getPositionAndMaybePNL, listClosedPositionsFromTracker, listFrozenPositionsInTracker, listPositionsByUser, reactivatePositionInTracker, removePosition, setSellAutoDoubleOnOpenPositionInPositionTracker, setSellSlippagePercentOnOpenPositionInTracker } from "../token_pair_position_tracker/token_pair_position_tracker_do_interop";
+import { adminDeleteClosedPositionsForUser, adminDeletePositionByIDFromTracker, deactivatePositionInTracker, editTriggerPercentOnOpenPositionInTracker, getDeactivatedPositionFromTracker, getPositionAndMaybePNL, listClosedPositionsFromTracker, listDeactivatedPositionsInTracker, listPositionsByUser, reactivatePositionInTracker, removePosition, setSellAutoDoubleOnOpenPositionInPositionTracker, setSellSlippagePercentOnOpenPositionInTracker } from "../token_pair_position_tracker/token_pair_position_tracker_do_interop";
 import { AdminDeleteAllPositionsRequest, AdminDeleteAllPositionsResponse } from "./actions/admin_delete_all_positions";
 import { AdminDeleteClosedPositionsRequest } from "./actions/admin_delete_closed_positions";
 import { AdminDeletePositionByIDRequest, AdminDeletePositionByIDResponse } from "./actions/admin_delete_position_by_id";
 import { AdminResetDefaultPositionRequest, AdminResetDefaultPositionResponse } from "./actions/admin_reset_default_position_request";
 import { AutomaticallyClosePositionsRequest, AutomaticallyClosePositionsResponse } from "./actions/automatically_close_positions";
 import { BaseUserDORequest, isBaseUserDORequest } from "./actions/base_user_do_request";
+import { DeactivatePositionRequest, DeactivatePositionResponse } from "./actions/deactivate_position";
 import { DeleteSessionRequest, DeleteSessionResponse } from "./actions/delete_session";
 import { EditTriggerPercentOnOpenPositionRequest, EditTriggerPercentOnOpenPositionResponse } from "./actions/edit_trigger_percent_on_open_position";
-import { DeactivatePositionRequest, DeactivatePositionResponse } from "./actions/freeze_position";
 import { GetClosedPositionsAndPNLSummaryRequest, GetClosedPositionsAndPNLSummaryResponse } from "./actions/get_closed_positions_and_pnl_summary";
-import { GetFrozenPositionRequest, GetFrozenPositionResponse } from "./actions/get_frozen_position";
+import { GetDeactivatedPositionRequest, GetDeactivatedPositionResponse } from "./actions/get_frozen_position";
 import { GetImpersonatedUserIDRequest, GetImpersonatedUserIDResponse } from "./actions/get_impersonated_user_id";
 import { GetLegalAgreementStatusRequest, GetLegalAgreementStatusResponse } from "./actions/get_legal_agreement_status";
 import { GetPositionFromUserDORequest, GetPositionFromUserDOResponse } from "./actions/get_position_from_user_do";
@@ -33,17 +33,17 @@ import { GetUserDataRequest } from "./actions/get_user_data";
 import { GetUserWalletSOLBalanceRequest, GetUserWalletSOLBalanceResponse } from "./actions/get_user_wallet_balance";
 import { GetWalletDataRequest, GetWalletDataResponse } from "./actions/get_wallet_data";
 import { ImpersonateUserRequest, ImpersonateUserResponse } from "./actions/impersonate_user";
-import { ListFrozenPositionsRequest, ListFrozenPositionsResponse } from "./actions/list_frozen_positions";
+import { ListDeactivatedPositionsRequest, ListDeactivatedPositionsResponse } from "./actions/list_frozen_positions";
 import { ListPositionsFromUserDORequest, ListPositionsFromUserDOResponse } from "./actions/list_positions_from_user_do";
 import { ManuallyClosePositionRequest, ManuallyClosePositionResponse } from "./actions/manually_close_position";
 import { OpenPositionRequest, OpenPositionResponse } from "./actions/open_new_position";
+import { ReactivatePositionRequest, ReactivatePositionResponse } from "./actions/reactivate_position";
 import { DefaultTrailingStopLossRequestRequest, DefaultTrailingStopLossRequestResponse } from "./actions/request_default_position_request";
 import { SendMessageToUserRequest, SendMessageToUserResponse, isSendMessageToUserRequest } from "./actions/send_message_to_user";
 import { SetSellAutoDoubleOnOpenPositionRequest, SetSellAutoDoubleOnOpenPositionResponse } from "./actions/set_sell_auto_double_on_open_position";
 import { SellSellSlippagePercentageOnOpenPositionRequest, SellSellSlippagePercentageOnOpenPositionResponse } from "./actions/set_sell_slippage_percent_on_open_position";
 import { StoreLegalAgreementStatusRequest, StoreLegalAgreementStatusResponse } from "./actions/store_legal_agreement_status";
 import { StoreSessionValuesRequest, StoreSessionValuesResponse } from "./actions/store_session_values";
-import { ReactivatePositionRequest, ReactivatePositionResponse } from "./actions/unfreeze_position";
 import { UnimpersonateUserRequest, UnimpersonateUserResponse } from "./actions/unimpersonate_user";
 import { ClosedPositionPNLSummarizer } from "./aggregators/closed_positions_pnl_summarizer";
 import { TokenPair } from "./model/token_pair";
@@ -333,8 +333,8 @@ export class UserDO {
             case UserDOFetchMethod.adminDeletePositionByID:
                 response = await this.handleAdminDeletePositionByID(userAction);
                 break;
-            case UserDOFetchMethod.listFrozenPositions:
-                response = await this.handleListFrozenPositions(userAction);
+            case UserDOFetchMethod.listDeactivatedPositions:
+                response = await this.handleListDeactivatedPositions(userAction);
                 break;
             case UserDOFetchMethod.deactivatePosition:
                 response = await this.handleDeactivatePosition(userAction);
@@ -342,8 +342,8 @@ export class UserDO {
             case UserDOFetchMethod.reactivatePosition:
                 response = await this.handleReactivatePosition(userAction);
                 break;
-            case UserDOFetchMethod.getFrozenPosition:
-                response = await this.handleGetFrozenPosition(userAction);
+            case UserDOFetchMethod.getDeactivatedPosition:
+                response = await this.handleGetDeactivatedPosition(userAction);
                 break;
             default:
                 assertNever(method);
@@ -352,38 +352,38 @@ export class UserDO {
         return [method,userAction,response];
     }
 
-    async handleGetFrozenPosition(userAction : GetFrozenPositionRequest) : Promise<Response> {
-        const response = await this.handleGetFrozenPositionInternal(userAction);
-        return makeJSONResponse<GetFrozenPositionResponse>(response);
+    async handleGetDeactivatedPosition(userAction : GetDeactivatedPositionRequest) : Promise<Response> {
+        const response = await this.handleGetDeactivatedPositionInternal(userAction);
+        return makeJSONResponse<GetDeactivatedPositionResponse>(response);
     }
 
-    async handleGetFrozenPositionInternal(userAction : GetFrozenPositionRequest) : Promise<GetFrozenPositionResponse> {
+    async handleGetDeactivatedPositionInternal(userAction : GetDeactivatedPositionRequest) : Promise<GetDeactivatedPositionResponse> {
         const tokenPair = this.tokenPairsForPositionIDsTracker.getPositionPair(userAction.positionID);
         if (tokenPair == null) {
-            return { frozenPosition : undefined };
+            return { deactivatedPosition : undefined };
         }
         const tokenAddress = tokenPair.token.address;
         const vsTokenAddress = tokenPair.vsToken.address;
-        const frozenPositionResponse = await getFrozenPositionFromTracker(userAction.telegramUserID, userAction.positionID, tokenAddress, vsTokenAddress, this.env);
-        return { frozenPosition : frozenPositionResponse.frozenPosition };
+        const deactivatedPositionResponse = await getDeactivatedPositionFromTracker(userAction.telegramUserID, userAction.positionID, tokenAddress, vsTokenAddress, this.env);
+        return { deactivatedPosition : deactivatedPositionResponse.deactivatedPosition };
     }
 
-    async handleListFrozenPositions(userAction : ListFrozenPositionsRequest) : Promise<Response> {
-        const response = await this.handleListFrozenPositionsInternal(userAction);
-        return makeJSONResponse<ListFrozenPositionsResponse>(response);
+    async handleListDeactivatedPositions(userAction : ListDeactivatedPositionsRequest) : Promise<Response> {
+        const response = await this.handleListDeactivatedPositionsInternal(userAction);
+        return makeJSONResponse<ListDeactivatedPositionsResponse>(response);
     }
 
-    async handleListFrozenPositionsInternal(userAction : ListFrozenPositionsRequest) : Promise<ListFrozenPositionsResponse> {
+    async handleListDeactivatedPositionsInternal(userAction : ListDeactivatedPositionsRequest) : Promise<ListDeactivatedPositionsResponse> {
         const userID = userAction.telegramUserID;
         const tokenPairs = this.tokenPairsForPositionIDsTracker.listUniqueTokenPairs()
-        const allFrozenPositions : Position[] = [];
+        const allDeactivatedPositions : Position[] = [];
         for (const tokenPair of tokenPairs) {
             const tokenAddress = tokenPair.tokenAddress;
             const vsTokenAddress = tokenPair.vsTokenAddress;
-            const response = await listFrozenPositionsInTracker(userID, tokenAddress, vsTokenAddress, this.env);
-            allFrozenPositions.push(...response.frozenPositions);
+            const response = await listDeactivatedPositionsInTracker(userID, tokenAddress, vsTokenAddress, this.env);
+            allDeactivatedPositions.push(...response.deactivatedPositions);
         }
-        return { frozenPositions : allFrozenPositions };
+        return { deactivatedPositions : allDeactivatedPositions };
     }
 
     async handleDeactivatePosition(userAction : DeactivatePositionRequest) : Promise<Response> {

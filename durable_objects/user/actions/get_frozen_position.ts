@@ -1,10 +1,10 @@
 import { Position } from "../../../positions";
 import { BaseUserDORequest } from "./base_user_do_request";
 
-export interface GetFrozenPositionRequest extends BaseUserDORequest {
+export interface GetDeactivatedPositionRequest extends BaseUserDORequest {
     positionID : string
 }
 
-export interface GetFrozenPositionResponse {
-    frozenPosition : Position|undefined
+export interface GetDeactivatedPositionResponse {
+    deactivatedPosition : Position|undefined
 }

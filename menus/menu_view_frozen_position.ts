@@ -5,7 +5,7 @@ import { CallbackData } from "./callback_data";
 import { Menu, MenuCapabilities } from "./menu";
 import { MenuCode } from "./menu_code";
 
-export class MenuViewFrozenPosition extends Menu<Position> implements MenuCapabilities {
+export class MenuViewDeactivatedPosition extends Menu<Position> implements MenuCapabilities {
     renderText(): string {
         return `:deactivated: <b><u>This position is DEACTIVATED.</u></b>
 <b>${asTokenPrice(this.menuData.tokenAmt)}</b> of $${this.menuData.token.symbol}
@@ -26,9 +26,9 @@ Support Code: <i><code>${this.menuData.positionID}</code></i>`
     }
     renderOptions(): CallbackButton[][] {
         const options = this.emptyMenu();
-        //this.insertButtonNextLine(options, 'Attempt Sale', new CallbackData(MenuCode.CloseFrozenPositionManually, this.menuData.positionID));
+        //this.insertButtonNextLine(options, 'Attempt Sale', new CallbackData(MenuCode.CloseDeactivatedPositionManually, this.menuData.positionID));
         this.insertButtonNextLine(options, "Reactivate Position", new CallbackData(MenuCode.ReactivatePosition,this.menuData.positionID));
-        this.insertButtonNextLine(options, ":back: Back", new CallbackData(MenuCode.ViewFrozenPositions));
+        this.insertButtonNextLine(options, ":back: Back", new CallbackData(MenuCode.ViewDeactivatedPositions));
         return options;
     }
 }

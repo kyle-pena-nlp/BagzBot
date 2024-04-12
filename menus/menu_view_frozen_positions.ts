@@ -5,7 +5,7 @@ import { CallbackData } from "./callback_data";
 import { Menu, MenuCapabilities } from "./menu";
 import { MenuCode } from "./menu_code";
 
-export class MenuViewFrozenPositions extends Menu<Position[]>  implements MenuCapabilities {
+export class MenuViewDeactivatedPositions extends Menu<Position[]>  implements MenuCapabilities {
     renderText(): string {
         const lines = [`<b><u>Deactivated Positions</u></b>
 :bullet: Deactivated positions are not price monitored and will not be automatically sold. 
@@ -19,14 +19,14 @@ export class MenuViewFrozenPositions extends Menu<Position[]>  implements MenuCa
     renderOptions(): CallbackButton[][] {
         const options = this.emptyMenu();
         for (const position of this.menuData) {
-            this.insertViewFrozenPositionButton(options, position);
+            this.insertViewDeactivatedPositionButton(options, position);
         }
-        this.insertButtonNextLine(options, ':refresh: Refresh', this.menuCallback(MenuCode.ViewFrozenPositions));
+        this.insertButtonNextLine(options, ':refresh: Refresh', this.menuCallback(MenuCode.ViewDeactivatedPositions));
         this.insertButtonNextLine(options, ':back: Back', this.menuCallback(MenuCode.Main));
         return options;
     }
 
-    private insertViewFrozenPositionButton(options : CallbackButton[][], position : Position) {
-        this.insertButtonNextLine(options, `:deactivated: ${asTokenPrice(position.tokenAmt)} of $${position.token.symbol}`, new CallbackData(MenuCode.ViewFrozenPosition, position.positionID));
+    private insertViewDeactivatedPositionButton(options : CallbackButton[][], position : Position) {
+        this.insertButtonNextLine(options, `:deactivated: ${asTokenPrice(position.tokenAmt)} of $${position.token.symbol}`, new CallbackData(MenuCode.ViewDeactivatedPosition, position.positionID));
     }
 }

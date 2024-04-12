@@ -11,7 +11,7 @@ import { _devOnlyFeatureUpdatePrice, adminInvokeAlarm } from "../durable_objects
 import { OpenPositionRequest } from "../durable_objects/user/actions/open_new_position";
 import { QuantityAndToken } from "../durable_objects/user/model/quantity_and_token";
 import { TokenSymbolAndAddress } from "../durable_objects/user/model/token_name_and_address";
-import { adminDeleteAllPositions, adminDeleteClosedPositions, adminDeletePositionByID, adminResetDefaultPositionRequest, deactivatePosition, editTriggerPercentOnOpenPositionFromUserDO, getClosedPositionsAndPNLSummary, getDefaultTrailingStopLoss, getFrozenPosition, getPositionFromUserDO, getUserData, getUserWalletSOLBalance, getWalletData, impersonateUser, listFrozenPositions, listPositionsFromUserDO, manuallyClosePosition, maybeReadSessionObj, reactivatePosition, readSessionObj, requestNewPosition, sendMessageToUser, setSellAutoDoubleOnOpenPosition, setSellSlippagePercentOnOpenPosition, storeLegalAgreementStatus, storeSessionObj, storeSessionObjProperty, storeSessionValues, unimpersonateUser } from "../durable_objects/user/userDO_interop";
+import { adminDeleteAllPositions, adminDeleteClosedPositions, adminDeletePositionByID, adminResetDefaultPositionRequest, deactivatePosition, editTriggerPercentOnOpenPositionFromUserDO, getClosedPositionsAndPNLSummary, getDeactivatedPosition, getDefaultTrailingStopLoss, getPositionFromUserDO, getUserData, getUserWalletSOLBalance, getWalletData, impersonateUser, listDeactivatedPositions, listPositionsFromUserDO, manuallyClosePosition, maybeReadSessionObj, reactivatePosition, readSessionObj, requestNewPosition, sendMessageToUser, setSellAutoDoubleOnOpenPosition, setSellSlippagePercentOnOpenPosition, storeLegalAgreementStatus, storeSessionObj, storeSessionObjProperty, storeSessionValues, unimpersonateUser } from "../durable_objects/user/userDO_interop";
 import { Env } from "../env";
 import { makeFakeFailedRequestResponse, makeSuccessResponse } from "../http";
 import { logDebug, logError } from "../logging";
@@ -19,8 +19,8 @@ import { BaseMenu, LegalAgreement, MenuAdminViewClosedPositions, MenuBetaInviteF
 import { MenuViewObj } from "../menus/menu_admin_view_obj";
 import { PositionIDAndSellSlippagePercent } from "../menus/menu_edit_open_position_sell_slippage_percent";
 import { MenuEditPositionRequest } from "../menus/menu_edit_position_request";
-import { MenuViewFrozenPosition } from "../menus/menu_view_frozen_position";
-import { MenuViewFrozenPositions } from "../menus/menu_view_frozen_positions";
+import { MenuViewDeactivatedPosition } from "../menus/menu_view_frozen_position";
+import { MenuViewDeactivatedPositions } from "../menus/menu_view_frozen_positions";
 import { PositionPreRequest, PositionRequest, convertPreRequestToRequest } from "../positions";
 import { ReplyQuestion, ReplyQuestionCode } from "../reply_question";
 import { ReplyQuestionData, replyQuestionHasNextSteps } from "../reply_question/reply_question_data";
@@ -648,7 +648,7 @@ export class CallbackHandler {
             case MenuCode.DeactivatePosition:
                 const deactivatePositionResponse = await deactivatePosition(params.getTelegramUserID(), params.chatID, callbackData.menuArg||'', this.env);
                 if (deactivatePositionResponse.success) {
-                    return new MenuContinueMessage("This position has been deactivated and will no longer be price monitored", MenuCode.ViewFrozenPositions);
+                    return new MenuContinueMessage("This position has been deactivated and will no longer be price monitored", MenuCode.ViewDeactivatedPositions);
                 }
                 else {
                     return new MenuContinueMessage("This position could not be deactivated", MenuCode.ViewOpenPosition, 'HTML', callbackData.menuArg);
@@ -659,19 +659,19 @@ export class CallbackHandler {
                     return new MenuContinueMessage("This position will now be price monitored", MenuCode.ListPositions);
                 }
                 else {
-                    return new MenuContinueMessage("This position could not be activated", MenuCode.ViewFrozenPosition, 'HTML', callbackData.menuArg);
+                    return new MenuContinueMessage("This position could not be activated", MenuCode.ViewDeactivatedPosition, 'HTML', callbackData.menuArg);
                 }
-            case MenuCode.ViewFrozenPosition:
-                const frozenPosition = await getFrozenPosition(params.getTelegramUserID(), params.chatID, callbackData.menuArg||'', this.env);
-                if (frozenPosition == null) {
-                    return new MenuContinueMessage("Sorry - this position is no longer deactivated or was removed", MenuCode.ViewFrozenPositions);
+            case MenuCode.ViewDeactivatedPosition:
+                const deactivatedPosition = await getDeactivatedPosition(params.getTelegramUserID(), params.chatID, callbackData.menuArg||'', this.env);
+                if (deactivatedPosition == null) {
+                    return new MenuContinueMessage("Sorry - this position is no longer deactivated or was removed", MenuCode.ViewDeactivatedPositions);
                 }
                 else {
-                    return new MenuViewFrozenPosition(frozenPosition);
+                    return new MenuViewDeactivatedPosition(deactivatedPosition);
                 }
-            case MenuCode.ViewFrozenPositions:
-                const listFrozenPositionsResponse = await listFrozenPositions(params.getTelegramUserID(), params.chatID, this.env);
-                return new MenuViewFrozenPositions(listFrozenPositionsResponse.frozenPositions);
+            case MenuCode.ViewDeactivatedPositions:
+                const listDeactivatedPositionsResponse = await listDeactivatedPositions(params.getTelegramUserID(), params.chatID, this.env);
+                return new MenuViewDeactivatedPositions(listDeactivatedPositionsResponse.deactivatedPositions);
             default:
                 assertNever(callbackData.menuCode);
         }

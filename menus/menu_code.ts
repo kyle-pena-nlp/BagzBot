@@ -30,10 +30,10 @@ export enum MenuCode {
 	SubmitPosRequestAutoDoubleSlippageOptions = "SPR.AutoDoubleSlip",
 	ReactivatePosition = "ReactivatePosition",
 	DeactivatePosition = "DeactivatePosition",
-	ViewFrozenPositions = "ListFrozenPositions",
-	ViewFrozenPosition = "ViewFrozenPosition", 
+	ViewDeactivatedPositions = "ListDeactivatedPositions",
+	ViewDeactivatedPosition = "ViewDeactivatedPosition", 
 	//This needs a bigger refactor because the PositionSeller assumes the position is being tracked.
-	//CloseFrozenPositionManually = "CloseFrozenPositionManually",
+	//CloseDeactivatedPositionManually = "CloseDeactivatedPositionManually",
 
 	EditOpenPositionAutoDoubleSlippage = "EOP.AutoDoubleSlip",
 	SubmitOpenPositionAutoDoubleSlippage = "SOP.AutoDoubleSlip",

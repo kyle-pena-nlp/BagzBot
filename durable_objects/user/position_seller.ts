@@ -258,9 +258,9 @@ export class PositionSeller {
             case 'could-not-retrieve-blockheight':
                 return MenuCode.ViewOpenPosition;
             case 'frozen-token-account':
-                return MenuCode.ViewFrozenPosition;
+                return MenuCode.ViewDeactivatedPosition;
             case 'insufficient-sol':
-                return MenuCode.ViewFrozenPosition;
+                return MenuCode.ViewDeactivatedPosition;
             case 'timed-out':
                 return MenuCode.ViewOpenPosition;
             case 'token-fee-account-not-initialized':
