@@ -43,7 +43,7 @@ export class MenuViewOpenPosition extends Menu<MenuData> implements MenuCapabili
             }
             
             this.insertButtonNextLine(options, `:chart_down: ${this.position().triggerPercent}% Trigger`, new CallbackData(MenuCode.EditOpenPositionTriggerPercent, this.position().positionID));
-            this.insertButtonNextLine(options, `:twisted_arrows: ${this.position().sellSlippagePercent}% Slippage`, new CallbackData(MenuCode.EditOpenPositionSellSlippagePercent, this.position().positionID));
+            this.insertButtonSameLine(options, `:twisted_arrows: ${this.position().sellSlippagePercent}% Slippage`, new CallbackData(MenuCode.EditOpenPositionSellSlippagePercent, this.position().positionID));
             if (this.allowChooseAutoDoubleSlippage()) {
                 this.insertButtonNextLine(options, `:brain: ${this.position().sellAutoDoubleSlippage ? '': 'Do Not'} Auto-Double Slippage If TSL Fails :brain:`, new CallbackData(MenuCode.EditOpenPositionAutoDoubleSlippage, this.position().positionID));
             }
@@ -55,7 +55,7 @@ export class MenuViewOpenPosition extends Menu<MenuData> implements MenuCapabili
 
         const refreshPositionCallbackData = new CallbackData(MenuCode.ViewOpenPosition, this.position().positionID);
         this.insertButtonNextLine(options, ":refresh: Refresh", refreshPositionCallbackData);
-        this.insertButtonNextLine(options, ":back: Back", this.menuCallback(MenuCode.ListPositions));
+        this.insertButtonSameLine(options, ":back: Back", this.menuCallback(MenuCode.ListPositions));
 
         return options;
     }

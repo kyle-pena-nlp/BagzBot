@@ -3,6 +3,7 @@ import { dAdd, dDiv, dMult } from "../../../decimalized";
 import { MATH_DECIMAL_PLACES, dZero, fromNumber } from "../../../decimalized/decimalized_amount";
 import { Env } from "../../../env";
 import { logDebug } from "../../../logging";
+import { PositionStatus } from "../../../positions";
 import { ChangeTrackedValue, strictParseFloat } from "../../../util";
 import { listPositionsByUser } from "../../token_pair_position_tracker/token_pair_position_tracker_do_interop";
 import { TokenPair } from "../model/token_pair";
@@ -42,6 +43,9 @@ export class UserPNLTracker {
                         return null;
                     }
                     if (!positionWithPNL.position.buyConfirmed) {
+                        continue;
+                    }
+                    if (positionWithPNL.position.status === PositionStatus.Closed) {
                         continue;
                     }
                     originalTotalValue = dAdd(originalTotalValue, positionWithPNL.position.vsTokenAmt);

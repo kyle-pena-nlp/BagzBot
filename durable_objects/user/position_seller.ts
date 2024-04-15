@@ -226,7 +226,7 @@ export class PositionSeller {
                 return 'There was an error executing the transaction.'
             case 'slippage-failed':
                 if (this.type === 'auto-sell' && position.sellAutoDoubleSlippage) {
-                    return `The sale failed due to slippage - the sale will be reattempted with slippage of ${Math.min(100,position.sellSlippagePercent * 2).toFixed(1)}.`;
+                    return `The sale failed due to slippage - the sale will be reattempted with slippage of ${Math.min(100,position.sellSlippagePercent * 2).toFixed(1)}%.`;
                 }
                 else if (this.type === 'auto-sell') {
                     return 'The sale failed due to slippage. If the trigger condition holds the sale will be reattempted automatically.'
