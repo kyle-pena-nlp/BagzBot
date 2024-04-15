@@ -58,10 +58,5 @@ Please note: Later versions of wrangler (1.19
 
 ### Deploying
 
-* If you are a team member talk to your project lead.
-
-
-## License
-
-This project is licensed under the [NAME HERE] License - see the LICENSE.md file for details
+* If you are a team member talk to your project lead
 
