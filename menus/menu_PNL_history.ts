@@ -1,8 +1,9 @@
 import { dAdd, dDiv, dMult } from "../decimalized";
-import { DecimalizedAmount, MATH_DECIMAL_PLACES, asPercentDeltaString, asTokenPriceDelta, dZero, fromNumber } from "../decimalized/decimalized_amount";
+import { DecimalizedAmount, MATH_DECIMAL_PLACES, asPercentDeltaString, asTokenPrice, asTokenPriceDelta, dZero, fromNumber } from "../decimalized/decimalized_amount";
 import { Position } from "../positions";
 import { CallbackButton } from "../telegram";
 import { groupIntoMap } from "../util";
+import { padRight } from "../util/strings";
 import { CallbackData } from "./callback_data";
 import { logoHack } from "./logo_hack";
 import { Menu, MenuCapabilities } from "./menu";
@@ -48,12 +49,11 @@ export class MenuPNLHistory extends Menu<{ closedPositions : Position[], netPNL 
         }
         const pos = closedPositionsForToken[0];
         const pnlPercentDelta = dMult(fromNumber(100), dDiv(netPNL, totalInvested, MATH_DECIMAL_PLACES)||dZero());
-        lines.push(`<b><u>$${pos.token.symbol}:</u></b>`);
-        lines.push(`:bullet: ${numPositions} closed position` + ((numPositions > 1) ? 's' : '') );
-        lines.push(`:bullet: ${asTokenPriceDelta(netPNL)} SOL`);
-        lines.push(`:bullet: ${asPercentDeltaString(pnlPercentDelta)} PNL`);
+        const soldTotal = dAdd(totalInvested,netPNL);
+        lines.push(`<b><u>$${pos.token.symbol}</u></b>: (<b>${numPositions}</b> Positions)`);
+        lines.push(`:bullet: ${asTokenPrice(totalInvested)} Total SOL Invested`);
+        lines.push(`:bullet: ${asTokenPriceDelta(netPNL)} net SOL (${asPercentDeltaString(pnlPercentDelta)})`);
         lines.push("");
-        //lines.push(summaryLine);
     }
 
     renderOptions(): CallbackButton[][] {
@@ -72,18 +72,9 @@ export class MenuPNLHistory extends Menu<{ closedPositions : Position[], netPNL 
         if (position.netPNL == null) {
             return;
         }
-        const label = this.padRight(`${position.token.symbol}: `, 9);
+        const label = padRight(`${position.token.symbol}: `, 9);
         const pnlString = `${asTokenPriceDelta(position.netPNL)} SOL`;
         lines.push(`:bullet: Sale of <code>${label} ${pnlString}</code>`);
-    }
-
-    private padRight(text : string, length : number) : string {
-        if (text.length < length) {
-            return text + " ".repeat(length - text.length);
-        }
-        else {
-            return text.slice(0, length);
-        }
     }
 
     renderURLPreviewNormally(): boolean {
