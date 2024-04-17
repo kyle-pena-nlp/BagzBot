@@ -34,7 +34,7 @@ export class UserPNLTracker {
         let originalTotalValue = dZero();
         let currentTotalValue = dZero();
         if (this.refreshIntervalExpired(env) || forceRefresh) {
-            logDebug(`Recalculating PNL for ${telegramUserID}`);
+            logDebug(`Recalculating PnL for ${telegramUserID}`);
             const startTimeMS = Date.now();
             for (const tokenPair of uniqueTokenPairs) {
                 const positionsWithPNL = await listPositionsByUser(telegramUserID, tokenPair.tokenAddress, tokenPair.vsTokenAddress, env);
@@ -60,7 +60,7 @@ export class UserPNLTracker {
                 PNL: PNL,
                 PNLpercent: PNLpercent||dZero()
             }
-            logDebug(`PNL recalculated for ${telegramUserID} in ${Date.now() - startTimeMS}ms`);
+            logDebug(`PnL recalculated for ${telegramUserID} in ${Date.now() - startTimeMS}ms`);
         }
         return this.maybeUserPNL.value||null;
     }

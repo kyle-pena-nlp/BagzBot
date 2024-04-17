@@ -65,7 +65,7 @@ export class MenuPNLHistory extends Menu<{ closedPositions : Position[], netPNL 
         return options;
     }
     private addHeader(lines : string[]) {
-        lines.push(`${logoHack()}<u><b>PNL Summary</b></u>`);        
+        lines.push(`${logoHack()}<u><b>PnL Summary</b></u>`);        
     }
     private addNetPNLSummary(lines : string[], closedPositions : Position[]) {
         let totalInvested = dZero();

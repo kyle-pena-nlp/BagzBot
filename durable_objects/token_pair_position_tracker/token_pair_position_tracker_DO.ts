@@ -785,7 +785,7 @@ export class TokenPairPositionTrackerDO {
                     await TGStatusMessage.finalMessage(channel, "We found that the sale didn't go through because there were not enough tokens in your wallet to cover the sale. The position has been deactivated.", true);
                 }
                 else if (isSuccessfullyParsedSwapSummary(confirmedSellStatus)) {
-                    // TODO: update with PNL               
+                    // TODO: update with PnL               
                     const netPNL = dSub(confirmedSellStatus.swapSummary.outTokenAmt, pos.vsTokenAmt);
                     this.tokenPairPositionTracker.closePosition(pos.positionID, netPNL);
                     await TGStatusMessage.finalMessage(channel, `The sale was confirmed! You made ${asTokenPriceDelta(netPNL)} SOL.`, MenuCode.ViewPNLHistory); 

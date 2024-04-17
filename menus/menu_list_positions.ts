@@ -12,7 +12,7 @@ export class MenuListPositions extends Menu<PositionAndMaybePNL[]> implements Me
         const lines = [ `<b>Your TSL Positions</b>` ];
         const maybeTotalPNL = this.maybeCalcTotalPNL();
         if (maybeTotalPNL != null) {
-            let pnlLine = `<b>Total Unrealized PNL</b> ${toFriendlyString(maybeTotalPNL, 4, { useSubscripts: false, addCommas: true, includePlusSign: true })} SOL`;
+            let pnlLine = `<b>Total Unrealized PnL</b> ${toFriendlyString(maybeTotalPNL, 4, { useSubscripts: false, addCommas: true, includePlusSign: true })} SOL`;
             const originalTotalValue = this.calcOriginalTotalValue();
             if (dCompare(originalTotalValue, dZero()) > 0) {
                 const fracTotalPNL = dDiv(maybeTotalPNL, 
