@@ -20,7 +20,10 @@ export function parseInstructionError(err : any, env : Env) {
     if (Custom === strictParseInt(env.JUPITER_SWAP_PROGRAM_FEE_ACCOUNT_NOT_INITIALIZED_ERROR_CODE)) {
         return SwapExecutionError.TokenAccountFeeNotInitialized;
     }
-    else if (Custom === strictParseInt(env.JUPITER_SWAP_PROGRAM_INSUFFICIENT_LAMPORTS_ERROR_CODE)) {
+    else if (index === 3 && Custom === strictParseInt(env.JUPITER_SWAP_PROGRAM_INSUFFICIENT_BALANCE_ERROR_CODE)) {
+        return SwapExecutionError.InsufficientTokensBalance;
+    }
+    else if (Custom === strictParseInt(env.JUPITER_SWAP_PROGRAM_INSUFFICIENT_BALANCE_ERROR_CODE)) {
         return SwapExecutionError.InsufficientSOLBalance;
     }
     else if (Custom === strictParseInt(env.JUPITER_SWAP_PROGRAM_SLIPPAGE_ERROR_CODE)) {

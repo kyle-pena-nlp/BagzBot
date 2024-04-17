@@ -3,7 +3,7 @@ import { Env } from "../../../env";
 import { logDebug, logError } from "../../../logging";
 import { Position, PositionStatus } from "../../../positions";
 import { parseParsedTransactionWithMeta } from "../../../rpc/rpc_parse";
-import { ParsedSuccessfulSwapSummary, ParsedSwapSummary, UnknownTransactionParseSummary, isFrozenTokenAccountSwapExecutionErrorParseSummary, isInsufficientNativeTokensSwapExecutionErrorParseSummary, isOtherKindOfSwapExecutionError, isSlippageSwapExecutionErrorParseSummary, isSuccessfulSwapSummary, isTokenFeeAccountNotInitializedSwapExecutionErrorParseSummary } from "../../../rpc/rpc_swap_parse_result_types";
+import { ParsedSuccessfulSwapSummary, ParsedSwapSummary, UnknownTransactionParseSummary, isFrozenTokenAccountSwapExecutionErrorParseSummary, isInsufficientNativeTokensSwapExecutionErrorParseSummary, isInsufficientTokensBalanceErrorParseSummary, isOtherKindOfSwapExecutionError, isSlippageSwapExecutionErrorParseSummary, isSuccessfulSwapSummary, isTokenFeeAccountNotInitializedSwapExecutionErrorParseSummary } from "../../../rpc/rpc_swap_parse_result_types";
 import { assertNever, strictParseInt } from "../../../util";
 
 
@@ -30,7 +30,8 @@ export class BuyConfirmer {
             'slippage-failed'|
             'token-fee-account-not-initialized'|
             'frozen-token-account'|
-            'insufficient-sol'> {
+            'insufficient-sol'|
+            'insufficient-tokens-balance'> {
 
         if (this.isTimedOut()) {
             return 'unconfirmed';
@@ -69,7 +70,8 @@ export class BuyConfirmer {
         'slippage-failed'|
         'frozen-token-account'|
         'token-fee-account-not-initialized'|
-        'insufficient-sol'> {
+        'insufficient-sol'|
+        'insufficient-tokens-balance'> {
         
         const parsedTx = await this.getParsedTransaction(unconfirmedPosition);
         
@@ -98,6 +100,9 @@ export class BuyConfirmer {
         }
         else if (isOtherKindOfSwapExecutionError(parsedTx)) {
             return 'failed';
+        }
+        else if (isInsufficientTokensBalanceErrorParseSummary(parsedTx)) {
+            return 'insufficient-tokens-balance';
         }
         else if (isSuccessfulSwapSummary(parsedTx)) {
             const confirmedPosition = this.convertToConfirmedPosition(unconfirmedPosition, parsedTx);

@@ -1,13 +1,14 @@
 import { Connection, SimulateTransactionConfig, VersionedTransaction } from "@solana/web3.js";
 import { Wallet } from "../../crypto";
 import { DecimalizedAmount, dSub } from "../../decimalized";
+import { asTokenPrice } from "../../decimalized/decimalized_amount";
 import { Env } from "../../env";
 import { MenuCode } from "../../menus";
 import { Position, PositionStatus } from "../../positions";
 import { getLatestValidBlockhash } from "../../rpc/rpc_blocks";
 import { parseInstructionError } from "../../rpc/rpc_parse_instruction_error";
 import { signatureOf } from "../../rpc/rpc_sign_tx";
-import { ParsedSuccessfulSwapSummary, SwapExecutionError, isFrozenTokenAccountSwapExecutionErrorParseSummary, isInsufficientNativeTokensSwapExecutionErrorParseSummary, isOtherKindOfSwapExecutionError, isSlippageSwapExecutionErrorParseSummary, isSuccessfulSwapSummary, isSuccessfullyParsedSwapSummary, isTokenFeeAccountNotInitializedSwapExecutionErrorParseSummary, isUnknownTransactionParseSummary } from "../../rpc/rpc_swap_parse_result_types";
+import { ParsedSuccessfulSwapSummary, ParsedSwapSummary, SwapExecutionError, isFrozenTokenAccountSwapExecutionErrorParseSummary, isInsufficientNativeTokensSwapExecutionErrorParseSummary, isInsufficientTokensBalanceErrorParseSummary, isOtherKindOfSwapExecutionError, isSlippageSwapExecutionErrorParseSummary, isSuccessfulSwapSummary, isSuccessfullyParsedSwapSummary, isTokenFeeAccountNotInitializedSwapExecutionErrorParseSummary, isUnknownTransactionParseSummary } from "../../rpc/rpc_swap_parse_result_types";
 import { TGStatusMessage, UpdateableNotification } from "../../telegram";
 import { assertNever, strictParseBoolean, strictParseInt } from "../../util";
 import { deactivatePositionInTracker, incrementOtherSellFailureCountInTracker, markAsClosed, markAsOpen, positionExistsInTracker, updatePosition } from "../token_pair_position_tracker/token_pair_position_tracker_do_interop";
@@ -16,8 +17,8 @@ import { SwapTransactionSigner } from "./swap_transaction_signer";
 import { doubleSellSlippageAndMarkAsOpen } from "./userDO_interop";
 
 type TxPreparationFailure = 'timed-out'|'already-sold'|'could-not-create-tx'|'could-not-retrieve-blockheight';
-type TxSimFailure = 'tx-sim-failed-other'|'tx-sim-failed-other-too-many-times'|'tx-sim-insufficient-sol'|'tx-sim-failed-slippage'|'tx-sim-frozen-token-account'|'tx-sim-failed-token-account-fee-not-initialized';
-type TxExecutionFailure = 'tx-failed'|'unconfirmed'|'slippage-failed'|'insufficient-sol'|'frozen-token-account'|'token-fee-account-not-initialized'|'other-failed'|'other-failed-too-many-times';
+type TxSimFailure = 'tx-sim-failed-other'|'tx-sim-failed-other-too-many-times'|'tx-sim-insufficient-sol'|'tx-sim-failed-slippage'|'tx-sim-frozen-token-account'|'tx-sim-failed-token-account-fee-not-initialized'|'tx-sim-insufficient-tokens-balance';
+type TxExecutionFailure = 'tx-failed'|'unconfirmed'|'slippage-failed'|'insufficient-sol'|'insufficient-tokens-balance'|'frozen-token-account'|'token-fee-account-not-initialized'|'other-failed'|'other-failed-too-many-times';
 
 // See also SellConfirmer in sell_confirmer.ts for a full picture of the sell lifecycle
 
@@ -129,6 +130,9 @@ export class PositionSeller {
         else if (result === 'token-fee-account-not-initialized' || result === 'tx-sim-failed-token-account-fee-not-initialized') {
             await this.markAsOpenAndDeactivate(position);
         }
+        else if (result === 'tx-sim-insufficient-tokens-balance' || result === 'insufficient-tokens-balance') {
+            await this.markAsOpenAndDeactivate(position);
+        }
         else if (result === 'other-failed' || result === 'tx-sim-failed-other') {
             await this.incrementOtherSellFailureCountInTracker(position);
             await this.markAsOpen(position);
@@ -169,14 +173,28 @@ export class PositionSeller {
         await incrementOtherSellFailureCountInTracker(position.positionID, position.token.address, position.vsToken.address, this.env);
     }
 
-    private async executeAndParseSwap(position : Position, signedTx : VersionedTransaction, lastValidBH : number) : Promise<'tx-failed'|'other-failed'|'slippage-failed'|'unconfirmed'|'frozen-token-account'|'insufficient-sol'|'token-fee-account-not-initialized'|'other-failed-too-many-times'|ParsedSuccessfulSwapSummary> {
+    private async executeAndParseSwap(position : Position, signedTx : VersionedTransaction, lastValidBH : number) : Promise<
+        'tx-failed'|
+        'other-failed'|
+        'slippage-failed'|
+        'unconfirmed'|
+        'frozen-token-account'|
+        'insufficient-sol'|
+        'token-fee-account-not-initialized'|
+        'insufficient-tokens-balance'|
+        'other-failed-too-many-times'|
+        ParsedSuccessfulSwapSummary> {
 
         // create a time-limited tx executor and confirmer
         const swapExecutor = new SwapExecutor(this.wallet, 'sell', this.env, this.channel, this.connection, lastValidBH, this.startTimeMS);
 
         // attempt to execute, confirm, and parse w/in time limit
         const parsedSwapSummary = await swapExecutor.executeTxAndParseResult(position, signedTx);
-        //const parsedSwapSummary : ('tx-failed'|'unconfirmed'|ParsedSwapSummary) = { status: SwapExecutionError.SlippageToleranceExceeded } as ('tx-failed'|'unconfirmed'|ParsedSwapSummary);
+        
+        // REPLICATION
+        //let parsedSwapSummary = await swapExecutor.executeTxAndParseResult(position, signedTx);
+        //parsedSwapSummary = 'unconfirmed' as ('tx-failed'|'unconfirmed'|ParsedSwapSummary);
+        // END
 
         // convert the tx execution result to a position, if possible
         if (parsedSwapSummary === 'tx-failed') {
@@ -199,6 +217,9 @@ export class PositionSeller {
         }
         else if (isFrozenTokenAccountSwapExecutionErrorParseSummary(parsedSwapSummary)) {
             return 'frozen-token-account';
+        }
+        else if (isInsufficientTokensBalanceErrorParseSummary(parsedSwapSummary)) {
+            return 'insufficient-tokens-balance';
         }
         else if (isOtherKindOfSwapExecutionError(parsedSwapSummary)) {
             if ((position.otherSellFailureCount||0)+1 >= strictParseInt(this.env.OTHER_SELL_FAILURES_TO_DEACTIVATE)) {
@@ -271,6 +292,9 @@ export class PositionSeller {
                 }
             case 'unconfirmed':
                 return 'The sale could not be confirmed due to network congestion. We will reattempt confirmation within a few minutes.';
+            case 'tx-sim-insufficient-tokens-balance':
+            case 'insufficient-tokens-balance':
+                return `There were not enough tokens in your wallet to cover the sale of ${asTokenPrice(position.tokenAmt)} $${position.token.symbol}, so this position has been deactivated.`
             default:
                 assertNever(status);
         }
@@ -314,18 +338,22 @@ export class PositionSeller {
             case 'tx-sim-failed-other-too-many-times':
             case 'other-failed-too-many-times':
                 return MenuCode.ViewDeactivatedPositions;
+            case 'tx-sim-insufficient-tokens-balance':
+            case 'insufficient-tokens-balance':
+                return MenuCode.ViewDeactivatedPositions;
             default:
                 assertNever(status);
         }
     }  
     
     private async simulateTx(signedTx : VersionedTransaction, position : Position, connection : Connection) : Promise<'success'|TxSimFailure> {
+        
         const config: SimulateTransactionConfig = {
             sigVerify: true, // use the signature of the signedTx to verify validity of tx, rather than fetching a new blockhash
             commitment: 'confirmed' // omitting this seems to cause simulation to fail.
         };
+
         const response = await connection.simulateTransaction(signedTx, config);
-        // TODO: we can use response + config to get detailed tx info, better than quote.
 
         if (!response.value.err) {
             return 'success';
@@ -352,7 +380,10 @@ export class PositionSeller {
             else {
                 return 'tx-sim-failed-other';
             }
-        }        
+        }
+        else if (swapExecutionError === SwapExecutionError.InsufficientTokensBalance) {
+            return 'tx-sim-insufficient-tokens-balance';
+        }     
         else {
             assertNever(swapExecutionError);
         }        

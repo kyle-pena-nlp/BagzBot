@@ -8,7 +8,7 @@ import { Position, PositionRequest, PositionStatus } from "../../positions";
 import { getLatestValidBlockhash } from "../../rpc/rpc_blocks";
 import { parseInstructionError } from "../../rpc/rpc_parse_instruction_error";
 import { signatureOf } from "../../rpc/rpc_sign_tx";
-import { ParsedSuccessfulSwapSummary, SwapExecutionError, isFrozenTokenAccountSwapExecutionErrorParseSummary, isInsufficientNativeTokensSwapExecutionErrorParseSummary, isOtherKindOfSwapExecutionError, isSlippageSwapExecutionErrorParseSummary, isSuccessfulSwapSummary, isTokenFeeAccountNotInitializedSwapExecutionErrorParseSummary, isUnknownTransactionParseSummary } from "../../rpc/rpc_swap_parse_result_types";
+import { ParsedSuccessfulSwapSummary, SwapExecutionError, isFrozenTokenAccountSwapExecutionErrorParseSummary, isInsufficientNativeTokensSwapExecutionErrorParseSummary, isInsufficientTokensBalanceErrorParseSummary, isOtherKindOfSwapExecutionError, isSlippageSwapExecutionErrorParseSummary, isSuccessfulSwapSummary, isTokenFeeAccountNotInitializedSwapExecutionErrorParseSummary, isUnknownTransactionParseSummary } from "../../rpc/rpc_swap_parse_result_types";
 import { TGStatusMessage, UpdateableNotification } from "../../telegram";
 import { assertNever, strictParseBoolean } from "../../util";
 import { insertPosition, positionExistsInTracker, removePosition, updatePosition } from "../token_pair_position_tracker/token_pair_position_tracker_do_interop";
@@ -55,6 +55,7 @@ export class PositionBuyer {
         'tx-sim-failed-slippage'|
         'tx-sim-insufficient-sol'|
         'tx-sim-failed-token-account-fee-not-initialized'|
+        'tx-sim-insufficient-tokens-balance'|
         'already-processed'|
         'could-not-create-tx'|
         'failed'|
@@ -62,6 +63,7 @@ export class PositionBuyer {
         'insufficient-sol'|
         'frozen-token-account'|
         'token-fee-account-not-initialized'|
+        'insufficient-tokens-balance'|
         'unconfirmed'|
         'confirmed'> {
 
@@ -112,7 +114,7 @@ export class PositionBuyer {
 
         // no guarantees that anything after this point executes... CF may drop it.
 
-        if (result === 'failed' || result === 'slippage-failed' || result === 'insufficient-sol' || result === 'frozen-token-account' || result === 'token-fee-account-not-initialized') {
+        if (result === 'failed' || result === 'slippage-failed' || result === 'insufficient-sol' || result === 'frozen-token-account' || result === 'token-fee-account-not-initialized' || result === 'insufficient-tokens-balance') {
             await removePosition(positionRequest.positionID, positionRequest.token.address, positionRequest.vsToken.address, this.env);
             return result;
         }
@@ -129,7 +131,14 @@ export class PositionBuyer {
         }
     }
 
-    private async simulateTx(signedTx : VersionedTransaction, connection : Connection) : Promise<'success'|'tx-sim-failed-other'|'tx-sim-insufficient-sol'|'tx-sim-failed-slippage'|'tx-sim-frozen-token-account'|'tx-sim-failed-token-account-fee-not-initialized'> {
+    private async simulateTx(signedTx : VersionedTransaction, connection : Connection) : Promise<
+        'success'|
+        'tx-sim-failed-other'|
+        'tx-sim-insufficient-sol'|
+        'tx-sim-failed-slippage'|
+        'tx-sim-frozen-token-account'|
+        'tx-sim-failed-token-account-fee-not-initialized'|
+        'tx-sim-insufficient-tokens-balance'> {
         const config: SimulateTransactionConfig = {
             sigVerify: true, // use the signature of the signedTx to verify validity of tx, rather than fetching a new blockhash
             commitment: 'confirmed' // omitting this seems to cause simulation to fail.
@@ -157,6 +166,9 @@ export class PositionBuyer {
         }
         else if (swapExecutionError === SwapExecutionError.OtherSwapExecutionError) {
             return 'tx-sim-failed-other';
+        }
+        else if (swapExecutionError === SwapExecutionError.InsufficientTokensBalance) {
+            return 'tx-sim-insufficient-tokens-balance';
         }        
         else {
             assertNever(swapExecutionError);
@@ -215,7 +227,9 @@ export class PositionBuyer {
         'frozen-token-account'|
         'slippage-failed'|
         'failed'|
-        'unconfirmed'|{ confirmedPosition: Position & { buyConfirmed : true } }> {
+        'unconfirmed'|
+        'insufficient-tokens-balance'|
+        { confirmedPosition: Position & { buyConfirmed : true } }> {
         
         // create a time-limited tx executor and confirmer
         const swapExecutor = new SwapExecutor(this.wallet, 'buy', this.env, this.channel, connection, lastValidBH, this.startTimeMS);
@@ -250,6 +264,9 @@ export class PositionBuyer {
         else if (isTokenFeeAccountNotInitializedSwapExecutionErrorParseSummary(parsedSwapSummary)) {
             return 'token-fee-account-not-initialized';
         }
+        else if (isInsufficientTokensBalanceErrorParseSummary(parsedSwapSummary)) {
+            return 'insufficient-tokens-balance';
+        }
         else if (isSuccessfulSwapSummary(parsedSwapSummary)) {
             const confirmedPosition = await this.makeConfirmedPositionFromSwapResult(positionRequest, signatureOf(signedTx), lastValidBH, parsedSwapSummary);
             return { confirmedPosition };
@@ -280,6 +297,7 @@ export class PositionBuyer {
     'tx-sim-failed-slippage'|
     'tx-sim-insufficient-sol'|
     'tx-sim-failed-token-account-fee-not-initialized'|
+    'tx-sim-insufficient-tokens-balance'|
     'already-processed'|
     'could-not-create-tx'|
     'failed'|
@@ -287,6 +305,7 @@ export class PositionBuyer {
     'insufficient-sol'|
     'frozen-token-account'|
     'token-fee-account-not-initialized'|
+    'insufficient-tokens-balance'|
     'unconfirmed'|
     'confirmed') : string {
         switch(status) {
@@ -321,6 +340,11 @@ export class PositionBuyer {
             case 'tx-sim-failed-slippage': 
             case 'slippage-failed':
                 return 'Purchase failed due to slippage tolerance exceeded.';
+
+            case 'insufficient-tokens-balance':
+            case 'tx-sim-insufficient-tokens-balance':
+                // it doesn't make any sense for this to happen but it's here to make TS happy
+                return 'Purchase failed due to insufficient token balance.';
             
             case 'unconfirmed':
                 return 'Purchase could not be confirmed due to network congestion.  We will reattempt to confirm the purchase in a bit.';
@@ -334,6 +358,7 @@ export class PositionBuyer {
     'tx-sim-failed-slippage'|
     'tx-sim-insufficient-sol'|
     'tx-sim-failed-token-account-fee-not-initialized'|
+    'tx-sim-insufficient-tokens-balance'|
     'already-processed'|
     'could-not-create-tx'|
     'failed'|
@@ -341,6 +366,7 @@ export class PositionBuyer {
     'insufficient-sol'|
     'frozen-token-account'|
     'token-fee-account-not-initialized'|
+    'insufficient-tokens-balance'|
     'unconfirmed'|
     'confirmed') : MenuCode {
         switch(status) {
@@ -375,6 +401,11 @@ export class PositionBuyer {
 
             case 'token-fee-account-not-initialized':
             case 'tx-sim-failed-token-account-fee-not-initialized':
+                return MenuCode.Main;
+
+            case 'tx-sim-insufficient-tokens-balance':
+            case 'insufficient-tokens-balance':
+                // this case should never happen but is here to make TS happy
                 return MenuCode.Main;
 
             default:

@@ -695,6 +695,12 @@ export class TokenPairPositionTrackerDO {
                     TGStatusMessage.queue(channel, `After checking, we found that the purchase didn't complete.`, true);
                     this.tokenPairPositionTracker.removePosition(pos.positionID);
                 }
+                else if (confirmedBuy === 'insufficient-tokens-balance') {
+                    // This shouldn't happen because we can't have too few of the tokens we are currently buying
+                    // But I include this case to make TS happy
+                    TGStatusMessage.queue(channel, `After checking, we found that there were not enough tokens to cover the purchase.`, true);
+                    this.tokenPairPositionTracker.removePosition(pos.positionID);
+                }
                 else if ('positionID' in confirmedBuy) {
                     // TODO: specific method just to handle changes made by confirmer.
                     TGStatusMessage.queue(channel, "We were able to confirm this purchase! It will be listed in your open positions.", true);
@@ -706,6 +712,7 @@ export class TokenPairPositionTrackerDO {
                 TGStatusMessage.finalize(channel);
             }
             else if (type === 'sell') {
+                // TODO: on confirm, too many errors
                 if (sellConfirmer.isTimedOut()) {
                     continue;
                 }
@@ -746,7 +753,7 @@ export class TokenPairPositionTrackerDO {
                 }
                 else if (confirmedSellStatus === 'slippage-failed') {
                     if (pos.sellAutoDoubleSlippage && strictParseBoolean(this.env.ALLOW_CHOOSE_AUTO_DOUBLE_SLIPPAGE)) {
-                        const maxSlippage = 100; // TODO: make a user global setting
+                        const maxSlippage = 100;
                         const sellSlippagePercent = Math.min(maxSlippage, 2 * pos.sellSlippagePercent);
                         await TGStatusMessage.finalMessage(channel, "The sale failed due to slippage.  We have increased the slippage to ${sellSlippagePercent}% and will retry the sale if the trigger conditions holds.", true);
                         this.tokenPairPositionTracker.updateSlippage(pos.positionID,sellSlippagePercent);
@@ -758,19 +765,24 @@ export class TokenPairPositionTrackerDO {
                     }
                 }
                 else if (confirmedSellStatus === 'frozen-token-account') {
-                    await TGStatusMessage.finalMessage(channel, "The sale didn't go through because this token has been frozen (most likely it was rugged).  Auto-Sell has been deactivated.", true);
+                    await TGStatusMessage.finalMessage(channel, "The sale didn't go through because this token has been frozen (most likely it was rugged).  The position has been deactivated.", true);
                     this.tokenPairPositionTracker.markPositionAsOpen(pos.positionID);
                     this.tokenPairPositionTracker.deactivatePosition(pos.positionID);
                 }
                 else if (confirmedSellStatus === 'insufficient-sol') {
-                    await TGStatusMessage.finalMessage(channel, "We found that the sale didn't go through because there wasn't enough SOL in your wallet to cover transaction fees. Auto-Sell has been deactivated.", true);
+                    await TGStatusMessage.finalMessage(channel, "We found that the sale didn't go through because there wasn't enough SOL in your wallet to cover transaction fees. The position has been deactivated.", true);
                     this.tokenPairPositionTracker.markPositionAsOpen(pos.positionID);
                     this.tokenPairPositionTracker.deactivatePosition(pos.positionID);
                 }
                 else if (confirmedSellStatus === 'token-fee-account-not-initialized') {
                     this.tokenPairPositionTracker.markPositionAsOpen(pos.positionID);
                     this.tokenPairPositionTracker.deactivatePosition(pos.positionID);
-                    await TGStatusMessage.finalMessage(channel, "We found that the sale didn't go through because of an error on our platform. Auto-Sell has been deactivated.", true);
+                    await TGStatusMessage.finalMessage(channel, "We found that the sale didn't go through because of an error on our platform. The position has been deactivated.", true);
+                }
+                else if (confirmedSellStatus === 'insufficient-tokens-balance') {
+                    this.tokenPairPositionTracker.markPositionAsOpen(pos.positionID);
+                    this.tokenPairPositionTracker.deactivatePosition(pos.positionID);
+                    await TGStatusMessage.finalMessage(channel, "We found that the sale didn't go through because there were not enough tokens in your wallet to cover the sale. The position has been deactivated.", true);
                 }
                 else if (isSuccessfullyParsedSwapSummary(confirmedSellStatus)) {
                     // TODO: update with PNL               

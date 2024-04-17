@@ -3,7 +3,7 @@ import { Env } from "../../../env";
 import { logDebug, logError } from "../../../logging";
 import { Position } from "../../../positions";
 import { parseParsedTransactionWithMeta } from "../../../rpc/rpc_parse";
-import { ParsedSuccessfulSwapSummary, ParsedSwapSummary, UnknownTransactionParseSummary, isFrozenTokenAccountSwapExecutionErrorParseSummary, isInsufficientNativeTokensSwapExecutionErrorParseSummary, isOtherKindOfSwapExecutionError, isSlippageSwapExecutionErrorParseSummary, isSuccessfulSwapSummary, isTokenFeeAccountNotInitializedSwapExecutionErrorParseSummary } from "../../../rpc/rpc_swap_parse_result_types";
+import { ParsedSuccessfulSwapSummary, ParsedSwapSummary, SwapExecutionError, UnknownTransactionParseSummary, isFrozenTokenAccountSwapExecutionErrorParseSummary, isInsufficientNativeTokensSwapExecutionErrorParseSummary, isInsufficientTokensBalanceErrorParseSummary, isOtherKindOfSwapExecutionError, isSlippageSwapExecutionErrorParseSummary, isSuccessfulSwapSummary, isTokenFeeAccountNotInitializedSwapExecutionErrorParseSummary } from "../../../rpc/rpc_swap_parse_result_types";
 import { assertNever, strictParseInt } from "../../../util";
 
 export class SellConfirmer {
@@ -27,6 +27,7 @@ export class SellConfirmer {
         'token-fee-account-not-initialized'|
         'frozen-token-account'|
         'insufficient-sol'|
+        'insufficient-tokens-balance'|
         ParsedSuccessfulSwapSummary> {
 
         if (this.isTimedOut()) {
@@ -74,9 +75,14 @@ export class SellConfirmer {
         'unconfirmed'|
         'frozen-token-account'|
         'token-fee-account-not-initialized'|
-        'insufficient-sol'> {
+        'insufficient-sol'|
+        'insufficient-tokens-balance'> {
         
         const parsedTx = await this.getParsedTransaction(unconfirmedPosition);
+        
+        // REPLICATION
+        //let parsedTx = await this.getParsedTransaction(unconfirmedPosition);
+        //parsedTx = { status : SwapExecutionError.FrozenTokenAccount } as ('tx-DNE'|'api-error'|Exclude<Exclude<ParsedSwapSummary,ParsedSuccessfulSwapSummary>,UnknownTransactionParseSummary>);
         
         // if we couldn't find the TX
         if (parsedTx === 'tx-DNE') {
@@ -107,6 +113,9 @@ export class SellConfirmer {
         }
         else if (isOtherKindOfSwapExecutionError(parsedTx)) {
             return 'other-failed';
+        }
+        else if (isInsufficientTokensBalanceErrorParseSummary(parsedTx)) {
+            return 'insufficient-tokens-balance';
         }
         else if (isSuccessfulSwapSummary(parsedTx)) {
             return parsedTx;

@@ -8,7 +8,8 @@ export type ParsedSwapSummary = ParsedSuccessfulSwapSummary |
     InsufficientNativeTokensExecutionErrorParseSummary |
     TokenFeeAccountNotInitializedExecutionErrorParseSummary |
     OtherSwapExecutionErrorParseSummary |
-    FrozenTokenAccountExecutionErrorParseSummary;
+    FrozenTokenAccountExecutionErrorParseSummary |
+    InsuffucientTokensBalanceParseSummary;
 
 export interface ParsedSuccessfulSwapSummary {
     status : 'swap-successful'
@@ -32,14 +33,19 @@ export enum SwapExecutionError {
     SlippageToleranceExceeded = "SlippageToleranceExceeded",
     OtherSwapExecutionError = "OtherSwapExecutionError",
     TokenAccountFeeNotInitialized = "TokenAccountFeeNotInitialized",
-    FrozenTokenAccount = "FrozenTokenAccount"
+    FrozenTokenAccount = "FrozenTokenAccount",
+    InsufficientTokensBalance = "InsufficientTokensBalance"
 };
-
 
 
 
 export interface UnknownTransactionParseSummary {
     status: 'unknown-transaction';
+}
+
+// not enough of the token to complete the swap
+export interface InsuffucientTokensBalanceParseSummary {
+    status: SwapExecutionError.InsufficientTokensBalance
 }
 
 // slippage
@@ -74,6 +80,10 @@ export function isSuccessfulSwapSummary(parsedSwapResult : ParsedSwapSummary): p
 
 export function isUnknownTransactionParseSummary(obj : ParsedSwapSummary) : obj is UnknownTransactionParseSummary {
     return obj.status === 'unknown-transaction';
+}
+
+export function isInsufficientTokensBalanceErrorParseSummary(obj : ParsedSwapSummary) : obj is InsuffucientTokensBalanceParseSummary {
+    return obj.status === SwapExecutionError.InsufficientTokensBalance;
 }
 
 export function isSlippageSwapExecutionErrorParseSummary(obj : ParsedSwapSummary) : obj is SlippageSwapExecutionErrorParseSummary {
