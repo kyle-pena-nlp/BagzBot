@@ -80,8 +80,8 @@ export async function getDeactivatedPositionFromTracker(telegramUserID : number,
 	return await sendJSONRequestToTokenPairPositionTracker<GetDeactivatedPositionFromTrackerRequest,GetDeactivatedPositionFromTrackerResponse>(method,request,tokenAddress,vsTokenAddress,env);
 }
 
-export async function deactivatePositionInTracker(positionID : string, tokenAddress : string, vsTokenAddress : string, env : Env) : Promise<DeactivatePositionInTrackerResponse> {
-	const request : DeactivatePositionInTrackerRequest = { positionID, tokenAddress, vsTokenAddress };
+export async function deactivatePositionInTracker(positionID : string, tokenAddress : string, vsTokenAddress : string, markOpenBeforeDeactivating : boolean, env : Env) : Promise<DeactivatePositionInTrackerResponse> {
+	const request : DeactivatePositionInTrackerRequest = { positionID, tokenAddress, vsTokenAddress, markOpenBeforeDeactivating };
 	const method = TokenPairPositionTrackerDOFetchMethod.deactivatePosition;
 	return await sendJSONRequestToTokenPairPositionTracker<DeactivatePositionInTrackerRequest,DeactivatePositionInTrackerResponse>(method,request,tokenAddress,vsTokenAddress,env);
 }

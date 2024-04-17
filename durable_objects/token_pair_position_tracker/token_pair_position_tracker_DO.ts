@@ -388,6 +388,10 @@ export class TokenPairPositionTrackerDO {
     }
 
     async handleDeactivatePosition(body: DeactivatePositionInTrackerRequest) : Promise<Response> {
+        // If the position is an auto-sell that's failing, mark as open first.
+        if (body.markOpenBeforeDeactivating) {
+            this.tokenPairPositionTracker.markPositionAsOpen(body.positionID);
+        }
         const success = this.tokenPairPositionTracker.deactivatePosition(body.positionID);
         return makeJSONResponse<DeactivatePositionInTrackerResponse>({ success });
     }
@@ -717,9 +721,17 @@ export class TokenPairPositionTrackerDO {
                     this.tokenPairPositionTracker.markPositionAsOpen(pos.positionID);                
                 }
                 else if (confirmedSellStatus === 'other-failed') {
-                    await TGStatusMessage.finalMessage(channel, "We found that the sale didn't go through.", true);                
-                    this.tokenPairPositionTracker.incrementOtherSellFailureCount(pos.positionID);
-                    this.tokenPairPositionTracker.markPositionAsOpen(pos.positionID);
+                    const max_other_sell_failures = strictParseInt(this.env.OTHER_SELL_FAILURES_TO_DEACTIVATE);
+                    if ((pos.otherSellFailureCount)||0+1 >= max_other_sell_failures) {
+                        this.tokenPairPositionTracker.markPositionAsOpen(pos.positionID);
+                        this.tokenPairPositionTracker.deactivatePosition(pos.positionID);
+                        await TGStatusMessage.finalMessage(channel, `Sale of this position failed for an unknown reason ${max_other_sell_failures} or more times, so this position will be deactivated.`, MenuCode.ViewDeactivatedPositions);                        
+                    }
+                    else {
+                        this.tokenPairPositionTracker.incrementOtherSellFailureCount(pos.positionID);
+                        this.tokenPairPositionTracker.markPositionAsOpen(pos.positionID);
+                        await TGStatusMessage.finalMessage(channel, "We found that the sale didn't go through.", true);
+                    }
                 }
                 else if (confirmedSellStatus === 'slippage-failed') {
                     if (pos.sellAutoDoubleSlippage && strictParseBoolean(this.env.ALLOW_CHOOSE_AUTO_DOUBLE_SLIPPAGE)) {
@@ -736,15 +748,18 @@ export class TokenPairPositionTrackerDO {
                 }
                 else if (confirmedSellStatus === 'frozen-token-account') {
                     await TGStatusMessage.finalMessage(channel, "The sale didn't go through because this token has been frozen (most likely it was rugged).  Auto-Sell has been deactivated.", true);
+                    this.tokenPairPositionTracker.markPositionAsOpen(pos.positionID);
                     this.tokenPairPositionTracker.deactivatePosition(pos.positionID);
                 }
                 else if (confirmedSellStatus === 'insufficient-sol') {
                     await TGStatusMessage.finalMessage(channel, "We found that the sale didn't go through because there wasn't enough SOL in your wallet to cover transaction fees. Auto-Sell has been deactivated.", true);
+                    this.tokenPairPositionTracker.markPositionAsOpen(pos.positionID);
                     this.tokenPairPositionTracker.deactivatePosition(pos.positionID);
                 }
                 else if (confirmedSellStatus === 'token-fee-account-not-initialized') {
-                    await TGStatusMessage.finalMessage(channel, "We found that the sale didn't go through because of an error on our platform. Auto-Sell has been deactivated.", true);
+                    this.tokenPairPositionTracker.markPositionAsOpen(pos.positionID);
                     this.tokenPairPositionTracker.deactivatePosition(pos.positionID);
+                    await TGStatusMessage.finalMessage(channel, "We found that the sale didn't go through because of an error on our platform. Auto-Sell has been deactivated.", true);
                 }
                 else if (isSuccessfullyParsedSwapSummary(confirmedSellStatus)) {
                     // TODO: update with PNL               

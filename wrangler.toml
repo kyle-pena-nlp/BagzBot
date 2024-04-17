@@ -32,7 +32,7 @@ SUPER_ADMIN_USER_ID = "6434185018"
 FORBIDDEN_TOKENS = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v,Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB"
 SOL_BUY_LIMIT = "5"
 TELEGRAM_BOT_DISPLAY_NAME = "SolSentry"
-TELEGRAM_BOT_TAGLINE = "Keeps watching, so you don't have to."
+TELEGRAM_BOT_TAGLINE = "Lock in your gains and limit your losses."
 TELEGRAM_BOT_SERVER_URL = "https://api.telegram.org"
 TELEGRAM_BOT_ID = "6764280746"
 TELEGRAM_BOT_USERNAME = "protecc_ur_bagz_bot"
@@ -74,6 +74,7 @@ ALLOW_CHOOSE_AUTO_DOUBLE_SLIPPAGE = "true"
 JUP_QUOTE_RESTRICT_INTERMEDIATE_TOKENS = "true"
 # When you try to swap a rugged token
 JUPITER_SWAP_PROGRAM_TOKEN_ACCOUNT_FROZEN_ERROR_CODE = "17"
+OTHER_SELL_FAILURES_TO_DEACTIVATE = "5"
 
 [env.beta.vars]
 # do not change this string EVER post launch
@@ -91,7 +92,7 @@ SUPER_ADMIN_USER_ID = "6434185018"
 FORBIDDEN_TOKENS = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v,Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB"
 SOL_BUY_LIMIT = "1"
 TELEGRAM_BOT_DISPLAY_NAME = "SolSentry"
-TELEGRAM_BOT_TAGLINE = "Keeps watching, so you don't have to."
+TELEGRAM_BOT_TAGLINE = "Lock in your gains and limit your losses."
 # this is overridden when server is started locally to point to local telegram server 
 TELEGRAM_BOT_SERVER_URL = "https://api.telegram.org"
 TELEGRAM_BOT_ID = "6544753362"
@@ -133,6 +134,7 @@ ALLOW_CHOOSE_AUTO_DOUBLE_SLIPPAGE = "false"
 JUP_QUOTE_RESTRICT_INTERMEDIATE_TOKENS = "true"
 # When you try to swap a rugged token
 JUPITER_SWAP_PROGRAM_TOKEN_ACCOUNT_FROZEN_ERROR_CODE = "17"
+OTHER_SELL_FAILURES_TO_DEACTIVATE = "5"
 
 [env.dev.durable_objects]
 bindings = [

@@ -117,6 +117,12 @@ export class SellConfirmer {
     }    
 
     private async getParsedTransaction(position : Position) : Promise<'api-error'|'tx-DNE'|Exclude<ParsedSwapSummary,UnknownTransactionParseSummary>> {
+
+        if (position.txSellSignature == null) {
+            logError(`Attempted to confirm transaction with no sell signature set on position: ${position.positionID}`);
+            return 'tx-DNE';
+        }
+
         const parsedTransaction : 'api-error'|ParsedTransactionWithMeta|null = await this.connection.getParsedTransaction(position.txSellSignature!!, {
             maxSupportedTransactionVersion: 0,
             commitment: 'confirmed'

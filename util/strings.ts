@@ -1,3 +1,5 @@
+import { assertNever } from "./enums";
+
 export function padRight(s : string, length : number, padChar : string = " ") : string  {
     if (padChar.length !== 1) {
         throw new Error("padChar must be exactly one character");
@@ -11,40 +13,59 @@ export function padRight(s : string, length : number, padChar : string = " ") : 
 }
 
 // Renders tables with right-padded cells in TG
-export class Table {
+export class FormattedTable {
     format : number[];
+    lineFormatting : 'bulleted'|'none'
     header ?: string[];
     columnSep : string;
     lines : string[];  
-    constructor(format : number[], header ?: string[], columnSep = "") {
+    constructor(format : number[], lineFormatting : 'bulleted'|'none', header ?: string[], columnSep = " | ") {
         this.format = format;
+        this.lineFormatting = lineFormatting;
         this.header = header;
         this.lines = [];
         this.columnSep = columnSep;
     }
-    addLine(items : string[]) {
+    addLine(...items : string[]) {
         this.lines.push(this.makeLine(items));
     }
     private makeLine(items : string[]) : string {
         const lineCells : string[] = [];
-        const paddedItems = items.slice(0,this.format.length);
         items.forEach((item,index) => {
             const padLength = this.format[index];
             const cell = padLength != null ? `<code>${padRight(item, padLength)}</code>` : item;
             lineCells.push(cell);
         });
-        return lineCells.join(this.columnSep);
+        const line = lineCells.join(this.columnSep);
+        return this.addLineFormatting(line);
     }
-    render() : string {
+    private build() {
         if (this.hasHeader()) {
             this.lines.unshift(this.headerLine());
         }
+    }
+    private render() : string {
+        this.build();
         return this.lines.join("\r\n");
+    }
+    appendTo(lines : string[]) {
+        this.build();
+        lines.push(...this.lines);
     }
     private hasHeader() :  this is this & { header :  string[] } {
         return this.header != null;
     }
     private headerLine(this : this & { header : string[] }) : string {
         return this.makeLine(this.header);
+    }
+    private addLineFormatting(line : string) : string {
+        switch(this.lineFormatting) {
+            case 'bulleted':
+                return `:bullet: ${line}`;
+            case 'none':
+                return line;
+            default:
+                assertNever(this.lineFormatting);
+        }
     }
 }

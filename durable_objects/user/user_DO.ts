@@ -398,7 +398,10 @@ export class UserDO {
         }
         const tokenAddress = tokenPair.token.address;
         const vsTokenAddress = tokenPair.vsToken.address;
-        const response = await deactivatePositionInTracker(userAction.positionID, tokenAddress, vsTokenAddress, this.env);
+        // we don't want to mark as open, because the closing flag means a sale might have been attempted.
+        // so, if status is currently Closing, upon reactivation, we want to check the last sale attempt with the SellConfirmer
+        const markAsOpenBeforeDeactivating = false;
+        const response = await deactivatePositionInTracker(userAction.positionID, tokenAddress, vsTokenAddress, markAsOpenBeforeDeactivating, this.env);
         return { success : response.success };
     }
 
@@ -873,10 +876,10 @@ export class UserDO {
                 const channel = TGStatusMessage.createAndSend(`Initiating.`, false, this.chatID.value||0, this.env, 'HTML', `:notify: <b>Automatic Sale of ${asTokenPrice(position.tokenAmt)} $${position.token.symbol}</b>: `);
                 channels.push(channel);
                 const positionSeller = new PositionSeller(connection, this.wallet.value!!, 'auto-sell', startTimeMS, channel, this.env);
-                // deliberate lack of await here, but still writes to storage afterwards
                 if (timedOut()) {
                     return;
                 }
+                // deliberate lack of await here, but still writes to storage afterwards
                 const sellPromise = positionSeller.sell(position).finally(async () => {
                     await this.flushToStorage();
                 });

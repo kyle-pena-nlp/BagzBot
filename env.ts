@@ -75,6 +75,7 @@ export interface Env {
 	TX_SIM_BEFORE_BUY : string
 	ALLOW_CHOOSE_AUTO_DOUBLE_SLIPPAGE : string
 	JUP_QUOTE_RESTRICT_INTERMEDIATE_TOKENS : string
+	OTHER_SELL_FAILURES_TO_DEACTIVATE : string
 
 	UserDO : any // i'd like to strongly type this as DurableObjectNamespace, but can't for technical reasons
 	TokenPairPositionTrackerDO : any // ditto

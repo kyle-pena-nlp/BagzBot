@@ -4,6 +4,11 @@ import { SwapExecutionError } from "./rpc_swap_parse_result_types";
 
 export function parseInstructionError(err : any, env : Env) {
 
+    // wallet with 0.0 SOL is considered 'not found' even if it had SOL previously
+    if (err === 'AccountNotFound') {
+        return SwapExecutionError.InsufficientSOLBalance;
+    }
+
     const instructionError = err?.InstructionError;
     if (!isInstructionError(instructionError)) {
         return SwapExecutionError.OtherSwapExecutionError;

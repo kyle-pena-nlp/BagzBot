@@ -33,6 +33,7 @@ export interface toFriendlyStringOpts {
     addCommas ?: boolean
     includePlusSign ?: boolean
     maxDecimalPlaces ?: number
+    emptySpaceForPlusSign ?: boolean
 }
 
 interface DefaultedOpts {
@@ -40,6 +41,7 @@ interface DefaultedOpts {
     addCommas : boolean
     includePlusSign : boolean
     maxDecimalPlaces ?: number 
+    emptySpaceForPlusSign : boolean
 }
 
 function optDefaults(x : toFriendlyStringOpts) : DefaultedOpts {
@@ -47,7 +49,8 @@ function optDefaults(x : toFriendlyStringOpts) : DefaultedOpts {
     const addCommas = x.addCommas == null ? true : x.addCommas;
     const includePlusSign = x.includePlusSign == null ? false : x.includePlusSign;
     const maxDecimalPlaces  = x.maxDecimalPlaces;
-    return { useSubscripts, addCommas, includePlusSign, maxDecimalPlaces };
+    const emptySpaceForPlusSign = x.emptySpaceForPlusSign == null ? false : x.emptySpaceForPlusSign;
+    return { useSubscripts, addCommas, includePlusSign, maxDecimalPlaces, emptySpaceForPlusSign };
 }
 
 export function asPercentDeltaString(x : DecimalizedAmount) : string {
@@ -58,8 +61,8 @@ export function asPercentString(x : DecimalizedAmount) : string {
     return toFriendlyString(x, 4, { useSubscripts: false, maxDecimalPlaces: 2, includePlusSign: false }) + "%";
 }
 
-export function asTokenPrice(x : DecimalizedAmount) : string {
-    return toFriendlyString(x, 4, { useSubscripts : true });
+export function asTokenPrice(x : DecimalizedAmount, emptySpaceForPlusSign : boolean = false) : string {
+    return toFriendlyString(x, 4, { useSubscripts : true, emptySpaceForPlusSign : emptySpaceForPlusSign });
 }
 
 export function asTokenPriceDelta(x : DecimalizedAmount) : string {
@@ -71,7 +74,10 @@ export function toFriendlyString(x : DecimalizedAmount, maxSigFigs : number,
     const defaultedOpts = optDefaults(opts||{});
     if (defaultedOpts.maxDecimalPlaces != null && defaultedOpts.useSubscripts) {
         throw new Error("Cannot use maxDecimalPlaces and useSubscripts");
-    }    
+    }  
+    if (defaultedOpts.emptySpaceForPlusSign && defaultedOpts.includePlusSign) {
+        throw new Error("Cannot have both includePlusSign true and emptySpaceForPlusSign true");
+    }  
     const longDecimalRepr = moveDecimalInString(x.tokenAmount, -x.decimals);
     const numberParts = longDecimalRepr.split(".");
     if (numberParts.length == 1) {
@@ -112,6 +118,9 @@ export function toFriendlyString(x : DecimalizedAmount, maxSigFigs : number,
             parseFloat(wholePart).toString();
         if (defaultedOpts.includePlusSign && sign === '') {
             sign = '+';
+        }
+        if (defaultedOpts.emptySpaceForPlusSign && sign === '') {
+            sign = ' ';
         }
         let zerosAndRest = zeros + rest;
         if (defaultedOpts.maxDecimalPlaces != null) {

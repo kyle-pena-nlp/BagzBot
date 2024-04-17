@@ -72,7 +72,8 @@ const emojis = {
     ':help:': '❔',
     ':stop:': '🛑',
     ':caution:': '🟡',
-    ':none:': ''
+    ':none:': '',
+    ':space:': ' '
 }
 
 type emojiTag = keyof typeof emojis;
@@ -92,6 +93,18 @@ export function interpretPct(pct: number) : emojiTag {
     }
     else {
         return ':rocket:';
+    }
+}
+
+export function asChartEmoji(pnl : number) : emojiTag {
+    if (pnl < 0) {
+        return ':chart_down:';
+    }
+    else if (pnl > 0) {
+        return ':chart_up:';
+    }
+    else {
+        return ':space:';
     }
 }
 

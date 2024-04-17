@@ -152,21 +152,28 @@ export class TokenPairPositionTracker {
     }
 
     deactivatePosition(positionID : string) : boolean {
+        // get the position
         const position = this.getPosition(positionID);
+        // validate it exists
         if (position == null) {
             return false;
         }
+        // get the position's peak price in the tracker (needed in a bit)
         const peakPrice = this.pricePeaks.getPeakPrice(positionID);
         if (peakPrice == null) {
             return false;
         }
-        // can't deactivat position whose buy isn't confirmed, and whose status is Closing or Closed
-        // (TODO: will this make it hard for users to deactivate if stuck in a sell loop?)
-        // (answer: yes, but if we have a max sell attempts we can auto-deactivate)          
-        if (!position.buyConfirmed || position.status !== PositionStatus.Open) {
+        // can't deactivate a position whose buy isn't confirmed
+        if (!position.buyConfirmed) {
             return false;
         }
+        // can't deactivate a closed position (even tho there should never be a closed position in the tracker)
+        if (position.status === PositionStatus.Closed) {
+            return false;
+        }
+        // remove the position from the tracker
         this.removePosition(positionID);
+        // annotate the position with the current peak price and send to the deactivated positions
         this.deactivatedPositions.insert(position.userID, position.positionID, { ...position, peakPrice : peakPrice });
         return true;
     }

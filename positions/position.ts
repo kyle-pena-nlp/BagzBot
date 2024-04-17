@@ -12,9 +12,13 @@ export function isPositionType(x : any) : x is PositionType {
 	return isEnumValue(x, PositionType);
 }
 
+// This flag (along with sellConfirmed and buyConfirmed drive the 'Position State Machine')
 export enum PositionStatus {
+	// Ready to Sell if buyConfirmed is true
 	Open = "Open",
+	// A sale may have been attempted - will be taken out of Closing upon sale completion, sale fail, or sell-confirm completion
 	Closing = "Closing",
+	// Position has been closed
 	Closed = "Closed"
 };
 
