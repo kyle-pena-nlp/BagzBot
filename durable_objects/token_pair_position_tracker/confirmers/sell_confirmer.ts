@@ -80,10 +80,6 @@ export class SellConfirmer {
         
         const parsedTx = await this.getParsedTransaction(unconfirmedPosition);
         
-        // REPLICATION
-        //let parsedTx = await this.getParsedTransaction(unconfirmedPosition);
-        //parsedTx = { status : SwapExecutionError.FrozenTokenAccount } as ('tx-DNE'|'api-error'|Exclude<Exclude<ParsedSwapSummary,ParsedSuccessfulSwapSummary>,UnknownTransactionParseSummary>);
-        
         // if we couldn't find the TX
         if (parsedTx === 'tx-DNE') {
             // and the blockhash was finalized (as determined via blockheight)

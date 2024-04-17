@@ -236,7 +236,7 @@ export class PositionBuyer {
 
         // attempt to execute, confirm, and parse w/in time limit
         const parsedSwapSummary = await swapExecutor.executeTxAndParseResult(positionRequest, signedTx);
-
+        
         // convert the tx execution result to a position, if possible
  
         if (parsedSwapSummary === 'tx-failed') {

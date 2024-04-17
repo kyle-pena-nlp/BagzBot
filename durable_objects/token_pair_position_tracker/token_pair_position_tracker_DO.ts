@@ -672,7 +672,7 @@ export class TokenPairPositionTrackerDO {
                     break;
                 }
                 else if (confirmedBuy === 'unconfirmed') {
-                    TGStatusMessage.queue(channel, "We had a hard time confirming the purchase - sorry, we will retry confirmation again soon.", true);
+                    TGStatusMessage.queue(channel, "We had a hard time confirming the purchase because of network congestion or the transaction happened too recently - sorry, we will retry confirmation again soon.", true);
                     continue;
                 }
                 else if (confirmedBuy === 'failed') {

@@ -3,12 +3,13 @@ import { Wallet } from "../../crypto";
 import { DecimalizedAmount, dSub } from "../../decimalized";
 import { asTokenPrice } from "../../decimalized/decimalized_amount";
 import { Env } from "../../env";
+import { logError } from "../../logging";
 import { MenuCode } from "../../menus";
 import { Position, PositionStatus } from "../../positions";
 import { getLatestValidBlockhash } from "../../rpc/rpc_blocks";
 import { parseInstructionError } from "../../rpc/rpc_parse_instruction_error";
 import { signatureOf } from "../../rpc/rpc_sign_tx";
-import { ParsedSuccessfulSwapSummary, ParsedSwapSummary, SwapExecutionError, isFrozenTokenAccountSwapExecutionErrorParseSummary, isInsufficientNativeTokensSwapExecutionErrorParseSummary, isInsufficientTokensBalanceErrorParseSummary, isOtherKindOfSwapExecutionError, isSlippageSwapExecutionErrorParseSummary, isSuccessfulSwapSummary, isSuccessfullyParsedSwapSummary, isTokenFeeAccountNotInitializedSwapExecutionErrorParseSummary, isUnknownTransactionParseSummary } from "../../rpc/rpc_swap_parse_result_types";
+import { ParsedSuccessfulSwapSummary, SwapExecutionError, isFrozenTokenAccountSwapExecutionErrorParseSummary, isInsufficientNativeTokensSwapExecutionErrorParseSummary, isInsufficientTokensBalanceErrorParseSummary, isOtherKindOfSwapExecutionError, isSlippageSwapExecutionErrorParseSummary, isSuccessfulSwapSummary, isSuccessfullyParsedSwapSummary, isTokenFeeAccountNotInitializedSwapExecutionErrorParseSummary, isUnknownTransactionParseSummary } from "../../rpc/rpc_swap_parse_result_types";
 import { TGStatusMessage, UpdateableNotification } from "../../telegram";
 import { assertNever, strictParseBoolean, strictParseInt } from "../../util";
 import { deactivatePositionInTracker, incrementOtherSellFailureCountInTracker, markAsClosed, markAsOpen, positionExistsInTracker, updatePosition } from "../token_pair_position_tracker/token_pair_position_tracker_do_interop";
@@ -47,7 +48,8 @@ export class PositionSeller {
             const menuCode = this.makeFinalMenuCode(status);
             TGStatusMessage.queue(this.channel, statusMessage, menuCode, position.positionID);
         }
-        catch {
+        catch (e) {
+            logError(e);
             const menuCode = this.type === 'manual-sell' ? MenuCode.ViewOpenPosition : MenuCode.Close;
             TGStatusMessage.queue(this.channel, "There was an unexpected error.", menuCode, position.positionID);
         }
@@ -73,14 +75,14 @@ export class PositionSeller {
             await this.markAsOpen(position);
             return 'could-not-create-tx';
         }
-
+        
         if (strictParseBoolean(this.env.TX_SIM_BEFORE_BUY)) {
             const txSimResult = await this.simulateTx(signedTx, position, this.connection);
             if (txSimResult !== 'success') {
                 await this.performTrackerActionBasedOnExecutionResult(position, txSimResult);
                 return txSimResult;
             }
-        }        
+        }
 
         // get latest valid BH (tells us how long to keep trying to send tx)
         let lastValidBH = await getLatestValidBlockhash(this.connection, 3);
@@ -190,11 +192,6 @@ export class PositionSeller {
 
         // attempt to execute, confirm, and parse w/in time limit
         const parsedSwapSummary = await swapExecutor.executeTxAndParseResult(position, signedTx);
-        
-        // REPLICATION
-        //let parsedSwapSummary = await swapExecutor.executeTxAndParseResult(position, signedTx);
-        //parsedSwapSummary = 'unconfirmed' as ('tx-failed'|'unconfirmed'|ParsedSwapSummary);
-        // END
 
         // convert the tx execution result to a position, if possible
         if (parsedSwapSummary === 'tx-failed') {

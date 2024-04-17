@@ -2,6 +2,8 @@ import { Env } from "../env";
 import { strictParseInt } from "../util";
 import { SwapExecutionError } from "./rpc_swap_parse_result_types";
 
+// Reference: https://github.com/solana-labs/solana-web3.js/blob/028bdcca60ca69897ea2131e4047c607ec354a3e/packages/rpc-types/src/transaction-error.ts
+
 export function parseInstructionError(err : any, env : Env) {
 
     // wallet with 0.0 SOL is considered 'not found' even if it had SOL previously
@@ -9,7 +11,17 @@ export function parseInstructionError(err : any, env : Env) {
         return SwapExecutionError.InsufficientSOLBalance;
     }
 
+    if (err === 'InsufficientFundsForFee') {
+        return SwapExecutionError.InsufficientSOLBalance;
+    }
+
+    // TODO: should technically also check err.InsufficientFundsForRent.accountIndex
+    if ('InsufficientFundsForRent' in err) {
+        return SwapExecutionError.InsufficientSOLBalance;
+    }
+
     const instructionError = err?.InstructionError;
+
     if (!isInstructionError(instructionError)) {
         return SwapExecutionError.OtherSwapExecutionError;
     }
