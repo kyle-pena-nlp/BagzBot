@@ -33,6 +33,17 @@ export class TokenPairPositionTracker {
         this.pricePeaks.__clearAllPositions();
     }
 
+    doubleSellSlippage(positionID : string) : { success : true, newSellSlippage : number }| { success : false } {
+        const position = this.getPosition(positionID);
+        if (position == null) {
+            return { success : false };
+        }
+        else {
+            position.sellSlippagePercent = Math.min(100, 2 * position.sellSlippagePercent);
+            return { success : true, newSellSlippage : position.sellSlippagePercent };
+        }
+    }
+
     incrementOtherSellFailureCount(positionID : string) : { success : true, newCount: number }|{ success : false } {
         const position = this.getPosition(positionID);
         if (position == null) {
@@ -184,6 +195,7 @@ export class TokenPairPositionTracker {
             return false;
         }
         const peakPrice = deactivatedPosition.peakPrice;
+        deactivatedPosition.otherSellFailureCount = 0;
         this.insertPosition(deactivatedPosition, peakPrice);
         this.deactivatedPositions.delete(userID, positionID);
         return true;

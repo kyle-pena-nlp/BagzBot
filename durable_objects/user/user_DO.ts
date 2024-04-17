@@ -13,7 +13,7 @@ import { ChangeTrackedValue, Structural, assertNever, groupIntoBatches, sleep, s
 import { assertIs } from "../../util/enums";
 import { listUnclaimedBetaInviteCodes } from "../beta_invite_codes/beta_invite_code_interop";
 import { PositionAndMaybePNL } from "../token_pair_position_tracker/model/position_and_PNL";
-import { adminDeleteClosedPositionsForUser, adminDeletePositionByIDFromTracker, deactivatePositionInTracker, editTriggerPercentOnOpenPositionInTracker, getDeactivatedPositionFromTracker, getPositionAndMaybePNL, listClosedPositionsFromTracker, listDeactivatedPositionsInTracker, listPositionsByUser, reactivatePositionInTracker, removePosition, setSellAutoDoubleOnOpenPositionInPositionTracker, setSellSlippagePercentOnOpenPositionInTracker } from "../token_pair_position_tracker/token_pair_position_tracker_do_interop";
+import { adminDeleteClosedPositionsForUser, adminDeletePositionByIDFromTracker, deactivatePositionInTracker, doubleSellSlippageInTracker, editTriggerPercentOnOpenPositionInTracker, getDeactivatedPositionFromTracker, getPositionAndMaybePNL, listClosedPositionsFromTracker, listDeactivatedPositionsInTracker, listPositionsByUser, reactivatePositionInTracker, removePosition, setSellAutoDoubleOnOpenPositionInPositionTracker, setSellSlippagePercentOnOpenPositionInTracker } from "../token_pair_position_tracker/token_pair_position_tracker_do_interop";
 import { AdminDeleteAllPositionsRequest, AdminDeleteAllPositionsResponse } from "./actions/admin_delete_all_positions";
 import { AdminDeleteClosedPositionsRequest } from "./actions/admin_delete_closed_positions";
 import { AdminDeletePositionByIDRequest, AdminDeletePositionByIDResponse } from "./actions/admin_delete_position_by_id";
@@ -22,6 +22,7 @@ import { AutomaticallyClosePositionsRequest, AutomaticallyClosePositionsResponse
 import { BaseUserDORequest, isBaseUserDORequest } from "./actions/base_user_do_request";
 import { DeactivatePositionRequest, DeactivatePositionResponse } from "./actions/deactivate_position";
 import { DeleteSessionRequest, DeleteSessionResponse } from "./actions/delete_session";
+import { DoubleSellSlippageRequest, DoubleSellSlippageResponse } from "./actions/double_sell_slippage";
 import { EditTriggerPercentOnOpenPositionRequest, EditTriggerPercentOnOpenPositionResponse } from "./actions/edit_trigger_percent_on_open_position";
 import { GetClosedPositionsAndPNLSummaryRequest, GetClosedPositionsAndPNLSummaryResponse } from "./actions/get_closed_positions_and_pnl_summary";
 import { GetDeactivatedPositionRequest, GetDeactivatedPositionResponse } from "./actions/get_frozen_position";
@@ -345,11 +346,30 @@ export class UserDO {
             case UserDOFetchMethod.getDeactivatedPosition:
                 response = await this.handleGetDeactivatedPosition(userAction);
                 break;
+            case UserDOFetchMethod.doubleSellSlippage:
+                response = await this.handleDoubleSellSlippage(userAction);
+                break;
             default:
                 assertNever(method);
         }
 
         return [method,userAction,response];
+    }
+
+    async handleDoubleSellSlippage(userAction : DoubleSellSlippageRequest) : Promise<Response> {
+        const response = await this.handleDoubleSellSlippageInternal(userAction);
+        return makeJSONResponse<DoubleSellSlippageResponse>(response);
+    }
+
+    async handleDoubleSellSlippageInternal(userAction : DoubleSellSlippageRequest) : Promise<DoubleSellSlippageResponse> {
+        const tokenPair = this.tokenPairsForPositionIDsTracker.getPositionPair(userAction.positionID);
+        if (tokenPair == null) {
+            return {};
+        }
+        const tokenAddress = tokenPair.token.address;
+        const vsTokenAddress = tokenPair.vsToken.address;
+        const response = await doubleSellSlippageInTracker(userAction.positionID, userAction.markAsOpen, tokenAddress, vsTokenAddress, this.env);
+        return response;
     }
 
     async handleGetDeactivatedPosition(userAction : GetDeactivatedPositionRequest) : Promise<Response> {

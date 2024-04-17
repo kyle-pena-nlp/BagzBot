@@ -20,6 +20,7 @@ import { AdminDeleteAllInTrackerRequest, AdminDeleteAllInTrackerResponse } from 
 import { AdminDeleteClosedPositionsForUserInTrackerRequest, AdminDeleteClosedPositionsForUserInTrackerResponse } from "./actions/admin_delete_closed_positions_for_user_in_tracker";
 import { AdminDeletePositionByIDFromTrackerRequest, AdminDeletePositionByIDFromTrackerResponse } from "./actions/admin_delete_position_by_id_from_tracker";
 import { DeactivatePositionInTrackerRequest, DeactivatePositionInTrackerResponse } from "./actions/deactivate_position_in_tracker";
+import { DoubleSellSlippageInTrackerRequest, DoubleSellSlippageInTrackerResponse } from "./actions/double_sell_slippage_in_tracker";
 import { EditTriggerPercentOnOpenPositionInTrackerRequest } from "./actions/edit_trigger_percent_on_open_position_in_tracker";
 import { GetDeactivatedPositionFromTrackerRequest, GetDeactivatedPositionFromTrackerResponse } from "./actions/get_frozen_position";
 import { GetPositionFromPriceTrackerRequest, GetPositionFromPriceTrackerResponse } from "./actions/get_position";
@@ -372,9 +373,19 @@ export class TokenPairPositionTrackerDO {
                 return await this.handleGetDeactivatedPosition(body);
             case TokenPairPositionTrackerDOFetchMethod.incrementOtherSellFailureCount:
                 return await this.handleIncrementOtherSellFailureCount(body);
+            case TokenPairPositionTrackerDOFetchMethod.doubleSellSlippage:
+                return await this.handleDoubleSellSlippageInTracker(body);
             default:
                 assertNever(method);
         }
+    }
+
+    async handleDoubleSellSlippageInTracker(body: DoubleSellSlippageInTrackerRequest) : Promise<Response> {
+        if (body.markAsOpen) {
+            this.tokenPairPositionTracker.markPositionAsOpen(body.positionID);
+        }
+        this.tokenPairPositionTracker.doubleSellSlippage(body.positionID);
+        return makeJSONResponse<DoubleSellSlippageInTrackerResponse>({});
     }
 
     async handleIncrementOtherSellFailureCount(body : IncrementOtherSellFailureCountInTrackerRequest) : Promise<Response> {

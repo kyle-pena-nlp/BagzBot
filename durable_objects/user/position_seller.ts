@@ -13,10 +13,11 @@ import { assertNever, strictParseBoolean, strictParseInt } from "../../util";
 import { deactivatePositionInTracker, incrementOtherSellFailureCountInTracker, markAsClosed, markAsOpen, positionExistsInTracker, updatePosition } from "../token_pair_position_tracker/token_pair_position_tracker_do_interop";
 import { SwapExecutor } from "./swap_executor";
 import { SwapTransactionSigner } from "./swap_transaction_signer";
+import { doubleSellSlippageAndMarkAsOpen } from "./userDO_interop";
 
 type TxPreparationFailure = 'timed-out'|'already-sold'|'could-not-create-tx'|'could-not-retrieve-blockheight';
-type TxSimFailure = 'tx-sim-failed-other'|'tx-sim-insufficient-sol'|'tx-sim-failed-slippage'|'tx-sim-frozen-token-account'|'tx-sim-failed-token-account-fee-not-initialized';
-type TxExecutionFailure = 'tx-failed'|'unconfirmed'|'slippage-failed'|'insufficient-sol'|'frozen-token-account'|'token-fee-account-not-initialized'|'other-failed';
+type TxSimFailure = 'tx-sim-failed-other'|'tx-sim-failed-other-too-many-times'|'tx-sim-insufficient-sol'|'tx-sim-failed-slippage'|'tx-sim-frozen-token-account'|'tx-sim-failed-token-account-fee-not-initialized';
+type TxExecutionFailure = 'tx-failed'|'unconfirmed'|'slippage-failed'|'insufficient-sol'|'frozen-token-account'|'token-fee-account-not-initialized'|'other-failed'|'other-failed-too-many-times';
 
 // See also SellConfirmer in sell_confirmer.ts for a full picture of the sell lifecycle
 
@@ -73,7 +74,7 @@ export class PositionSeller {
         }
 
         if (strictParseBoolean(this.env.TX_SIM_BEFORE_BUY)) {
-            const txSimResult = await this.simulateTx(signedTx, this.connection);
+            const txSimResult = await this.simulateTx(signedTx, position, this.connection);
             if (txSimResult !== 'success') {
                 await this.performTrackerActionBasedOnExecutionResult(position, txSimResult);
                 return txSimResult;
@@ -117,27 +118,23 @@ export class PositionSeller {
             await this.markAsOpen(position);
         }
         else if (result === 'slippage-failed' || result === 'tx-sim-failed-slippage') {
-            await this.markAsOpen(position);
+            await this.markAsOpenAndDoubleSlippage(position);
         }
         else if (result === 'frozen-token-account' || result === 'tx-sim-frozen-token-account') {
-            await this.markAsDeactivated(position);
+            await this.markAsOpenAndDeactivate(position);
         }
         else if (result === 'insufficient-sol' || result === 'tx-sim-insufficient-sol') {
-            await this.markAsDeactivated(position);
+            await this.markAsOpenAndDeactivate(position);
         }
         else if (result === 'token-fee-account-not-initialized' || result === 'tx-sim-failed-token-account-fee-not-initialized') {
-            await this.markAsDeactivated(position);
+            await this.markAsOpenAndDeactivate(position);
         }
         else if (result === 'other-failed' || result === 'tx-sim-failed-other') {
-            const max_other_sell_failure_count = strictParseInt(this.env.OTHER_SELL_FAILURES_TO_DEACTIVATE);
-            if (position.otherSellFailureCount||0+1 >= max_other_sell_failure_count) {
-                await this.markAsOpen(position);
-                await this.markAsDeactivated(position);
-            }
-            else {
-                await this.incrementOtherSellFailureCountInTracker(position);
-                await this.markAsOpen(position);
-            }
+            await this.incrementOtherSellFailureCountInTracker(position);
+            await this.markAsOpen(position);
+        }
+        else if (result === 'other-failed-too-many-times' || result === 'tx-sim-failed-other-too-many-times') {
+            await this.markAsOpenAndDeactivate(position);
         }
         else if (result === 'unconfirmed') {
             // no-op --- sellConfirmer will pick it up on next CRON job execution.
@@ -157,24 +154,29 @@ export class PositionSeller {
         return signedTx;
     }
 
-    private async markAsDeactivated(position : Position) {
+    private async markAsOpenAndDeactivate(position : Position) {
         // We mark as open before deactivating so that, if reactivated, it isn't in a 'try to confirm' state
         // At this point, if 'markAsDeactivated' is invoked, we know that the sale failed and trying to confirm upon reactivation is superfluous 
         const markAsOpenBeforeDeactivating = true;
         await deactivatePositionInTracker(position.positionID, position.token.address, position.vsToken.address, markAsOpenBeforeDeactivating, this.env);
     }
 
+    private async markAsOpenAndDoubleSlippage(position : Position) {
+        await doubleSellSlippageAndMarkAsOpen(position.userID, position.chatID, position.positionID, this.env);
+    }
+
     private async incrementOtherSellFailureCountInTracker(position : Position) {
         await incrementOtherSellFailureCountInTracker(position.positionID, position.token.address, position.vsToken.address, this.env);
     }
 
-    private async executeAndParseSwap(position : Position, signedTx : VersionedTransaction, lastValidBH : number) : Promise<'tx-failed'|'other-failed'|'slippage-failed'|'unconfirmed'|'frozen-token-account'|'insufficient-sol'|'token-fee-account-not-initialized'|ParsedSuccessfulSwapSummary> {
-        
+    private async executeAndParseSwap(position : Position, signedTx : VersionedTransaction, lastValidBH : number) : Promise<'tx-failed'|'other-failed'|'slippage-failed'|'unconfirmed'|'frozen-token-account'|'insufficient-sol'|'token-fee-account-not-initialized'|'other-failed-too-many-times'|ParsedSuccessfulSwapSummary> {
+
         // create a time-limited tx executor and confirmer
         const swapExecutor = new SwapExecutor(this.wallet, 'sell', this.env, this.channel, this.connection, lastValidBH, this.startTimeMS);
 
         // attempt to execute, confirm, and parse w/in time limit
         const parsedSwapSummary = await swapExecutor.executeTxAndParseResult(position, signedTx);
+        //const parsedSwapSummary : ('tx-failed'|'unconfirmed'|ParsedSwapSummary) = { status: SwapExecutionError.SlippageToleranceExceeded } as ('tx-failed'|'unconfirmed'|ParsedSwapSummary);
 
         // convert the tx execution result to a position, if possible
         if (parsedSwapSummary === 'tx-failed') {
@@ -199,7 +201,12 @@ export class PositionSeller {
             return 'frozen-token-account';
         }
         else if (isOtherKindOfSwapExecutionError(parsedSwapSummary)) {
-            return 'other-failed';
+            if ((position.otherSellFailureCount||0)+1 >= strictParseInt(this.env.OTHER_SELL_FAILURES_TO_DEACTIVATE)) {
+                return 'other-failed-too-many-times';
+            }
+            else {
+                return 'other-failed';
+            }
         }        
         else if (isSuccessfulSwapSummary(parsedSwapSummary)) {
             return parsedSwapSummary;
@@ -230,7 +237,10 @@ export class PositionSeller {
                 return 'The sale was successful!';
             case 'tx-sim-failed-other':
             case 'other-failed':
-                return 'The sale failed.';
+                return 'The sale failed for an unknown reason.';
+            case 'tx-sim-failed-other-too-many-times':
+            case 'other-failed-too-many-times':
+                return 'The sale failed for an unknown reason too many times and will be deactivated.';
             case 'could-not-create-tx':
                 return 'We could not create a transaction';
             case 'could-not-retrieve-blockheight':
@@ -245,7 +255,7 @@ export class PositionSeller {
                 return 'The transaction ran out of time to execute.';
             case 'tx-sim-failed-token-account-fee-not-initialized':
             case 'token-fee-account-not-initialized':
-                return 'There was an error executing the transaction.'
+                return 'There was a critical error executing the transaction and the position has been marked as deactivated.'
             case 'tx-failed':
                 return 'There was an error executing the transaction.'
             case 'tx-sim-failed-slippage':
@@ -275,8 +285,7 @@ export class PositionSeller {
                 return MenuCode.ListPositions;
             case 'confirmed':
                 return MenuCode.ViewPNLHistory;
-            case 'other-failed':
-                return MenuCode.ViewOpenPosition;
+
             case 'tx-sim-failed-slippage':
             case 'slippage-failed':
                 return MenuCode.ViewOpenPosition;
@@ -300,13 +309,17 @@ export class PositionSeller {
             case 'tx-failed':
                 return MenuCode.ViewOpenPosition;
             case 'tx-sim-failed-other':
+            case 'other-failed':
                 return MenuCode.ViewOpenPosition;
+            case 'tx-sim-failed-other-too-many-times':
+            case 'other-failed-too-many-times':
+                return MenuCode.ViewDeactivatedPositions;
             default:
                 assertNever(status);
         }
     }  
     
-    private async simulateTx(signedTx : VersionedTransaction, connection : Connection) : Promise<'success'|TxSimFailure> {
+    private async simulateTx(signedTx : VersionedTransaction, position : Position, connection : Connection) : Promise<'success'|TxSimFailure> {
         const config: SimulateTransactionConfig = {
             sigVerify: true, // use the signature of the signedTx to verify validity of tx, rather than fetching a new blockhash
             commitment: 'confirmed' // omitting this seems to cause simulation to fail.
@@ -333,7 +346,12 @@ export class PositionSeller {
             return 'tx-sim-frozen-token-account';
         }
         else if (swapExecutionError === SwapExecutionError.OtherSwapExecutionError) {
-            return 'tx-sim-failed-other';
+            if ((position.otherSellFailureCount||0)+1 >= strictParseInt(this.env.OTHER_SELL_FAILURES_TO_DEACTIVATE)) {
+                return 'tx-sim-failed-other-too-many-times';
+            }
+            else {
+                return 'tx-sim-failed-other';
+            }
         }        
         else {
             assertNever(swapExecutionError);

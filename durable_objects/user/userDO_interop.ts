@@ -12,6 +12,7 @@ import { AdminResetDefaultPositionRequest, AdminResetDefaultPositionResponse } f
 import { AutomaticallyClosePositionsRequest, AutomaticallyClosePositionsResponse } from "./actions/automatically_close_positions";
 import { DeactivatePositionRequest, DeactivatePositionResponse } from "./actions/deactivate_position";
 import { DeleteSessionRequest } from "./actions/delete_session";
+import { DoubleSellSlippageRequest, DoubleSellSlippageResponse } from "./actions/double_sell_slippage";
 import { EditTriggerPercentOnOpenPositionRequest, EditTriggerPercentOnOpenPositionResponse } from "./actions/edit_trigger_percent_on_open_position";
 import { GetClosedPositionsAndPNLSummaryRequest, GetClosedPositionsAndPNLSummaryResponse } from "./actions/get_closed_positions_and_pnl_summary";
 import { GetDeactivatedPositionRequest, GetDeactivatedPositionResponse } from "./actions/get_frozen_position";
@@ -69,7 +70,15 @@ export enum UserDOFetchMethod {
 	listDeactivatedPositions = "listDeactivatedPositions",
 	deactivatePosition = "deactivatePosition",
 	reactivatePosition = "reactivatePosition",
-	getDeactivatedPosition = "getDeactivatedPosition"
+	getDeactivatedPosition = "getDeactivatedPosition",
+	doubleSellSlippage = "doubleSellSlippage"
+}
+
+export async function doubleSellSlippageAndMarkAsOpen(telegramUserID : number, chatID : number, positionID : string, env : Env) : Promise<DoubleSellSlippageResponse> {
+	const request : DoubleSellSlippageRequest = { telegramUserID, chatID, positionID, markAsOpen: true };
+	const method = UserDOFetchMethod.doubleSellSlippage;
+	const response = await sendJSONRequestToUserDO<DoubleSellSlippageRequest,DoubleSellSlippageResponse>(telegramUserID,method,request,env);
+	return response;
 }
 
 export async function getDeactivatedPosition(telegramUserID : number, chatID : number, positionID : string, env : Env) : Promise<Position|undefined> {

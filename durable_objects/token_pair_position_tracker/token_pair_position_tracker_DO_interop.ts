@@ -11,6 +11,7 @@ import { AdminDeleteAllInTrackerRequest, AdminDeleteAllInTrackerResponse } from 
 import { AdminDeleteClosedPositionsForUserInTrackerRequest, AdminDeleteClosedPositionsForUserInTrackerResponse } from "./actions/admin_delete_closed_positions_for_user_in_tracker";
 import { AdminDeletePositionByIDFromTrackerRequest, AdminDeletePositionByIDFromTrackerResponse } from "./actions/admin_delete_position_by_id_from_tracker";
 import { DeactivatePositionInTrackerRequest, DeactivatePositionInTrackerResponse } from "./actions/deactivate_position_in_tracker";
+import { DoubleSellSlippageInTrackerRequest, DoubleSellSlippageInTrackerResponse } from "./actions/double_sell_slippage_in_tracker";
 import { EditTriggerPercentOnOpenPositionInTrackerRequest } from "./actions/edit_trigger_percent_on_open_position_in_tracker";
 import { GetDeactivatedPositionFromTrackerRequest, GetDeactivatedPositionFromTrackerResponse } from "./actions/get_frozen_position";
 import { GetPositionFromPriceTrackerRequest, GetPositionFromPriceTrackerResponse } from "./actions/get_position";
@@ -64,7 +65,15 @@ export enum TokenPairPositionTrackerDOFetchMethod {
 	reactivatePosition = "reactivatePosition",
 	listDeactivatedPositions = "listDeactivatedPositions",
 	getDeactivatedPosition = "getDeactivatedPosition",
-	incrementOtherSellFailureCount = "incrementOtherSellFailureCount"
+	incrementOtherSellFailureCount = "incrementOtherSellFailureCount",
+	doubleSellSlippage = "doubleSellSlippage"
+}
+
+export async function doubleSellSlippageInTracker(positionID : string, markAsOpen: boolean, tokenAddress : string, vsTokenAddress : string, env : Env) : Promise<DoubleSellSlippageInTrackerResponse> {
+	const request : DoubleSellSlippageInTrackerRequest = { positionID, markAsOpen, tokenAddress, vsTokenAddress };
+	const method = TokenPairPositionTrackerDOFetchMethod.doubleSellSlippage;
+	const response = await sendJSONRequestToTokenPairPositionTracker<DoubleSellSlippageInTrackerRequest,DoubleSellSlippageInTrackerResponse>(method, request, tokenAddress, vsTokenAddress, env);
+	return response;
 }
 
 export async function incrementOtherSellFailureCountInTracker(positionID : string, tokenAddress : string, vsTokenAddress : string, env : Env) : Promise<IncrementOtherSellFailureCountInTrackerResponse> {
