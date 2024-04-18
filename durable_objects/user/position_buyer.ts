@@ -210,7 +210,9 @@ export class PositionBuyer {
             fillPrice: positionRequest.quote.fillPrice,
             fillPriceMS : positionRequest.quote.quoteTimeMS,
             netPNL: null, // to be set when position is closed
-            otherSellFailureCount: 0
+            otherSellFailureCount: 0,
+            buyPriorityFeeAutoMultiplier: positionRequest.buyPriorityFeeAutoMultiplier,
+            sellPriorityFeeAutoMultiplier: positionRequest.sellPriorityFeeAutoMultiplier
         };
         return position;
     }
@@ -236,7 +238,7 @@ export class PositionBuyer {
 
         // attempt to execute, confirm, and parse w/in time limit
         const parsedSwapSummary = await swapExecutor.executeTxAndParseResult(positionRequest, signedTx);
-        
+
         // convert the tx execution result to a position, if possible
  
         if (parsedSwapSummary === 'tx-failed') {
@@ -449,7 +451,10 @@ function convertToConfirmedPosition(positionRequest: PositionRequest,
         fillPrice: parsedSuccessfulSwap.swapSummary.fillPrice,
         fillPriceMS : parsedSuccessfulSwap.swapSummary.swapTimeMS,
         netPNL: null, // to be set when position is sold
-        otherSellFailureCount: 0
+        otherSellFailureCount: 0,
+
+        buyPriorityFeeAutoMultiplier: positionRequest.buyPriorityFeeAutoMultiplier,
+        sellPriorityFeeAutoMultiplier: positionRequest.sellPriorityFeeAutoMultiplier
     };
     return position;
 }

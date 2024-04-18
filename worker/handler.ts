@@ -117,7 +117,9 @@ export class CallbackHandler {
             vsTokenAmt: defaultTSL.vsTokenAmt,
             slippagePercent: defaultTSL.slippagePercent,
             sellAutoDoubleSlippage: defaultTSL.sellAutoDoubleSlippage,
-            triggerPercent: defaultTSL.triggerPercent
+            triggerPercent: defaultTSL.triggerPercent,
+            sellPriorityFeeAutoMultiplier: defaultTSL.sellPriorityFeeAutoMultiplier,
+            buyPriorityFeeAutoMultiplier: defaultTSL.buyPriorityFeeAutoMultiplier
         };
 
         // get a quote for the token being swapped to

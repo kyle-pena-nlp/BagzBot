@@ -4,11 +4,12 @@ import { Env } from "../../env";
 import { logError } from "../../logging";
 import { Swappable, getSwapOfXDescription, isPosition, isPositionRequest } from "../../positions";
 import { getBuyTokenSwapRoute, getSellTokenSwapRoute } from "../../rpc/jupiter_quotes";
-import { serializeSwapRouteTransaction } from "../../rpc/jupiter_serialize";
+import { SwapOpts, serializeSwapRouteTransaction } from "../../rpc/jupiter_serialize";
 import { SwapRoute } from "../../rpc/jupiter_types";
 import { signTransaction } from "../../rpc/rpc_sign_tx";
 import { GetQuoteFailure, isGetQuoteFailure, isTransactionPreparationFailure } from "../../rpc/rpc_types";
 import { TGStatusMessage, UpdateableNotification } from "../../telegram";
+import { assertNever } from "../../util";
 
 export class SwapTransactionSigner {
     wallet : Wallet
@@ -46,7 +47,7 @@ export class SwapTransactionSigner {
         }
     
         // serialize swap route. if fails, early out.
-        const txBuffer = await serializeSwapRouteTransaction(swapRoute, this.wallet.publicKey, shouldIncludeReferralPlatformFee(s), this.env).catch(r => null);
+        const txBuffer = await serializeSwapRouteTransaction(swapRoute, this.wallet.publicKey, swapOptsOf(s), this.env).catch(r => null);
         if (txBuffer == null || isTransactionPreparationFailure(txBuffer)) {
             logError("Failed serializing transaction", s, txBuffer);
             TGStatusMessage.queue(this.notificationChannel, `Could not prepare transaction - ${swapOfX} failed.`, false);
@@ -71,6 +72,24 @@ export class SwapTransactionSigner {
     }
 }
 
+function swapOptsOf(s : Swappable) : SwapOpts {
+    return {
+        includeReferralPlatformFee: shouldIncludeReferralPlatformFee(s),
+        priorityFeeAutoMultiplier : maybeGetFeeAutoMultiplier(s)
+    }
+}
+
+function maybeGetFeeAutoMultiplier(s : Swappable) : 'auto'|number|null {
+    if (isPosition(s)) {
+        return s.sellPriorityFeeAutoMultiplier;
+    }
+    else if (isPositionRequest(s)) {
+        return s.buyPriorityFeeAutoMultiplier;
+    }
+    else {
+        assertNever(s);
+    }
+}
 
 function shouldIncludeReferralPlatformFee(s : Swappable) : boolean {
     if (isPosition(s)) {
@@ -80,7 +99,7 @@ function shouldIncludeReferralPlatformFee(s : Swappable) : boolean {
         return false;
     }
     else {
-        throw new Error("Programmer Error.");
+        assertNever(s);
     }
 }
 
@@ -92,6 +111,6 @@ async function getSwapRoute(s : Swappable, env : Env) : Promise<SwapRoute|GetQuo
         return getSellTokenSwapRoute(s, env);
     }
     else {
-        throw new Error("Programmer error.");
+        assertNever(s);
     }
 }

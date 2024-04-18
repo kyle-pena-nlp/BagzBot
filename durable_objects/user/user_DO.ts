@@ -68,7 +68,9 @@ const DEFAULT_POSITION_PREREQUEST : PositionPreRequest = {
     vsTokenAmt : 1.0,
     slippagePercent : 5.0,
     triggerPercent : 5,
-    sellAutoDoubleSlippage : false            
+    sellAutoDoubleSlippage : false,
+    buyPriorityFeeAutoMultiplier: null, // TODO: set to 'auto' if feature flag on
+    sellPriorityFeeAutoMultiplier: null // TODO: set to 'auto' if feature flag on
 };
 
 /* Durable Object storing state of user */

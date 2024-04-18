@@ -4,7 +4,7 @@ import { dZero } from "../decimalized/decimalized_amount";
 import { Env, getQuoteAPIURL } from "../env";
 import { Position, PositionPreRequest, PositionRequest, Quote } from "../positions";
 import { TokenInfo, getVsTokenDecimalsMultiplier, getVsTokenInfo } from "../tokens";
-import { strictParseBoolean } from "../util";
+import { assertNever, strictParseBoolean } from "../util";
 import { JupiterQuoteAPIParams, SwapRoute } from "./jupiter_types";
 import { GetQuoteFailure, isGetQuoteFailure } from "./rpc_types";
 
@@ -87,7 +87,9 @@ function getTokenAddress(p : PositionPreRequest|PositionRequest) : string {
     else if (('tokenAddress' in p)) {
         return p.tokenAddress;
     }
-    throw new Error("Programmer error.");
+    else {
+        assertNever(p);
+    }
 }
 
 export async function getSellTokenSwapRoute(position : Position, env : Env) : Promise<SwapRoute|GetQuoteFailure> {

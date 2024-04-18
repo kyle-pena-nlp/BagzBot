@@ -144,7 +144,9 @@ export class BuyConfirmer {
             fillPriceMS : parsedSuccessfulSwap.swapSummary.swapTimeMS,
             txSellAttemptTimeMS: null,
             netPNL: null, // to be set on sell
-            otherSellFailureCount: 0
+            otherSellFailureCount: 0,
+            buyPriorityFeeAutoMultiplier: unconfirmedPosition.buyPriorityFeeAutoMultiplier,
+            sellPriorityFeeAutoMultiplier: unconfirmedPosition.sellPriorityFeeAutoMultiplier
         };
         return confirmedPosition;
     }

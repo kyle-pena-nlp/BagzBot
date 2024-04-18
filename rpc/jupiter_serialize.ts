@@ -1,26 +1,50 @@
 import { Buffer } from "node:buffer";
 import { Env, getSwapAPIUrl } from "../env";
+import { makeJSONRequest, tryReadResponseBody } from "../http";
+import { logError } from "../logging";
 import { deriveFeeAccount } from "../tokens";
 import { strictParseBoolean as parseBoolStrict } from "../util";
 import { SwapRoute } from "./jupiter_types";
 import { TransactionPreparationFailure, isTransactionPreparationFailure } from "./rpc_types";
-import { makeJSONRequest, tryReadResponseBody } from "../http";
+
+export interface SwapOpts {
+    includeReferralPlatformFee : boolean
+    priorityFeeAutoMultiplier : 'auto'|number|null
+}
 
 export async function serializeSwapRouteTransaction(swapRoute : SwapRoute|TransactionPreparationFailure, 
     publicKey : string, 
-    includeReferralPlatformFee : boolean,
+    opts : SwapOpts,
     env : Env) : Promise<Buffer|TransactionPreparationFailure> {
         
     if (isTransactionPreparationFailure(swapRoute)) {
         return swapRoute;
     }
+
+    const includeReferralPlatformFee = opts.includeReferralPlatformFee;
+    const priorityFeeAutoMultiplier = opts.priorityFeeAutoMultiplier;
     
     let body : any = {
       quoteResponse: swapRoute.route,
       userPublicKey: publicKey,
       wrapAndUnwrapSol: true,
-      computeUnitPriceMicroLamports: "auto"
+      
     };
+
+    // include a multiplier on auto if desired, or just rely on 'auto'
+    if (priorityFeeAutoMultiplier === "auto") {
+        body.prioritizationFeeLamports = "auto";
+    }
+    else if (typeof priorityFeeAutoMultiplier === 'number') {
+        body.prioritizationFeeLamports = {
+            autoMultiplier: priorityFeeAutoMultiplier,
+        };
+    }
+    else {
+        // backwards compat behavior for earlier releases of bot
+        body.computeUnitPriceMicroLamports = "auto";
+    }
+
     if (parseBoolStrict(env.JUPITER_USE_DYNAMIC_COMPUTE_UNIT_LIMIT)) {
         body.dynamicComputeUnitLimit = true; 
     }
@@ -33,6 +57,7 @@ export async function serializeSwapRouteTransaction(swapRoute : SwapRoute|Transa
         const swapResponse = await fetch(swapRequest);
         if (!swapResponse.ok) {
             const responseBody = await tryReadResponseBody(swapResponse);
+            logError("Failure generating swap route", responseBody||'');
             return TransactionPreparationFailure.FailedToSerializeTransaction;
         }
         const swapRequestResponseJSON : any = await swapResponse.json();

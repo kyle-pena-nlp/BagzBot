@@ -145,7 +145,9 @@ function posWithPrice(initPrice : DecimalizedAmount) : Position {
         sellLastValidBlockheight: 0,
         buyConfirmed: true,
         netPNL : dZero(),
-        otherSellFailureCount: 0
+        otherSellFailureCount: 0,
+        sellPriorityFeeAutoMultiplier : null,
+        buyPriorityFeeAutoMultiplier : null
     }
 }
 

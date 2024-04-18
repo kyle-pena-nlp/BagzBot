@@ -256,7 +256,9 @@ function posWithPrice(initPrice : DecimalizedAmount) : Position {
         netPNL: null,
         txBuyAttemptTimeMS: 0,
         txSellAttemptTimeMS: 0,
-        otherSellFailureCount: 0
+        otherSellFailureCount: 0,
+        sellPriorityFeeAutoMultiplier: null,
+        buyPriorityFeeAutoMultiplier: null
     }
 }
 

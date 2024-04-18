@@ -1,7 +1,7 @@
 import { UserAddress } from "../crypto";
 import { DecimalizedAmount } from "../decimalized";
 import { TokenInfo } from "../tokens";
-import { Structural, isEnumValue } from "../util";
+import { Structural, assertNever, isEnumValue } from "../util";
 import { Quote } from "./quote";
 
 export enum PositionType {
@@ -67,6 +67,9 @@ export interface Position {
 	sellConfirmed : boolean
 	netPNL : DecimalizedAmount|null
 	otherSellFailureCount : number|null // null for backwards compat
+
+	buyPriorityFeeAutoMultiplier : 'auto'|number|null
+	sellPriorityFeeAutoMultiplier : 'auto'|number|null
 };
 
 interface BasePositionRequest {
@@ -84,6 +87,9 @@ interface BasePositionRequest {
     /* Relevant if TLS position */
 	triggerPercent : number
 	sellAutoDoubleSlippage : boolean|null
+
+	sellPriorityFeeAutoMultiplier : 'auto'|number|null
+	buyPriorityFeeAutoMultiplier : 'auto'|number|null
 }
 
 // Pre-request before full info is retrieved (like TokenInfo and BuyQuote)
@@ -128,7 +134,9 @@ export function convertPreRequestToRequest(r : PositionPreRequest, quote : Quote
 		triggerPercent: r.triggerPercent,
 		sellAutoDoubleSlippage: r.sellAutoDoubleSlippage,
 		token: token,
-		vsToken: r.vsToken
+		vsToken: r.vsToken,
+		buyPriorityFeeAutoMultiplier: r.buyPriorityFeeAutoMultiplier,
+		sellPriorityFeeAutoMultiplier: r.sellPriorityFeeAutoMultiplier
 	};
 	return positionRequest;
 }
@@ -147,7 +155,7 @@ export function getInAndOutTokens(s : Swappable): { inToken : TokenInfo, outToke
         };
     }
     else {
-        throw new Error("Programmer error.");
+        assertNever(s);
     }
 }
 
@@ -159,6 +167,6 @@ export function getSwapOfXDescription(s : Swappable, caps : boolean = false) : s
         return (caps ? 'S' : 's') + `ale of ${s.token.symbol}`;
     }
     else {
-        throw new Error("Programmer error.");
+        assertNever(s);
     }
 }
