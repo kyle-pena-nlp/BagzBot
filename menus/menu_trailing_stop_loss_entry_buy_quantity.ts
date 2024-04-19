@@ -26,7 +26,7 @@ export class MenuTrailingStopLossEntryBuyQuantity extends Menu<{ quantityAndToke
         }
 
         this.insertButtonNextLine(options, `X ${symbol}`, new CallbackData(MenuCode.CustomBuyQuantity, this.menuData.quantityAndToken.quantity.toString()));
-        this.insertButtonNextLine(options, ":back: Back", new CallbackData(MenuCode.TrailingStopLossRequestReturnToEditorMenu));
+        this.insertButtonNextLine(options, ":back: Back", new CallbackData(MenuCode.ReturnToPositionRequestEditor));
         return options;
     }
 }

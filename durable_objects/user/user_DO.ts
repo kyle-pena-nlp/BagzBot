@@ -13,7 +13,7 @@ import { ChangeTrackedValue, Structural, assertNever, groupIntoBatches, sleep, s
 import { assertIs } from "../../util/enums";
 import { listUnclaimedBetaInviteCodes } from "../beta_invite_codes/beta_invite_code_interop";
 import { PositionAndMaybePNL } from "../token_pair_position_tracker/model/position_and_PNL";
-import { adminDeleteClosedPositionsForUser, adminDeletePositionByIDFromTracker, deactivatePositionInTracker, doubleSellSlippageInTracker, editTriggerPercentOnOpenPositionInTracker, getDeactivatedPositionFromTracker, getPositionAndMaybePNL, listClosedPositionsFromTracker, listDeactivatedPositionsInTracker, listPositionsByUser, reactivatePositionInTracker, removePosition, setSellAutoDoubleOnOpenPositionInPositionTracker, setSellSlippagePercentOnOpenPositionInTracker } from "../token_pair_position_tracker/token_pair_position_tracker_do_interop";
+import { adminDeleteClosedPositionsForUser, adminDeletePositionByIDFromTracker, deactivatePositionInTracker, doubleSellSlippageInTracker, editTriggerPercentOnOpenPositionInTracker, getDeactivatedPositionFromTracker, getPositionAndMaybePNL, listClosedPositionsFromTracker, listDeactivatedPositionsInTracker, listPositionsByUser, reactivatePositionInTracker, removePosition, setOpenPositionSellPriorityFeeInTracker, setSellAutoDoubleOnOpenPositionInPositionTracker, setSellSlippagePercentOnOpenPositionInTracker } from "../token_pair_position_tracker/token_pair_position_tracker_do_interop";
 import { AdminDeleteAllPositionsRequest, AdminDeleteAllPositionsResponse } from "./actions/admin_delete_all_positions";
 import { AdminDeleteClosedPositionsRequest } from "./actions/admin_delete_closed_positions";
 import { AdminDeletePositionByIDRequest, AdminDeletePositionByIDResponse } from "./actions/admin_delete_position_by_id";
@@ -41,6 +41,7 @@ import { OpenPositionRequest, OpenPositionResponse } from "./actions/open_new_po
 import { ReactivatePositionRequest, ReactivatePositionResponse } from "./actions/reactivate_position";
 import { DefaultTrailingStopLossRequestRequest, DefaultTrailingStopLossRequestResponse } from "./actions/request_default_position_request";
 import { SendMessageToUserRequest, SendMessageToUserResponse, isSendMessageToUserRequest } from "./actions/send_message_to_user";
+import { SetOpenPositionSellPriorityFeeMultiplierRequest, SetOpenPositionSellPriorityFeeMultiplierResponse } from "./actions/set_open_position_sell_priority_fee_multiplier";
 import { SetSellAutoDoubleOnOpenPositionRequest, SetSellAutoDoubleOnOpenPositionResponse } from "./actions/set_sell_auto_double_on_open_position";
 import { SellSellSlippagePercentageOnOpenPositionRequest, SellSellSlippagePercentageOnOpenPositionResponse } from "./actions/set_sell_slippage_percent_on_open_position";
 import { StoreLegalAgreementStatusRequest, StoreLegalAgreementStatusResponse } from "./actions/store_legal_agreement_status";
@@ -69,8 +70,7 @@ const DEFAULT_POSITION_PREREQUEST : PositionPreRequest = {
     slippagePercent : 5.0,
     triggerPercent : 5,
     sellAutoDoubleSlippage : false,
-    buyPriorityFeeAutoMultiplier: null, // TODO: set to 'auto' if feature flag on
-    sellPriorityFeeAutoMultiplier: null // TODO: set to 'auto' if feature flag on
+    priorityFeeAutoMultiplier: null, // TODO: set to 'auto' if feature flag on
 };
 
 /* Durable Object storing state of user */
@@ -351,11 +351,30 @@ export class UserDO {
             case UserDOFetchMethod.doubleSellSlippage:
                 response = await this.handleDoubleSellSlippage(userAction);
                 break;
+            case UserDOFetchMethod.setOpenPositionSellPriorityFee:
+                response = await this.handleSetOpenPositionPriorityFee(userAction);
+                break;
             default:
                 assertNever(method);
         }
 
         return [method,userAction,response];
+    }
+
+    async handleSetOpenPositionPriorityFee(userAction : SetOpenPositionSellPriorityFeeMultiplierRequest) : Promise<Response> {
+        const response = await this.handleSetOpenPositionPriorityFeeInternal(userAction);
+        return makeJSONResponse<SetOpenPositionSellPriorityFeeMultiplierResponse>(response);
+    }
+
+    async handleSetOpenPositionPriorityFeeInternal(userAction : SetOpenPositionSellPriorityFeeMultiplierRequest) : Promise<SetOpenPositionSellPriorityFeeMultiplierResponse> {
+        const tokenPair = this.tokenPairsForPositionIDsTracker.getPositionPair(userAction.positionID);
+        if (tokenPair == null) {
+            return {};
+        }
+        const tokenAddress = tokenPair.token.address;
+        const vsTokenAddress = tokenPair.vsToken.address;
+        const response = await setOpenPositionSellPriorityFeeInTracker(userAction.positionID, tokenAddress, vsTokenAddress, userAction.multiplier, this.env);
+        return { ...response };
     }
 
     async handleDoubleSellSlippage(userAction : DoubleSellSlippageRequest) : Promise<Response> {
@@ -710,6 +729,9 @@ export class UserDO {
         defaultPrerequest.userID = defaultTrailingStopLossRequestRequest.telegramUserID;
         defaultPrerequest.chatID = defaultTrailingStopLossRequestRequest.chatID;
         defaultPrerequest.messageID = defaultTrailingStopLossRequestRequest.messageID;
+        if (strictParseBoolean(this.env.ALLOW_PRIORITY_FEE_MULTIPLIERS)) {
+            defaultPrerequest.priorityFeeAutoMultiplier = "auto";
+        }
         defaultPrerequest.positionID = crypto.randomUUID();
         if (defaultTrailingStopLossRequestRequest.token != null) {
             defaultPrerequest.tokenAddress = defaultTrailingStopLossRequestRequest.token.address;

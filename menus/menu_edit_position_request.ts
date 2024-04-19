@@ -1,12 +1,12 @@
 import { DecimalizedAmount, asTokenPrice } from "../decimalized/decimalized_amount";
-import { PositionRequest } from "../positions";
+import { PositionRequest, describePriorityFee } from "../positions";
 import { CallbackButton } from "../telegram";
 import { CallbackData } from "./callback_data";
 import { Menu, MenuCapabilities } from "./menu";
 import { MenuCode } from "./menu_code";
 import { renderTrailingStopLossRequestMarkdown } from "./trailing_stop_loss_helpers";
 
-export class MenuEditPositionRequest extends Menu< { positionRequest: PositionRequest, maybeSOLBalance : DecimalizedAmount|null, allowChooseAutoDoubleSlippage : boolean }> implements MenuCapabilities {
+export class MenuEditPositionRequest extends Menu< { positionRequest: PositionRequest, maybeSOLBalance : DecimalizedAmount|null, allowChooseAutoDoubleSlippage : boolean, allowChoosePriorityFees : boolean }> implements MenuCapabilities {
     renderText(): string {
         const positionRequest = this.menuData.positionRequest;
         
@@ -35,12 +35,18 @@ export class MenuEditPositionRequest extends Menu< { positionRequest: PositionRe
         //this.insertButtonNextLine(options, `Buying With: ${positionRequest.vsToken.symbol}`, new CallbackData(MenuCode.TrailingStopLossPickVsTokenMenu, positionRequest.vsToken.symbol));
         this.insertButtonNextLine(options, `:pencil: Change Token`, new CallbackData(MenuCode.EditPositionChangeToken));
         this.insertButtonNextLine(options, `:dollars: ${positionRequest.vsTokenAmt} ${positionRequest.vsToken.symbol}`, new CallbackData(MenuCode.TrailingStopLossEntryBuyQuantityMenu, positionRequest.vsTokenAmt.toString()));
+        
         this.insertButtonSameLine(options, `:chart_down: ${positionRequest.triggerPercent}% Trigger`, new CallbackData(MenuCode.TrailingStopLossTriggerPercentMenu, positionRequest.triggerPercent.toString()));
         this.insertButtonSameLine(options, `:twisted_arrows: ${positionRequest.slippagePercent}% Slippage`, new CallbackData(MenuCode.TrailingStopLossSlippagePctMenu, positionRequest.slippagePercent.toString()));
         if (this.menuData.allowChooseAutoDoubleSlippage) {
             this.insertButtonNextLine(options, `:brain: ${positionRequest.sellAutoDoubleSlippage ? 'Sell: Auto-Double Slippage': 'Sell: No Auto-Double Slippage'} :brain:`, new CallbackData(MenuCode.PosRequestChooseAutoDoubleSlippageOptions));
         }
-        this.insertButtonNextLine(options, `:refresh: Refresh Quote`, new CallbackData(MenuCode.TrailingStopLossRequestReturnToEditorMenu));
+        
+        if (this.menuData.allowChoosePriorityFees) {
+            this.insertButtonNextLine(options, `Priority Fees: ${describePriorityFee(positionRequest.priorityFeeAutoMultiplier)}`, this.menuCallback(MenuCode.EditPositionRequestPriorityFees));
+        }
+
+        this.insertButtonNextLine(options, `:refresh: Refresh Quote`, new CallbackData(MenuCode.ReturnToPositionRequestEditor));
         this.insertButtonSameLine(options, `:cancel: Cancel`, new CallbackData(MenuCode.Main));
         //this.insertButtonSameLine(options, ':help: Help', new CallbackData(MenuCode.EditPositionHelp));
         this.insertButtonNextLine(options, `:sparkle: Submit :sparkle:`, new CallbackData(MenuCode.TrailingStopLossEditorFinalSubmit));

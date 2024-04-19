@@ -32,11 +32,15 @@ export enum MenuCode {
 	DeactivatePosition = "DeactivatePosition",
 	ViewDeactivatedPositions = "ListDeactivatedPositions",
 	ViewDeactivatedPosition = "ViewDeactivatedPosition", 
+	EditOpenPositionPriorityFee = "EOP.PriorityFee",
+	EditOpenPositionSubmitPriorityFee = "EOP.SubmitPriorityFee",
 	//This needs a bigger refactor because the PositionSeller assumes the position is being tracked.
 	//CloseDeactivatedPositionManually = "CloseDeactivatedPositionManually",
 
 	EditOpenPositionAutoDoubleSlippage = "EOP.AutoDoubleSlip",
 	SubmitOpenPositionAutoDoubleSlippage = "SOP.AutoDoubleSlip",
+	EditPositionRequestPriorityFees = "EOPR.PriorityFee",
+	EditPositionRequestSubmitPriorityFees = "SOPR.PriorityFees",
 
 	EditOpenPositionTriggerPercent = "EOP.Trigger",
 	SubmitOpenPositionTriggerPct = "SEOP.Trigger",
@@ -60,7 +64,7 @@ export enum MenuCode {
 	ViewOpenPosition = "ViewOpenPosition",
 	ClosePositionManuallyAction = "Pos.Close.Manually",
 
-    TrailingStopLossRequestReturnToEditorMenu = "TLS.ReturnEditorMenu",
+    ReturnToPositionRequestEditor = "TLS.ReturnEditorMenu",
 
 	// Trailing Stop Loss: set buy quantity in vsToken units
 	TrailingStopLossEntryBuyQuantityMenu = "TSL.BuyQuantityMenu",

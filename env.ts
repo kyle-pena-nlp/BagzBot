@@ -78,6 +78,7 @@ export interface Env {
 	JUP_QUOTE_RESTRICT_INTERMEDIATE_TOKENS : string
 	OTHER_SELL_FAILURES_TO_DEACTIVATE : string
 	ALLOW_PRIORITY_FEE_MULTIPLIERS : string
+	PRIORITY_FEE_MULTIPLIER_OPTIONS : string
 
 	UserDO : any // i'd like to strongly type this as DurableObjectNamespace, but can't for technical reasons
 	TokenPairPositionTrackerDO : any // ditto

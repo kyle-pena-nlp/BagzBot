@@ -30,6 +30,7 @@ import { MarkPositionAsClosingRequest, MarkPositionAsClosingResponse } from "./a
 import { MarkPositionAsOpenRequest, MarkPositionAsOpenResponse } from "./actions/mark_position_as_open";
 import { PositionExistsInTrackerRequest, PositionExistsInTrackerResponse } from "./actions/position_exists_in_tracker";
 import { RemovePositionRequest, RemovePositionResponse } from "./actions/remove_position";
+import { SetOpenPositionSellPriorityFeeInTrackerRequest, SetOpenPositionSellPriorityFeeInTrackerResponse } from "./actions/set_open_position_sell_priority_fee_in_tracker";
 import { SetSellAutoDoubleOnOpenPositionInTrackerRequest } from "./actions/set_sell_auto_double_on_open_position_in_tracker";
 import { SetSellSlippagePercentOnOpenPositionTrackerRequest } from "./actions/set_sell_slippage_percent_on_open_position";
 import { UpdatePositionRequest, UpdatePositionResponse } from "./actions/update_position";
@@ -66,7 +67,15 @@ export enum TokenPairPositionTrackerDOFetchMethod {
 	listDeactivatedPositions = "listDeactivatedPositions",
 	getDeactivatedPosition = "getDeactivatedPosition",
 	incrementOtherSellFailureCount = "incrementOtherSellFailureCount",
-	doubleSellSlippage = "doubleSellSlippage"
+	doubleSellSlippage = "doubleSellSlippage",
+	setOpenPositionSellPriorityFee = "setOpenPositionSellPriorityFee"
+}
+
+export async function setOpenPositionSellPriorityFeeInTracker(positionID : string, tokenAddress : string, vsTokenAddress : string, multiplier : 'auto'|number, env : Env) : Promise<SetOpenPositionSellPriorityFeeInTrackerResponse> {
+	const request : SetOpenPositionSellPriorityFeeInTrackerRequest = { positionID, tokenAddress, vsTokenAddress, multiplier };
+	const method = TokenPairPositionTrackerDOFetchMethod.setOpenPositionSellPriorityFee;
+	const response = await sendJSONRequestToTokenPairPositionTracker<SetOpenPositionSellPriorityFeeInTrackerRequest,SetOpenPositionSellPriorityFeeInTrackerResponse>(method,request,tokenAddress,vsTokenAddress,env);
+	return response;
 }
 
 export async function doubleSellSlippageInTracker(positionID : string, markAsOpen: boolean, tokenAddress : string, vsTokenAddress : string, env : Env) : Promise<DoubleSellSlippageInTrackerResponse> {

@@ -9,7 +9,7 @@ export class MenuEditPositionHelp extends Menu<undefined> implements MenuCapabil
     }
     renderOptions(): CallbackButton[][] {
         const options = this.emptyMenu();
-        this.insertButtonNextLine(options, ":back: Back", new CallbackData(MenuCode.TrailingStopLossRequestReturnToEditorMenu));
+        this.insertButtonNextLine(options, ":back: Back", new CallbackData(MenuCode.ReturnToPositionRequestEditor));
         return options;
     }
 }

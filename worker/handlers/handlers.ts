@@ -57,7 +57,7 @@ export const MenuCodeHandlerMap : HandlerMap<MenuCode,MenuCodeHandler> = {
     [MenuCode.SubmitImpersonateUser]: new MenuCodeTODOHandler(),
     [MenuCode.ViewOpenPosition]: new MenuCodeTODOHandler(),
     [MenuCode.ClosePositionManuallyAction]: new MenuCodeTODOHandler(),
-    [MenuCode.TrailingStopLossRequestReturnToEditorMenu]: new MenuCodeTODOHandler(),
+    [MenuCode.ReturnToPositionRequestEditor]: new MenuCodeTODOHandler(),
     [MenuCode.TrailingStopLossEntryBuyQuantityMenu]: new MenuCodeTODOHandler(),
     [MenuCode.CustomBuyQuantity]: new MenuCodeTODOHandler(),
     [MenuCode.SubmitBuyQuantity]: new MenuCodeTODOHandler(),
@@ -78,5 +78,9 @@ export const MenuCodeHandlerMap : HandlerMap<MenuCode,MenuCodeHandler> = {
     [MenuCode.SubmitAdminDevSetPrice]: new MenuCodeTODOHandler(),
     [MenuCode.AdminInvokeAlarm]: new MenuCodeTODOHandler(),
     [MenuCode.SubmitAdminInvokeAlarm]: new MenuCodeTODOHandler(),
-    [MenuCode.Close]: new MenuCodeTODOHandler()
+    [MenuCode.Close]: new MenuCodeTODOHandler(),
+    [MenuCode.EditPositionRequestPriorityFees]: new MenuCodeTODOHandler(),
+    [MenuCode.EditPositionRequestSubmitPriorityFees]: new MenuCodeTODOHandler(),
+    [MenuCode.EditOpenPositionPriorityFee]: new MenuCodeTODOHandler(),
+    [MenuCode.EditOpenPositionSubmitPriorityFee]: new MenuCodeTODOHandler()    
 }

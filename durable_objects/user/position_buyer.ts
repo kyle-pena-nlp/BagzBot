@@ -41,7 +41,7 @@ export class PositionBuyer {
                 positionRequest.positionID);
         }
         catch {
-            TGStatusMessage.queue(this.channel, 'There was an unexpected error with this purchase', MenuCode.TrailingStopLossRequestReturnToEditorMenu, positionRequest.positionID);
+            TGStatusMessage.queue(this.channel, 'There was an unexpected error with this purchase', MenuCode.ReturnToPositionRequestEditor, positionRequest.positionID);
         }
         finally {
             await TGStatusMessage.finalize(this.channel);
@@ -211,8 +211,8 @@ export class PositionBuyer {
             fillPriceMS : positionRequest.quote.quoteTimeMS,
             netPNL: null, // to be set when position is closed
             otherSellFailureCount: 0,
-            buyPriorityFeeAutoMultiplier: positionRequest.buyPriorityFeeAutoMultiplier,
-            sellPriorityFeeAutoMultiplier: positionRequest.sellPriorityFeeAutoMultiplier
+            buyPriorityFeeAutoMultiplier: positionRequest.priorityFeeAutoMultiplier,
+            sellPriorityFeeAutoMultiplier: positionRequest.priorityFeeAutoMultiplier
         };
         return position;
     }
@@ -376,30 +376,30 @@ export class PositionBuyer {
                 return MenuCode.Main;
             
             case 'could-not-create-tx':
-                return MenuCode.TrailingStopLossRequestReturnToEditorMenu;
+                return MenuCode.ReturnToPositionRequestEditor;
             
             case 'confirmed':
                 return MenuCode.ViewOpenPosition;
             
             case 'failed':
-                return MenuCode.TrailingStopLossRequestReturnToEditorMenu;
+                return MenuCode.ReturnToPositionRequestEditor;
             
             case 'tx-sim-failed-slippage':
             case 'slippage-failed':
-                return MenuCode.TrailingStopLossRequestReturnToEditorMenu;
+                return MenuCode.ReturnToPositionRequestEditor;
             
             case 'unconfirmed':
                 return MenuCode.ListPositions;
             case 'tx-sim-failed-other':
-                return MenuCode.TrailingStopLossRequestReturnToEditorMenu;
+                return MenuCode.ReturnToPositionRequestEditor;
 
             case 'tx-sim-insufficient-sol':
             case 'insufficient-sol':
-                return MenuCode.TrailingStopLossRequestReturnToEditorMenu;
+                return MenuCode.ReturnToPositionRequestEditor;
 
             case 'frozen-token-account':
             case 'tx-sim-frozen-token-account':
-                return MenuCode.TrailingStopLossRequestReturnToEditorMenu;
+                return MenuCode.ReturnToPositionRequestEditor;
 
             case 'token-fee-account-not-initialized':
             case 'tx-sim-failed-token-account-fee-not-initialized':
@@ -453,8 +453,8 @@ function convertToConfirmedPosition(positionRequest: PositionRequest,
         netPNL: null, // to be set when position is sold
         otherSellFailureCount: 0,
 
-        buyPriorityFeeAutoMultiplier: positionRequest.buyPriorityFeeAutoMultiplier,
-        sellPriorityFeeAutoMultiplier: positionRequest.sellPriorityFeeAutoMultiplier
+        buyPriorityFeeAutoMultiplier: positionRequest.priorityFeeAutoMultiplier,
+        sellPriorityFeeAutoMultiplier: positionRequest.priorityFeeAutoMultiplier
     };
     return position;
 }

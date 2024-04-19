@@ -1,7 +1,7 @@
 import { dClamp, dCompare, dMult, fromNumber } from "../decimalized";
 import { DecimalizedAmount, asPercentDeltaString, asPercentString, asTokenPrice, asTokenPriceDelta, toNumber } from "../decimalized/decimalized_amount";
 import { PNL, PositionAndMaybePNL } from "../durable_objects/token_pair_position_tracker/model/position_and_PNL";
-import { Position, PositionStatus } from "../positions";
+import { Position, PositionStatus, describePriorityFee } from "../positions";
 import { CallbackButton } from "../telegram";
 import { assertNever } from "../util";
 import { CallbackData } from "./callback_data";
@@ -9,7 +9,7 @@ import { Menu, MenuCapabilities } from "./menu";
 import { MenuCode } from "./menu_code";
 
 type BrandNewPosition = { brandNewPosition : true, position : Position };
-type MenuData = { allowChooseAutoDoubleSlippage : boolean, data: (PositionAndMaybePNL|BrandNewPosition) };
+type MenuData = { allowChooseAutoDoubleSlippage : boolean, allowChoosePriorityFees : boolean, data: (PositionAndMaybePNL|BrandNewPosition) };
 type ThisType = { menuData : MenuData }
 type ThisTypeMaybeHasPNL = ThisType & { menuData: { data: PositionAndMaybePNL } };
 type ThisTypeHasPNL = ThisType & { menuData: { data : PositionAndMaybePNL & { PNL : PNL }  } };
@@ -44,6 +44,11 @@ export class MenuViewOpenPosition extends Menu<MenuData> implements MenuCapabili
             
             this.insertButtonNextLine(options, `:chart_down: ${this.position().triggerPercent}% Trigger`, new CallbackData(MenuCode.EditOpenPositionTriggerPercent, this.position().positionID));
             this.insertButtonSameLine(options, `:twisted_arrows: ${this.position().sellSlippagePercent}% Slippage`, new CallbackData(MenuCode.EditOpenPositionSellSlippagePercent, this.position().positionID));
+
+            if (this.allowChoosePriorityFees()) {
+                this.insertButtonNextLine(options, `Priority Fees: ${describePriorityFee(this.position().sellPriorityFeeAutoMultiplier)}`, new CallbackData(MenuCode.EditOpenPositionPriorityFee, this.position().positionID));
+            }
+
             if (this.allowChooseAutoDoubleSlippage()) {
                 this.insertButtonNextLine(options, `:brain: ${this.position().sellAutoDoubleSlippage ? '': 'Do Not'} Auto-Double Slippage If TSL Fails :brain:`, new CallbackData(MenuCode.EditOpenPositionAutoDoubleSlippage, this.position().positionID));
             }
@@ -62,6 +67,10 @@ export class MenuViewOpenPosition extends Menu<MenuData> implements MenuCapabili
 
     private allowChooseAutoDoubleSlippage() : boolean {
         return this.menuData.allowChooseAutoDoubleSlippage;
+    }
+
+    private allowChoosePriorityFees() : boolean {
+        return this.menuData.allowChoosePriorityFees;
     }
 
     private statusEmoji() : string {

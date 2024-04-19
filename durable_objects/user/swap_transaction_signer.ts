@@ -84,7 +84,7 @@ function maybeGetFeeAutoMultiplier(s : Swappable) : 'auto'|number|null {
         return s.sellPriorityFeeAutoMultiplier;
     }
     else if (isPositionRequest(s)) {
-        return s.buyPriorityFeeAutoMultiplier;
+        return s.priorityFeeAutoMultiplier;
     }
     else {
         assertNever(s);

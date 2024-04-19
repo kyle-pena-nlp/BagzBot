@@ -88,8 +88,7 @@ interface BasePositionRequest {
 	triggerPercent : number
 	sellAutoDoubleSlippage : boolean|null
 
-	sellPriorityFeeAutoMultiplier : 'auto'|number|null
-	buyPriorityFeeAutoMultiplier : 'auto'|number|null
+	priorityFeeAutoMultiplier : 'auto'|number|null
 }
 
 // Pre-request before full info is retrieved (like TokenInfo and BuyQuote)
@@ -135,8 +134,7 @@ export function convertPreRequestToRequest(r : PositionPreRequest, quote : Quote
 		sellAutoDoubleSlippage: r.sellAutoDoubleSlippage,
 		token: token,
 		vsToken: r.vsToken,
-		buyPriorityFeeAutoMultiplier: r.buyPriorityFeeAutoMultiplier,
-		sellPriorityFeeAutoMultiplier: r.sellPriorityFeeAutoMultiplier
+		priorityFeeAutoMultiplier: r.priorityFeeAutoMultiplier
 	};
 	return positionRequest;
 }
@@ -157,6 +155,21 @@ export function getInAndOutTokens(s : Swappable): { inToken : TokenInfo, outToke
     else {
         assertNever(s);
     }
+}
+
+export function describePriorityFee(priorityFee : null|"auto"|number) {
+	if (priorityFee == null) {
+		return "Default";
+	}
+	else if (priorityFee == "auto") {
+		return "Default";
+	}
+	else if (typeof priorityFee === 'number') {
+		return `${priorityFee.toString(10)}x`;
+	}
+	else {
+		assertNever(priorityFee);
+	}
 }
 
 export function getSwapOfXDescription(s : Swappable, caps : boolean = false) : string {

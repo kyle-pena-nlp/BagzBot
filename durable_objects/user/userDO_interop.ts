@@ -31,6 +31,7 @@ import { OpenPositionRequest, OpenPositionResponse } from "./actions/open_new_po
 import { ReactivatePositionRequest, ReactivatePositionResponse } from "./actions/reactivate_position";
 import { DefaultTrailingStopLossRequestRequest, DefaultTrailingStopLossRequestResponse } from "./actions/request_default_position_request";
 import { SendMessageToUserRequest, SendMessageToUserResponse } from "./actions/send_message_to_user";
+import { SetOpenPositionSellPriorityFeeMultiplierRequest, SetOpenPositionSellPriorityFeeMultiplierResponse } from "./actions/set_open_position_sell_priority_fee_multiplier";
 import { SetSellAutoDoubleOnOpenPositionRequest, SetSellAutoDoubleOnOpenPositionResponse } from "./actions/set_sell_auto_double_on_open_position";
 import { SellSellSlippagePercentageOnOpenPositionRequest, SellSellSlippagePercentageOnOpenPositionResponse } from "./actions/set_sell_slippage_percent_on_open_position";
 import { StoreLegalAgreementStatusRequest, StoreLegalAgreementStatusResponse } from "./actions/store_legal_agreement_status";
@@ -71,7 +72,15 @@ export enum UserDOFetchMethod {
 	deactivatePosition = "deactivatePosition",
 	reactivatePosition = "reactivatePosition",
 	getDeactivatedPosition = "getDeactivatedPosition",
-	doubleSellSlippage = "doubleSellSlippage"
+	doubleSellSlippage = "doubleSellSlippage",
+	setOpenPositionSellPriorityFee = "setOpenPositionSellPriorityFee"
+}
+
+export async function setOpenPositionSellPriorityFeeMultiplier(telegramUserID : number, chatID : number, positionID : string, multiplier : 'auto'|number, env : Env) : Promise<SetOpenPositionSellPriorityFeeMultiplierResponse> {
+	const request: SetOpenPositionSellPriorityFeeMultiplierRequest = { telegramUserID, chatID, positionID, multiplier };
+	const method = UserDOFetchMethod.setOpenPositionSellPriorityFee;
+	const response = await sendJSONRequestToUserDO<SetOpenPositionSellPriorityFeeMultiplierRequest,SetOpenPositionSellPriorityFeeMultiplierResponse>(telegramUserID, method, request, env);
+	return response;
 }
 
 export async function doubleSellSlippageAndMarkAsOpen(telegramUserID : number, chatID : number, positionID : string, env : Env) : Promise<DoubleSellSlippageResponse> {
@@ -290,8 +299,8 @@ export async function getSessionState(telegramUserID : number, chatID : number, 
 	return sessionValuesResponse.sessionValues;
 }
 
-export async function storeSessionObjProperty(telegramUserID : number, chatID : number, messageID : number, property : string, value : Structural, prefix : string, env : Env) {
-	const sessionValues = new Map<SessionKey,Structural>([[property,value]]);
+export async function storeSessionObjProperty<TObj>(telegramUserID : number, chatID : number, messageID : number, property : keyof TObj, value : Structural, prefix : string, env : Env) {
+	const sessionValues = new Map<string,Structural>([[property as string,value]]);
 	return await storeSessionValues(telegramUserID, chatID, messageID, sessionValues, prefix, env);
 }
 

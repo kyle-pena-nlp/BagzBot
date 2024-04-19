@@ -15,7 +15,7 @@ export class MenuTrailingStopLossSlippagePercent extends Menu<number> implements
         this.insertButtonSameLine(options, "1.0%", new CallbackData(submitValueCode, "1.0"));
         this.insertButtonSameLine(options, "2.0%", new CallbackData(submitValueCode, "2.0"));
         this.insertButtonSameLine(options, "X%", new CallbackData(MenuCode.CustomSlippagePct, defaultCustomSlippagePercentage.toString()));
-        this.insertButtonNextLine(options, ":back: Back", new CallbackData(MenuCode.TrailingStopLossRequestReturnToEditorMenu));
+        this.insertButtonNextLine(options, ":back: Back", new CallbackData(MenuCode.ReturnToPositionRequestEditor));
         return options;
     }
 }

@@ -10,7 +10,7 @@ export class MenuRetryBuySlippageError extends Menu<PositionRequest> implements 
     renderOptions(): CallbackButton[][] {
         const options = this.emptyMenu();
         this.insertButtonNextLine(options, "Yes", this.menuCallback(MenuCode.TrailingStopLossEditorFinalSubmit));
-        this.insertButtonNextLine(options, "No", this.menuCallback(MenuCode.TrailingStopLossRequestReturnToEditorMenu));
+        this.insertButtonNextLine(options, "No", this.menuCallback(MenuCode.ReturnToPositionRequestEditor));
         return options;
     }
 }

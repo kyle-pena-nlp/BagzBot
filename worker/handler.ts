@@ -11,11 +11,11 @@ import { _devOnlyFeatureUpdatePrice, adminInvokeAlarm } from "../durable_objects
 import { OpenPositionRequest } from "../durable_objects/user/actions/open_new_position";
 import { QuantityAndToken } from "../durable_objects/user/model/quantity_and_token";
 import { TokenSymbolAndAddress } from "../durable_objects/user/model/token_name_and_address";
-import { adminDeleteAllPositions, adminDeleteClosedPositions, adminDeletePositionByID, adminResetDefaultPositionRequest, deactivatePosition, editTriggerPercentOnOpenPositionFromUserDO, getClosedPositionsAndPNLSummary, getDeactivatedPosition, getDefaultTrailingStopLoss, getPositionFromUserDO, getUserData, getUserWalletSOLBalance, getWalletData, impersonateUser, listDeactivatedPositions, listPositionsFromUserDO, manuallyClosePosition, maybeReadSessionObj, reactivatePosition, readSessionObj, requestNewPosition, sendMessageToUser, setSellAutoDoubleOnOpenPosition, setSellSlippagePercentOnOpenPosition, storeLegalAgreementStatus, storeSessionObj, storeSessionObjProperty, storeSessionValues, unimpersonateUser } from "../durable_objects/user/userDO_interop";
+import { adminDeleteAllPositions, adminDeleteClosedPositions, adminDeletePositionByID, adminResetDefaultPositionRequest, deactivatePosition, editTriggerPercentOnOpenPositionFromUserDO, getClosedPositionsAndPNLSummary, getDeactivatedPosition, getDefaultTrailingStopLoss, getPositionFromUserDO, getUserData, getUserWalletSOLBalance, getWalletData, impersonateUser, listDeactivatedPositions, listPositionsFromUserDO, manuallyClosePosition, maybeReadSessionObj, reactivatePosition, readSessionObj, requestNewPosition, sendMessageToUser, setOpenPositionSellPriorityFeeMultiplier, setSellAutoDoubleOnOpenPosition, setSellSlippagePercentOnOpenPosition, storeLegalAgreementStatus, storeSessionObj, storeSessionObjProperty, storeSessionValues, unimpersonateUser } from "../durable_objects/user/userDO_interop";
 import { Env } from "../env";
 import { makeFakeFailedRequestResponse, makeSuccessResponse } from "../http";
 import { logDebug, logError } from "../logging";
-import { BaseMenu, LegalAgreement, MenuAdminViewClosedPositions, MenuBetaInviteFriends, MenuCode, MenuComingSoon, MenuContinueMessage, MenuEditOpenPositionSellAutoDoubleSlippage, MenuEditOpenPositionSellSlippagePercent, MenuEditOpenPositionTriggerPercent, MenuEditPositionHelp, MenuEditPositionRequestSellAutoDoubleSlippage, MenuError, MenuFAQ, MenuListPositions, MenuMain, MenuOKClose, MenuPNLHistory, MenuTODO, MenuTrailingStopLossEntryBuyQuantity, MenuTrailingStopLossPickVsToken, MenuTrailingStopLossSlippagePercent, MenuTrailingStopLossTriggerPercent, MenuViewDecryptedWallet, MenuViewOpenPosition, MenuWallet, MenuWhatIsTSL, PositionIDAndChoice, SubmittedTriggerPctKey, WelcomeScreenPart1 } from "../menus";
+import { BaseMenu, LegalAgreement, MenuAdminViewClosedPositions, MenuBetaInviteFriends, MenuCode, MenuComingSoon, MenuContinueMessage, MenuEditOpenPositionSellAutoDoubleSlippage, MenuEditOpenPositionSellPriorityFee, MenuEditOpenPositionSellSlippagePercent, MenuEditOpenPositionTriggerPercent, MenuEditPositionHelp, MenuEditPositionRequestPriorityFees, MenuEditPositionRequestSellAutoDoubleSlippage, MenuError, MenuFAQ, MenuListPositions, MenuMain, MenuOKClose, MenuPNLHistory, MenuTODO, MenuTrailingStopLossEntryBuyQuantity, MenuTrailingStopLossPickVsToken, MenuTrailingStopLossSlippagePercent, MenuTrailingStopLossTriggerPercent, MenuViewDecryptedWallet, MenuViewOpenPosition, MenuWallet, MenuWhatIsTSL, PositionIDAndChoice, PositionIDAndPriorityFeeMultiplier, SubmittedTriggerPctKey, WelcomeScreenPart1 } from "../menus";
 import { MenuViewObj } from "../menus/menu_admin_view_obj";
 import { PositionIDAndSellSlippagePercent } from "../menus/menu_edit_open_position_sell_slippage_percent";
 import { MenuEditPositionRequest } from "../menus/menu_edit_position_request";
@@ -118,8 +118,7 @@ export class CallbackHandler {
             slippagePercent: defaultTSL.slippagePercent,
             sellAutoDoubleSlippage: defaultTSL.sellAutoDoubleSlippage,
             triggerPercent: defaultTSL.triggerPercent,
-            sellPriorityFeeAutoMultiplier: defaultTSL.sellPriorityFeeAutoMultiplier,
-            buyPriorityFeeAutoMultiplier: defaultTSL.buyPriorityFeeAutoMultiplier
+            priorityFeeAutoMultiplier: defaultTSL.priorityFeeAutoMultiplier
         };
 
         // get a quote for the token being swapped to
@@ -204,7 +203,7 @@ export class CallbackHandler {
                 }
                 const request = convertPreRequestToRequest(newPrerequest, quote, tokenInfoResponse.tokenInfo);
                 await storeSessionObj<PositionRequest>(params.getTelegramUserID(), params.chatID, messageID, request, POSITION_REQUEST_STORAGE_KEY, this.env);
-                return new MenuEditPositionRequest({ positionRequest: request, maybeSOLBalance, allowChooseAutoDoubleSlippage: this.allowChooseAutoDouble() });
+                return new MenuEditPositionRequest({ positionRequest: request, maybeSOLBalance, allowChooseAutoDoubleSlippage: this.allowChooseAutoDouble(), allowChoosePriorityFees: this.allowChoosePriorityFees() });
             case MenuCode.Error:
                 return new MenuError(undefined);
             case MenuCode.ViewDecryptedWallet:
@@ -231,7 +230,7 @@ export class CallbackHandler {
                 if (positionAndMaybePNL == null) {
                     return new MenuContinueMessage('Sorry - this position is no longer being price monitored!', MenuCode.Main);
                 }
-                return new MenuViewOpenPosition({ data: positionAndMaybePNL, allowChooseAutoDoubleSlippage: this.allowChooseAutoDouble() });
+                return new MenuViewOpenPosition({ data: positionAndMaybePNL, allowChooseAutoDoubleSlippage: this.allowChooseAutoDouble(), allowChoosePriorityFees: this.allowChoosePriorityFees() });
             case MenuCode.ClosePositionManuallyAction:
                 const closePositionID = callbackData.menuArg;
                 if (closePositionID != null) {
@@ -258,7 +257,7 @@ export class CallbackHandler {
                     return new MenuContinueMessage(`Sorry - '${callbackData.menuArg||''}' is not a valid percentage.`, MenuCode.TrailingStopLossSlippagePctMenu);
                 }
                 if (slipPctEntry) {
-                    await storeSessionObjProperty(params.getTelegramUserID(), params.chatID, messageID, "slippagePercent", slipPctEntry, POSITION_REQUEST_STORAGE_KEY, this.env);
+                    await storeSessionObjProperty<PositionRequest>(params.getTelegramUserID(), params.chatID, messageID, "slippagePercent", slipPctEntry, POSITION_REQUEST_STORAGE_KEY, this.env);
                 }
                 const positionRequestAfterEditingSlippagePct = await readSessionObj<PositionRequest>(params.getTelegramUserID(), params.chatID, messageID, POSITION_REQUEST_STORAGE_KEY, this.env);
                 return await this.makeStopLossRequestEditorMenu(positionRequestAfterEditingSlippagePct, maybeSOLBalance, this.env);                
@@ -283,7 +282,7 @@ export class CallbackHandler {
                 if (submittedBuyQuantity > strictParseFloat(this.env.SOL_BUY_LIMIT)) {
                     return new MenuContinueMessage(`Sorry - ${this.env.TELEGRAM_BOT_DISPLAY_NAME} does not currently allow purchases of over ${strictParseFloat(this.env.SOL_BUY_LIMIT)} SOL`, MenuCode.TrailingStopLossSlippagePctMenu); 
                 }
-                await storeSessionObjProperty(params.getTelegramUserID(), params.chatID, messageID, "vsTokenAmt", submittedBuyQuantity, POSITION_REQUEST_STORAGE_KEY, this.env);
+                await storeSessionObjProperty<PositionRequest>(params.getTelegramUserID(), params.chatID, messageID, "vsTokenAmt", submittedBuyQuantity, POSITION_REQUEST_STORAGE_KEY, this.env);
                 const trailingStopLossRequestStateAfterBuyQuantityEdited = await readSessionObj<PositionRequest>(params.getTelegramUserID(), params.chatID, messageID, POSITION_REQUEST_STORAGE_KEY, this.env);
                 return await this.makeStopLossRequestEditorMenu(trailingStopLossRequestStateAfterBuyQuantityEdited, maybeSOLBalance, this.env);
             case MenuCode.CustomTriggerPct:
@@ -306,7 +305,7 @@ export class CallbackHandler {
                         `Sorry - '${callbackData.menuArg||''}' is not a valid percentage`,
                         MenuCode.TrailingStopLossTriggerPercentMenu);
                 }
-                await storeSessionObjProperty(params.getTelegramUserID(), params.chatID, messageID, "triggerPercent", triggerPctEntry, POSITION_REQUEST_STORAGE_KEY, this.env);
+                await storeSessionObjProperty<PositionRequest>(params.getTelegramUserID(), params.chatID, messageID, "triggerPercent", triggerPctEntry, POSITION_REQUEST_STORAGE_KEY, this.env);
                 const updatedTSL = await readSessionObj<PositionRequest>(params.getTelegramUserID(), params.chatID, messageID, POSITION_REQUEST_STORAGE_KEY, this.env);
                 return await this.makeStopLossRequestEditorMenu(updatedTSL, maybeSOLBalance, this.env);                
             case MenuCode.TrailingStopLossEditorFinalSubmit:
@@ -351,7 +350,7 @@ export class CallbackHandler {
                 const y = await readSessionObj<PositionRequest>(params.getTelegramUserID(), params.chatID, messageID, POSITION_REQUEST_STORAGE_KEY, this.env);
                 const triggerPercent = y.triggerPercent;
                 return new MenuTrailingStopLossTriggerPercent(triggerPercent);
-            case MenuCode.TrailingStopLossRequestReturnToEditorMenu:
+            case MenuCode.ReturnToPositionRequestEditor:
                 const z = await readSessionObj<PositionRequest>(params.getTelegramUserID(), params.chatID, messageID, POSITION_REQUEST_STORAGE_KEY, this.env);
                 return await this.makeStopLossRequestEditorMenu(z, maybeSOLBalance, this.env);
             case MenuCode.BetaGateInviteFriends:
@@ -377,25 +376,25 @@ export class CallbackHandler {
                 const tokenAddressExtractor = new TokenAddressExtractor();
                 const newTokenAddress = tokenAddressExtractor.maybeExtractTokenAddress(maybeTokenAddress);
                 if (newTokenAddress == null) {
-                    return new MenuContinueMessage(`Sorry - we couldn't interpret this as a token address.`, MenuCode.TrailingStopLossRequestReturnToEditorMenu);
+                    return new MenuContinueMessage(`Sorry - we couldn't interpret this as a token address.`, MenuCode.ReturnToPositionRequestEditor);
                 }
                 const positionRequest = await readSessionObj<PositionRequest>(params.getTelegramUserID(), params.chatID, messageID, POSITION_REQUEST_STORAGE_KEY, this.env);
                 if (positionRequest.token.address === newTokenAddress) {
-                    return new MenuEditPositionRequest({ positionRequest: positionRequest, maybeSOLBalance, allowChooseAutoDoubleSlippage: this.allowChooseAutoDouble() });
+                    return new MenuEditPositionRequest({ positionRequest: positionRequest, maybeSOLBalance, allowChooseAutoDoubleSlippage: this.allowChooseAutoDouble(), allowChoosePriorityFees: this.allowChoosePriorityFees() });
                 }                
                 const tokenValidationInfo = await getTokenInfo(newTokenAddress, this.env);
                 if (isInvalidTokenInfoResponse(tokenValidationInfo)) {
-                    return new MenuContinueMessage(`Sorry - <code>${newTokenAddress}</code> was not recognized as a valid token. If it is a new token, you may want to try in a few minutes.  See Jupiter's <a href='https://jup.ag/'>swap UI</a> for a list of supported tokens.`, MenuCode.TrailingStopLossRequestReturnToEditorMenu);
+                    return new MenuContinueMessage(`Sorry - <code>${newTokenAddress}</code> was not recognized as a valid token. If it is a new token, you may want to try in a few minutes.  See Jupiter's <a href='https://jup.ag/'>swap UI</a> for a list of supported tokens.`, MenuCode.ReturnToPositionRequestEditor);
                 }
                 const newTokenInfo = tokenValidationInfo.tokenInfo;
                 positionRequest.token = newTokenInfo;
                 const maybeQuote = await quoteBuy(positionRequest, newTokenInfo, this.env);
                 if (isGetQuoteFailure(maybeQuote)) {
-                    return new MenuContinueMessage(`Sorry - could not get a quote for $${newTokenInfo.symbol}`, MenuCode.TrailingStopLossRequestReturnToEditorMenu);
+                    return new MenuContinueMessage(`Sorry - could not get a quote for $${newTokenInfo.symbol}`, MenuCode.ReturnToPositionRequestEditor);
                 }
                 positionRequest.quote = maybeQuote;
                 await storeSessionObj<PositionRequest>(params.getTelegramUserID(), params.chatID, messageID, positionRequest, POSITION_REQUEST_STORAGE_KEY, this.env);
-                return new MenuEditPositionRequest({ positionRequest, maybeSOLBalance, allowChooseAutoDoubleSlippage: this.allowChooseAutoDouble() });
+                return new MenuEditPositionRequest({ positionRequest, maybeSOLBalance, allowChooseAutoDoubleSlippage: this.allowChooseAutoDouble(), allowChoosePriorityFees: this.allowChoosePriorityFees() });
             case MenuCode.WelcomeScreenPart1:
                 return new WelcomeScreenPart1({ botDisplayName: this.env.TELEGRAM_BOT_DISPLAY_NAME });
             case MenuCode.LegalAgreement:
@@ -513,7 +512,7 @@ export class CallbackHandler {
                     return new MenuContinueMessage(`Sorry - please choose a percent greater than zero and less than 100`, MenuCode.ViewOpenPosition, 'HTML', parsedCallbackData.positionID);
                 }
                 else {
-                    return new MenuViewOpenPosition( { data: editTriggerPercentResult, allowChooseAutoDoubleSlippage: this.allowChooseAutoDouble() });
+                    return new MenuViewOpenPosition( { data: editTriggerPercentResult, allowChooseAutoDoubleSlippage: this.allowChooseAutoDouble(), allowChoosePriorityFees: this.allowChoosePriorityFees() });
                 }
             case MenuCode.EditOpenPositionAutoDoubleSlippage:
                 return new MenuEditOpenPositionSellAutoDoubleSlippage(callbackData.menuArg||'');
@@ -540,7 +539,7 @@ export class CallbackHandler {
                         params.messageID, 
                         POSITION_REQUEST_STORAGE_KEY, 
                         this.env);                    
-                    await storeSessionObjProperty(params.getTelegramUserID(), 
+                    await storeSessionObjProperty<PositionRequest>(params.getTelegramUserID(), 
                         params.chatID, 
                         params.messageID, 
                         "sellAutoDoubleSlippage", 
@@ -553,7 +552,7 @@ export class CallbackHandler {
                         params.messageID, 
                         POSITION_REQUEST_STORAGE_KEY, 
                         this.env);
-                    return new MenuEditPositionRequest({ positionRequest: pr, maybeSOLBalance, allowChooseAutoDoubleSlippage: this.allowChooseAutoDouble() });
+                    return new MenuEditPositionRequest({ positionRequest: pr, maybeSOLBalance, allowChooseAutoDoubleSlippage: this.allowChooseAutoDouble(), allowChoosePriorityFees : this.allowChoosePriorityFees() });
                 }
             case MenuCode.AdminInvokeAlarm:
                 return new ReplyQuestion('Enter token address', ReplyQuestionCode.AdminInvokeAlarm, this.context, { callback: { linkedMessageID: params.messageID, nextMenuCode: MenuCode.SubmitAdminInvokeAlarm }});
@@ -583,7 +582,7 @@ export class CallbackHandler {
                 if (updatedPosition.positionAndMaybePNL == null) {
                     return this.sorryError();
                 }
-                return new MenuViewOpenPosition({ data: updatedPosition.positionAndMaybePNL, allowChooseAutoDoubleSlippage: this.allowChooseAutoDouble() });
+                return new MenuViewOpenPosition({ data: updatedPosition.positionAndMaybePNL, allowChooseAutoDoubleSlippage: this.allowChooseAutoDouble(),  allowChoosePriorityFees: this.allowChoosePriorityFees() });
             case MenuCode.AdminSendUserMessage:
                 return new ReplyQuestion("Enter userID|message", ReplyQuestionCode.AdminSendUserMessage, this.context, {
                     callback: {
@@ -674,9 +673,29 @@ export class CallbackHandler {
             case MenuCode.ViewDeactivatedPositions:
                 const listDeactivatedPositionsResponse = await listDeactivatedPositions(params.getTelegramUserID(), params.chatID, this.env);
                 return new MenuViewDeactivatedPositions(listDeactivatedPositionsResponse.deactivatedPositions);
+            case MenuCode.EditPositionRequestPriorityFees:
+                return new MenuEditPositionRequestPriorityFees(this.priorityFeeMultipliers());
+            case MenuCode.EditPositionRequestSubmitPriorityFees:
+                const selectedPriorityFee = tryParseInt(callbackData.menuArg||'')||(callbackData.menuArg||'');
+                await storeSessionObjProperty(params.getTelegramUserID(), params.chatID, params.messageID, "priorityFeeAutoMultiplier", selectedPriorityFee, POSITION_REQUEST_STORAGE_KEY, this.env);
+                const posRequestWithPriorityFeeSet = await readSessionObj<PositionRequest>(params.getTelegramUserID(), params.chatID, params.messageID, POSITION_REQUEST_STORAGE_KEY, this.env);
+                return new MenuEditPositionRequest({ positionRequest: posRequestWithPriorityFeeSet, maybeSOLBalance, allowChooseAutoDoubleSlippage: this.allowChooseAutoDouble(), allowChoosePriorityFees : this.allowChoosePriorityFees() });
+            case MenuCode.EditOpenPositionPriorityFee:
+                return new MenuEditOpenPositionSellPriorityFee({ positionID : callbackData.menuArg||'', priorityFeeMultipliers : this.priorityFeeMultipliers() })
+            case MenuCode.EditOpenPositionSubmitPriorityFee:
+                const thing = PositionIDAndPriorityFeeMultiplier.parse(callbackData.menuArg||'');
+                if (thing == null) {
+                    return new MenuContinueMessage(`Sorry - that selection was not recognized as valid`, MenuCode.Main);
+                }
+                await setOpenPositionSellPriorityFeeMultiplier(params.getTelegramUserID(), params.chatID, thing.positionID, thing.multiplier, this.env);
+                return await this.makeOpenPositionMenu(params, thing.positionID);
             default:
                 assertNever(callbackData.menuCode);
         }
+    }
+
+    private priorityFeeMultipliers() : number[] {
+        return this.env.PRIORITY_FEE_MULTIPLIER_OPTIONS.split(",").map(x => strictParseInt(x));
     }
 
     private sorryError(menuCode ?: MenuCode, menuArg ?: string) : MenuContinueMessage {
@@ -688,7 +707,7 @@ export class CallbackHandler {
         if (positionAndMaybePNL == null) {
             return this.sorryError();
         }
-        return new MenuViewOpenPosition({ data: positionAndMaybePNL, allowChooseAutoDoubleSlippage: this.allowChooseAutoDouble() });
+        return new MenuViewOpenPosition({ data: positionAndMaybePNL, allowChooseAutoDoubleSlippage: this.allowChooseAutoDouble(), allowChoosePriorityFees: this.allowChoosePriorityFees() });
     }
 
     private async sendBetaFeedbackToSuperAdmin(feedback : string, myUserName : string, myUserID : number) : Promise<void> {
@@ -742,7 +761,7 @@ export class CallbackHandler {
 
     private async makeStopLossRequestEditorMenu(positionRequest : PositionRequest, maybeSOLBalance : DecimalizedAmount|null, env : Env) : Promise<BaseMenu> {
         await this.refreshQuote(positionRequest, env);
-        return new MenuEditPositionRequest({ positionRequest, maybeSOLBalance, allowChooseAutoDoubleSlippage: this.allowChooseAutoDouble() });
+        return new MenuEditPositionRequest({ positionRequest, maybeSOLBalance, allowChooseAutoDoubleSlippage: this.allowChooseAutoDouble(), allowChoosePriorityFees : this.allowChoosePriorityFees() });
     }
 
     private async handleManuallyClosePosition(telegramUserID : number, chatID : number, positionID : string, env : Env) : Promise<Response> {
@@ -895,7 +914,7 @@ export class CallbackHandler {
 
                 const maybeSOLBalance = await getUserWalletSOLBalance(positionRequest.userID, positionRequest.chatID, this.env);
 
-                return ['...', new MenuEditPositionRequest({ positionRequest, maybeSOLBalance, allowChooseAutoDoubleSlippage: this.allowChooseAutoDouble() }), storeObjectRequest];
+                return ['...', new MenuEditPositionRequest({ positionRequest, maybeSOLBalance, allowChooseAutoDoubleSlippage: this.allowChooseAutoDouble(), allowChoosePriorityFees: this.allowChoosePriorityFees() }), storeObjectRequest];
             default:
                 throw new Error(`Unrecognized command: ${command}`);
         }
@@ -912,5 +931,9 @@ export class CallbackHandler {
 
     private allowChooseAutoDouble() : boolean {
         return strictParseBoolean(this.env.ALLOW_CHOOSE_AUTO_DOUBLE_SLIPPAGE);
+    }
+
+    private allowChoosePriorityFees() : boolean {
+        return strictParseBoolean(this.env.ALLOW_PRIORITY_FEE_MULTIPLIERS);
     }
 }

@@ -40,6 +40,7 @@ import { MarkPositionAsClosingRequest, MarkPositionAsClosingResponse } from "./a
 import { MarkPositionAsOpenRequest, MarkPositionAsOpenResponse } from "./actions/mark_position_as_open";
 import { PositionExistsInTrackerRequest, PositionExistsInTrackerResponse } from "./actions/position_exists_in_tracker";
 import { RemovePositionRequest, RemovePositionResponse } from "./actions/remove_position";
+import { SetOpenPositionSellPriorityFeeInTrackerRequest, SetOpenPositionSellPriorityFeeInTrackerResponse } from "./actions/set_open_position_sell_priority_fee_in_tracker";
 import { SetSellAutoDoubleOnOpenPositionInTrackerRequest } from "./actions/set_sell_auto_double_on_open_position_in_tracker";
 import { SetSellSlippagePercentOnOpenPositionTrackerRequest } from "./actions/set_sell_slippage_percent_on_open_position";
 import { UpdatePositionRequest, UpdatePositionResponse } from "./actions/update_position";
@@ -375,9 +376,28 @@ export class TokenPairPositionTrackerDO {
                 return await this.handleIncrementOtherSellFailureCount(body);
             case TokenPairPositionTrackerDOFetchMethod.doubleSellSlippage:
                 return await this.handleDoubleSellSlippageInTracker(body);
+            case TokenPairPositionTrackerDOFetchMethod.setOpenPositionSellPriorityFee:
+                return await this.handleSetOpenPositionSellPriorityFee(body);
             default:
                 assertNever(method);
         }
+    }
+
+    async handleSetOpenPositionSellPriorityFee(body : SetOpenPositionSellPriorityFeeInTrackerRequest) : Promise<Response> {
+        const response = await this.handleSetOpenPositionSellPriorityFeeInternal(body);
+        return makeJSONResponse<SetOpenPositionSellPriorityFeeInTrackerResponse>(response);
+    }
+
+    async handleSetOpenPositionSellPriorityFeeInternal(body: SetOpenPositionSellPriorityFeeInTrackerRequest) : Promise<SetOpenPositionSellPriorityFeeInTrackerResponse> {
+        const position = this.tokenPairPositionTracker.getPosition(body.positionID);
+        if (position == null) {
+            return {};
+        }
+        else if (position.status !== PositionStatus.Open) {
+            return {};
+        }
+        position.sellPriorityFeeAutoMultiplier = body.multiplier;
+        return {};
     }
 
     async handleDoubleSellSlippageInTracker(body: DoubleSellSlippageInTrackerRequest) : Promise<Response> {
