@@ -72,7 +72,7 @@ export interface Position {
 	sellPriorityFeeAutoMultiplier : 'auto'|number|null
 };
 
-interface BasePositionRequest {
+export interface BasePositionRequest {
 
 	userID : number
 	chatID : number
@@ -81,6 +81,7 @@ interface BasePositionRequest {
 	positionID : string
 	positionType : PositionType
 
+	vsToken : TokenInfo
 	vsTokenAmt : number
 	slippagePercent : number
 
@@ -95,14 +96,16 @@ interface BasePositionRequest {
 export interface PositionPreRequest extends BasePositionRequest {
 	readonly [ keyof : string ] : Structural
 	tokenAddress : string
-	vsToken : TokenInfo
 }
 
-// Complete position request
+/*
+	Complete position request - 
+	just like a prerequest except with a quote and a full TokenInfo object 
+	instead of just a address 
+*/
 export interface PositionRequest extends BasePositionRequest {
 	readonly [ key : string ] : Structural
 	token : TokenInfo
-	vsToken : TokenInfo
 	quote : Quote
 };
 
@@ -159,13 +162,13 @@ export function getInAndOutTokens(s : Swappable): { inToken : TokenInfo, outToke
 
 export function describePriorityFee(priorityFee : null|"auto"|number) {
 	if (priorityFee == null) {
-		return "Default";
+		return "Priority Fees: Default";
 	}
 	else if (priorityFee == "auto") {
-		return "Default";
+		return "Priority Fees: Default";
 	}
 	else if (typeof priorityFee === 'number') {
-		return `${priorityFee.toString(10)}x`;
+		return `Priority Fees: ${priorityFee.toString(10)}x`;
 	}
 	else {
 		assertNever(priorityFee);

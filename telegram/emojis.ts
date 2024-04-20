@@ -4,7 +4,6 @@ const emojis = {
 
     ':bot:': '🤖',
 
-    ':winged_money:': '💸',
     ':dollars:': '💵',
     ':wallet:': '💰',
     ':eyes:': '👀',
@@ -13,7 +12,6 @@ const emojis = {
     ':notify:': '🔔',
     ':mountain:': '🏔️',
     ':wave:': '🌊',
-    ':cart:': '🛒',
     ':deactivated:': '🧊',
 
     ':red:': '🔴',
@@ -24,9 +22,6 @@ const emojis = {
     ':purple:': '🟣',
     ':blue:': '🔵',
 
-    ':down:': '🔻',
-    ':up:': '💰', // irritating, but no green triangle up in emojis.
-    ':equals:': '😑',
     ':ledger:': '📒',
 
     ':bullet:': '•',
@@ -40,61 +35,23 @@ const emojis = {
 
     ':chart_up:': '📈',
     ':chart_down:': '📉',
-    ':rocket:': '🚀',
-    ':roller_coaster:': '🎢',
-    ':meh:': '😑',
-    
-    ':globe:': '🌍',
-    ':whale:': '🐋',
-    ':dolphin:': '🐬',
-    ':shrimp:': '🦐',
-    ':microbe:' : '🦠',
-
-    ':lock:': '🔒', // closing position
+    ':priority_fees:': '🚀',
 
     ':key:': '🔑',
 
     ':sparkle:' : '✨',
     
     ':briefcase:': '💼',
-    ':envelope:': '✉️',
     ':ticket:': '🎟️',
     ':love_letter:': '💌',
 
-    ':rage:': '🤬',
-    ':anger:': '😠',
-    ':disappointed:': '😞',
-    ':indifference:': '😑',
-    ':peanuts:': '🥜',
-    ':happy:': '😊',
-    ':beaming:': '😁',
-    ':money_face:': '🤑',
     ':help:': '❔',
-    ':stop:': '🛑',
-    ':caution:': '🟡',
     ':none:': '',
     ':space:': ' '
 }
 
 type emojiTag = keyof typeof emojis;
 
-export function interpretPct(pct: number) : emojiTag {
-    if (pct < -50) {
-        return ':rage:';
-    }
-    else if (pct < -1) {
-        return ':chart_down:';
-    }
-    else if (pct < 1) {
-        return ':meh:';
-    }
-    else if (pct < 50) {
-        return ':chart_up:';
-    }
-    else {
-        return ':rocket:';
-    }
-}
 
 export function asChartEmoji(pnl : number) : emojiTag {
     if (pnl < 0) {
@@ -105,63 +62,6 @@ export function asChartEmoji(pnl : number) : emojiTag {
     }
     else {
         return ':space:';
-    }
-}
-
-export function interpretPNL(pnl : number) : emojiTag {
-    if (pnl < -10) {
-        return ':rage:';
-    }
-    else if (pnl < -5) {
-        return ':anger:';
-    }
-    else if (pnl <= -0.5) {
-        return ':disappointed:'
-    }
-    else if (pnl < 0.0) {
-        return ':meh:';
-    }
-    else if (pnl < 0.5) {
-        return ':peanuts:';
-    }
-    else if (pnl < 5) {
-        return ':happy:';
-    }
-    else if (pnl < 10) {
-        return ':beaming:';
-    }
-    else {
-        return ':money_face:';
-    }
-}
-
-export function interpretPNLWithArrows(pnl : number) : emojiTag {
-    if (pnl < 0) {
-        return ':down:';
-    }
-    else if (pnl == 0) {
-        return ':equals:';
-    }
-    else {
-        return ':up:';
-    }
-}
-
-export function interpretSOLAmount(amt : number) : emojiTag {
-    if (amt <= 0.0001) {
-        return ':microbe:';
-    }
-    if (amt <= 5) {
-        return ':shrimp:';
-    }
-    else if (amt <= 10) {
-        return ':dolphin:';
-    }
-    else if (amt <= 100) {
-        return ':whale:';
-    }
-    else {
-        return ':globe:';
     }
 }
 

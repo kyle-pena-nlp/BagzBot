@@ -32,22 +32,26 @@ export class MenuEditPositionRequest extends Menu< { positionRequest: PositionRe
     renderOptions(): CallbackButton[][] {
         const options = this.emptyMenu();
         const positionRequest = this.menuData.positionRequest;
+        
         //this.insertButtonNextLine(options, `Buying With: ${positionRequest.vsToken.symbol}`, new CallbackData(MenuCode.TrailingStopLossPickVsTokenMenu, positionRequest.vsToken.symbol));
         this.insertButtonNextLine(options, `:pencil: Change Token`, new CallbackData(MenuCode.EditPositionChangeToken));
+
         this.insertButtonNextLine(options, `:dollars: ${positionRequest.vsTokenAmt} ${positionRequest.vsToken.symbol}`, new CallbackData(MenuCode.TrailingStopLossEntryBuyQuantityMenu, positionRequest.vsTokenAmt.toString()));
-        
-        this.insertButtonSameLine(options, `:chart_down: ${positionRequest.triggerPercent}% Trigger`, new CallbackData(MenuCode.TrailingStopLossTriggerPercentMenu, positionRequest.triggerPercent.toString()));
+        this.insertButtonNextLine(options, `:chart_down: ${positionRequest.triggerPercent}% Trigger`, new CallbackData(MenuCode.TrailingStopLossTriggerPercentMenu, positionRequest.triggerPercent.toString()));
         this.insertButtonSameLine(options, `:twisted_arrows: ${positionRequest.slippagePercent}% Slippage`, new CallbackData(MenuCode.TrailingStopLossSlippagePctMenu, positionRequest.slippagePercent.toString()));
-        if (this.menuData.allowChooseAutoDoubleSlippage) {
-            this.insertButtonNextLine(options, `:brain: ${positionRequest.sellAutoDoubleSlippage ? 'Sell: Auto-Double Slippage': 'Sell: No Auto-Double Slippage'} :brain:`, new CallbackData(MenuCode.PosRequestChooseAutoDoubleSlippageOptions));
-        }
-        
+
+        const nextLine = options.length + 1;
         if (this.menuData.allowChoosePriorityFees) {
-            this.insertButtonNextLine(options, `Priority Fees: ${describePriorityFee(positionRequest.priorityFeeAutoMultiplier)}`, this.menuCallback(MenuCode.EditPositionRequestPriorityFees));
+            this.insertButton(options, `${describePriorityFee(positionRequest.priorityFeeAutoMultiplier)}`, this.menuCallback(MenuCode.EditPositionRequestPriorityFees), nextLine);
+        }
+        if (this.menuData.allowChooseAutoDoubleSlippage) {
+            this.insertButton(options, `${positionRequest.sellAutoDoubleSlippage ? '': 'Do Not '} Auto-Double Slippage`, new CallbackData(MenuCode.PosRequestChooseAutoDoubleSlippageOptions), nextLine);
         }
 
+
         this.insertButtonNextLine(options, `:refresh: Refresh Quote`, new CallbackData(MenuCode.ReturnToPositionRequestEditor));
-        this.insertButtonSameLine(options, `:cancel: Cancel`, new CallbackData(MenuCode.Main));
+        //this.insertButtonSameLine(options, `:cancel: Cancel`, new CallbackData(MenuCode.Main));
+        this.insertButtonSameLine(options, `Close`, new CallbackData(MenuCode.Close));
         //this.insertButtonSameLine(options, ':help: Help', new CallbackData(MenuCode.EditPositionHelp));
         this.insertButtonNextLine(options, `:sparkle: Submit :sparkle:`, new CallbackData(MenuCode.TrailingStopLossEditorFinalSubmit));
         return options;

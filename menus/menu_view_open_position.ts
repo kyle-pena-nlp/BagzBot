@@ -45,22 +45,24 @@ export class MenuViewOpenPosition extends Menu<MenuData> implements MenuCapabili
             this.insertButtonNextLine(options, `:chart_down: ${this.position().triggerPercent}% Trigger`, new CallbackData(MenuCode.EditOpenPositionTriggerPercent, this.position().positionID));
             this.insertButtonSameLine(options, `:twisted_arrows: ${this.position().sellSlippagePercent}% Slippage`, new CallbackData(MenuCode.EditOpenPositionSellSlippagePercent, this.position().positionID));
 
+            // this will simplify when i strip out these feature flags
+            const nextLine = options.length + 1;
             if (this.allowChoosePriorityFees()) {
-                this.insertButtonNextLine(options, `Priority Fees: ${describePriorityFee(this.position().sellPriorityFeeAutoMultiplier)}`, new CallbackData(MenuCode.EditOpenPositionPriorityFee, this.position().positionID));
+                this.insertButton(options, `${describePriorityFee(this.position().sellPriorityFeeAutoMultiplier)}`, new CallbackData(MenuCode.EditOpenPositionPriorityFee, this.position().positionID), nextLine);
             }
-
             if (this.allowChooseAutoDoubleSlippage()) {
-                this.insertButtonNextLine(options, `:brain: ${this.position().sellAutoDoubleSlippage ? '': 'Do Not'} Auto-Double Slippage If TSL Fails :brain:`, new CallbackData(MenuCode.EditOpenPositionAutoDoubleSlippage, this.position().positionID));
+                this.insertButton(options, `${this.position().sellAutoDoubleSlippage ? '': 'Do Not'} Auto-Double Slippage`, new CallbackData(MenuCode.EditOpenPositionAutoDoubleSlippage, this.position().positionID), nextLine);
             }
         }
 
         if (this.canBeDeactivated()) {
-            this.insertButtonNextLine(options, ':deactivated: Deactivate Position', new CallbackData(MenuCode.DeactivatePosition, this.position().positionID));
+            this.insertButtonNextLine(options, ':deactivated: Deactivate Position :deactivated:', new CallbackData(MenuCode.DeactivatePosition, this.position().positionID));
         }
 
         const refreshPositionCallbackData = new CallbackData(MenuCode.ViewOpenPosition, this.position().positionID);
         this.insertButtonNextLine(options, ":refresh: Refresh", refreshPositionCallbackData);
         this.insertButtonSameLine(options, ":back: Back", this.menuCallback(MenuCode.ListPositions));
+        this.insertButtonSameLine(options, "Close", this.menuCallback(MenuCode.Close));
 
         return options;
     }
@@ -165,7 +167,7 @@ export class MenuViewOpenPosition extends Menu<MenuData> implements MenuCapabili
             lines.push(`:bullet: <code><b>Current Price</b>:   </code>${asTokenPrice(this.currentPrice())} SOL (${asPercentDeltaString(this.pnlDeltaPct())}) (${peakPriceComparison} Peak Price)`);
             lines.push(`:bullet: <code><b>Peak Price</b>:      </code>${asTokenPrice(this.menuData.data.peakPrice)} SOL`)
             lines.push(`:bullet: <code><b>Trigger Percent</b>: </code>${this.position().triggerPercent.toFixed(1)}%`)
-            lines.push(`:bullet: <code><b>PNL</b>:             </code>${asTokenPriceDelta(this.PNL().PNL)} SOL`);
+            lines.push(`:bullet: <code><b>PnL</b>:             </code>${asTokenPriceDelta(this.PNL().PNL)} SOL`);
         }
 
         if (this.buyIsConfirmed() && this.isCloseToBeingTriggered() && !this.isClosingOrClosed() && !this.triggerConditionMet()) {

@@ -28,6 +28,7 @@ export class MenuPNLHistory extends Menu<{ closedPositions : Position[], netPNL 
     }
 
     addPNLSummaryForToken(lines : string[], closedPositionsForToken : Position[]) {
+        
         let netPNL = dZero();
         let totalInvested = dZero();
         let numPositions = 0;
@@ -39,29 +40,24 @@ export class MenuPNLHistory extends Menu<{ closedPositions : Position[], netPNL 
                 numPositions += 1;
             }
         }
-        const table = new FormattedTable([10], 'bulleted');
+        
         const pos = closedPositionsForToken[0];
         const pnlPercentDelta = dMult(fromNumber(100), dDiv(netPNL, totalInvested, MATH_DECIMAL_PLACES)||dZero());
-        const soldTotal = dAdd(totalInvested,netPNL);
-        
         const heading = `<b><u>${pos.token.symbol}</u></b> ${asChartEmoji(toNumber(netPNL))} (${asPercentDeltaString(pnlPercentDelta)})`;
         lines.push(`<code>${pos.token.address}</code>`);
         lines.push(heading);
-        //table.addLine(`:bullet: <b>${asTokenPrice(totalInvested)}</b> Total SOL Invested`);
-        //table.addLine(`:bullet: <b>${asTokenPriceDelta(netPNL)}</b> net SOL (${asPercentDeltaString(pnlPercentDelta)})`);
-        
+        const table = new FormattedTable([10], 'bulleted');
         table.addLine(`${asTokenPrice(totalInvested, true)}`, "SOL Invested");
         table.addLine(`${asTokenPriceDelta(netPNL)}`, `Net SOL (${asPercentDeltaString(pnlPercentDelta)})`);
-        
         table.appendTo(lines);
-
         lines.push("")
     }
 
     renderOptions(): CallbackButton[][] {
         const options = this.emptyMenu();
         this.insertButtonNextLine(options, `:refresh: Refresh`, new CallbackData(MenuCode.ViewPNLHistory));
-        this.insertButtonNextLine(options, `:back: Back`, new CallbackData(MenuCode.Main))
+        this.insertButtonSameLine(options, `:back: Back`, new CallbackData(MenuCode.Main));
+        this.insertButtonSameLine(options, `Close`, new CallbackData(MenuCode.Close));
         return options;
     }
     private addHeader(lines : string[]) {

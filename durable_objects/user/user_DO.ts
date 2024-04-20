@@ -5,11 +5,11 @@ import { asTokenPrice } from "../../decimalized/decimalized_amount";
 import { Env, getRPCUrl } from "../../env";
 import { makeFailureResponse, makeJSONResponse, makeSuccessResponse, maybeGetJson } from "../../http";
 import { logDebug, logError, logInfo } from "../../logging";
-import { Position, PositionPreRequest, PositionStatus, PositionType } from "../../positions";
+import { Position, PositionPreRequest, PositionRequest, PositionStatus, PositionType } from "../../positions";
 import { POSITION_REQUEST_STORAGE_KEY } from "../../storage_keys";
 import { TGStatusMessage, UpdateableNotification, sendMessageToTG } from "../../telegram";
 import { WEN_ADDRESS, getVsTokenInfo } from "../../tokens";
-import { ChangeTrackedValue, Structural, assertNever, groupIntoBatches, sleep, strictParseBoolean, strictParseInt } from "../../util";
+import { ChangeTrackedValue, Intersect, Structural, Subtract, assertNever, ensureArrayIsAllAndOnlyPropsOf, ensureArrayIsOnlyPropsOf, groupIntoBatches, sleep, strictParseBoolean, strictParseInt } from "../../util";
 import { assertIs } from "../../util/enums";
 import { listUnclaimedBetaInviteCodes } from "../beta_invite_codes/beta_invite_code_interop";
 import { PositionAndMaybePNL } from "../token_pair_position_tracker/model/position_and_PNL";
@@ -729,8 +729,8 @@ export class UserDO {
         defaultPrerequest.userID = defaultTrailingStopLossRequestRequest.telegramUserID;
         defaultPrerequest.chatID = defaultTrailingStopLossRequestRequest.chatID;
         defaultPrerequest.messageID = defaultTrailingStopLossRequestRequest.messageID;
-        if (strictParseBoolean(this.env.ALLOW_PRIORITY_FEE_MULTIPLIERS)) {
-            defaultPrerequest.priorityFeeAutoMultiplier = "auto";
+        if (!strictParseBoolean(this.env.ALLOW_PRIORITY_FEE_MULTIPLIERS)) {
+            defaultPrerequest.priorityFeeAutoMultiplier = null;
         }
         defaultPrerequest.positionID = crypto.randomUUID();
         if (defaultTrailingStopLossRequestRequest.token != null) {
@@ -774,24 +774,50 @@ export class UserDO {
         });
     }
 
-    // TODO: a less hacky/dangerous way to do this.
+    /* 
+        TODO: This is a major, awful hack.  At the very least the backing instance should be a PositionRequest so the types match.
+        The purpose is to intercept sessionProperty writes to PositionRequest and set them on the default position request.
+        That way, the default 'remembers' whatever the user did last time.
+    */
     maybeWriteToDefaultPositionPrerequest(sessionKey : string, value : any) {
-        // MAJOR hack to avoid large code change
+
         if (sessionKey.startsWith(POSITION_REQUEST_STORAGE_KEY)) {
+            
             const sessionProperty = sessionKey.split("/")[1];
-            const dont_store_these : (keyof PositionPreRequest)[] = [ 'userID', 'chatID', 'positionID', 'messageID', 'positionID' ];
-            if (dont_store_these.includes(sessionProperty)) {
+            
+            // never overwrite these properties
+            const dont_overwrite_these  = ensureArrayIsOnlyPropsOf<PositionPreRequest>()([ 'userID', 'chatID', 'positionID', 'messageID', 'positionID' ] as const) as string[];
+            if (dont_overwrite_these.includes(sessionProperty)) {
                 return;
             }
-            if (sessionProperty != null && sessionProperty in this.defaultTrailingStopLossRequest.value) {
-                (this.defaultTrailingStopLossRequest.value as any)[sessionProperty] = value;
-            }
-            if (sessionProperty != null && sessionProperty === 'token') {
+
+            // make token.address on the positionRequest to tokenAddress on the positionPreRequest
+            const tokenProp : keyof PositionRequest = 'token';
+            if (sessionProperty === tokenProp) {
                 const tokenAddress = (value as any)?.address;
-                if (tokenAddress != null) {
-                    (this.defaultTrailingStopLossRequest.value as any)['tokenAddress'] = tokenAddress;
+                if (tokenAddress != null && typeof tokenAddress === 'string') {
+                    this.defaultTrailingStopLossRequest.value.tokenAddress = tokenAddress;
                 }      
+            }            
+            
+            // Never copy these positionRequest-only properties over to the positionPrerequest
+            const positionRequestOnlyProperties  = ensureArrayIsAllAndOnlyPropsOf<Subtract<PositionRequest,PositionPreRequest>>()([ "quote","token" ] as const) as string[];
+            if (positionRequestOnlyProperties.includes(sessionProperty)) {
+                return;
             }
+            // But you can write to these because they are properties in common!
+            const commonProperties = ensureArrayIsAllAndOnlyPropsOf<Omit<Intersect<PositionRequest,PositionPreRequest>,'userID'|'chatID'|'messageID'|'positionID'>>()([
+                'positionType',
+                'vsToken',
+                'vsTokenAmt',
+                'slippagePercent',
+                'triggerPercent',
+                'sellAutoDoubleSlippage',
+                'priorityFeeAutoMultiplier'
+            ] as const);
+            if ((commonProperties as readonly string[]).includes(sessionProperty)) {
+                (this.defaultTrailingStopLossRequest.value as any)[sessionProperty] = value;
+            }           
         }        
     }
 

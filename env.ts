@@ -1,4 +1,4 @@
-import { strictParseBoolean, tryParseInt } from "./util"
+import { strictParseBoolean, strictParseFloat, tryParseInt } from "./util"
 
 export interface Env {
 	
@@ -86,6 +86,13 @@ export interface Env {
 	BetaInviteCodesDO : any
 	HeartbeatDO: any
 };
+
+export function parsePriorityFeeOptions(env : Env) : Map<number,string> {
+	const priorityFeeOptions = env.PRIORITY_FEE_MULTIPLIER_OPTIONS.split(",")
+		.map(x => x.split(":"))
+		.map<[number,string]>(tokens => [strictParseFloat(tokens[0]), tokens[1]]);
+	return new Map<number,string>(priorityFeeOptions);
+}
 
 export function isUserBetaCodeExempt(telegramUserID : number, env : Env) {
 	return env.BETA_CODE_GATE_EXCEPTIONS.split(",").map(x => tryParseInt(x)).includes(telegramUserID);

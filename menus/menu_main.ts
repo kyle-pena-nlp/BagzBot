@@ -73,9 +73,11 @@ export class MenuMain extends Menu<UserData & Stuff> implements MenuCapabilities
                 this.insertButtonSameLine(options, ':wave: Wave Rider :wave:', new CallbackData(MenuCode.ComingSoon, "Combines Auto-Buy and TSL.!"));
             }*/
             this.insertButtonNextLine(options, ':briefcase: Wallet', this.menuCallback(MenuCode.Wallet));
-            this.insertButtonSameLine(options, ':chart_up: TSL Positions', this.menuCallback(MenuCode.ListPositions));
-            this.insertButtonNextLine(options, ':deactivated: Deactivated Positions', this.menuCallback(MenuCode.ViewDeactivatedPositions));
             this.insertButtonSameLine(options, ':ledger: PnL Summary', this.menuCallback(MenuCode.ViewPNLHistory));
+
+            this.insertButtonNextLine(options, ':chart_up: TSL Positions', this.menuCallback(MenuCode.ListPositions));
+            this.insertButtonSameLine(options, ':deactivated: Deactivated Positions', this.menuCallback(MenuCode.ViewDeactivatedPositions));
+            
             if (this.menuData.hasInviteBetaCodes) {
                 this.insertButtonNextLine(options, ":envelope: Invite Friends To Beta", this.menuCallback(MenuCode.BetaGateInviteFriends));
             }
@@ -116,7 +118,7 @@ export class MenuMain extends Menu<UserData & Stuff> implements MenuCapabilities
                 this.insertButtonNextLine(options, ':love_letter: Send Feedback :love_letter:', this.menuCallback(MenuCode.BetaFeedbackQuestion));
             }
             this.insertButtonNextLine(options, ":thinking: What is a TSL Position?", this.menuCallback(MenuCode.MenuWhatIsTSL));
-            this.insertButtonSameLine(options, ":help: FAQ", this.menuCallback(MenuCode.FAQ));
+            //this.insertButtonSameLine(options, ":help: FAQ", this.menuCallback(MenuCode.FAQ));
         }
         this.insertButtonNextLine(options, ":refresh: Refresh", this.menuCallback(MenuCode.Main));
         this.insertButtonSameLine(options, "Close", this.menuCallback(MenuCode.Close));

@@ -677,7 +677,7 @@ export class CallbackHandler {
                 return new MenuEditPositionRequestPriorityFees(this.priorityFeeMultipliers());
             case MenuCode.EditPositionRequestSubmitPriorityFees:
                 const selectedPriorityFee = tryParseInt(callbackData.menuArg||'')||(callbackData.menuArg||'');
-                await storeSessionObjProperty(params.getTelegramUserID(), params.chatID, params.messageID, "priorityFeeAutoMultiplier", selectedPriorityFee, POSITION_REQUEST_STORAGE_KEY, this.env);
+                await storeSessionObjProperty<PositionRequest>(params.getTelegramUserID(), params.chatID, params.messageID, "priorityFeeAutoMultiplier", selectedPriorityFee, POSITION_REQUEST_STORAGE_KEY, this.env);
                 const posRequestWithPriorityFeeSet = await readSessionObj<PositionRequest>(params.getTelegramUserID(), params.chatID, params.messageID, POSITION_REQUEST_STORAGE_KEY, this.env);
                 return new MenuEditPositionRequest({ positionRequest: posRequestWithPriorityFeeSet, maybeSOLBalance, allowChooseAutoDoubleSlippage: this.allowChooseAutoDouble(), allowChoosePriorityFees : this.allowChoosePriorityFees() });
             case MenuCode.EditOpenPositionPriorityFee:

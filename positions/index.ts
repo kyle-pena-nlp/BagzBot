@@ -1,4 +1,5 @@
 import {
+    BasePositionRequest,
     Position,
     PositionPreRequest,
     PositionRequest,
@@ -23,6 +24,7 @@ import {
 import { Quote } from "./quote";
 
 export {
+    BasePositionRequest,
     Position, PositionPreRequest,
     PositionRequest, PositionRequestAndMaybeQuote, PositionRequestAndQuote, PositionStatus, PositionType, Quote, Swappable, convertPreRequestToRequest, describePriorityFee, getInAndOutTokens,
     getSwapOfXDescription, isPosition,
