@@ -32,9 +32,12 @@ def print_wrangler_environment_variables(env : str):
     print("")
     print(f"===ENVIRONMENT VARIABLES for '{env}'===")
     print("")
-    for key in sorted(environment_variables):
+
+    for i, key in enumerate(sorted(environment_variables)):
         value = environment_variables[key]
-        print(f"{(key):{max_key_length+1}}: {value}")
+        padding_length = (max_key_length+1)-(len(key))
+        filler = '-'*(padding_length) if (i % 2 == 0) else '='*(padding_length)
+        print(f"{key}{filler}: {value}")
     
 
 def is_empty_or_none(string : Union[str,None]):
