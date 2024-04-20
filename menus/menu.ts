@@ -27,8 +27,6 @@ export interface MenuCapabilities {
     parseMode() : 'MarkdownV2'|'HTML'
     renderURLPreviewNormally() : boolean
     photo(): string|null
-    // TODO: factor things out of the abominable switch statement and into this:
-    //handleCallback(incomingMenuCode : MenuCode, params : CallbackHandlerParams, context : FetchEvent, env : Env);
 }
 
 export abstract class BaseMenu {
@@ -148,11 +146,13 @@ export abstract class BaseMenu {
 export abstract class Menu<T> extends BaseMenu {
 
     menuData   : T;
+    env : Env
 
     // ENV with no secrets as parameter.
-    constructor(miscData : T) {
+    constructor(miscData : T, env : Env) {
         super();
         this.menuData = miscData;
+        this.env = env;
     }
 
     parseMode(): "HTML" | "MarkdownV2" {

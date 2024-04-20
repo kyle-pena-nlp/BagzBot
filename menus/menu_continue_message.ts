@@ -1,3 +1,4 @@
+import { Env } from "../env";
 import { CallbackButton } from "../telegram";
 import { CallbackData } from "./callback_data";
 import { Menu, MenuCapabilities } from "./menu";
@@ -7,8 +8,8 @@ export class MenuContinueMessage extends Menu<string> implements MenuCapabilitie
     continueMenuCode: MenuCode;
     menuArg ?: string
     messageParseMode : 'HTML'|'MarkdownV2';
-    constructor(message : string, continueMenuCode : MenuCode, messageParseMode : 'HTML'|'MarkdownV2' = 'HTML', menuArg ?: string) {
-        super(message);
+    constructor(message : string, continueMenuCode : MenuCode, env : Env, messageParseMode : 'HTML'|'MarkdownV2' = 'HTML', menuArg ?: string) {
+        super(message, env);
         this.continueMenuCode = continueMenuCode;
         this.messageParseMode = messageParseMode;
         this.menuArg = menuArg;
