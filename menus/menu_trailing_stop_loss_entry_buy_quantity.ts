@@ -1,10 +1,11 @@
 import { QuantityAndToken } from "../durable_objects/user/model/quantity_and_token";
+import { getCommonEnvironmentVariables } from "../env";
 import { CallbackButton } from "../telegram";
 import { CallbackData } from "./callback_data";
 import { Menu, MenuCapabilities } from "./menu";
 import { MenuCode } from "./menu_code";
 
-export class MenuTrailingStopLossEntryBuyQuantity extends Menu<{ quantityAndToken: QuantityAndToken, isBeta : boolean }> implements MenuCapabilities {
+export class MenuTrailingStopLossEntryBuyQuantity extends Menu<{ quantityAndToken: QuantityAndToken }> implements MenuCapabilities {
     renderText(): string {
         return `Choose ${this.menuData.quantityAndToken.thisTokenSymbol} quantity`;
     }
@@ -14,7 +15,7 @@ export class MenuTrailingStopLossEntryBuyQuantity extends Menu<{ quantityAndToke
         
         let amounts = [];
 
-        if (this.menuData.isBeta) {
+        if (getCommonEnvironmentVariables(this.env).isBeta) {
             amounts = [0.01,0.1,0.25,0.5];
         }
         else {
@@ -22,10 +23,10 @@ export class MenuTrailingStopLossEntryBuyQuantity extends Menu<{ quantityAndToke
         }
 
         for (const amount of amounts) {
-            this.insertButtonNextLine(options, `${amount} ${symbol}`, new CallbackData(MenuCode.SubmitBuyQuantity, amount.toString()));
+            this.insertButtonSameLine(options, `${amount} ${symbol}`, new CallbackData(MenuCode.SubmitBuyQuantity, amount.toString()));
         }
 
-        this.insertButtonNextLine(options, `X ${symbol}`, new CallbackData(MenuCode.CustomBuyQuantity, this.menuData.quantityAndToken.quantity.toString()));
+        this.insertButtonSameLine(options, `X ${symbol}`, new CallbackData(MenuCode.CustomBuyQuantity, this.menuData.quantityAndToken.quantity.toString()));
         this.insertButtonNextLine(options, ":back: Back", new CallbackData(MenuCode.ReturnToPositionRequestEditor));
         return options;
     }

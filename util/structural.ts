@@ -42,6 +42,10 @@ function recIndentedToString(x : (Structural|Structural[]), lines : string[], in
         lines.push(`${prefix}undefined`);
     }
     else if (typeof x === 'string' || typeof x === 'number' || typeof x === 'boolean') {
+        if(typeof x === 'string' && x.startsWith("SECRET")) {
+            // paranoia here is probably good
+            return;
+        }
         lines.push(`${prefix}${x.toString()}`);
     }
     else if (Array.isArray(x)) {

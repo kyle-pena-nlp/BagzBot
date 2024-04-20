@@ -4,16 +4,17 @@ import { logoHack } from "./logo_hack";
 import { Menu, MenuCapabilities } from "./menu";
 import { MenuCode } from "./menu_code";
 
-export class WelcomeScreenPart1 extends Menu<{ botDisplayName : string }> implements MenuCapabilities {
+export class WelcomeScreenPart1 extends Menu<undefined> implements MenuCapabilities {
     renderText(): string {
-        return `${logoHack()}<b>WECOME!
+        const botDisplayName = this.env.TELEGRAM_BOT_DISPLAY_NAME;
+        return `${logoHack()}<b>WELCOME!
           
 If I could have just a moment of your time.</b>
 
-${this.menuData.botDisplayName} implements a unique feature called a <b>'Trailing Stop Loss'</b>.
+${botDisplayName} implements a unique feature called a <b>'Trailing Stop Loss'</b>.
 
 <b>This is how it works</b>:
-:bullet: When you open a new position, ${this.menuData.botDisplayName} will <u>Track The Peak</u>.
+:bullet: When you open a new position, ${botDisplayName} will <u>Track The Peak</u>.
 :bullet: <u>The Peak</u> is the highest value ever attained by your position since you opened it.
 :bullet: If the value of your position dips more than 5% below the peak, the position is automatically sold.
 :bullet: That way, you can lock in most of your gains.

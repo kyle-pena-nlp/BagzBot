@@ -4,7 +4,7 @@ import { logoHack } from "./logo_hack";
 import { Menu, MenuCapabilities } from "./menu";
 import { MenuCode } from "./menu_code";
 
-export class LegalAgreement extends Menu<{ botDisplayName : string }> implements MenuCapabilities {
+export class LegalAgreement extends Menu<undefined> implements MenuCapabilities {
     renderText(): string {
         return this.renderLegalAgreementText();
     }
@@ -15,9 +15,9 @@ export class LegalAgreement extends Menu<{ botDisplayName : string }> implements
         return options;
     }
     renderLegalAgreementText() : string {
-        let LEGAL_AGREEMENT_TEXT = `${logoHack()} <u><b>Welcome to ${this.menuData.botDisplayName}</b></u>
+        let LEGAL_AGREEMENT_TEXT = `${logoHack()} <u><b>Welcome to ${this.env.TELEGRAM_BOT_DISPLAY_NAME}</b></u>
 
-To use ${this.menuData.botDisplayName} you must agree to the following Terms Of Service.
+To use ${this.env.TELEGRAM_BOT_DISPLAY_NAME} you must agree to the following Terms Of Service.
 
 I. You use this bot at your own risk.  
 

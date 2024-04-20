@@ -1,14 +1,14 @@
-import { Env } from "./env";
+import { EnvironmentVariables } from "./env";
 import { strictParseBoolean, strictParseInt, tryParseInt } from "./util";
 
-export function isAdminOrSuperAdmin(userID : number, env : Env) {
+export function isAdminOrSuperAdmin(userID : number, env : EnvironmentVariables) {
 	if (strictParseBoolean(env.TEST_NO_ADMINS_MODE)) {
 		return false;
 	}
 	return isAnAdminUserID(userID, env) || isTheSuperAdminUserID(userID, env);
 }
 
-export function isTheSuperAdminUserID(userID : number, env : Env) : boolean {
+export function isTheSuperAdminUserID(userID : number, env : EnvironmentVariables) : boolean {
 	if (strictParseBoolean(env.TEST_NO_ADMINS_MODE)) {
 		return false;
 	}
@@ -17,7 +17,7 @@ export function isTheSuperAdminUserID(userID : number, env : Env) : boolean {
 }
 
 // deliberately not exported to avoid confusion.
-function isAnAdminUserID(userID : number, env : Env) {
+function isAnAdminUserID(userID : number, env : EnvironmentVariables) {
 	if (strictParseBoolean(env.TEST_NO_ADMINS_MODE)) {
 		return false;
 	}

@@ -11,13 +11,15 @@ export class TelegramWebhookInfo {
     private _telegramUserName : string;
     chatID : number; /* The Telegram chat ID */
     messageID : number; /* The message ID, but the original message ID if a callback or response */
+    text : string|null; // the text of the message
+	
 	realMessageID : number|undefined; /* The actual message ID */
     messageType : 'callback'|'message'|'command'|'replyToBot'|null; // determined dynamically from request
     command: string|null;
 	commandTokens : TGTextEntity[]|null; // parsed from request
     callbackData : CallbackData|null; // parsed from request
 	originalMessageText : string|null; // the original message text if it is a response to a message
-    text : string|null; // the text of the message
+
 
     constructor(telegramRequestBody : any, env : Env) {
 		this.chatID = this.extractChatID(telegramRequestBody);

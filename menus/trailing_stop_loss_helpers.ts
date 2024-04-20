@@ -2,8 +2,6 @@ import { toFriendlyString } from "../decimalized";
 import { PositionRequest } from "../positions";
 import { isGetQuoteFailure } from "../rpc/rpc_types";
 
-const SIG_FIGS = 4;
-
 export function renderTrailingStopLossRequestMarkdown(positionRequest : PositionRequest) {
     const quote = positionRequest.quote;
     if (isGetQuoteFailure(quote)) {

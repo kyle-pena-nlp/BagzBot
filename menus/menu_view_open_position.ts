@@ -1,6 +1,7 @@
 import { dClamp, dCompare, dMult, fromNumber } from "../decimalized";
 import { DecimalizedAmount, asPercentDeltaString, asPercentString, asTokenPrice, asTokenPriceDelta, toNumber } from "../decimalized/decimalized_amount";
 import { PNL, PositionAndMaybePNL } from "../durable_objects/token_pair_position_tracker/model/position_and_PNL";
+import { allowChooseAutoDoubleSlippage, allowChoosePriorityFees } from "../env";
 import { Position, PositionStatus, describePriorityFee } from "../positions";
 import { CallbackButton } from "../telegram";
 import { assertNever } from "../util";
@@ -9,7 +10,7 @@ import { Menu, MenuCapabilities } from "./menu";
 import { MenuCode } from "./menu_code";
 
 type BrandNewPosition = { brandNewPosition : true, position : Position };
-type MenuData = { allowChooseAutoDoubleSlippage : boolean, allowChoosePriorityFees : boolean, data: (PositionAndMaybePNL|BrandNewPosition) };
+type MenuData = { data: (PositionAndMaybePNL|BrandNewPosition) };
 type ThisType = { menuData : MenuData }
 type ThisTypeMaybeHasPNL = ThisType & { menuData: { data: PositionAndMaybePNL } };
 type ThisTypeHasPNL = ThisType & { menuData: { data : PositionAndMaybePNL & { PNL : PNL }  } };
@@ -47,10 +48,10 @@ export class MenuViewOpenPosition extends Menu<MenuData> implements MenuCapabili
 
             // this will simplify when i strip out these feature flags
             const nextLine = options.length + 1;
-            if (this.allowChoosePriorityFees()) {
+            if (allowChoosePriorityFees(this.env)) {
                 this.insertButton(options, `${describePriorityFee(this.position().sellPriorityFeeAutoMultiplier)}`, new CallbackData(MenuCode.EditOpenPositionPriorityFee, this.position().positionID), nextLine);
             }
-            if (this.allowChooseAutoDoubleSlippage()) {
+            if (allowChooseAutoDoubleSlippage(this.env)) {
                 this.insertButton(options, `${this.position().sellAutoDoubleSlippage ? '': 'Do Not'} Auto-Double Slippage`, new CallbackData(MenuCode.EditOpenPositionAutoDoubleSlippage, this.position().positionID), nextLine);
             }
         }
@@ -65,14 +66,6 @@ export class MenuViewOpenPosition extends Menu<MenuData> implements MenuCapabili
         this.insertButtonSameLine(options, "Close", this.menuCallback(MenuCode.Close));
 
         return options;
-    }
-
-    private allowChooseAutoDoubleSlippage() : boolean {
-        return this.menuData.allowChooseAutoDoubleSlippage;
-    }
-
-    private allowChoosePriorityFees() : boolean {
-        return this.menuData.allowChoosePriorityFees;
     }
 
     private statusEmoji() : string {

@@ -2,7 +2,7 @@ import { CallbackButton } from "../telegram";
 import { logoHack } from "./logo_hack";
 import { Menu, MenuCapabilities } from "./menu";
 
-export class MenuFAQ extends Menu<{ botName : string, botInstance : string, botTagline : string, userID : number, chatID : number }> implements MenuCapabilities {
+export class MenuFAQ extends Menu<{ userID : number, chatID : number }> implements MenuCapabilities {
     renderText(): string {
         return this.renderFAQ();
     }
@@ -12,9 +12,9 @@ export class MenuFAQ extends Menu<{ botName : string, botInstance : string, botT
         return options;
     }   
     renderFAQ() : string {
-        const botName = this.menuData.botName;
-        const botInstance = this.menuData.botInstance;
-        const botTagline = this.menuData.botTagline;
+        const botName = this.env.TELEGRAM_BOT_DISPLAY_NAME;
+        const botInstance = this.env.TELEGRAM_BOT_INSTANCE_DISPLAY_NAME;
+        const botTagline = this.env.TELEGRAM_BOT_TAGLINE;
         return `${logoHack()}<b>${botName} - ${botInstance}</b>
 <i>${botTagline}</i>
 

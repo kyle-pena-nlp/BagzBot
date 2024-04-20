@@ -60,9 +60,11 @@ export class MenuPNLHistory extends Menu<{ closedPositions : Position[], netPNL 
         this.insertButtonSameLine(options, `Close`, new CallbackData(MenuCode.Close));
         return options;
     }
+
     private addHeader(lines : string[]) {
         lines.push(`${logoHack()}<u><b>PnL Summary</b></u>`);        
     }
+
     private addNetPNLSummary(lines : string[], closedPositions : Position[]) {
         let totalInvested = dZero();
         let netPNL = dZero();
@@ -73,6 +75,7 @@ export class MenuPNLHistory extends Menu<{ closedPositions : Position[], netPNL 
         const percentPNL = dMult(fromNumber(100), dDiv(netPNL, totalInvested, MATH_DECIMAL_PLACES)||dZero());
         lines.push(`<b>Bottom Line</b>: <code>${asTokenPriceDelta(this.menuData.netPNL)} SOL (${asPercentDeltaString(percentPNL)})</code>`);
     }
+    
     private addClosedPositionSummary(lines : string[], position : Position) {
         if (position.netPNL == null) {
             return;

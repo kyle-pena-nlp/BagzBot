@@ -1,36 +1,33 @@
 import { dAdd, toFriendlyString } from "../decimalized";
 import { asPercentDeltaString, asTokenPrice } from "../decimalized/decimalized_amount";
 import { UserData } from "../durable_objects/user/model/user_data";
+import { getCommonEnvironmentVariables } from "../env";
 import { CallbackButton } from "../telegram";
 import { logoHack } from "./logo_hack";
 import { Menu, MenuCapabilities } from "./menu";
 import { MenuCode } from "./menu_code";
 
-export interface Stuff {
+export interface AdminInfo {
     isAdminOrSuperAdmin : boolean
     isImpersonatingUser: boolean
     impersonatedUserID : number|undefined
-    botName : string
-    botTagline : string
-    isBeta : boolean
-    isDev : boolean,
-    isInviteCodeGated : boolean
 }
 
-export class MenuMain extends Menu<UserData & Stuff> implements MenuCapabilities {
+export class MenuMain extends Menu<UserData & AdminInfo> implements MenuCapabilities {
     renderText(): string {
+        const envVars = getCommonEnvironmentVariables(this.env);
         const lines = [
-            `${logoHack()}<b>${this.menuData.botName} Main Menu</b>`,
-            `<i>${this.menuData.botTagline}</i>`
+            `${logoHack()}<b>${envVars.botName} Main Menu</b>`,
+            `<i>${envVars.botTagline}</i>`
         ];
 
         if (!this.menuData.hasWallet) {
             lines.push("<blockquote>We are creating your wallet! Refresh in a few seconds to see the full menu.</blockquote>")
         }        
 
-        if (this.menuData.isBeta) {
+        if (envVars.isBeta) {
             lines.push("");
-            lines.push(`<blockquote>${this.menuData.botName} is in BETA - USE AT YOUR OWN RISK!`);
+            lines.push(`<blockquote>${envVars.botName} is in BETA - USE AT YOUR OWN RISK!`);
             lines.push(`Maintenance window will be from 12:00 AM to 2:00 AM EST.</blockquote>`);
             lines.push("");
         }
@@ -56,14 +53,14 @@ export class MenuMain extends Menu<UserData & Stuff> implements MenuCapabilities
             lines.push(`<b>Total Value:</b> ${asTokenPrice(totalWalletValue)} SOL`)
         }
 
-
-
         if (this.menuData.isImpersonatingUser) {
             lines.push(`Currently IMPERSONATING '${this.menuData.impersonatedUserID||''}'`)
         }
+        
         return lines.join("\r\n");
     }
     renderOptions(): CallbackButton[][] {
+        const envVars = getCommonEnvironmentVariables(this.env);
         const options = this.emptyMenu();
         const hasWallet = this.menuData.hasWallet;
         if (hasWallet) {
@@ -90,10 +87,10 @@ export class MenuMain extends Menu<UserData & Stuff> implements MenuCapabilities
             if (this.menuData.isAdminOrSuperAdmin && !this.menuData.isImpersonatingUser) {
                 this.insertButtonNextLine(options, 'ADMIN: Begin User Support', this.menuCallback(MenuCode.ImpersonateUser));
             }
-            if (this.menuData.isAdminOrSuperAdmin && this.menuData.isDev) {
+            if (this.menuData.isAdminOrSuperAdmin && envVars.isDev) {
                 this.insertButtonNextLine(options, 'ADMIN (Dev Only): Set Price', this.menuCallback(MenuCode.AdminDevSetPrice));
             }
-            if (this.menuData.isAdminOrSuperAdmin && (this.menuData.isDev || this.menuData.isBeta)) {
+            if (this.menuData.isAdminOrSuperAdmin && (envVars.isDev || envVars.isBeta)) {
                 this.insertButtonNextLine(options, 'ADMIN: Delete all positions', this.menuCallback(MenuCode.AdminDeleteAllPositions));
             }   
             if (this.menuData.isAdminOrSuperAdmin) {
@@ -114,7 +111,7 @@ export class MenuMain extends Menu<UserData & Stuff> implements MenuCapabilities
             if (this.menuData.isAdminOrSuperAdmin) {
                 this.insertButtonNextLine(options, 'ADMIN: Delete Position By ID', this.menuCallback(MenuCode.AdminDeletePositionByID));
             }
-            if (this.menuData.isBeta) {
+            if (envVars.isBeta) {
                 this.insertButtonNextLine(options, ':love_letter: Send Feedback :love_letter:', this.menuCallback(MenuCode.BetaFeedbackQuestion));
             }
             this.insertButtonNextLine(options, ":thinking: What is a TSL Position?", this.menuCallback(MenuCode.MenuWhatIsTSL));

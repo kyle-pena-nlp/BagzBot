@@ -1,4 +1,4 @@
-import { Env } from "../env";
+import { Env, EnvironmentVariables } from "../env";
 import { CallbackData } from "./callback_data";
 import { MenuCode } from "./menu_code";
 
@@ -146,10 +146,10 @@ export abstract class BaseMenu {
 export abstract class Menu<T> extends BaseMenu {
 
     menuData   : T;
-    env : Env
+    env : EnvironmentVariables
 
     // ENV with no secrets as parameter.
-    constructor(miscData : T, env : Env) {
+    constructor(miscData : T, env : EnvironmentVariables) {
         super();
         this.menuData = miscData;
         this.env = env;

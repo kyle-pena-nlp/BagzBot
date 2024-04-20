@@ -11,8 +11,9 @@ export class CallbackHandlerParams {
     private _telegramUserName : string
     chatID : number
     messageID : number
+    text : string|null 	
+	
     callbackData : CallbackData   
-    text : string|null 
 
     constructor(info : TelegramWebhookInfo, replyQuestion ?: ReplyQuestionWithNextSteps) {
         this._impersonatedUserID = info.getTelegramUserID();

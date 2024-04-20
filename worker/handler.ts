@@ -19,6 +19,7 @@ import { BaseMenu, LegalAgreement, MenuAdminViewClosedPositions, MenuBetaInviteF
 import { MenuViewObj } from "../menus/menu_admin_view_obj";
 import { PositionIDAndSellSlippagePercent } from "../menus/menu_edit_open_position_sell_slippage_percent";
 import { MenuEditPositionRequest } from "../menus/menu_edit_position_request";
+import { AdminInfo } from "../menus/menu_main";
 import { MenuViewDeactivatedPosition } from "../menus/menu_view_frozen_position";
 import { MenuViewDeactivatedPositions } from "../menus/menu_view_frozen_positions";
 import { PositionPreRequest, PositionRequest, convertPreRequestToRequest } from "../positions";
@@ -203,7 +204,7 @@ export class CallbackHandler {
                 }
                 const request = convertPreRequestToRequest(newPrerequest, quote, tokenInfoResponse.tokenInfo);
                 await storeSessionObj<PositionRequest>(params.getTelegramUserID(), params.chatID, messageID, request, POSITION_REQUEST_STORAGE_KEY, this.env);
-                return new MenuEditPositionRequest({ positionRequest: request, maybeSOLBalance, allowChooseAutoDoubleSlippage: this.allowChooseAutoDouble(), allowChoosePriorityFees: this.allowChoosePriorityFees() }, this.env);
+                return new MenuEditPositionRequest({ positionRequest: request, maybeSOLBalance }, this.env);
             case MenuCode.Error:
                 return new MenuError(undefined, this.env);
             case MenuCode.ViewDecryptedWallet:
@@ -214,13 +215,7 @@ export class CallbackHandler {
                 const decryptedPrivateKey = await decryptPrivateKey(walletDataResponse.wallet.encryptedPrivateKey, params.getTelegramUserID(), this.env);
                 return new MenuViewDecryptedWallet({ publicKey: walletDataResponse.wallet.publicKey, decryptedPrivateKey: decryptedPrivateKey }, this.env)
             case MenuCode.FAQ:
-                return new MenuFAQ({ 
-                    botName : this.env.TELEGRAM_BOT_DISPLAY_NAME,
-                    botInstance : this.env.TELEGRAM_BOT_INSTANCE_DISPLAY_NAME,
-                    botTagline: this.env.TELEGRAM_BOT_TAGLINE,
-                    userID : params.getTelegramUserID(),
-                    chatID : params.chatID
-                }, this.env);
+                return new MenuFAQ({ userID : params.getTelegramUserID(), chatID : params.chatID }, this.env);
             case MenuCode.ListPositions:
                 const positions = await listPositionsFromUserDO(params.getTelegramUserID(), params.chatID, this.env);
                 return new MenuListPositions(positions, this.env);
@@ -230,7 +225,7 @@ export class CallbackHandler {
                 if (positionAndMaybePNL == null) {
                     return new MenuContinueMessage('Sorry - this position is no longer being price monitored!', MenuCode.Main, this.env);
                 }
-                return new MenuViewOpenPosition({ data: positionAndMaybePNL, allowChooseAutoDoubleSlippage: this.allowChooseAutoDouble(), allowChoosePriorityFees: this.allowChoosePriorityFees() }, this.env);
+                return new MenuViewOpenPosition({ data: positionAndMaybePNL }, this.env);
             case MenuCode.ClosePositionManuallyAction:
                 const closePositionID = callbackData.menuArg;
                 if (closePositionID != null) {
@@ -277,10 +272,10 @@ export class CallbackHandler {
             case MenuCode.SubmitBuyQuantity:
                 const submittedBuyQuantity = tryParseFloat(callbackData.menuArg!!);
                 if (!submittedBuyQuantity || submittedBuyQuantity <= 0.0) {
-                    return new MenuContinueMessage(`Sorry - '${callbackData.menuArg||''}' is not a valid quantity of SOL to buy.`, MenuCode.TrailingStopLossSlippagePctMenu, this.env);
+                    return new MenuContinueMessage(`Sorry - '${callbackData.menuArg||''}' is not a valid quantity of SOL to buy.`, MenuCode.ReturnToPositionRequestEditor, this.env);
                 }
                 if (submittedBuyQuantity > strictParseFloat(this.env.SOL_BUY_LIMIT)) {
-                    return new MenuContinueMessage(`Sorry - ${this.env.TELEGRAM_BOT_DISPLAY_NAME} does not currently allow purchases of over ${strictParseFloat(this.env.SOL_BUY_LIMIT)} SOL`, MenuCode.TrailingStopLossSlippagePctMenu, this.env); 
+                    return new MenuContinueMessage(`Sorry - ${this.env.TELEGRAM_BOT_DISPLAY_NAME} does not currently allow purchases of over ${strictParseFloat(this.env.SOL_BUY_LIMIT)} SOL`, MenuCode.ReturnToPositionRequestEditor, this.env); 
                 }
                 await storeSessionObjProperty<PositionRequest>(params.getTelegramUserID(), params.chatID, messageID, "vsTokenAmt", submittedBuyQuantity, POSITION_REQUEST_STORAGE_KEY, this.env);
                 const trailingStopLossRequestStateAfterBuyQuantityEdited = await readSessionObj<PositionRequest>(params.getTelegramUserID(), params.chatID, messageID, POSITION_REQUEST_STORAGE_KEY, this.env);
@@ -320,7 +315,7 @@ export class CallbackHandler {
                 return;
             case MenuCode.TrailingStopLossEntryBuyQuantityMenu:
                 const quantityAndTokenForBuyQuantityMenu : QuantityAndToken = await this.getTrailingStopLossPositionQuantityAndVsTokenFromSession(params.getTelegramUserID(), params.chatID, messageID, this.env);
-                return new MenuTrailingStopLossEntryBuyQuantity({ quantityAndToken: quantityAndTokenForBuyQuantityMenu, isBeta: strictParseBoolean(this.env.IS_BETA_CODE_GATED) }, this.env);
+                return new MenuTrailingStopLossEntryBuyQuantity({ quantityAndToken: quantityAndTokenForBuyQuantityMenu }, this.env);
             case MenuCode.TrailingStopLossPickVsTokenMenu:
                 const trailingStopLossVsTokenNameAndAddress : TokenSymbolAndAddress = await this.getTrailingStopLossPositionVsTokenFromSession(params.getTelegramUserID(), params.chatID, messageID, this.env);
                 return new MenuTrailingStopLossPickVsToken(trailingStopLossVsTokenNameAndAddress, this.env);
@@ -380,7 +375,7 @@ export class CallbackHandler {
                 }
                 const positionRequest = await readSessionObj<PositionRequest>(params.getTelegramUserID(), params.chatID, messageID, POSITION_REQUEST_STORAGE_KEY, this.env);
                 if (positionRequest.token.address === newTokenAddress) {
-                    return new MenuEditPositionRequest({ positionRequest: positionRequest, maybeSOLBalance, allowChooseAutoDoubleSlippage: this.allowChooseAutoDouble(), allowChoosePriorityFees: this.allowChoosePriorityFees() }, this.env);
+                    return new MenuEditPositionRequest({ positionRequest: positionRequest, maybeSOLBalance }, this.env);
                 }                
                 const tokenValidationInfo = await getTokenInfo(newTokenAddress, this.env);
                 if (isInvalidTokenInfoResponse(tokenValidationInfo)) {
@@ -394,14 +389,14 @@ export class CallbackHandler {
                 }
                 positionRequest.quote = maybeQuote;
                 await storeSessionObj<PositionRequest>(params.getTelegramUserID(), params.chatID, messageID, positionRequest, POSITION_REQUEST_STORAGE_KEY, this.env);
-                return new MenuEditPositionRequest({ positionRequest, maybeSOLBalance, allowChooseAutoDoubleSlippage: this.allowChooseAutoDouble(), allowChoosePriorityFees: this.allowChoosePriorityFees() }, this.env);
+                return new MenuEditPositionRequest({ positionRequest, maybeSOLBalance }, this.env);
             case MenuCode.WelcomeScreenPart1:
-                return new WelcomeScreenPart1({ botDisplayName: this.env.TELEGRAM_BOT_DISPLAY_NAME }, this.env);
+                return new WelcomeScreenPart1(undefined, this.env);
             case MenuCode.LegalAgreement:
-                return new LegalAgreement({ botDisplayName: this.env.TELEGRAM_BOT_DISPLAY_NAME }, this.env);
+                return new LegalAgreement(undefined, this.env);
             case MenuCode.LegalAgreementAgree:
                 await storeLegalAgreementStatus(params.getTelegramUserID('real'), params.chatID, 'agreed', this.env);
-                return new WelcomeScreenPart1({ botDisplayName: this.env.TELEGRAM_BOT_DISPLAY_NAME }, this.env);
+                return new WelcomeScreenPart1(undefined, this.env);
             case MenuCode.LegalAgreementRefuse:
                 await storeLegalAgreementStatus(params.getTelegramUserID('real'), params.chatID, 'refused', this.env);
                 const youCanChangeYourMind = TGMessageChannel.createAndSend("You can agree to the legal agreement at any time if you change your mind!", false, params.chatID, this.env);
@@ -512,7 +507,7 @@ export class CallbackHandler {
                     return new MenuContinueMessage(`Sorry - please choose a percent greater than zero and less than 100`, MenuCode.ViewOpenPosition, this.env, 'HTML', parsedCallbackData.positionID);
                 }
                 else {
-                    return new MenuViewOpenPosition( { data: editTriggerPercentResult, allowChooseAutoDoubleSlippage: this.allowChooseAutoDouble(), allowChoosePriorityFees: this.allowChoosePriorityFees() }, this.env);
+                    return new MenuViewOpenPosition( { data: editTriggerPercentResult }, this.env);
                 }
             case MenuCode.EditOpenPositionAutoDoubleSlippage:
                 return new MenuEditOpenPositionSellAutoDoubleSlippage(callbackData.menuArg||'', this.env);
@@ -552,7 +547,7 @@ export class CallbackHandler {
                         params.messageID, 
                         POSITION_REQUEST_STORAGE_KEY, 
                         this.env);
-                    return new MenuEditPositionRequest({ positionRequest: pr, maybeSOLBalance, allowChooseAutoDoubleSlippage: this.allowChooseAutoDouble(), allowChoosePriorityFees : this.allowChoosePriorityFees() }, this.env);
+                    return new MenuEditPositionRequest({ positionRequest: pr, maybeSOLBalance }, this.env);
                 }
             case MenuCode.AdminInvokeAlarm:
                 return new ReplyQuestion('Enter token address', ReplyQuestionCode.AdminInvokeAlarm, this.context, { callback: { linkedMessageID: params.messageID, nextMenuCode: MenuCode.SubmitAdminInvokeAlarm }});
@@ -582,7 +577,7 @@ export class CallbackHandler {
                 if (updatedPosition.positionAndMaybePNL == null) {
                     return this.sorryError();
                 }
-                return new MenuViewOpenPosition({ data: updatedPosition.positionAndMaybePNL, allowChooseAutoDoubleSlippage: this.allowChooseAutoDouble(),  allowChoosePriorityFees: this.allowChoosePriorityFees() }, this.env);
+                return new MenuViewOpenPosition({ data: updatedPosition.positionAndMaybePNL }, this.env);
             case MenuCode.AdminSendUserMessage:
                 return new ReplyQuestion("Enter userID|message", ReplyQuestionCode.AdminSendUserMessage, this.context, {
                     callback: {
@@ -616,7 +611,7 @@ export class CallbackHandler {
                 await TGStatusMessage.createAndSend(JSON.stringify(positionCounts), true, params.chatID, this.env);
                 return;
             case MenuCode.MenuWhatIsTSL:
-                return new MenuWhatIsTSL({ botDisplayName : this.env.TELEGRAM_BOT_DISPLAY_NAME }, this.env);
+                return new MenuWhatIsTSL(undefined, this.env);
             case MenuCode.AdminDeleteClosedPositions:
                 await adminDeleteClosedPositions(params.getTelegramUserID(), params.chatID, this.env);
                 return await this.createMainMenu(params, this.env);
@@ -679,7 +674,7 @@ export class CallbackHandler {
                 const selectedPriorityFee = tryParseInt(callbackData.menuArg||'')||(callbackData.menuArg||'');
                 await storeSessionObjProperty<PositionRequest>(params.getTelegramUserID(), params.chatID, params.messageID, "priorityFeeAutoMultiplier", selectedPriorityFee, POSITION_REQUEST_STORAGE_KEY, this.env);
                 const posRequestWithPriorityFeeSet = await readSessionObj<PositionRequest>(params.getTelegramUserID(), params.chatID, params.messageID, POSITION_REQUEST_STORAGE_KEY, this.env);
-                return new MenuEditPositionRequest({ positionRequest: posRequestWithPriorityFeeSet, maybeSOLBalance, allowChooseAutoDoubleSlippage: this.allowChooseAutoDouble(), allowChoosePriorityFees : this.allowChoosePriorityFees() }, this.env);
+                return new MenuEditPositionRequest({ positionRequest: posRequestWithPriorityFeeSet, maybeSOLBalance }, this.env);
             case MenuCode.EditOpenPositionPriorityFee:
                 return new MenuEditOpenPositionSellPriorityFee({ positionID : callbackData.menuArg||'', priorityFeeMultipliers : this.priorityFeeMultipliers() }, this.env)
             case MenuCode.EditOpenPositionSubmitPriorityFee:
@@ -707,7 +702,7 @@ export class CallbackHandler {
         if (positionAndMaybePNL == null) {
             return this.sorryError();
         }
-        return new MenuViewOpenPosition({ data: positionAndMaybePNL, allowChooseAutoDoubleSlippage: this.allowChooseAutoDouble(), allowChoosePriorityFees: this.allowChoosePriorityFees() }, this.env);
+        return new MenuViewOpenPosition({ data: positionAndMaybePNL }, this.env);
     }
 
     private async sendBetaFeedbackToSuperAdmin(feedback : string, myUserName : string, myUserID : number) : Promise<void> {
@@ -716,20 +711,15 @@ export class CallbackHandler {
 
     private async createMainMenu(info : CallbackHandlerParams | TelegramWebhookInfo, env : Env) : Promise<BaseMenu> {
         const userData = await getUserData(info.getTelegramUserID(), info.chatID, info.messageID, false, env);
-        return new MenuMain({ ...userData, 
-            isAdminOrSuperAdmin: info.isAdminOrSuperAdmin(env), 
-            isImpersonatingUser: info.isImpersonatingAUser(),
-            impersonatedUserID: info.isImpersonatingAUser() ? info.getTelegramUserID() : undefined,
-            botName : this.getBotName(env),
-            botTagline: env.TELEGRAM_BOT_TAGLINE,
-            isBeta : env.ENVIRONMENT === 'beta',
-            isDev : env.ENVIRONMENT === 'dev',
-            isInviteCodeGated : strictParseBoolean(env.IS_BETA_CODE_GATED)
-        }, this.env);
+        return new MenuMain({ ...userData, ...this.makeAdminInfo(info, this.env) }, this.env);
     }
 
-    private getBotName(env : Env) {
-        return `${env.TELEGRAM_BOT_DISPLAY_NAME} - (${env.TELEGRAM_BOT_INSTANCE_DISPLAY_NAME})`;
+    private makeAdminInfo(info : CallbackHandlerParams | TelegramWebhookInfo, env : Env) : AdminInfo {
+        return { 
+            isAdminOrSuperAdmin: info.isAdminOrSuperAdmin(env), 
+            isImpersonatingUser: info.isImpersonatingAUser(),
+            impersonatedUserID: info.isImpersonatingAUser() ? info.getTelegramUserID() : undefined
+        };
     }
 
     private async handleMenuClose(chatID : number, messageID : number, env : Env) : Promise<Response> {
@@ -761,7 +751,7 @@ export class CallbackHandler {
 
     private async makeStopLossRequestEditorMenu(positionRequest : PositionRequest, maybeSOLBalance : DecimalizedAmount|null, env : Env) : Promise<BaseMenu> {
         await this.refreshQuote(positionRequest, env);
-        return new MenuEditPositionRequest({ positionRequest, maybeSOLBalance, allowChooseAutoDoubleSlippage: this.allowChooseAutoDouble(), allowChoosePriorityFees : this.allowChoosePriorityFees() }, this.env);
+        return new MenuEditPositionRequest({ positionRequest, maybeSOLBalance }, this.env);
     }
 
     private async handleManuallyClosePosition(telegramUserID : number, chatID : number, positionID : string, env : Env) : Promise<Response> {
@@ -850,7 +840,7 @@ export class CallbackHandler {
     }
 
     private async sendUserWelcomeScreen(telegramWebhookInfo : TelegramWebhookInfo, env : Env) {
-        await new WelcomeScreenPart1({ botDisplayName: this.env.TELEGRAM_BOT_DISPLAY_NAME }, this.env).sendToTG({ chatID : telegramWebhookInfo.chatID }, env);
+        await new WelcomeScreenPart1(undefined, this.env).sendToTG({ chatID : telegramWebhookInfo.chatID }, env);
     }
 
     private async handleCommandInternal(command : string, info : TelegramWebhookInfo, messageID : number, env : Env) : Promise<[string,BaseMenu?,{ obj : any, prefix : string }?]> {
@@ -864,16 +854,11 @@ export class CallbackHandler {
                 const menuMain = await this.createMainMenu(info, env);
                 return ['...', menuMain];
             case '/welcome_screen':
-                return ['...', new WelcomeScreenPart1({ botDisplayName: this.env.TELEGRAM_BOT_DISPLAY_NAME }, this.env)];
+                return ['...', new WelcomeScreenPart1(undefined, this.env)];
             case '/legal_agreement':
-                return ['...', new LegalAgreement({ botDisplayName: this.env.TELEGRAM_BOT_DISPLAY_NAME }, this.env)];
+                return ['...', new LegalAgreement(undefined, this.env)];
             case '/faq':
-                return ['...', new MenuFAQ({ 
-                    botName : env.TELEGRAM_BOT_DISPLAY_NAME, 
-                    botInstance: env.TELEGRAM_BOT_INSTANCE_DISPLAY_NAME, 
-                    botTagline: env.TELEGRAM_BOT_TAGLINE,
-                    userID : info.getTelegramUserID(),
-                    chatID : info.chatID }, this.env)];
+                return ['...', new MenuFAQ({ userID : info.getTelegramUserID(), chatID : info.chatID }, this.env)];
             case '/list_positions':
                 const positions = await listPositionsFromUserDO(info.getTelegramUserID(), info.chatID, env);
                 return ['...', new MenuListPositions(positions, this.env)];
@@ -914,7 +899,7 @@ export class CallbackHandler {
 
                 const maybeSOLBalance = await getUserWalletSOLBalance(positionRequest.userID, positionRequest.chatID, this.env);
 
-                return ['...', new MenuEditPositionRequest({ positionRequest, maybeSOLBalance, allowChooseAutoDoubleSlippage: this.allowChooseAutoDouble(), allowChoosePriorityFees: this.allowChoosePriorityFees() }, this.env), storeObjectRequest];
+                return ['...', new MenuEditPositionRequest({ positionRequest, maybeSOLBalance }, this.env), storeObjectRequest];
             default:
                 throw new Error(`Unrecognized command: ${command}`);
         }

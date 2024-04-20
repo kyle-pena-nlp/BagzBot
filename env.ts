@@ -1,7 +1,18 @@
 import { strictParseBoolean, strictParseFloat, tryParseInt } from "./util"
 
-export interface Env {
-	
+interface Secrets {
+	SECRET__TELEGRAM_BOT_TOKEN : string	
+	SECRET__TELEGRAM_BOT_WEBHOOK_SECRET_TOKEN : string
+	SECRET__TELEGRAM_API_ID : string
+	SECRET__TELEGRAM_API_HASH : string
+	SECRET__HELIUS_API_KEY : string	
+	SECRET__PK_AES_SALT : string	
+	SECRET__FEE_ACCOUNT_PUBLIC_KEY : string
+	SECRET__QUICKNODE_API_KEY : string
+}
+
+export interface EnvironmentVariables {
+
 	// display name of bot
 	TELEGRAM_BOT_DISPLAY_NAME : string
 	TELEGRAM_BOT_INSTANCE_DISPLAY_NAME : string
@@ -20,13 +31,7 @@ export interface Env {
 	// id assigned to bot
 	TELEGRAM_BOT_ID : string		
 
-	SECRET__TELEGRAM_BOT_TOKEN : string	
-	SECRET__TELEGRAM_BOT_WEBHOOK_SECRET_TOKEN : string
-	SECRET__TELEGRAM_API_ID : string
-	SECRET__TELEGRAM_API_HASH : string
-	SECRET__HELIUS_API_KEY : string	
-	SECRET__PK_AES_SALT : string	
-	SECRET__FEE_ACCOUNT_PUBLIC_KEY : string
+	
 
 	// don't access this directly, use getRPCUrl, per below.
 	RPC_ENDPOINT_URL : string
@@ -62,7 +67,7 @@ export interface Env {
 	FORBIDDEN_TOKENS : string
 	TX_TIMEOUT_MS : string
 	CONFIRM_TIMEOUT_MS : string
-	SECRET__QUICKNODE_API_KEY : string
+
 	USE_QUICKNODE : string
 	QUICKNODE_RPC_URL : string
 	USE_METIS : string
@@ -79,22 +84,52 @@ export interface Env {
 	OTHER_SELL_FAILURES_TO_DEACTIVATE : string
 	ALLOW_PRIORITY_FEE_MULTIPLIERS : string
 	PRIORITY_FEE_MULTIPLIER_OPTIONS : string
+}
 
+interface DurableObjects {
 	UserDO : any // i'd like to strongly type this as DurableObjectNamespace, but can't for technical reasons
 	TokenPairPositionTrackerDO : any // ditto
 	PolledTokenPairListDO : any // ditto
 	BetaInviteCodesDO : any
 	HeartbeatDO: any
-};
+}
 
-export function parsePriorityFeeOptions(env : Env) : Map<number,string> {
+export type Env = Secrets & EnvironmentVariables & DurableObjects;
+
+export interface CommonEnvironmentVariables {
+    botName : string
+    botTagline : string
+    isBeta : boolean
+    isDev : boolean,
+    isInviteCodeGated : boolean
+}
+
+export function getCommonEnvironmentVariables(env : EnvironmentVariables) : CommonEnvironmentVariables {
+	return {
+		botName : `${env.TELEGRAM_BOT_DISPLAY_NAME} - (${env.TELEGRAM_BOT_INSTANCE_DISPLAY_NAME})`,
+		botTagline: env.TELEGRAM_BOT_TAGLINE,
+		isDev: env.ENVIRONMENT === 'dev',
+		isBeta: env.ENVIRONMENT === 'beta',
+		isInviteCodeGated: strictParseBoolean(env.IS_BETA_CODE_GATED)
+	};
+}
+
+export function allowChooseAutoDoubleSlippage(env : EnvironmentVariables) : boolean {
+	return strictParseBoolean(env.ALLOW_CHOOSE_AUTO_DOUBLE_SLIPPAGE);
+}
+
+export function allowChoosePriorityFees(env : EnvironmentVariables) : boolean {
+	return strictParseBoolean(env.ALLOW_PRIORITY_FEE_MULTIPLIERS);
+}
+
+export function parsePriorityFeeOptions(env : EnvironmentVariables) : Map<number,string> {
 	const priorityFeeOptions = env.PRIORITY_FEE_MULTIPLIER_OPTIONS.split(",")
 		.map(x => x.split(":"))
 		.map<[number,string]>(tokens => [strictParseFloat(tokens[0]), tokens[1]]);
 	return new Map<number,string>(priorityFeeOptions);
 }
 
-export function isUserBetaCodeExempt(telegramUserID : number, env : Env) {
+export function isUserBetaCodeExempt(telegramUserID : number, env : EnvironmentVariables) {
 	return env.BETA_CODE_GATE_EXCEPTIONS.split(",").map(x => tryParseInt(x)).includes(telegramUserID);
 }
 
@@ -107,7 +142,7 @@ export function getRPCUrl(env : Env) {
 	}
 }
 
-export function getPriceAPIURL(env : Env) {
+export function getPriceAPIURL(env : EnvironmentVariables) {
 	if (strictParseBoolean(env.USE_METIS)) {
 		return env.METIS_PRICE_API_URL;
 	}
@@ -116,7 +151,7 @@ export function getPriceAPIURL(env : Env) {
 	}
 }
 
-export function getSwapAPIUrl(env : Env) {
+export function getSwapAPIUrl(env : EnvironmentVariables) {
 	if (strictParseBoolean(env.USE_METIS)) {
 		return env.METIS_SWAP_API_URL;
 	}
@@ -125,7 +160,7 @@ export function getSwapAPIUrl(env : Env) {
 	}
 }
 
-export function getQuoteAPIURL(env : Env) {
+export function getQuoteAPIURL(env : EnvironmentVariables) {
 	if (strictParseBoolean(env.USE_METIS)) {
 		return env.METIS_QUOTE_API_URL;
 	}

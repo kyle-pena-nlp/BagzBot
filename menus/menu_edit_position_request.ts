@@ -1,4 +1,5 @@
 import { DecimalizedAmount, asTokenPrice } from "../decimalized/decimalized_amount";
+import { allowChooseAutoDoubleSlippage, allowChoosePriorityFees } from "../env";
 import { PositionRequest, describePriorityFee } from "../positions";
 import { CallbackButton } from "../telegram";
 import { CallbackData } from "./callback_data";
@@ -6,7 +7,7 @@ import { Menu, MenuCapabilities } from "./menu";
 import { MenuCode } from "./menu_code";
 import { renderTrailingStopLossRequestMarkdown } from "./trailing_stop_loss_helpers";
 
-export class MenuEditPositionRequest extends Menu< { positionRequest: PositionRequest, maybeSOLBalance : DecimalizedAmount|null, allowChooseAutoDoubleSlippage : boolean, allowChoosePriorityFees : boolean }> implements MenuCapabilities {
+export class MenuEditPositionRequest extends Menu< { positionRequest: PositionRequest, maybeSOLBalance : DecimalizedAmount|null }> implements MenuCapabilities {
     renderText(): string {
         const positionRequest = this.menuData.positionRequest;
         
@@ -41,10 +42,10 @@ export class MenuEditPositionRequest extends Menu< { positionRequest: PositionRe
         this.insertButtonSameLine(options, `:twisted_arrows: ${positionRequest.slippagePercent}% Slippage`, new CallbackData(MenuCode.TrailingStopLossSlippagePctMenu, positionRequest.slippagePercent.toString()));
 
         const nextLine = options.length + 1;
-        if (this.menuData.allowChoosePriorityFees) {
+        if (allowChoosePriorityFees(this.env)) {
             this.insertButton(options, `${describePriorityFee(positionRequest.priorityFeeAutoMultiplier)}`, this.menuCallback(MenuCode.EditPositionRequestPriorityFees), nextLine);
         }
-        if (this.menuData.allowChooseAutoDoubleSlippage) {
+        if (allowChooseAutoDoubleSlippage(this.env)) {
             this.insertButton(options, `${positionRequest.sellAutoDoubleSlippage ? '': 'Do Not '} Auto-Double Slippage`, new CallbackData(MenuCode.PosRequestChooseAutoDoubleSlippageOptions), nextLine);
         }
 
