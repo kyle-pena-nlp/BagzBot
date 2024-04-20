@@ -1,5 +1,6 @@
 import { UserAddress } from "../crypto";
 import { DecimalizedAmount } from "../decimalized";
+import { EnvironmentVariables, parsePriorityFeeOptions } from "../env";
 import { TokenInfo } from "../tokens";
 import { Structural, assertNever, isEnumValue } from "../util";
 import { Quote } from "./quote";
@@ -160,7 +161,7 @@ export function getInAndOutTokens(s : Swappable): { inToken : TokenInfo, outToke
     }
 }
 
-export function describePriorityFee(priorityFee : null|"auto"|number) {
+export function describePriorityFee(priorityFee : null|"auto"|number, env : EnvironmentVariables) {
 	if (priorityFee == null) {
 		return "Priority Fees: Default";
 	}
@@ -168,7 +169,8 @@ export function describePriorityFee(priorityFee : null|"auto"|number) {
 		return "Priority Fees: Default";
 	}
 	else if (typeof priorityFee === 'number') {
-		return `Priority Fees: ${priorityFee.toString(10)}x`;
+		const multiplierName = parsePriorityFeeOptions(env).get(priorityFee) || `${priorityFee.toString(10)}x`;
+		return `Priority Fees: ${multiplierName}`;
 	}
 	else {
 		assertNever(priorityFee);

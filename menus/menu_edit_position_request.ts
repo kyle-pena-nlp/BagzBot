@@ -43,7 +43,7 @@ export class MenuEditPositionRequest extends Menu< { positionRequest: PositionRe
 
         const nextLine = options.length + 1;
         if (allowChoosePriorityFees(this.env)) {
-            this.insertButton(options, `${describePriorityFee(positionRequest.priorityFeeAutoMultiplier)}`, this.menuCallback(MenuCode.EditPositionRequestPriorityFees), nextLine);
+            this.insertButton(options, `${describePriorityFee(positionRequest.priorityFeeAutoMultiplier, this.env)}`, this.menuCallback(MenuCode.EditPositionRequestPriorityFees), nextLine);
         }
         if (allowChooseAutoDoubleSlippage(this.env)) {
             this.insertButton(options, `${positionRequest.sellAutoDoubleSlippage ? '': 'Do Not '} Auto-Double Slippage`, new CallbackData(MenuCode.PosRequestChooseAutoDoubleSlippageOptions), nextLine);

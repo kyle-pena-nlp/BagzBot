@@ -31,7 +31,7 @@ import { POSITION_REQUEST_STORAGE_KEY } from "../storage_keys";
 import { TGStatusMessage, TelegramWebhookInfo, deleteTGMessage, sendMessageToTG, updateTGMessage } from "../telegram";
 import { TGMessageChannel } from "../telegram/telegram_status_message";
 import { TokenInfo, WEN_ADDRESS, getVsTokenInfo } from "../tokens";
-import { Structural, assertNever, strictParseBoolean, strictParseFloat, strictParseInt, tryParseBoolean, tryParseFloat, tryParseInt } from "../util";
+import { Structural, assertNever, strictParseFloat, strictParseInt, tryParseBoolean, tryParseFloat, tryParseInt } from "../util";
 import { assertIs } from "../util/enums";
 import { CallbackHandlerParams } from "./model/callback_handler_params";
 import { TokenAddressExtractor } from "./token_address_extractor";
@@ -669,14 +669,14 @@ export class CallbackHandler {
                 const listDeactivatedPositionsResponse = await listDeactivatedPositions(params.getTelegramUserID(), params.chatID, this.env);
                 return new MenuViewDeactivatedPositions(listDeactivatedPositionsResponse.deactivatedPositions, this.env);
             case MenuCode.EditPositionRequestPriorityFees:
-                return new MenuEditPositionRequestPriorityFees(this.priorityFeeMultipliers(), this.env);
+                return new MenuEditPositionRequestPriorityFees(undefined,this.env);
             case MenuCode.EditPositionRequestSubmitPriorityFees:
                 const selectedPriorityFee = tryParseInt(callbackData.menuArg||'')||(callbackData.menuArg||'');
                 await storeSessionObjProperty<PositionRequest>(params.getTelegramUserID(), params.chatID, params.messageID, "priorityFeeAutoMultiplier", selectedPriorityFee, POSITION_REQUEST_STORAGE_KEY, this.env);
                 const posRequestWithPriorityFeeSet = await readSessionObj<PositionRequest>(params.getTelegramUserID(), params.chatID, params.messageID, POSITION_REQUEST_STORAGE_KEY, this.env);
                 return new MenuEditPositionRequest({ positionRequest: posRequestWithPriorityFeeSet, maybeSOLBalance }, this.env);
             case MenuCode.EditOpenPositionPriorityFee:
-                return new MenuEditOpenPositionSellPriorityFee({ positionID : callbackData.menuArg||'', priorityFeeMultipliers : this.priorityFeeMultipliers() }, this.env)
+                return new MenuEditOpenPositionSellPriorityFee({ positionID : callbackData.menuArg||'' }, this.env)
             case MenuCode.EditOpenPositionSubmitPriorityFee:
                 const thing = PositionIDAndPriorityFeeMultiplier.parse(callbackData.menuArg||'');
                 if (thing == null) {
@@ -687,10 +687,6 @@ export class CallbackHandler {
             default:
                 assertNever(callbackData.menuCode);
         }
-    }
-
-    private priorityFeeMultipliers() : number[] {
-        return this.env.PRIORITY_FEE_MULTIPLIER_OPTIONS.split(",").map(x => strictParseInt(x));
     }
 
     private sorryError(menuCode ?: MenuCode, menuArg ?: string) : MenuContinueMessage {
@@ -912,13 +908,5 @@ export class CallbackHandler {
         }
         positionRequest.quote = quote;
         return true;
-    }
-
-    private allowChooseAutoDouble() : boolean {
-        return strictParseBoolean(this.env.ALLOW_CHOOSE_AUTO_DOUBLE_SLIPPAGE);
-    }
-
-    private allowChoosePriorityFees() : boolean {
-        return strictParseBoolean(this.env.ALLOW_PRIORITY_FEE_MULTIPLIERS);
     }
 }

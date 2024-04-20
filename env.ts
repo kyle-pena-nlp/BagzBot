@@ -30,9 +30,7 @@ export interface EnvironmentVariables {
 	TELEGRAM_BOT_SERVER_URL : string
 	// id assigned to bot
 	TELEGRAM_BOT_ID : string		
-
 	
-
 	// don't access this directly, use getRPCUrl, per below.
 	RPC_ENDPOINT_URL : string
 	JUPITER_PRICE_API_URL : string

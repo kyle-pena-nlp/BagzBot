@@ -49,7 +49,7 @@ export class MenuViewOpenPosition extends Menu<MenuData> implements MenuCapabili
             // this will simplify when i strip out these feature flags
             const nextLine = options.length + 1;
             if (allowChoosePriorityFees(this.env)) {
-                this.insertButton(options, `${describePriorityFee(this.position().sellPriorityFeeAutoMultiplier)}`, new CallbackData(MenuCode.EditOpenPositionPriorityFee, this.position().positionID), nextLine);
+                this.insertButton(options, `${describePriorityFee(this.position().sellPriorityFeeAutoMultiplier, this.env)}`, new CallbackData(MenuCode.EditOpenPositionPriorityFee, this.position().positionID), nextLine);
             }
             if (allowChooseAutoDoubleSlippage(this.env)) {
                 this.insertButton(options, `${this.position().sellAutoDoubleSlippage ? '': 'Do Not'} Auto-Double Slippage`, new CallbackData(MenuCode.EditOpenPositionAutoDoubleSlippage, this.position().positionID), nextLine);

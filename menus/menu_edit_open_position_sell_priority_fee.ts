@@ -1,10 +1,11 @@
+import { parsePriorityFeeOptions } from "../env";
 import { CallbackButton } from "../telegram";
 import { FormattedTable, tryParseInt } from "../util";
 import { CallbackData } from "./callback_data";
 import { Menu, MenuCapabilities } from "./menu";
 import { MenuCode } from "./menu_code";
 
-export class MenuEditOpenPositionSellPriorityFee extends Menu<{ positionID : string, priorityFeeMultipliers : number[] }> implements MenuCapabilities {
+export class MenuEditOpenPositionSellPriorityFee extends Menu<{ positionID : string }> implements MenuCapabilities {
     renderText(): string {
         
         const lines = [
@@ -15,8 +16,8 @@ export class MenuEditOpenPositionSellPriorityFee extends Menu<{ positionID : str
 
         table.addLine(`Default`, '75th percentile of recent priority fees');
 
-        for (const multiplier of this.menuData.priorityFeeMultipliers) {
-            table.addLine(`${multiplier}x`, `${multiplier} times the Default`);
+        for (const [multiplier,multiplierName] of parsePriorityFeeOptions(this.env)) {
+            table.addLine(`${multiplierName}`, `${multiplier} times the Default`);
         }
 
         table.appendTo(lines);
@@ -27,9 +28,9 @@ export class MenuEditOpenPositionSellPriorityFee extends Menu<{ positionID : str
         const options = this.emptyMenu();
         const autoPriorityFeeCallbackData = new PositionIDAndPriorityFeeMultiplier(this.menuData.positionID, "auto");
         this.insertButtonNextLine(options, "Default", new CallbackData(MenuCode.EditOpenPositionSubmitPriorityFee, autoPriorityFeeCallbackData.asMenuArg()));
-        for (const multiplier of this.menuData.priorityFeeMultipliers) {
+        for (const [multiplier,multiplierName] of parsePriorityFeeOptions(this.env)) {
             const multiplierCallbackData = new PositionIDAndPriorityFeeMultiplier(this.menuData.positionID, multiplier);
-            this.insertButtonSameLine(options, `${multiplier}x`, new CallbackData(MenuCode.EditOpenPositionSubmitPriorityFee, multiplierCallbackData.asMenuArg()));
+            this.insertButtonSameLine(options, `${multiplierName}`, new CallbackData(MenuCode.EditOpenPositionSubmitPriorityFee, multiplierCallbackData.asMenuArg()));
         }
         this.insertButtonNextLine(options, ':cancel: Cancel', new CallbackData(MenuCode.ViewOpenPosition, this.menuData.positionID));
         return options;

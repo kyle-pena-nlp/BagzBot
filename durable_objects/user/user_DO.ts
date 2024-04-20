@@ -2,7 +2,7 @@ import { Connection } from "@solana/web3.js";
 import { isAdminOrSuperAdmin } from "../../admins";
 import { Wallet, encryptPrivateKey, generateEd25519Keypair } from "../../crypto";
 import { asTokenPrice } from "../../decimalized/decimalized_amount";
-import { Env, getRPCUrl } from "../../env";
+import { Env, allowChooseAutoDoubleSlippage, allowChoosePriorityFees, getRPCUrl } from "../../env";
 import { makeFailureResponse, makeJSONResponse, makeSuccessResponse, maybeGetJson } from "../../http";
 import { logDebug, logError, logInfo } from "../../logging";
 import { Position, PositionPreRequest, PositionRequest, PositionStatus, PositionType } from "../../positions";
@@ -729,8 +729,11 @@ export class UserDO {
         defaultPrerequest.userID = defaultTrailingStopLossRequestRequest.telegramUserID;
         defaultPrerequest.chatID = defaultTrailingStopLossRequestRequest.chatID;
         defaultPrerequest.messageID = defaultTrailingStopLossRequestRequest.messageID;
-        if (!strictParseBoolean(this.env.ALLOW_PRIORITY_FEE_MULTIPLIERS)) {
+        if (!allowChoosePriorityFees(this.env)) {
             defaultPrerequest.priorityFeeAutoMultiplier = null;
+        }
+        if (!allowChooseAutoDoubleSlippage(this.env)) {
+            defaultPrerequest.sellAutoDoubleSlippage = false;
         }
         defaultPrerequest.positionID = crypto.randomUUID();
         if (defaultTrailingStopLossRequestRequest.token != null) {
