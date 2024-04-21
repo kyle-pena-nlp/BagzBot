@@ -18,7 +18,7 @@ import { MenuEditPositionRequestSellAutoDoubleSlippage } from "./menu_edit_posit
 import { MenuError } from "./menu_error";
 import { MenuFAQ } from "./menu_faq";
 import { MenuListPositions } from "./menu_list_positions";
-import { MenuMain } from "./menu_main";
+import { AdminInfo, MenuMain } from "./menu_main";
 import { MenuOKClose } from "./menu_ok_close";
 import { MenuRetryBuy } from "./menu_retry_buy";
 import { MenuRetryBuySlippageError } from "./menu_retry_buy_slippage_error";
@@ -27,6 +27,8 @@ import { MenuTrailingStopLossEntryBuyQuantity } from "./menu_trailing_stop_loss_
 import { MenuTrailingStopLossPickVsToken } from "./menu_trailing_stop_loss_pick_vs_token";
 import { MenuTrailingStopLossSlippagePercent } from "./menu_trailing_stop_loss_slippage_percent";
 import { MenuTrailingStopLossTriggerPercent } from "./menu_trailing_stop_loss_trigger_percent";
+import { MenuViewDeactivatedPosition } from "./menu_view_deactivated_position";
+import { MenuViewDeactivatedPositions } from "./menu_view_deactivated_positions";
 import { MenuViewDecryptedWallet } from "./menu_view_decrypted_wallet";
 import { MenuViewOpenPosition } from "./menu_view_open_position";
 import { MenuWallet } from "./menu_wallet";
@@ -36,12 +38,12 @@ import { MenuTODO } from "./todo_menu";
 import { WelcomeScreenPart1 } from "./welcome_screen_part_1";
 
 export {
-    BaseMenu, LegalAgreement, MenuAdminViewClosedPositions, MenuBetaInviteFriends, MenuCode, MenuComingSoon, MenuContinueMessage, MenuEditOpenPositionSellAutoDoubleSlippage, MenuEditOpenPositionSellPriorityFee, MenuEditOpenPositionSellSlippagePercent, MenuEditOpenPositionTriggerPercent, MenuEditPositionHelp, MenuEditPositionRequest, MenuEditPositionRequestPriorityFees, MenuEditPositionRequestSellAutoDoubleSlippage, MenuError, MenuFAQ,
+    AdminInfo, BaseMenu, LegalAgreement, MenuAdminViewClosedPositions, MenuBetaInviteFriends, MenuCode, MenuComingSoon, MenuContinueMessage, MenuEditOpenPositionSellAutoDoubleSlippage, MenuEditOpenPositionSellPriorityFee, MenuEditOpenPositionSellSlippagePercent, MenuEditOpenPositionTriggerPercent, MenuEditPositionHelp, MenuEditPositionRequest, MenuEditPositionRequestPriorityFees, MenuEditPositionRequestSellAutoDoubleSlippage, MenuError, MenuFAQ,
     MenuListPositions, MenuMain, MenuOKClose, MenuPNLHistory, MenuRetryBuy, MenuRetryBuySlippageError, MenuRetryManualSell, MenuTODO,
     MenuTrailingStopLossEntryBuyQuantity,
     MenuTrailingStopLossPickVsToken,
     MenuTrailingStopLossSlippagePercent,
-    MenuTrailingStopLossTriggerPercent, MenuViewDecryptedWallet, MenuViewOpenPosition,
+    MenuTrailingStopLossTriggerPercent, MenuViewDeactivatedPosition, MenuViewDeactivatedPositions, MenuViewDecryptedWallet, MenuViewOpenPosition,
     MenuWallet, MenuWhatIsTSL, PositionIDAndChoice, PositionIDAndPriorityFeeMultiplier, PositionIDAndSellSlippagePercent as PositionIDAndSlippagePercent, PositionIDAndTriggerPercent as SubmittedTriggerPctKey, WelcomeScreenPart1, logoHack
 };
 

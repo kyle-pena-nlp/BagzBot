@@ -1,7 +1,7 @@
 import { MenuCode } from "../menus";
 import { HandlerMap } from "../util";
-import { BaseMenuCodeHandler } from "./handlers/base_menu_code_handler";
 import * as handlers from "./handlers";
+import { BaseMenuCodeHandler } from "./handlers/base_menu_code_handler";
 
 export const MenuCodeHandlerMap : HandlerMap<MenuCode,BaseMenuCodeHandler<MenuCode>> = {
     [MenuCode.Main]: new handlers.MainHandler(MenuCode.Main),

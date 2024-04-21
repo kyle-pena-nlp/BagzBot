@@ -1,19 +1,24 @@
-import * as Menus from "../../menus";
-import * as Util from "../../util";
-import { BaseMenuCodeHandler } from "./base_menu_code_handler";
+import { DecimalizedAmount } from "../../decimalized";
+import { isInvalidTokenInfoResponse } from "../../durable_objects/polled_token_pair_list/actions/get_token_info";
+import { getTokenInfo } from "../../durable_objects/polled_token_pair_list/polled_token_pair_list_DO_interop";
+import { readSessionObj, storeSessionObj } from "../../durable_objects/user/userDO_interop";
 import { Env } from "../../env";
+import * as Menus from "../../menus";
 import { BaseMenu, MenuCode } from "../../menus";
-import { ReplyQuestion, ReplyQuestionCode } from "../../reply_question";
+import { PositionRequest } from "../../positions";
+import { ReplyQuestion } from "../../reply_question";
+import { quoteBuy } from "../../rpc/jupiter_quotes";
+import { isGetQuoteFailure } from "../../rpc/rpc_types";
+import { POSITION_REQUEST_STORAGE_KEY } from "../../storage_keys";
 import { CallbackHandlerParams } from "../model/callback_handler_params";
-import { TGStatusMessage, TGMessageChannel } from "../../telegram";
-import { logError, logDebug, logInfo } from "../../logging";
-import { readSessionObj, storeSessionObj, storeSessionObjProperty } from "../../durable_objects/user/userDO_interop";
+import { TokenAddressExtractor } from "../token_address_extractor";
+import { BaseMenuCodeHandler, MenuCodeHandlerCapabilities } from "./base_menu_code_handler";
 
-export class EditPositionChangeTokenSubmitHandler extends BaseMenuCodeHandler<MenuCode.EditPositionChangeTokenSubmit> {
+export class EditPositionChangeTokenSubmitHandler extends BaseMenuCodeHandler<MenuCode.EditPositionChangeTokenSubmit> implements MenuCodeHandlerCapabilities {
     constructor(menuCode : MenuCode.EditPositionChangeTokenSubmit) {
         super(menuCode);
     }
-    async handleCallback(params : CallbackHandlerParams, context: FetchEvent, env: Env) : Promise<BaseMenu|ReplyQuestion|void> {
+    async handleCallback(params : CallbackHandlerParams, maybeSOLBalance : DecimalizedAmount|null, context: FetchEvent, env: Env) : Promise<BaseMenu|ReplyQuestion|void> {
         const callbackData = params.callbackData;
         const messageID = params.messageID;
         const maybeTokenAddress = (callbackData.menuArg||'').trim();

@@ -28,7 +28,8 @@ def generate_files(menuCodes : List[str], overwrite : bool):
 def generate_file_contents(menuCode : str):
     template = '''import * as Menus from "../../menus";
 import * as Util from "../../util";
-import { BaseMenuCodeHandler } from "./base_menu_code_handler";
+import { DecimalizedAmount } from "../../decimalized";
+import { BaseMenuCodeHandler, MenuCodeHandlerCapabilities } from "./base_menu_code_handler";
 import { Env } from "../../env";
 import { BaseMenu, MenuCode } from "../../menus";
 import { ReplyQuestion, ReplyQuestionCode } from "../../reply_question";
@@ -37,11 +38,11 @@ import { TGStatusMessage, TGMessageChannel } from "../../telegram";
 import { logError, logDebug, logInfo } from "../../logging";
 import { readSessionObj, storeSessionObj, storeSessionObjProperty } from "../../durable_objects/user/userDO_interop";
 
-export class ~MENU_CODE~Handler extends BaseMenuCodeHandler<MenuCode.~MENU_CODE~> {
+export class ~MENU_CODE~Handler extends BaseMenuCodeHandler<MenuCode.~MENU_CODE~> implements MenuCodeHandlerCapabilities {
     constructor(menuCode : MenuCode.~MENU_CODE~) {
         super(menuCode);
     }
-    async handleCallback(params : CallbackHandlerParams, context: FetchEvent, env: Env) : Promise<BaseMenu|ReplyQuestion|void> {
+    async handleCallback(params : CallbackHandlerParams, maybeSOLBalance : DecimalizedAmount|null, context: FetchEvent, env: Env) : Promise<BaseMenu|ReplyQuestion|void> {
 ~IMPL~
     }
 }

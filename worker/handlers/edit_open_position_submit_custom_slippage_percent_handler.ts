@@ -1,19 +1,18 @@
-import * as Menus from "../../menus";
-import * as Util from "../../util";
-import { BaseMenuCodeHandler } from "./base_menu_code_handler";
+import { DecimalizedAmount } from "../../decimalized";
+import { setSellSlippagePercentOnOpenPosition } from "../../durable_objects/user/userDO_interop";
 import { Env } from "../../env";
+import * as Menus from "../../menus";
 import { BaseMenu, MenuCode } from "../../menus";
-import { ReplyQuestion, ReplyQuestionCode } from "../../reply_question";
+import { PositionIDAndSellSlippagePercent } from "../../menus/menu_edit_open_position_sell_slippage_percent";
+import { ReplyQuestion } from "../../reply_question";
 import { CallbackHandlerParams } from "../model/callback_handler_params";
-import { TGStatusMessage, TGMessageChannel } from "../../telegram";
-import { logError, logDebug, logInfo } from "../../logging";
-import { readSessionObj, storeSessionObj, storeSessionObjProperty } from "../../durable_objects/user/userDO_interop";
+import { BaseMenuCodeHandler, MenuCodeHandlerCapabilities } from "./base_menu_code_handler";
 
-export class EditOpenPositionSubmitCustomSlippagePercentHandler extends BaseMenuCodeHandler<MenuCode.EditOpenPositionSubmitCustomSlippagePercent> {
+export class EditOpenPositionSubmitCustomSlippagePercentHandler extends BaseMenuCodeHandler<MenuCode.EditOpenPositionSubmitCustomSlippagePercent> implements MenuCodeHandlerCapabilities {
     constructor(menuCode : MenuCode.EditOpenPositionSubmitCustomSlippagePercent) {
         super(menuCode);
     }
-    async handleCallback(params : CallbackHandlerParams, context: FetchEvent, env: Env) : Promise<BaseMenu|ReplyQuestion|void> {
+    async handleCallback(params : CallbackHandlerParams, maybeSOLBalance : DecimalizedAmount|null, context: FetchEvent, env: Env) : Promise<BaseMenu|ReplyQuestion|void> {
         const callbackData = params.callbackData;
         const positionIDAndSlippagePercent = PositionIDAndSellSlippagePercent.gracefulParse(callbackData.menuArg||'');
         if (positionIDAndSlippagePercent == null) {
@@ -21,7 +20,7 @@ export class EditOpenPositionSubmitCustomSlippagePercentHandler extends BaseMenu
         }
         if ('sellSlippagePercent' in positionIDAndSlippagePercent && positionIDAndSlippagePercent.sellSlippagePercent > 0 && positionIDAndSlippagePercent.sellSlippagePercent < 100) {
             await setSellSlippagePercentOnOpenPosition(params.getTelegramUserID(), params.chatID, positionIDAndSlippagePercent.positionID, positionIDAndSlippagePercent.sellSlippagePercent, env);
-            return await this.makeOpenPositionMenu(params, positionIDAndSlippagePercent.positionID);
+            return await this.makeOpenPositionMenu(params, positionIDAndSlippagePercent.positionID, env);
         }
         else {
             return new Menus.MenuContinueMessage('Sorry - that was an invalid percentage', MenuCode.ViewOpenPosition, env, 'HTML', positionIDAndSlippagePercent.positionID);

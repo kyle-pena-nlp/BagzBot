@@ -1,19 +1,18 @@
-import * as Menus from "../../menus";
-import * as Util from "../../util";
-import { BaseMenuCodeHandler } from "./base_menu_code_handler";
+import { DecimalizedAmount } from "../../decimalized";
+import { sendMessageToUser } from "../../durable_objects/user/userDO_interop";
 import { Env } from "../../env";
+import * as Menus from "../../menus";
 import { BaseMenu, MenuCode } from "../../menus";
-import { ReplyQuestion, ReplyQuestionCode } from "../../reply_question";
+import { ReplyQuestion } from "../../reply_question";
+import * as Util from "../../util";
 import { CallbackHandlerParams } from "../model/callback_handler_params";
-import { TGStatusMessage, TGMessageChannel } from "../../telegram";
-import { logError, logDebug, logInfo } from "../../logging";
-import { readSessionObj, storeSessionObj, storeSessionObjProperty } from "../../durable_objects/user/userDO_interop";
+import { BaseMenuCodeHandler, MenuCodeHandlerCapabilities } from "./base_menu_code_handler";
 
-export class SubmitAdminSendUserMessageHandler extends BaseMenuCodeHandler<MenuCode.SubmitAdminSendUserMessage> {
+export class SubmitAdminSendUserMessageHandler extends BaseMenuCodeHandler<MenuCode.SubmitAdminSendUserMessage> implements MenuCodeHandlerCapabilities {
     constructor(menuCode : MenuCode.SubmitAdminSendUserMessage) {
         super(menuCode);
     }
-    async handleCallback(params : CallbackHandlerParams, context: FetchEvent, env: Env) : Promise<BaseMenu|ReplyQuestion|void> {
+    async handleCallback(params : CallbackHandlerParams, maybeSOLBalance : DecimalizedAmount|null, context: FetchEvent, env: Env) : Promise<BaseMenu|ReplyQuestion|void> {
         const callbackData = params.callbackData;
         const tokens = (callbackData.menuArg||'').split("|");
         const recepientUserID = Util.tryParseInt(tokens[0]||'');

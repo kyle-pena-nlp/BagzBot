@@ -1,19 +1,20 @@
-import * as Menus from "../../menus";
-import * as Util from "../../util";
-import { BaseMenuCodeHandler } from "./base_menu_code_handler";
+import { DecimalizedAmount } from "../../decimalized";
+import { readSessionObj, storeSessionObjProperty } from "../../durable_objects/user/userDO_interop";
 import { Env } from "../../env";
+import * as Menus from "../../menus";
 import { BaseMenu, MenuCode } from "../../menus";
-import { ReplyQuestion, ReplyQuestionCode } from "../../reply_question";
+import { PositionRequest } from "../../positions";
+import { ReplyQuestion } from "../../reply_question";
+import { POSITION_REQUEST_STORAGE_KEY } from "../../storage_keys";
+import * as Util from "../../util";
 import { CallbackHandlerParams } from "../model/callback_handler_params";
-import { TGStatusMessage, TGMessageChannel } from "../../telegram";
-import { logError, logDebug, logInfo } from "../../logging";
-import { readSessionObj, storeSessionObj, storeSessionObjProperty } from "../../durable_objects/user/userDO_interop";
+import { BaseMenuCodeHandler, MenuCodeHandlerCapabilities } from "./base_menu_code_handler";
 
-export class SubmitTriggerPctHandler extends BaseMenuCodeHandler<MenuCode.SubmitTriggerPct> {
+export class SubmitTriggerPctHandler extends BaseMenuCodeHandler<MenuCode.SubmitTriggerPct> implements MenuCodeHandlerCapabilities {
     constructor(menuCode : MenuCode.SubmitTriggerPct) {
         super(menuCode);
     }
-    async handleCallback(params : CallbackHandlerParams, context: FetchEvent, env: Env) : Promise<BaseMenu|ReplyQuestion|void> {
+    async handleCallback(params : CallbackHandlerParams, maybeSOLBalance : DecimalizedAmount|null, context: FetchEvent, env: Env) : Promise<BaseMenu|ReplyQuestion|void> {
         const callbackData = params.callbackData;
         const messageID = params.messageID;
         const triggerPctEntry = Util.tryParseFloat(callbackData.menuArg!!);

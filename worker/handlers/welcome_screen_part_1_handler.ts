@@ -1,19 +1,16 @@
-import * as Menus from "../../menus";
-import * as Util from "../../util";
-import { BaseMenuCodeHandler } from "./base_menu_code_handler";
+import { DecimalizedAmount } from "../../decimalized";
 import { Env } from "../../env";
+import * as Menus from "../../menus";
 import { BaseMenu, MenuCode } from "../../menus";
-import { ReplyQuestion, ReplyQuestionCode } from "../../reply_question";
+import { ReplyQuestion } from "../../reply_question";
 import { CallbackHandlerParams } from "../model/callback_handler_params";
-import { TGStatusMessage, TGMessageChannel } from "../../telegram";
-import { logError, logDebug, logInfo } from "../../logging";
-import { readSessionObj, storeSessionObj, storeSessionObjProperty } from "../../durable_objects/user/userDO_interop";
+import { BaseMenuCodeHandler, MenuCodeHandlerCapabilities } from "./base_menu_code_handler";
 
-export class WelcomeScreenPart1Handler extends BaseMenuCodeHandler<MenuCode.WelcomeScreenPart1> {
+export class WelcomeScreenPart1Handler extends BaseMenuCodeHandler<MenuCode.WelcomeScreenPart1> implements MenuCodeHandlerCapabilities {
     constructor(menuCode : MenuCode.WelcomeScreenPart1) {
         super(menuCode);
     }
-    async handleCallback(params : CallbackHandlerParams, context: FetchEvent, env: Env) : Promise<BaseMenu|ReplyQuestion|void> {
-        return new WelcomeScreenPart1(undefined, env);
+    async handleCallback(params : CallbackHandlerParams, maybeSOLBalance : DecimalizedAmount|null, context: FetchEvent, env: Env) : Promise<BaseMenu|ReplyQuestion|void> {
+        return new Menus.WelcomeScreenPart1(undefined, env);
     }
 }

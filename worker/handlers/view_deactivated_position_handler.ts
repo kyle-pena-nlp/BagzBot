@@ -1,19 +1,17 @@
-import * as Menus from "../../menus";
-import * as Util from "../../util";
-import { BaseMenuCodeHandler } from "./base_menu_code_handler";
+import { DecimalizedAmount } from "../../decimalized";
+import { getDeactivatedPosition } from "../../durable_objects/user/userDO_interop";
 import { Env } from "../../env";
+import * as Menus from "../../menus";
 import { BaseMenu, MenuCode } from "../../menus";
-import { ReplyQuestion, ReplyQuestionCode } from "../../reply_question";
+import { ReplyQuestion } from "../../reply_question";
 import { CallbackHandlerParams } from "../model/callback_handler_params";
-import { TGStatusMessage, TGMessageChannel } from "../../telegram";
-import { logError, logDebug, logInfo } from "../../logging";
-import { readSessionObj, storeSessionObj, storeSessionObjProperty } from "../../durable_objects/user/userDO_interop";
+import { BaseMenuCodeHandler, MenuCodeHandlerCapabilities } from "./base_menu_code_handler";
 
-export class ViewDeactivatedPositionHandler extends BaseMenuCodeHandler<MenuCode.ViewDeactivatedPosition> {
+export class ViewDeactivatedPositionHandler extends BaseMenuCodeHandler<MenuCode.ViewDeactivatedPosition> implements MenuCodeHandlerCapabilities {
     constructor(menuCode : MenuCode.ViewDeactivatedPosition) {
         super(menuCode);
     }
-    async handleCallback(params : CallbackHandlerParams, context: FetchEvent, env: Env) : Promise<BaseMenu|ReplyQuestion|void> {
+    async handleCallback(params : CallbackHandlerParams, maybeSOLBalance : DecimalizedAmount|null, context: FetchEvent, env: Env) : Promise<BaseMenu|ReplyQuestion|void> {
         const callbackData = params.callbackData;
         const deactivatedPosition = await getDeactivatedPosition(params.getTelegramUserID(), params.chatID, callbackData.menuArg||'', env);
         if (deactivatedPosition == null) {

@@ -1,19 +1,20 @@
-import * as Menus from "../../menus";
-import * as Util from "../../util";
-import { BaseMenuCodeHandler } from "./base_menu_code_handler";
+import { DecimalizedAmount } from "../../decimalized";
+import { isValidTokenInfoResponse } from "../../durable_objects/polled_token_pair_list/actions/get_token_info";
+import { getTokenInfo } from "../../durable_objects/polled_token_pair_list/polled_token_pair_list_DO_interop";
+import { adminInvokeAlarm } from "../../durable_objects/token_pair_position_tracker/token_pair_position_tracker_do_interop";
 import { Env } from "../../env";
+import * as Menus from "../../menus";
 import { BaseMenu, MenuCode } from "../../menus";
-import { ReplyQuestion, ReplyQuestionCode } from "../../reply_question";
+import { ReplyQuestion } from "../../reply_question";
+import { getVsTokenInfo } from "../../tokens";
 import { CallbackHandlerParams } from "../model/callback_handler_params";
-import { TGStatusMessage, TGMessageChannel } from "../../telegram";
-import { logError, logDebug, logInfo } from "../../logging";
-import { readSessionObj, storeSessionObj, storeSessionObjProperty } from "../../durable_objects/user/userDO_interop";
+import { BaseMenuCodeHandler, MenuCodeHandlerCapabilities } from "./base_menu_code_handler";
 
-export class SubmitAdminInvokeAlarmHandler extends BaseMenuCodeHandler<MenuCode.SubmitAdminInvokeAlarm> {
+export class SubmitAdminInvokeAlarmHandler extends BaseMenuCodeHandler<MenuCode.SubmitAdminInvokeAlarm> implements MenuCodeHandlerCapabilities {
     constructor(menuCode : MenuCode.SubmitAdminInvokeAlarm) {
         super(menuCode);
     }
-    async handleCallback(params : CallbackHandlerParams, context: FetchEvent, env: Env) : Promise<BaseMenu|ReplyQuestion|void> {
+    async handleCallback(params : CallbackHandlerParams, maybeSOLBalance : DecimalizedAmount|null, context: FetchEvent, env: Env) : Promise<BaseMenu|ReplyQuestion|void> {
         const callbackData = params.callbackData;
         const ti = await getTokenInfo(callbackData.menuArg||'',env);
         if (isValidTokenInfoResponse(ti)) {
