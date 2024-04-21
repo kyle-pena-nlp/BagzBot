@@ -82,6 +82,7 @@ export interface EnvironmentVariables {
 	OTHER_SELL_FAILURES_TO_DEACTIVATE : string
 	ALLOW_PRIORITY_FEE_MULTIPLIERS : string
 	PRIORITY_FEE_MULTIPLIER_OPTIONS : string
+	QUESTION_TIMEOUT_MS : string
 }
 
 interface DurableObjects {

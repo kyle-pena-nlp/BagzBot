@@ -16,7 +16,7 @@ import { TGMessageChannel, UpdateableMessage } from "./telegram_status_message";
 import { TelegramWebhookInfo } from "./telegram_webhook_info";
 
 export {
-    CallbackButton, DeleteTGMessageResponse, TGMessageChannel as TGStatusMessage, TGTextEntity,
+    CallbackButton, DeleteTGMessageResponse, TGMessageChannel, TGMessageChannel as TGStatusMessage, TGTextEntity,
     TGTextEntityType, TelegramWebhookInfo, TgMessageSentInfo, UpdateableMessage as UpdateableNotification, asChartEmoji, deleteTGMessage, escapeTGText, makeTelegramBotUrl, sendMessageToTG, sendRequestToTG, subInEmojis, subInEmojisOnButtons, updateTGMessage
 };
 

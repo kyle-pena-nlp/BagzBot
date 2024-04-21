@@ -1,18 +1,8 @@
 import { MenuCode } from "../../menus";
-import { TelegramWebhookInfo } from "../../telegram";
 import { HandlerMap } from "../../util";
-import { CallbackHandlerParams } from "../model/callback_handler_params";
+import { BaseMenuCodeHandler } from "./base_menu_code_handler";
 
-export interface MenuCodeHandler {
-    handle(params : CallbackHandlerParams|TelegramWebhookInfo) : Promise<void>;
-}
-
-export class MenuCodeTODOHandler {
-    async handle() : Promise<void> {
-    }
-}
-
-export const MenuCodeHandlerMap : HandlerMap<MenuCode,MenuCodeHandler> = {
+export const MenuCodeHandlerMap : HandlerMap<MenuCode,BaseMenuCodeHandler<MenuCode>> = {
     [MenuCode.Main]: new MenuCodeTODOHandler(),
     [MenuCode.Wallet]: new MenuCodeTODOHandler(),
     [MenuCode.ViewDecryptedWallet]: new MenuCodeTODOHandler(),

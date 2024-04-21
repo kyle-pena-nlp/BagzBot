@@ -39,8 +39,6 @@ export enum MenuCode {
 	EditOpenPositionSubmitCustomTriggerPercent = "EOP.SubmitCustomTriggerPct",
 	EditOpenPositionCustomSlippagePercent = "EOP.CustomSlippagePct",
 	EditOpenPositionSubmitCustomSlippagePercent = "EOP.SubmitCustomSlippagePct",
-	//This needs a bigger refactor because the PositionSeller assumes the position is being tracked.
-	//CloseDeactivatedPositionManually = "CloseDeactivatedPositionManually",
 
 	EditOpenPositionAutoDoubleSlippage = "EOP.AutoDoubleSlip",
 	SubmitOpenPositionAutoDoubleSlippage = "SOP.AutoDoubleSlip",
