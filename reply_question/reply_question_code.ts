@@ -13,6 +13,8 @@ export enum ReplyQuestionCode {
     AdminDevSetPrice = "AdminDevSetPrice",
     AdminInvokeAlarm = "AdminInvokeAlarm",
     AdminSendUserMessage = "AdminSendUserMessage",
-    AdminDeletePositionByID = "AdminDeletePositionByID"
+    AdminDeletePositionByID = "AdminDeletePositionByID",
+    OpenPositionCustomTriggerPercent = "OpenPositionCustomTriggerPercent",
+    OpenPositionCustomSlippagePercent = "OpenPositionCustomSlippagePercent"
     
 }

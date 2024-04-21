@@ -12,7 +12,7 @@ export class CallbackHandlerParams {
     chatID : number
     messageID : number
     text : string|null 	
-	
+
     callbackData : CallbackData   
 
     constructor(info : TelegramWebhookInfo, replyQuestion ?: ReplyQuestionWithNextSteps) {
@@ -25,7 +25,8 @@ export class CallbackHandlerParams {
         this.callbackData = info.callbackData!!;
 		if (replyQuestion != null) {
 			this.messageID = replyQuestion.linkedMessageID;
-			this.callbackData = new CallbackData(replyQuestion.nextMenuCode, this.text||'')
+			const replyQuestionMenuArg = replyQuestion.menuArg != null ? `${replyQuestion.menuArg||''}|${this.text||''}` : this.text||''
+			this.callbackData = new CallbackData(replyQuestion.nextMenuCode, replyQuestionMenuArg);
 		}
     }
 

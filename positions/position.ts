@@ -105,7 +105,7 @@ export interface PositionPreRequest extends BasePositionRequest {
 	instead of just a address 
 */
 export interface PositionRequest extends BasePositionRequest {
-	readonly [ key : string ] : Structural
+	readonly [ key : string ] : Exclude<Structural,undefined>
 	token : TokenInfo
 	quote : Quote
 };

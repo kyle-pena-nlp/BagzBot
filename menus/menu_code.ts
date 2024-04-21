@@ -34,6 +34,11 @@ export enum MenuCode {
 	ViewDeactivatedPosition = "ViewDeactivatedPosition", 
 	EditOpenPositionPriorityFee = "EOP.PriorityFee",
 	EditOpenPositionSubmitPriorityFee = "EOP.SubmitPriorityFee",
+
+	EditOpenPositionCustomTriggerPercent = "EOP.CustomTriggerPct",
+	EditOpenPositionSubmitCustomTriggerPercent = "EOP.SubmitCustomTriggerPct",
+	EditOpenPositionCustomSlippagePercent = "EOP.CustomSlippagePct",
+	EditOpenPositionSubmitCustomSlippagePercent = "EOP.SubmitCustomSlippagePct",
 	//This needs a bigger refactor because the PositionSeller assumes the position is being tracked.
 	//CloseDeactivatedPositionManually = "CloseDeactivatedPositionManually",
 

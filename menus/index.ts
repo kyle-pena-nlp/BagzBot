@@ -10,7 +10,7 @@ import { MenuContinueMessage } from "./menu_continue_message";
 import { MenuEditOpenPositionSellAutoDoubleSlippage } from "./menu_edit_open_position_sell_auto_double_slippage";
 import { MenuEditOpenPositionSellPriorityFee, PositionIDAndPriorityFeeMultiplier } from "./menu_edit_open_position_sell_priority_fee";
 import { MenuEditOpenPositionSellSlippagePercent, PositionIDAndSellSlippagePercent } from "./menu_edit_open_position_sell_slippage_percent";
-import { MenuEditOpenPositionTriggerPercent, SubmittedTriggerPctKey } from "./menu_edit_open_position_trigger_percent";
+import { MenuEditOpenPositionTriggerPercent, PositionIDAndTriggerPercent } from "./menu_edit_open_position_trigger_percent";
 import { MenuEditPositionHelp } from "./menu_edit_position_help";
 import { MenuEditPositionRequest } from "./menu_edit_position_request";
 import { MenuEditPositionRequestPriorityFees } from "./menu_edit_position_request_priority_fees";
@@ -42,6 +42,6 @@ export {
     MenuTrailingStopLossPickVsToken,
     MenuTrailingStopLossSlippagePercent,
     MenuTrailingStopLossTriggerPercent, MenuViewDecryptedWallet, MenuViewOpenPosition,
-    MenuWallet, MenuWhatIsTSL, PositionIDAndChoice, PositionIDAndPriorityFeeMultiplier, PositionIDAndSellSlippagePercent as PositionIDAndSlippagePercent, SubmittedTriggerPctKey, WelcomeScreenPart1, logoHack
+    MenuWallet, MenuWhatIsTSL, PositionIDAndChoice, PositionIDAndPriorityFeeMultiplier, PositionIDAndSellSlippagePercent as PositionIDAndSlippagePercent, PositionIDAndTriggerPercent as SubmittedTriggerPctKey, WelcomeScreenPart1, logoHack
 };
 

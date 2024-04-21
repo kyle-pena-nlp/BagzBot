@@ -3,15 +3,16 @@ import { Structural } from "../util";
 import { ReplyQuestionCode } from "./reply_question_code";
 
 export interface ReplyQuestionWithNextSteps {
-    readonly [ key : string ] : Structural
+    readonly [ key : string ] : Exclude<Structural,undefined>
     messageQuestionID : number
     replyQuestionCode: ReplyQuestionCode
     linkedMessageID : number
     nextMenuCode : MenuCode
+    menuArg : string|null
 }
 
 export interface StandAloneSessionReplyQuestion {
-    readonly [ key : string ] : Structural
+    readonly [ key : string ] : Exclude<Structural,undefined>
     replyQuestionCode: ReplyQuestionCode
     messageQuestionID : number
 }

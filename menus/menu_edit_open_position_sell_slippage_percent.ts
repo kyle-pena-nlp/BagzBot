@@ -23,6 +23,14 @@ export class PositionIDAndSellSlippagePercent {
         }
         return new PositionIDAndSellSlippagePercent(positionID,sellSlippagePercent);
     }
+    static gracefulParse(menuArg : string) : PositionIDAndSellSlippagePercent|{ positionID : string }|null {
+        const result = PositionIDAndSellSlippagePercent.parse(menuArg);
+        if (result != null) {
+            return result;
+        }
+        const tokens = menuArg.split("|");
+        return { positionID : tokens[0] };
+    }
     asMenuArg() : string {
         return `${this.positionID}|${this.sellSlippagePercent}`
     }
@@ -37,8 +45,9 @@ export class MenuEditOpenPositionSellSlippagePercent extends Menu<{ positionID: 
         const options = this.emptyMenu();
         const percentageOptions = [1,5,10];
         for (const percentOption of percentageOptions) {
-            this.insertButtonNextLine(options, `${percentOption}%`, new CallbackData(MenuCode.SubmitOpenPositionSellSlippagePercent, new PositionIDAndSellSlippagePercent(positionID,percentOption).asMenuArg()));
+            this.insertButtonSameLine(options, `${percentOption}%`, new CallbackData(MenuCode.SubmitOpenPositionSellSlippagePercent, new PositionIDAndSellSlippagePercent(positionID,percentOption).asMenuArg()));
         }
+        this.insertButtonSameLine(options, 'X%', new CallbackData(MenuCode.EditOpenPositionCustomSlippagePercent, positionID));
         this.insertButtonNextLine(options, `:back: Back`, new CallbackData(MenuCode.ViewOpenPosition, positionID));
         return options;
     }

@@ -3,7 +3,7 @@ import { TokenInfo } from "../tokens";
 import { Structural } from "../util";
 
 export interface Quote {
-    readonly [ key : string ] : Structural
+    readonly [ key : string ] : Exclude<Structural,undefined>
     inToken : TokenInfo
     outToken : TokenInfo
     inTokenAmt : DecimalizedAmount

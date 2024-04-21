@@ -10,7 +10,7 @@ const ASSOCIATED_TOKEN_PROGRAM_ID = "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8kn
     
 
 export interface StagedTokenInfo {
-    readonly [ key : string ] : Structural
+    readonly [ key : string ] : Exclude<Structural,undefined>
     address: string
     name : string
 	symbol : string
@@ -19,7 +19,7 @@ export interface StagedTokenInfo {
 }
 
 export interface TokenInfo extends StagedTokenInfo {
-    readonly [ key : string ] : Structural
+    readonly [ key : string ] : Exclude<Structural,undefined>
 }
 
 export async function deriveFeeAccount(tokenAddress : string, env : Env) : Promise<PublicKey> {

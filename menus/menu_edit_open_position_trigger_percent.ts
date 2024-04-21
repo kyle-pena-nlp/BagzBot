@@ -4,7 +4,7 @@ import { CallbackData } from "./callback_data";
 import { Menu, MenuCapabilities } from "./menu";
 import { MenuCode } from "./menu_code";
 
-export class SubmittedTriggerPctKey {
+export class PositionIDAndTriggerPercent {
     positionID : string
     percent : number
     constructor(positionID : string, percent : number) {
@@ -28,7 +28,15 @@ export class SubmittedTriggerPctKey {
         if (percent == null) {
             return null;
         }
-        return new SubmittedTriggerPctKey(positionID,percent);
+        return new PositionIDAndTriggerPercent(positionID,percent);
+    }
+    static gracefulParse(menuArg : string) : PositionIDAndTriggerPercent|{ positionID : string }|null {
+        const result = PositionIDAndTriggerPercent.parse(menuArg);
+        if (result != null) {
+            return result;
+        }
+        const tokens = menuArg.split("|");
+        return { positionID : tokens[0] };
     }
 }
 
@@ -42,9 +50,9 @@ export class MenuEditOpenPositionTriggerPercent extends Menu<string> implements 
         const submitValueCode = MenuCode.SubmitOpenPositionTriggerPct;
         const percents = [1.0,5.0,10.0];
         for (const percent of percents) {
-            this.insertButtonNextLine(options, percent.toFixed(1), new CallbackData(submitValueCode, new SubmittedTriggerPctKey(positionID,percent).toCallbackData()));
+            this.insertButtonSameLine(options, percent.toFixed(1), new CallbackData(submitValueCode, new PositionIDAndTriggerPercent(positionID,percent).toCallbackData()));
         }
-        //this.insertButtonSameLine(options, "X%", new CallbackData(MenuCode.CustomOpenPositionTriggerPct, `1.0|${positionID}`));
+        this.insertButtonSameLine(options, "X%", new CallbackData(MenuCode.EditOpenPositionCustomTriggerPercent, positionID));
         this.insertButtonNextLine(options, ":back: Back", new CallbackData(MenuCode.ViewOpenPosition, positionID));
         return options;
     }

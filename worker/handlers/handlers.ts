@@ -82,5 +82,9 @@ export const MenuCodeHandlerMap : HandlerMap<MenuCode,MenuCodeHandler> = {
     [MenuCode.EditPositionRequestPriorityFees]: new MenuCodeTODOHandler(),
     [MenuCode.EditPositionRequestSubmitPriorityFees]: new MenuCodeTODOHandler(),
     [MenuCode.EditOpenPositionPriorityFee]: new MenuCodeTODOHandler(),
-    [MenuCode.EditOpenPositionSubmitPriorityFee]: new MenuCodeTODOHandler()    
+    [MenuCode.EditOpenPositionSubmitPriorityFee]: new MenuCodeTODOHandler(),
+    [MenuCode.EditOpenPositionCustomSlippagePercent]: new MenuCodeTODOHandler(),
+    [MenuCode.EditOpenPositionSubmitCustomSlippagePercent]: new MenuCodeTODOHandler(),
+    [MenuCode.EditOpenPositionCustomTriggerPercent]: new MenuCodeTODOHandler(),
+    [MenuCode.EditOpenPositionSubmitCustomTriggerPercent]: new MenuCodeTODOHandler(),    
 }

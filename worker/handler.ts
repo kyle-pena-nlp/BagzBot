@@ -18,6 +18,7 @@ import { logDebug, logError } from "../logging";
 import { BaseMenu, LegalAgreement, MenuAdminViewClosedPositions, MenuBetaInviteFriends, MenuCode, MenuComingSoon, MenuContinueMessage, MenuEditOpenPositionSellAutoDoubleSlippage, MenuEditOpenPositionSellPriorityFee, MenuEditOpenPositionSellSlippagePercent, MenuEditOpenPositionTriggerPercent, MenuEditPositionHelp, MenuEditPositionRequestPriorityFees, MenuEditPositionRequestSellAutoDoubleSlippage, MenuError, MenuFAQ, MenuListPositions, MenuMain, MenuOKClose, MenuPNLHistory, MenuTODO, MenuTrailingStopLossEntryBuyQuantity, MenuTrailingStopLossPickVsToken, MenuTrailingStopLossSlippagePercent, MenuTrailingStopLossTriggerPercent, MenuViewDecryptedWallet, MenuViewOpenPosition, MenuWallet, MenuWhatIsTSL, PositionIDAndChoice, PositionIDAndPriorityFeeMultiplier, SubmittedTriggerPctKey, WelcomeScreenPart1 } from "../menus";
 import { MenuViewObj } from "../menus/menu_admin_view_obj";
 import { PositionIDAndSellSlippagePercent } from "../menus/menu_edit_open_position_sell_slippage_percent";
+import { PositionIDAndTriggerPercent } from "../menus/menu_edit_open_position_trigger_percent";
 import { MenuEditPositionRequest } from "../menus/menu_edit_position_request";
 import { AdminInfo } from "../menus/menu_main";
 import { MenuViewDeactivatedPosition } from "../menus/menu_view_frozen_position";
@@ -684,6 +685,48 @@ export class CallbackHandler {
                 }
                 await setOpenPositionSellPriorityFeeMultiplier(params.getTelegramUserID(), params.chatID, thing.positionID, thing.multiplier, this.env);
                 return await this.makeOpenPositionMenu(params, thing.positionID);
+            case MenuCode.EditOpenPositionCustomSlippagePercent:
+                return new ReplyQuestion('Enter a Slippage Percent', ReplyQuestionCode.OpenPositionCustomSlippagePercent, this.context, {
+                    callback: {
+                        linkedMessageID: params.messageID,
+                        nextMenuCode: MenuCode.EditOpenPositionSubmitCustomSlippagePercent,
+                        menuArg: callbackData.menuArg
+                    },
+                    timeoutMS: QUESTION_TIMEOUT_MS
+                });
+            case MenuCode.EditOpenPositionSubmitCustomSlippagePercent:
+                const positionIDAndSlippagePercent = PositionIDAndSellSlippagePercent.gracefulParse(callbackData.menuArg||'');
+                if (positionIDAndSlippagePercent == null) {
+                    return new MenuContinueMessage('Sorry - that was an unexpected problem', MenuCode.Main, this.env);
+                }
+                if ('sellSlippagePercent' in positionIDAndSlippagePercent && positionIDAndSlippagePercent.sellSlippagePercent > 0 && positionIDAndSlippagePercent.sellSlippagePercent < 100) {
+                    await setSellSlippagePercentOnOpenPosition(params.getTelegramUserID(), params.chatID, positionIDAndSlippagePercent.positionID, positionIDAndSlippagePercent.sellSlippagePercent, this.env);
+                    return await this.makeOpenPositionMenu(params, positionIDAndSlippagePercent.positionID);
+                }
+                else { 
+                    return new MenuContinueMessage('Sorry - that was an invalid percentage', MenuCode.ViewOpenPosition, this.env, 'HTML', positionIDAndSlippagePercent.positionID);
+                }
+            case MenuCode.EditOpenPositionCustomTriggerPercent:
+                return new ReplyQuestion('Enter a Trigger Percent', ReplyQuestionCode.OpenPositionCustomTriggerPercent, this.context, {
+                    callback: {
+                        linkedMessageID: params.messageID,
+                        nextMenuCode: MenuCode.EditOpenPositionSubmitCustomTriggerPercent,
+                        menuArg: callbackData.menuArg
+                    },
+                    timeoutMS: QUESTION_TIMEOUT_MS
+                });
+            case MenuCode.EditOpenPositionSubmitCustomTriggerPercent:
+                const positionIDAndTriggerPercent = PositionIDAndTriggerPercent.gracefulParse(callbackData.menuArg||'');    
+                if (positionIDAndTriggerPercent == null) {
+                    return new MenuContinueMessage('Sorry - there was an unexpected problem', MenuCode.Main, this.env);
+                }
+                else if ('percent' in positionIDAndTriggerPercent &&  positionIDAndTriggerPercent.percent > 0 && positionIDAndTriggerPercent.percent < 100) {
+                    await editTriggerPercentOnOpenPositionFromUserDO(params.getTelegramUserID(), params.chatID, positionIDAndTriggerPercent.positionID, positionIDAndTriggerPercent.percent, this.env);               
+                    return await this.makeOpenPositionMenu(params, positionIDAndTriggerPercent.positionID);
+                }
+                else { 
+                    return new MenuContinueMessage('Sorry - that was an invalid percentage', MenuCode.ViewOpenPosition, this.env, 'HTML', positionIDAndTriggerPercent.positionID);
+                }
             default:
                 assertNever(callbackData.menuCode);
         }

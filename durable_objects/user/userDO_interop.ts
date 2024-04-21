@@ -340,7 +340,7 @@ async function readSessionValuesWithPrefix(telegramUserID : number, chatID : num
 	return response.values;
 }
 
-export async function storeSessionObj<TObj extends {[key : string] : Structural}>(telegramUserID : number, chatID : number, messageID : number, obj : TObj, prefix : string, env : Env) : Promise<StoreSessionValuesResponse> {
+export async function storeSessionObj<TObj extends {[key : string] : Exclude<Structural,undefined>}>(telegramUserID : number, chatID : number, messageID : number, obj : TObj, prefix : string, env : Env) : Promise<StoreSessionValuesResponse> {
 	const valuesMap = new Map<string,Structural>();
 	for (const key of Object.keys(obj)) {
 		const propertyValue = obj[key];
