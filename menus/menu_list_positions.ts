@@ -4,10 +4,11 @@ import { PNL, PositionAndMaybePNL } from "../durable_objects/token_pair_position
 import { Position, PositionStatus } from "../positions";
 import { CallbackButton } from "../telegram";
 import { CallbackData } from "./callback_data";
-import { Menu, MenuCapabilities } from "./menu";
+import { MenuCapabilities, PaginatedMenu } from "./menu";
 import { MenuCode } from "./menu_code";
+import { PaginationOpts } from "./pagination";
 
-export class MenuListPositions extends Menu<PositionAndMaybePNL[]> implements MenuCapabilities {
+export class MenuListPositions extends PaginatedMenu<PositionAndMaybePNL,{ items: PositionAndMaybePNL[], pageIndex: number }> implements MenuCapabilities {
     renderText(): string {
         const lines = [ `<b>Your TSL Positions</b>` ];
         const maybeTotalPNL = this.maybeCalcTotalPNL();
@@ -28,27 +29,22 @@ export class MenuListPositions extends Menu<PositionAndMaybePNL[]> implements Me
     renderOptions(): CallbackButton[][] {
         const options = this.emptyMenu();
         
-        for (const p of this.menuData) {
+        for (const p of this.getItemsOnPage()) {
             const position = p.position;
-            if (!this.shouldBeListed(position)) {
-                continue;
-            }
             const positionLabel = this.makePositionLabel(p);
             const callbackData = new CallbackData(MenuCode.ViewOpenPosition, position.positionID);
             this.insertButtonNextLine(options, positionLabel, callbackData);
         }
+        this.insertPaginationButtons(options, MenuCode.ListPositions);
         this.insertButtonNextLine(options, ':refresh: Refresh', this.menuCallback(MenuCode.ListPositions))
         this.insertBackToMainButtonOnNewLine(options);
         return options;
     }
     maybeCalcTotalPNL() : DecimalizedAmount|undefined {
         let totalPNL = dZero();
-        for (const p of this.menuData) {
+        for (const p of this.menuData.items) {
             if (p.PNL == null) {
                 return;
-            }
-            if (!this.shouldBeListed(p.position)) {
-                continue;
             }
             totalPNL = dAdd(totalPNL, p.PNL.PNL);
         }
@@ -56,7 +52,7 @@ export class MenuListPositions extends Menu<PositionAndMaybePNL[]> implements Me
     }
     calcOriginalTotalValue() : DecimalizedAmount {
         let totalOriginalValue = dZero();
-        for (const p of this.menuData) {
+        for (const p of this.menuData.items) {
             totalOriginalValue = dAdd(totalOriginalValue, p.position.vsTokenAmt);
         }
         return totalOriginalValue;
@@ -153,8 +149,10 @@ export class MenuListPositions extends Menu<PositionAndMaybePNL[]> implements Me
     triggerConditionMet(p : PositionAndMaybePNL & { PNL : PNL }) {
         return p.position.triggerPercent <  (100 * toNumber(p.PNL.fracBelowPeak));
     }
-
-    shouldBeListed(position : Position) : boolean {
-        return position.status != PositionStatus.Closed && position.buyConfirmed;
+    protected paginationOpts(): PaginationOpts {
+        return {
+            itemsPerPage: 10,
+            numClickablePages: 4
+        };
     }
 }

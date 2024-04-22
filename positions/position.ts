@@ -124,6 +124,10 @@ export function isSwappable(x : any) : x is Swappable {
 	return ('positionID' in x) && ('positionType' in x) && isPositionType(x['positionType']);
 }
 
+export function shouldDisplayToUserAsOpenPosition(position : Position) : boolean {
+	return position.status != PositionStatus.Closed && position.buyConfirmed;
+}
+
 export function convertPreRequestToRequest(r : PositionPreRequest, quote : Quote, token : TokenInfo) {
 	const positionRequest : PositionRequest = {
 		userID : r.userID,

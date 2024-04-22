@@ -13,7 +13,8 @@ import {
     isPosition,
     isPositionRequest,
     isPositionType,
-    isSwappable
+    isSwappable,
+    shouldDisplayToUserAsOpenPosition
 } from "./position";
 import {
     PositionRequestAndMaybeQuote,
@@ -30,6 +31,6 @@ export {
     getSwapOfXDescription, isPosition,
     isPositionRequest, isPositionRequestAndQuote,
     isPositionRequestAndQuoteFailure, isPositionType,
-    isSwappable
+    isSwappable, shouldDisplayToUserAsOpenPosition
 };
 

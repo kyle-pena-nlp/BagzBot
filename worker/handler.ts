@@ -11,7 +11,7 @@ import { logDebug } from "../logging";
 import { BaseMenu, LegalAgreement, MenuFAQ, MenuListPositions, MenuMain, MenuOKClose, MenuPNLHistory, WelcomeScreenPart1 } from "../menus";
 import { MenuEditPositionRequest } from "../menus/menu_edit_position_request";
 import { AdminInfo } from "../menus/menu_main";
-import { PositionPreRequest, PositionRequest, convertPreRequestToRequest } from "../positions";
+import { PositionPreRequest, PositionRequest, convertPreRequestToRequest, shouldDisplayToUserAsOpenPosition } from "../positions";
 import { ReplyQuestion, ReplyQuestionCode } from "../reply_question";
 import { ReplyQuestionData, replyQuestionHasNextSteps } from "../reply_question/reply_question_data";
 import { quoteBuy } from "../rpc/jupiter_quotes";
@@ -295,7 +295,7 @@ export class CallbackHandler {
                 return ['...', new MenuFAQ({ userID : info.getTelegramUserID(), chatID : info.chatID }, this.env)];
             case '/list_positions':
                 const positions = await listPositionsFromUserDO(info.getTelegramUserID(), info.chatID, env);
-                return ['...', new MenuListPositions(positions, this.env)];
+                return ['...', new MenuListPositions({ items : positions.filter(p => shouldDisplayToUserAsOpenPosition(p.position)), pageIndex : 0 }, this.env)];
             case '/pnl_history':
                 const closedPositionsAndPNLSummary = await getClosedPositionsAndPNLSummary(info.getTelegramUserID(), info.chatID, this.env);
                 const pnlHistoryPageIndex = 0;
