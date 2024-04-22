@@ -2,29 +2,35 @@ import { dAdd, dDiv, dMult } from "../decimalized";
 import { DecimalizedAmount, MATH_DECIMAL_PLACES, asPercentDeltaString, asTokenPrice, asTokenPriceDelta, dZero, fromNumber, toNumber } from "../decimalized/decimalized_amount";
 import { Position } from "../positions";
 import { CallbackButton, asChartEmoji } from "../telegram";
-import { groupIntoMap } from "../util";
-import { FormattedTable, padRight } from "../util/strings";
+import { FormattedTable } from "../util/strings";
 import { CallbackData } from "./callback_data";
 import { logoHack } from "./logo_hack";
-import { Menu, MenuCapabilities } from "./menu";
+import { MenuCapabilities, PaginatedMenu } from "./menu";
 import { MenuCode } from "./menu_code";
+import { PaginationOpts } from "./pagination";
 
-export class MenuPNLHistory extends Menu<{ closedPositions : Position[], netPNL : DecimalizedAmount }> implements MenuCapabilities {
+export class MenuPNLHistory extends PaginatedMenu<Position[],{ items : Position[][], netPNL : DecimalizedAmount, pageIndex : number }> implements MenuCapabilities {
     renderText(): string {
+
         const lines : string[] = [];
+
         this.addHeader(lines);
+        this.addNetPNLSummary(lines, this.menuData.items.flatMap(x => x));
         lines.push("");
-
-        const closedPositions = this.menuData.closedPositions;
-        closedPositions.sort((a,b) => (a.txBuyAttemptTimeMS||0 - b.txBuyAttemptTimeMS||0))
         
-        const groupedClosedPositions = groupIntoMap(closedPositions, pos => pos.token.address);
-        for (const [_,closedPositionsForToken] of groupedClosedPositions) {
-            this.addPNLSummaryForToken(lines, closedPositionsForToken);
+        const displayed = this.getItemsOnPage();
+        for (const displayItem of displayed) {
+            this.addPNLSummaryForToken(lines, displayItem);
         }
-
-        this.addNetPNLSummary(lines, closedPositions);
+        
         return lines.join("\r\n");
+    }
+
+    protected paginationOpts(): PaginationOpts {
+        return {
+            itemsPerPage: 4,
+            numClickablePages: 4
+        }
     }
 
     addPNLSummaryForToken(lines : string[], closedPositionsForToken : Position[]) {
@@ -44,10 +50,11 @@ export class MenuPNLHistory extends Menu<{ closedPositions : Position[], netPNL 
         const pos = closedPositionsForToken[0];
         const pnlPercentDelta = dMult(fromNumber(100), dDiv(netPNL, totalInvested, MATH_DECIMAL_PLACES)||dZero());
         const heading = `<b><u>${pos.token.symbol}</u></b> ${asChartEmoji(toNumber(netPNL))} (${asPercentDeltaString(pnlPercentDelta)})`;
-        lines.push(`<code>${pos.token.address}</code>`);
         lines.push(heading);
+        lines.push(`<code>${pos.token.address}</code>`);        
         const table = new FormattedTable([10], 'bulleted');
         table.addLine(`${asTokenPrice(totalInvested, true)}`, "SOL Invested");
+        table.addLine(`${asTokenPrice(dAdd(totalInvested, netPNL), true)}`, "SOL Returned");
         table.addLine(`${asTokenPriceDelta(netPNL)}`, `Net SOL (${asPercentDeltaString(pnlPercentDelta)})`);
         table.appendTo(lines);
         lines.push("")
@@ -55,6 +62,7 @@ export class MenuPNLHistory extends Menu<{ closedPositions : Position[], netPNL 
 
     renderOptions(): CallbackButton[][] {
         const options = this.emptyMenu();
+        this.insertPaginationButtons(options, MenuCode.ViewPNLHistory);
         this.insertButtonNextLine(options, `:refresh: Refresh`, new CallbackData(MenuCode.ViewPNLHistory));
         this.insertButtonSameLine(options, `:back: Back`, new CallbackData(MenuCode.Main));
         this.insertButtonSameLine(options, `Close`, new CallbackData(MenuCode.Close));
@@ -76,15 +84,6 @@ export class MenuPNLHistory extends Menu<{ closedPositions : Position[], netPNL 
         lines.push(`<b>Bottom Line</b>: <code>${asTokenPriceDelta(this.menuData.netPNL)} SOL (${asPercentDeltaString(percentPNL)})</code>`);
     }
     
-    private addClosedPositionSummary(lines : string[], position : Position) {
-        if (position.netPNL == null) {
-            return;
-        }
-        const label = padRight(`${position.token.symbol}: `, 9);
-        const pnlString = `${asTokenPriceDelta(position.netPNL)} SOL`;
-        lines.push(`:bullet: Sale of <code>${label} ${pnlString}</code>`);
-    }
-
     renderURLPreviewNormally(): boolean {
         return false;
     }

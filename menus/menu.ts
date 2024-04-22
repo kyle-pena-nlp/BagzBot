@@ -5,6 +5,7 @@ import { MenuCode } from "./menu_code";
 import { makeJSONRequest } from "../http";
 import { fetchAndReadResponse as safeFetchAndReadResponse } from "../http/http_helpers";
 import { CallbackButton, escapeTGText, makeTelegramBotUrl, subInEmojis, subInEmojisOnButtons } from "../telegram";
+import { PaginationOpts, getPageItems, insertPageButtons } from "./pagination";
 
 export enum MenuDisplayMode {
 	UpdateMenu,
@@ -143,6 +144,7 @@ export abstract class BaseMenu {
 
 // export EnvWithNoSecrets
 
+
 export abstract class Menu<T> extends BaseMenu {
 
     menuData   : T;
@@ -205,6 +207,24 @@ export abstract class Menu<T> extends BaseMenu {
 
     protected menuCallback(menuCode : MenuCode) {
         return new CallbackData(menuCode);
+    }
+}
+
+export abstract class PaginatedMenu<TItem, T extends { items : TItem[], pageIndex : number }> extends Menu<T> {
+    constructor(miscData : T, env : EnvironmentVariables) {
+        super(miscData,env);
+    }
+    protected paginationOpts() : PaginationOpts {
+        return {
+            itemsPerPage: 10,
+            numClickablePages: 4
+        };
+    }
+    protected insertPaginationButtons(options : CallbackButton[][], menuCode : MenuCode) {
+        insertPageButtons(options, menuCode, this.menuData.items, this.menuData.pageIndex, this.paginationOpts());
+    }
+    protected getItemsOnPage() {
+        return getPageItems(this.menuData.items, this.menuData.pageIndex, this.paginationOpts());
     }
 }
 

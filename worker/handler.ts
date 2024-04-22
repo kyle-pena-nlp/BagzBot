@@ -19,7 +19,7 @@ import { isGetQuoteFailure } from "../rpc/rpc_types";
 import { POSITION_REQUEST_STORAGE_KEY } from "../storage_keys";
 import { TelegramWebhookInfo, deleteTGMessage, sendMessageToTG, updateTGMessage } from "../telegram";
 import { TokenInfo, WEN_ADDRESS } from "../tokens";
-import { assertNever } from "../util";
+import { assertNever, groupIntoMap } from "../util";
 import { assertIs } from "../util/enums";
 import { MenuCodeHandlerCapabilities } from "./handlers/base_menu_code_handler";
 import { MenuCodeHandlerMap } from "./menu_code_handler_map";
@@ -298,7 +298,10 @@ export class CallbackHandler {
                 return ['...', new MenuListPositions(positions, this.env)];
             case '/pnl_history':
                 const closedPositionsAndPNLSummary = await getClosedPositionsAndPNLSummary(info.getTelegramUserID(), info.chatID, this.env);
-                return ['...',new MenuPNLHistory({ closedPositions : closedPositionsAndPNLSummary.closedPositions, netPNL: closedPositionsAndPNLSummary.closedPositionsPNLSummary.netSOL }, this.env)];
+                const pnlHistoryPageIndex = 0;
+                const groupedClosedPositions = [...groupIntoMap(closedPositionsAndPNLSummary.closedPositions, x => x.token.address).values()];
+                groupedClosedPositions.sort(x => Math.min(...x.map(y => -(y.txSellAttemptTimeMS||0))));
+                return ['...',new MenuPNLHistory({ items : groupedClosedPositions, netPNL: closedPositionsAndPNLSummary.closedPositionsPNLSummary.netSOL, pageIndex: pnlHistoryPageIndex }, this.env)];
             case '/new_position':
                 const defaultPr = await getDefaultTrailingStopLoss(info.getTelegramUserID(), info.chatID, messageID, env);
                 const prerequest = defaultPr.prerequest;
