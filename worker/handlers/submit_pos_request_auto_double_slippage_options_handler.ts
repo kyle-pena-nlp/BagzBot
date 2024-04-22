@@ -21,12 +21,6 @@ export class SubmitPosRequestAutoDoubleSlippageOptionsHandler extends BaseMenuCo
             return this.sorryError(env);
         }
         else {
-            const x = await readSessionObj<PositionRequest>(
-                params.getTelegramUserID(),
-                params.chatID,
-                params.messageID,
-                POSITION_REQUEST_STORAGE_KEY,
-                env);
             await storeSessionObjProperty<PositionRequest>(params.getTelegramUserID(),
                 params.chatID,
                 params.messageID,
