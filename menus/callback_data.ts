@@ -13,6 +13,7 @@ export class CallbackData {
             return new CallbackData(CallbackData.parseMenuCode(tokens[0]), undefined);
         }
         else {
+			// TODO: bug here ???, 2nd arg should be: tokens.slice(1).join(":")
             return new CallbackData(CallbackData.parseMenuCode(tokens[0]), tokens[1]);
         }
 	}

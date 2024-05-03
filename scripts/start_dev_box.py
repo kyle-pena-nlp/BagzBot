@@ -1,5 +1,5 @@
-from argparse import ArgumentParser
-import subprocess, json, shlex, os, shutil
+from argparse import ArgumentParser, ArgumentTypeError
+import subprocess, json, shlex, os, shutil, platform
 import requests
 from wrangler_common import *
 from commands import COMMANDS
@@ -7,25 +7,25 @@ from dev.local_dev_common import *
 
 def run_cloudflare_worker():
     command = START_CLOUDFLARE_LOCAL_WORKER_COMMAND
-    print(command)
-    child_proc = subprocess.Popen(shlex.split(command), shell = True)
+    child_proc = execute_shell_command(command)
     poll_until_port_is_occupied(LOCAL_CLOUDFLARE_WORKER_PORT)
     return child_proc
 
 def start_CRON_poller():
     command = START_CRON_POLLER_COMMAND
-    child_proc = subprocess.Popen(shlex.split(command), shell = True)
+    child_proc = execute_shell_command(command)
     return child_proc
 
 def start_token_list_rebuild_CRON_poller(token_list_rebuild_frequency : int):
     command = START_TOKEN_LIST_REBUILD_CRON_POLLER_COMMAND.format(token_list_rebuild_frequency = token_list_rebuild_frequency)
-    child_proc = subprocess.Popen(shlex.split(command), shell = True)
+    child_proc = execute_shell_command(command)
     return child_proc
 
 def parse_args():
     # NEVER CHANGE THIS because this script takes down the bot and migratres it to the local server
     parser = ArgumentParser()
     parser.add_argument("--token_list_rebuild_frequency", required = False, default = 60*30)
+    parser.add_argument("--start_local_telegram_bot", type = parse_bool, required = False, default = True)
     args = parser.parse_args()
     return args
 
@@ -38,22 +38,18 @@ def do_it(args):
         print("Starting local cloudflare worker")
         child_procs.append(run_cloudflare_worker())
 
-        #do_wrangler_login() #This ends up being a pain and most of the time we are already logged in anyway
-        #Start a local telegram bot API
-        print("Starting local telegram-bot-api server")
-        api_id   = get_secret("SECRET__TELEGRAM_API_ID", "dev")
-        api_hash = get_secret("SECRET__TELEGRAM_API_HASH", "dev")
-        child_procs.append(fork_shell_telegram_bot_api_local_server(api_id = api_id, api_hash = api_hash))
+        if args.start_local_telegram_bot:
 
-        print("Setting up bot locally")
-        bot_token = get_secret("SECRET__TELEGRAM_BOT_TOKEN", "dev")
-        bot_secret_token = get_secret("SECRET__TELEGRAM_BOT_WEBHOOK_SECRET_TOKEN", "dev")
+            print("Starting local telegram-bot-api server")
+            api_id   = get_secret("SECRET__TELEGRAM_API_ID", "dev")
+            api_hash = get_secret("SECRET__TELEGRAM_API_HASH", "dev")
+            child_procs.append(fork_shell_telegram_bot_api_local_server(api_id = api_id, api_hash = api_hash))
 
-        # this didn't work
-        #if not args.skip_bot_setup:
-        #    migrate_and_configure_bot_for_local_server(bot_token, bot_secret_token)
+            print("Setting up bot locally")
+            bot_token = get_secret("SECRET__TELEGRAM_BOT_TOKEN", "dev")
+            bot_secret_token = get_secret("SECRET__TELEGRAM_BOT_WEBHOOK_SECRET_TOKEN", "dev")
 
-        migrate_and_configure_bot_for_local_server(bot_token, bot_secret_token)
+            migrate_and_configure_bot_for_local_server(bot_token, bot_secret_token)
 
         child_procs.append(start_CRON_poller())
 
@@ -70,16 +66,12 @@ def do_it(args):
     finally:
         kill_procs(child_procs)
 
-
-
-    # Make sure the local cloudflare worker is running
-
 def fork_shell_telegram_bot_api_local_server(api_id, api_hash):
     shutil.rmtree(TELEGRAM_LOCAL_SERVER_WORKING_DIR, ignore_errors=True)
     os.makedirs(TELEGRAM_LOCAL_SERVER_WORKING_DIR, exist_ok=False)
     command = START_TELEGRAM_LOCAL_SERVER_COMMAND.format(api_id = api_id, api_hash = api_hash, working_dir=TELEGRAM_LOCAL_SERVER_WORKING_DIR)
     print(command)
-    child_proc = subprocess.Popen(command,shell = True) # no shlex split here on purpose.  makes it parse the --local param weirdly.
+    child_proc = execute_shell_command(command) # no shlex split here on purpose.  makes it parse the --local param weirdly.
     poll_until_port_is_occupied(LOCAL_TELEGRAM_BOT_API_SERVER_PORT)
     print("Local telegram-bot-api server process forked.")
     return child_proc
@@ -164,7 +156,12 @@ def configure_webhook_for_local_bot(bot_token, bot_secret_token):
         raise Exception(response.text)
     
 if __name__ == "__main__":
+
     args = parse_args()
+    
     poll_until_port_is_unoccupied(LOCAL_CLOUDFLARE_WORKER_PORT)
-    poll_until_port_is_unoccupied(LOCAL_TELEGRAM_BOT_API_SERVER_PORT)
+
+    if args.start_local_telegram_bot:
+        poll_until_port_is_unoccupied(LOCAL_TELEGRAM_BOT_API_SERVER_PORT)
+    
     do_it(args)

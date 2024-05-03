@@ -35,18 +35,18 @@
               "--end=${input:endValue}",
               "--limit=${input:limitValue}"
             ]
-      }, 
+        }, 
       
-      {
-        "name": "Python Debugger: Start Dev Box",
-        "type": "debugpy",
-        "request": "launch",
-        "program": "${file}",
-        "console": "integratedTerminal",
-        "args": [
-            "--token_list_rebuild_frequency=${input:tokenListRebuildFrequencyValue}"
-          ]
-    },       
+        {
+          "name": "Python Debugger: Start Dev Box",
+          "type": "debugpy",
+          "request": "launch",
+          "program": "${file}",
+          "console": "integratedTerminal",
+          "args": [
+              "--token_list_rebuild_frequency=${input:tokenListRebuildFrequencyValue}"
+            ]
+        },       
 
         {
             "name": "Wrangler",
@@ -71,7 +71,55 @@
             "windows": {
               "program": "${workspaceFolder}/node_modules/jest/bin/jest"
             }
-          }       
+        },
+          
+        {
+          "name": "Attach 5678: Sim Fake TG",
+          "type": "debugpy",
+          "request": "attach",
+          "connect": {
+              "host": "localhost",
+              "port": 5678
+          }
+        },
+        {
+            "name": "Attach 5679: Sim Filewatcher",
+            "type": "debugpy",
+            "request": "attach",
+            "connect": {
+                "host": "localhost",
+                "port": 5679
+            }
+        },
+
+        {
+            "name": "Attach 5680: Spin Up Users",
+            "type": "debugpy",
+            "request": "attach",
+            "connect": {
+                "host": "localhost",
+                "port": 5680
+            }
+        },
+        {
+            "name": "Attach 5681: Simulated User",
+            "type": "debugpy",
+            "request": "attach",
+            "connect": {
+                "host": "localhost",
+                "port": 5681
+            }
+        },
+        {
+          "name": "Attach 5682: Run Sim",
+          "type": "debugpy",
+          "request": "attach",
+          "connect": {
+              "host": "localhost",
+              "port": 5682
+          }
+        }
+
     ],
     "inputs": [
         {
