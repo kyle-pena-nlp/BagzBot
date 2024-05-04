@@ -1,15 +1,32 @@
-from argparse import ArgumentParser, ArgumentTypeError
-import subprocess, json, shlex, os, shutil, platform
+from argparse import ArgumentParser
+import json, os, shutil
 import requests
+from simulator import *
 from wrangler_common import *
 from commands import COMMANDS
 from dev.local_dev_common import *
 
-def run_cloudflare_worker():
-    command = START_CLOUDFLARE_LOCAL_WORKER_COMMAND
+def run_cloudflare_worker(args):
+    ENV = "sim" if args.sim else "dev"
+    env_vars : Dict[str,str] = convert_env_vars_to_dict(args.env_vars)   
+    if args.sim:
+        env_vars["TELEGRAM_BOT_SERVER_URL"] = f"http://localhost:{FAKE_TELEGRAM_SERVER_PORT}"
+    elif 'TELEGRAM_BOT_SERVER_URL' not in env_vars:
+        env_vars['TELEGRAM_BOT_SERVER_URL'] = LOCAL_TELEGRAM_BOT_API_SERVER_ADDRESS 
+    ENV_VARS = " ".join([ f'{var}:"{value}"' for (var,value) in env_vars.items() ])
+    command = f'npx wrangler dev --env {ENV} --port {LOCAL_CLOUDFLARE_WORKER_PORT} --test-scheduled --ip 127.0.0.1 --var {ENV_VARS}'
     child_proc = execute_shell_command(command)
     poll_until_port_is_occupied(LOCAL_CLOUDFLARE_WORKER_PORT)
     return child_proc
+
+def convert_env_vars_to_dict(env_vars):
+    env_vars_dict = dict()
+    for env_var in env_vars:
+        if "=" not in env_var:
+            raise Exception("env_var must be in format KEY=VALUE, was: {env_var}")
+        tokens = env_var.split("=")
+        env_vars_dict[tokens[0]] = tokens[1]
+    return env_vars_dict
 
 def start_CRON_poller():
     command = START_CRON_POLLER_COMMAND
@@ -22,10 +39,11 @@ def start_token_list_rebuild_CRON_poller(token_list_rebuild_frequency : int):
     return child_proc
 
 def parse_args():
-    # NEVER CHANGE THIS because this script takes down the bot and migratres it to the local server
     parser = ArgumentParser()
     parser.add_argument("--token_list_rebuild_frequency", required = False, default = 60*30)
     parser.add_argument("--start_local_telegram_bot", type = parse_bool, required = False, default = True)
+    parser.add_argument("--env_vars", nargs="*", type = str, default=[])
+    parser.add_argument("--sim", action="store_true")
     args = parser.parse_args()
     return args
 
@@ -35,10 +53,15 @@ def do_it(args):
 
     try:
 
-        print("Starting local cloudflare worker")
-        child_procs.append(run_cloudflare_worker())
+        if args.sim:
+            ensure_simdir_exists()
+            child_procs.append(start_fake_telegram_server())
+            child_procs.append(start_user_messages_file_watcher())
 
-        if args.start_local_telegram_bot:
+        print("Starting local cloudflare worker")
+        child_procs.append(run_cloudflare_worker(args))
+
+        if not args.sim:
 
             print("Starting local telegram-bot-api server")
             api_id   = get_secret("SECRET__TELEGRAM_API_ID", "dev")
@@ -55,6 +78,9 @@ def do_it(args):
 
         child_procs.append(start_token_list_rebuild_CRON_poller(args.token_list_rebuild_frequency))
 
+        if args.sim:
+            child_procs.append(spin_up_simulation_users())
+
         print("You may wish to start the wrangler debugger now.")
         print("Cloudflare worker and local bot api server ARE RUNNING!")
         print("Press any key to shut them down.")
@@ -65,6 +91,7 @@ def do_it(args):
         print(e)
     finally:
         kill_procs(child_procs)
+        remove_lingering_file_locks()
 
 def fork_shell_telegram_bot_api_local_server(api_id, api_hash):
     shutil.rmtree(TELEGRAM_LOCAL_SERVER_WORKING_DIR, ignore_errors=True)

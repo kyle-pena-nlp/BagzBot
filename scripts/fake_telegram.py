@@ -177,6 +177,7 @@ def get_user_messages(user_id):
             data = json.load(file)
     else:
         data = []
+    return data
 
 def write_user_messages(user_id, data):
     # Write the updated data back to the file
@@ -194,4 +195,5 @@ if __name__ == '__main__':
     args = parse_args()
     if args.attach_debugger:
         attach_debugger(FAKE_TELEGRAM_DEBUG_PORT)
-    app.run(debug=True)
+    
+    app.run(debug=False, host = "localhost", port = FAKE_TELEGRAM_SERVER_PORT)

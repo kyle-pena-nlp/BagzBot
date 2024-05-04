@@ -313,14 +313,6 @@ def make_reply_question_response(response, reply_question, user_metadata, new_me
     }
 
 
-def user_types_in_random_token(message_data, user_metadata):
-    token_addresses = [ "Wen" ]
-    token_address = random.choice(token_addresses)
-    return make_webhook_send_text_request_body(user_metadata.get("user_id"), user_metadata.chat_id, token_address)
-
-
-
-
 def make_webhook_send_text_request_body(message_data, text):
     # Extracting chat ID
     chat_id = message_data['chat_id']

@@ -56,6 +56,9 @@ TS Dev Dependencies:
 * wrangler
 * @cloudflare/workers-types
 
+Other:
+    mitmproxy (`brew install mitmproxy` for MacOS)
+
 Python Scripting Dependencies:
 * tomli
 * tqdm

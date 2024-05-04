@@ -22,7 +22,7 @@ LOCAL_FAKE_TELEGRAM_SERVER_ADDRESS = f"http://127.0.0.1:{FAKE_TELEGRAM_SERVER_PO
 
 # Commands
 # --ip is to keep wrangler happy for windows for versions 3.18ish
-START_CLOUDFLARE_LOCAL_WORKER_COMMAND = f'npx wrangler dev --env=dev --port={LOCAL_CLOUDFLARE_WORKER_PORT} --test-scheduled --ip 127.0.0.1 --var TELEGRAM_BOT_SERVER_URL:"{LOCAL_TELEGRAM_BOT_API_SERVER_ADDRESS}"' # --log-level=debug
+START_CLOUDFLARE_LOCAL_WORKER_COMMAND = f'npx wrangler dev --env=dev --port={LOCAL_CLOUDFLARE_WORKER_PORT} --test-scheduled --ip 127.0.0.1'
 START_TELEGRAM_LOCAL_SERVER_COMMAND   = f'telegram-bot-api --api-id={{api_id}} --api-hash={{api_hash}} --dir={{working_dir}} --local --log=log.log --http-port={LOCAL_TELEGRAM_BOT_API_SERVER_PORT}' # --verbosity=4
 TELEGRAM_LOCAL_SERVER_WORKING_DIR = f"telegram_bot_api_working_dir" + os.sep
 START_CRON_POLLER_COMMAND = f'python3 scripts/dev/cron_poller.py --port={LOCAL_CLOUDFLARE_WORKER_PORT}'
@@ -108,7 +108,7 @@ def deep_proc_kill(proc):
 
 def execute_shell_command(command : str, **kwargs):
     command = maybe_source_profile(command)
-    args =  dict(shell = True, cwd = os.getcwd())
+    args =  dict(shell = True, cwd = os.getcwd(), bufsize=0)
     if platform.system().strip() in ['Darwin','Linux']:
         args["executable"] = "/bin/bash"
     args = { **args, **kwargs }
