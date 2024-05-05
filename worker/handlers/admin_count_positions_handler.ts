@@ -9,7 +9,7 @@ import { CallbackHandlerParams } from "../model/callback_handler_params";
 import { TGStatusMessage, TGMessageChannel } from "../../telegram";
 import { logError, logDebug, logInfo } from "../../logging";
 import { readSessionObj, storeSessionObj, storeSessionObjProperty } from "../../durable_objects/user/userDO_interop";
-import { adminCountAllPositions } from "../../durable_objects/heartbeat/heartbeat_do_interop";
+import { adminCountAllPositions } from "../../durable_objects/heartbeat/heartbeat_DO_interop";
 
 export class AdminCountPositionsHandler extends BaseMenuCodeHandler<MenuCode.AdminCountPositions> implements MenuCodeHandlerCapabilities {
     constructor(menuCode : MenuCode.AdminCountPositions) {

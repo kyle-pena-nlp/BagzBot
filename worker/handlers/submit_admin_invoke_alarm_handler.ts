@@ -1,7 +1,7 @@
 import { DecimalizedAmount } from "../../decimalized";
 import { isValidTokenInfoResponse } from "../../durable_objects/polled_token_pair_list/actions/get_token_info";
 import { getTokenInfo } from "../../durable_objects/polled_token_pair_list/polled_token_pair_list_DO_interop";
-import { adminInvokeAlarm } from "../../durable_objects/token_pair_position_tracker/token_pair_position_tracker_do_interop";
+import { adminInvokeAlarm } from "../../durable_objects/token_pair_position_tracker/token_pair_position_tracker_DO_interop";
 import { Env } from "../../env";
 import * as Menus from "../../menus";
 import { BaseMenu, MenuCode } from "../../menus";

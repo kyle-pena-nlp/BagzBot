@@ -1,5 +1,5 @@
 import { DecimalizedAmount, fromNumber } from "../../decimalized";
-import { _devOnlyFeatureUpdatePrice } from "../../durable_objects/token_pair_position_tracker/token_pair_position_tracker_do_interop";
+import { _devOnlyFeatureUpdatePrice } from "../../durable_objects/token_pair_position_tracker/token_pair_position_tracker_DO_interop";
 import { Env } from "../../env";
 import * as Menus from "../../menus";
 import { BaseMenu, MenuCode } from "../../menus";

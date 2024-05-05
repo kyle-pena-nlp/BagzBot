@@ -10,7 +10,7 @@ import { Position, PositionStatus } from "../../positions";
 import { isSuccessfullyParsedSwapSummary } from "../../rpc/rpc_swap_parse_result_types";
 import { TGStatusMessage } from "../../telegram";
 import { ChangeTrackedValue, assertNever, strictParseBoolean, strictParseInt } from "../../util";
-import { ensureTokenPairIsRegistered } from "../heartbeat/heartbeat_do_interop";
+import { ensureTokenPairIsRegistered } from "../heartbeat/heartbeat_DO_interop";
 import { EditTriggerPercentOnOpenPositionResponse } from "../user/actions/edit_trigger_percent_on_open_position";
 import { SetSellAutoDoubleOnOpenPositionResponse } from "../user/actions/set_sell_auto_double_on_open_position";
 import { SellSellSlippagePercentageOnOpenPositionResponse } from "../user/actions/set_sell_slippage_percent_on_open_position";
@@ -49,7 +49,7 @@ import { WakeupTokenPairPositionTrackerRequest, WakeupTokenPairPositionTrackerRe
 import { BuyConfirmer } from "./confirmers/buy_confirmer";
 import { SellConfirmer } from "./confirmers/sell_confirmer";
 import { PositionAndMaybePNL } from "./model/position_and_PNL";
-import { TokenPairPositionTrackerDOFetchMethod, parseTokenPairPositionTrackerDOFetchMethod } from "./token_pair_position_tracker_do_interop";
+import { TokenPairPositionTrackerDOFetchMethod, parseTokenPairPositionTrackerDOFetchMethod } from "./token_pair_position_tracker_DO_interop";
 import { CurrentPriceTracker } from "./trackers/current_price_tracker";
 import { ActionsToTake, TokenPairPositionTracker } from "./trackers/token_pair_position_tracker";
 /*

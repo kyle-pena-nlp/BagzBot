@@ -5,7 +5,7 @@ import { Env } from "../../../env";
 import { logDebug } from "../../../logging";
 import { PositionStatus } from "../../../positions";
 import { ChangeTrackedValue, strictParseFloat } from "../../../util";
-import { listPositionsByUser } from "../../token_pair_position_tracker/token_pair_position_tracker_do_interop";
+import { listPositionsByUser } from "../../token_pair_position_tracker/token_pair_position_tracker_DO_interop";
 import { TokenPair } from "../model/token_pair";
 import { UserPNL } from "../model/user_data";
 

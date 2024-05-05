@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { DecimalizedAmount } from "../decimalized";
 import { claimInviteCode } from "../durable_objects/beta_invite_codes/beta_invite_code_interop";
-import { doHeartbeatWakeup } from "../durable_objects/heartbeat/heartbeat_do_interop";
+import { doHeartbeatWakeup } from "../durable_objects/heartbeat/heartbeat_DO_interop";
 import { GetTokenInfoResponse, isInvalidTokenInfoResponse } from "../durable_objects/polled_token_pair_list/actions/get_token_info";
 import { forceRebuildTokensList, getTokenInfo } from "../durable_objects/polled_token_pair_list/polled_token_pair_list_DO_interop";
 import { getClosedPositionsAndPNLSummary, getDefaultTrailingStopLoss, getUserData, getUserWalletSOLBalance, listPositionsFromUserDO, maybeReadSessionObj, storeSessionObj } from "../durable_objects/user/userDO_interop";

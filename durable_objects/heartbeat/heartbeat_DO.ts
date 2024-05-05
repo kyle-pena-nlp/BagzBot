@@ -5,10 +5,10 @@ import { PositionStatus } from "../../positions";
 import { SOL_ADDRESS } from "../../tokens";
 import { MapWithStorage, assertNever } from "../../util";
 import { HeartbeatWakeupRequestForTokenPairPositionTracker } from "../token_pair_position_tracker/actions/heartbeat_wake_up_for_token_pair_position_tracker";
-import { TokenPairKey, TokenPairPositionTrackerDOFetchMethod, getPositionCountsFromTracker } from "../token_pair_position_tracker/token_pair_position_tracker_do_interop";
+import { TokenPairKey, TokenPairPositionTrackerDOFetchMethod, getPositionCountsFromTracker } from "../token_pair_position_tracker/token_pair_position_tracker_DO_interop";
 import { AdminCountPositionsRequest, AdminCountPositionsResponse } from "./actions/admin_count_positions";
 import { RegisterTokenPairRequest, RegisterTokenPairResponse } from "./actions/register_token_pair";
-import { HeartbeatDOFetchMethod, parseHeartbeatDOFetchMethod } from "./heartbeat_do_interop";
+import { HeartbeatDOFetchMethod, parseHeartbeatDOFetchMethod } from "./heartbeat_DO_interop";
 import { makeJSONRequest, makeJSONResponse, maybeGetJson } from "../../http";
 
 export class HeartbeatDO {
