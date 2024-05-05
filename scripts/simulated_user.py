@@ -1,8 +1,9 @@
 import os, json, random, time, requests, re, shutil
 from argparse import ArgumentParser, Namespace
-from typing import List, Union
+from typing import List, Union, Any
 from dev.transfer_funds import transfer_sol
 from dev.local_dev_common import *
+from wrangler_common import get_secret
 
 """
     The purpose of this script is to handle file change events on
@@ -11,23 +12,29 @@ from dev.local_dev_common import *
     If the file changes, that means that a new message was pushed to the user or a message was edited or deleted.
 
     This script looks at the messages the user has and simulates a user "choice" in response.
+
+    There is some intelligent steering of which 'choice' the 'user' makes depending on what info is available
+
+    This is done via the property 'nav_hint_paths' in user_metadata.
 """
 
 def parse_args():
     parser = ArgumentParser()
     parser.add_argument("--user_id", type = int, required = True)
-    parser.add_argument("--wrangler_url", type = str, required = True)
-    parser.add_argument("--telegram_secret_token", type = str, required = True)
-    parser.add_argument("--funding_wallet_private_key", type = str, required = True)
-    parser.add_argument("--user_funding_amt", type = float, required = True)
-    parser.add_argument("--attach_debugger", type = parse_bool, required = False, default = False)
     args = parser.parse_args()
+
+    # Rather than restructure a lot of code...
+    args.wrangler_url = LOCAL_CLOUDFLARE_WORKER_URL
+    args.telegram_secret_token = get_secret("SECRET__TELEGRAM_BOT_WEBHOOK_SECRET_TOKEN", "sim")
+    args.funding_wallet_private_key = get_secret("SECRET__SIMTEST_FUNDING_WALLET_PRIVATE_KEY", "sim")
+    args.user_funding_amt = get_sim_setting("user_funding_amount")
+
     return args
 
 def load_user_metadata(user_id : int):
     user_metadata_filepath = pathed(f"{user_id}.metadata")
     if  not os.path.exists(user_metadata_filepath):
-        user_metadata = dict(user_id = user_id, unfunded = True, look_back = 3)     
+        user_metadata = dict(user_id = user_id, unfunded = True, agreed_TOS = False, look_back = 3, nav_hint_paths = [])     
         with open(user_metadata_filepath, "w+") as f:
             json.dump(user_metadata, f)
     with open(user_metadata_filepath, "r+") as f:
@@ -42,42 +49,54 @@ def load_user_messages(user_id : int):
         messages = json.load(f)
     return messages
 
-def get_simulated_user_webhook_response(args, messages, user_metadata) -> Union[any,None]:
+def try_accept_TOS(messages, user_metadata):
+    recent_messages = messages[::-1]
+    for recent_message in recent_messages:
+        if has_menu_code(recent_message, "LegalAgreementAgree"):
+            return make_click_menu_code_button_webhook_request("LegalAgreementAgree", recent_message, user_metadata)
+    return None
+
+def get_simulated_user_webhook_response(args, messages, user_metadata) -> Union[Any,None]:
 
     # sleep a random amount of time 0-10 seconds
-    time.sleep(random.random() * 10)
+    time.sleep(random.random() * get_sim_setting("user_response_delay_multiplier"))
 
-    # If there are no messages in history, initiate interactions with bot by sending the 'start' command
+    # If there are no messages in history, initiate interactions with bot by opening up the legal_agreement
     if len(messages) == 0:
-        return make_command_webhook_request('start', messages, user_metadata)
+        return make_command_webhook_request('legal_agreement', messages, user_metadata)
+    
+    if not user_metadata["agreed_TOS"]:
+        accept_TOS_webhook_request = try_accept_TOS(messages, user_metadata)
+        if accept_TOS_webhook_request is not None:
+            user_metadata["agreed_TOS"] = True
+            return accept_TOS_webhook_request
+        else:
+            return make_command_webhook_request('legal_agreement', messages, user_metadata)
 
-    # Scrape essential data out of messages history.  If essential data is missing, add nav_hint to get to page with it.
-    try_init_metadata_from_messages(messages, user_metadata)
+    # Scrape essential data out of messages history.  
+    # If essential data is missing, add nav_hint_path that leads to page where it is scrapeable
+    try_scrape_metadata_from_messages(messages, user_metadata)
 
-    # Always respond to a reply question
+    # Always respond to a reply question if one is being asked
     reply_question = get_reply_question(messages)
     if reply_question:
-        webhook_request_body = make_response_to_reply_question_webhook_request(reply_question)
-        return webhook_request_body
+        return make_response_to_reply_question_webhook_request(reply_question,user_metadata,next_message_id(messages))
 
     # Otherwise, If there are nav_hints to follow, try to follow them instead of doing anything else.
-    if len(user_metadata.get("nav_hint") or []) > 0:
-        navhint_followed, response = try_follow_next_nav_hint(messages, user_metadata)
-        if navhint_followed is not None:
-            nav_hints = user_metadata.get("nav_hint")
-            user_metadata["nav_hint"] = nav_hints[nav_hints.index(navhint_followed)+1:]           
-            return response
+    nav_hint_followed, response = try_follow_next_nav_hint(messages, user_metadata)
+    if nav_hint_followed is not None:
+        update_nav_hint_paths(user_metadata, nav_hint_followed)       
+        return response
 
     # If the wallet has never been funded, try to fund it from the simulation funds wallet
     if user_metadata.get("unfunded"):
-        user_metadata["unfunded"] = try_fund_user_wallet(args, user_metadata)
+        try_fund_user_wallet(args, user_metadata)
 
     # click a random button on a menu if any visible
-    recent_menus = get_menus(messages)[-user_metadata.look_back:]
+    recent_menus = get_menus(messages)[-user_metadata.get("look_back"):]
     if len(recent_menus) > 1:
         menu = random.choice(recent_menus)
-        webhook_request_body = make_click_random_menu_code_button_webhook_request(menu, user_metadata)
-        return webhook_request_body
+        return make_click_random_menu_code_button_webhook_request(menu, user_metadata)
     
     # or issues the start command
     return make_command_webhook_request("start", messages, user_metadata)
@@ -87,19 +106,35 @@ def try_fund_user_wallet(args, user_metadata):
     funding_wallet_private_key = args.funding_wallet_private_key
     user_wallet = user_metadata.get("wallet_address")
     if user_wallet is not None:
-        return try_transfer_funds_to_user(funding_wallet_private_key, user_wallet, allowance)
-    return False
+        success = try_transfer_funds_to_user(funding_wallet_private_key, user_wallet, allowance)
+        user_metadata["unfunded"] = not success
 
 def try_transfer_funds_to_user(funding_wallet_private_key, user_wallet, allowance):
     try:
         transfer_sol(funding_wallet_private_key, user_wallet, allowance)
         return True
-    except:
+    except Exception as e:
+        print(str(e))
         return False
+
+def update_nav_hint_paths(user_metadata, nav_hint_followed):
+    if "nav_hint_paths" not in user_metadata:
+        return
+    nav_hint_paths = user_metadata.get("nav_hint_paths")
+    if len(nav_hint_paths) == 0:
+        return
+    active_nav_path = nav_hint_paths[0]
+    if nav_hint_followed not in active_nav_path:
+        return
+    active_nav_path = active_nav_path[active_nav_path.index(nav_hint_followed)+1:]
+    if len(active_nav_path) == 0:
+        user_metadata["nav_hint_paths"] = user_metadata["nav_hint_paths"][1:]
+    else:
+        user_metadata["nav_hint_paths"][0] = active_nav_path
 
 def make_command_webhook_request(command, messages, user_metadata):
     user_id = user_metadata.get("user_id")
-    new_message_id = max([get_message_id(message) for message in messages], default = 0) + 1
+    new_message_id = next_message_id(messages)
     return {
         "update_id": 123456789,
         "message": {
@@ -133,18 +168,23 @@ def make_command_webhook_request(command, messages, user_metadata):
 
 def try_follow_next_nav_hint(messages, user_metadata):
     recent_messages = messages[::-1][:3]
-    for nav_hint in (user_metadata.get("nav_hint") or []):
+    active_nav_path = next(iter(user_metadata.get("nav_hint_paths")),None)
+    if active_nav_path is None:
+        return None,None
+    for nav_hint in active_nav_path:
         for recent_message in recent_messages:
             if has_menu_code(recent_message, nav_hint):
-                return nav_hint, make_click_menu_code_button_webhook_request(recent_message, nav_hint)
-    return None
+                return nav_hint, make_click_menu_code_button_webhook_request(nav_hint, recent_message, user_metadata)
+    return None, None
 
 def has_menu_code(message, menu_code):
     return menu_code in get_button_menu_codes(message)
 
-def get_button_menu_codes(message):
+def get_button_menu_codes(message, exclude = None):
+    exclude = exclude or []
     buttons = get_buttons(message)
     button_menu_codes = [ (button.get("callback_data") or "").split(":")[0] for button in buttons ]
+    button_menu_codes = [ button_menu_code for button_menu_code in button_menu_codes if button_menu_code not in exclude ]
     return button_menu_codes
 
 def get_buttons(message):
@@ -158,7 +198,7 @@ def make_click_menu_code_button_webhook_request(menu_code, message, user_metadat
     idx = menu_codes.index(menu_code)
     user_id = user_metadata.get("user_id")
     button = buttons[idx]
-    {
+    return {
         "update_id": 123456789, # not used in my code, doesn't matter
         "callback_query": {
             "id": "4382abcdef", # not used in my code, doesn't matter
@@ -170,47 +210,53 @@ def make_click_menu_code_button_webhook_request(menu_code, message, user_metadat
                 "username": "UserID{user_id}",
                 "language_code": "en"
             },
+            "chat": {
+                "id": user_id,
+                "first_name": "John",
+                "last_name": "Doe",
+                "username": "johndoe",
+                "type": "private"
+            },
             "message": message,
             "chat_instance": user_id,
-            "data": button.callback_data
+            "data": button["callback_data"]
         }
     }
 
 def make_click_random_menu_code_button_webhook_request(message, user_metadata):
-    random_menu_code = random.choice(get_button_menu_codes(message))
+    random_menu_code = random.choice(get_button_menu_codes(message, exclude = ["Close"]))
     return make_click_menu_code_button_webhook_request(random_menu_code, message, user_metadata)
 
-def get_message_id(message):
-    return (message.get("message") or dict()).get("message_id")
+def get_message_id(message) -> Union[int,None]:
+    return json_get(message, "message", "message_id") or json_get(message, "message_id")
 
-def get_menus(messages : List[any]) -> List[any]:
+def get_menus(messages : List[Any]) -> List[Any]:
     return [ message for message in messages if is_menu(message) ]
 
 def is_menu(message) -> bool:
     return len(parse_callback_buttons(message)) > 0
 
-def try_init_metadata_from_messages(messages, user_metadata):
-    
-    if "wallet_address" not in user_metadata:
-        wallet_address = try_get_wallet_address(messages)
-        if wallet_address:
-            user_metadata["wallet_address"] = wallet_address
-        else:
-            user_metadata["nav_hint"] = ["Main"] # MenuCode.Main
-    
-    if "private_key" not in user_metadata:
-        private_key = try_get_private_key(messages)
-        if private_key:
-            user_metadata["private_key"] = private_key
-        else:
-            user_metadata["nav_hint"] = ["Wallet","View.PK"]
+def add_nav_hint_path(user_metadata, path):
+    if path not in user_metadata["nav_hint_paths"]:
+        user_metadata["nav_hint_paths"].append(path)
 
-    if "balance" not in user_metadata:
-        balance = try_get_balance(messages)
-        if balance:
-            user_metadata["balance"] = balance
-        else:
-            user_metadata["nav_hint"] = ["Main"]
+def scrape_metadata(user_metadata, messages, key, nav_path, scraper):
+
+    # If the key hasn't been initialized, initialize with None and set a nav_path that results in getting the key
+    if key not in user_metadata:
+        user_metadata[key] = None
+        add_nav_hint_path(user_metadata, nav_path)
+
+    # As long as the data is None, scrape for the data on the current page.
+    if user_metadata[key] is None:
+        data = scraper(messages)
+        if data is not None:
+            user_metadata[key] = data
+
+def try_scrape_metadata_from_messages(messages, user_metadata):
+    scrape_metadata(user_metadata, messages, "wallet_address", ["Main"], try_get_wallet_address)
+    scrape_metadata(user_metadata, messages, "private_key", ["Main","Wallet","View.PK","Wallet","Main"], try_get_private_key)
+    scrape_metadata(user_metadata, messages, "balance", ["Main"], try_get_balance)
 
 def try_get_wallet_address(messages):
     for message in messages:
@@ -218,28 +264,28 @@ def try_get_wallet_address(messages):
         for line in lines:
             # This will match the main menu.
             if ("Wallet" in line) and "<code>" in line and "</code>" in line:
-                match : re.Match[str] = re.match(r"<code>(?<wallet>[^<]+)</code>")
+                match : re.Match[str]|None = re.search(r"<code>(?P<wallet>[^<]+)</code>",line)
                 if match:
                     return match.group("wallet")
                 
 def try_get_private_key(messages):
     for message in messages:
-        lines = (message.text("text") or "").splitlines()
+        lines = (message.get("text") or "").splitlines()
         for line in lines:
             if '<span class="tg-spoiler">' in line:
-                match : re.Match[str] = re.match(r'>(?<privatekey>[^<]+)</span>')
+                match : re.Match[str]|None = re.search(r'>(?P<private_key>[^<]+)</span>', line)
                 if match:
                     return match.group("private_key")
 
 def try_get_balance(messages):
     for message in messages:
-        lines = (message.text("text") or "").spitlines()
+        lines = (message.get("text") or "").splitlines()
         for line in lines:
             if 'Wallet SOL Balance' in line:
-                match : re.Match[str]=  re.match("(?<amt>[0-9₀₁₂₃₄₅₆₇₈₉]+)")
+                match : re.Match[str]|None =  re.search(r"(?P<amt>[0-9₀₁₂₃₄₅₆₇₈₉]+)", line)
                 if match:
                     amt : str = match.group("amt")
-                    amt = re.sub(r"(?<subs>0[₀₁₂₃₄₅₆₇₈₉]+)", lambda m: "0"*int(m.group("subs")[1:]))
+                    amt = re.sub(r"(?P<subs>0[₀₁₂₃₄₅₆₇₈₉]+)", lambda m: "0"*int(m.group("subs")[1:]), amt)
                     return float(amt)
 
 
@@ -287,7 +333,7 @@ def get_reply_question_type(reply_question):
 def make_reply_question_response(response, reply_question, user_metadata, new_message_id):
     response = str(response)
     user_id = user_metadata["user_id"]
-    {
+    return {
         "update_id": 123456789,
         "message": {
             "message_id": new_message_id,
@@ -359,7 +405,8 @@ def parse_callback_buttons(request_data):
 
 def send_to_wrangler(user_response, args):
     requests.post(args.wrangler_url, json = user_response, headers = {
-        'X-Telegram-Bot-Api-Secret-Token': args.telegram_secret_token
+        'X-Telegram-Bot-Api-Secret-Token': args.telegram_secret_token,
+        'Content-Type': 'application/json'
     })
 
 
@@ -400,7 +447,7 @@ def do_it(args : Namespace):
         orig_user_metadata = deep_clone(user_metadata)
         user_response = get_simulated_user_webhook_response(args, messages, user_metadata)
         if not deep_equals(orig_user_metadata, user_metadata):
-            write_user_metadata(user_metadata)
+            write_user_metadata(user_id, user_metadata)
         send_to_wrangler(user_response, args)
     finally:
         release_file_locks(user_id)
@@ -411,8 +458,17 @@ def deep_clone(x):
 def deep_equals(x, y):
     return json.dumps(x, sort_keys=True) == json.dumps(y, sort_keys=True)
 
+def json_get(obj, *props):
+    for prop in props:
+        if prop not in obj:
+            return None
+        obj = obj[prop]
+    return obj
+
+def next_message_id(messages : List[Any]) -> int:
+    return max([x for x in [get_message_id(message) for message in messages] if x is not None ], default = 0) + 1
+
 if __name__ == "__main__":
     args = parse_args()
-    if args.attach_debugger and args.user_id == 1:
-        attach_debugger(SIMULATED_USER_DEBUG_PORT)
+    maybe_attach_debugger("simulated_user", SIMULATED_USER_DEBUG_PORT)
     do_it(args)

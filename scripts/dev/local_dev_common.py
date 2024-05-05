@@ -3,6 +3,7 @@ import os, sys, socket, time, subprocess, platform
 from typing import List, Union
 from argparse import ArgumentTypeError
 import debugpy
+import tomli
 
 # Ports
 # port that the cloudflare worker runs on.
@@ -50,7 +51,7 @@ def _wait_for_keypress_unix():
 
 def _wait_for_keypress_windows():
     import msvcrt
-    msvcrt.getch()
+    msvcrt.getch() # type: ignore
 
 def wait_for_any_key():
     # Technical Reference: https://www.youtube.com/watch?v=st6-DgWeuos
@@ -134,7 +135,18 @@ def pathed(filename : str):
 def sim_dir():
     return pathed("")
 
-def attach_debugger(debug_port):
-    print(f"Waiting to attach debugger on port {debug_port}")
+def get_sim_setting(name):
+    with open("./scripts/.sim.settings.toml", "rb") as f:
+        parsed_toml = tomli.load(f)
+        return parsed_toml[name]
+
+def maybe_attach_debugger(name, debug_port):
+    if name in get_sim_setting("debuggers_to_attach"):
+        wait = name in get_sim_setting("waiting_debuggers")
+        attach_debugger(debug_port, wait = wait)
+
+def attach_debugger(debug_port, wait = True):
     debugpy.listen(('0.0.0.0', debug_port))
-    debugpy.wait_for_client()
+    if wait:
+        print(f"Waiting to attach debugger on port {debug_port}")
+        debugpy.wait_for_client()

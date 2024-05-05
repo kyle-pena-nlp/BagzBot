@@ -10,14 +10,14 @@ def transfer_sol(sender_keypair: Keypair, receiver_pubkey_str: str, amount_sol: 
     client = Client("https://api.mainnet-beta.solana.com")
 
     # Receiver's public key
-    receiver_pubkey = Pubkey(receiver_pubkey_str)
+    receiver_pubkey = Pubkey.from_string(receiver_pubkey_str)
 
     # Calculate the amount in lamports (the smallest unit of SOL)
     lamports = int(amount_sol * 1_000_000_000)  # 1 SOL = 1 billion lamports
 
     # Create a transfer instruction
     transfer_instr = transfer(TransferParams(
-        from_pubkey=sender_keypair.public_key,
+        from_pubkey=sender_keypair.pubkey(),
         to_pubkey=receiver_pubkey,
         lamports=lamports
     ))
