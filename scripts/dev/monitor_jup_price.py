@@ -11,7 +11,7 @@ def parse_args():
     return args
 
 def do_it(args):
-    url = f'https://price.jup.ag/v4/price?ids={args.token.strip()}&vsToken={SOL_ADDRESS}'
+    url = f'https://price.jup.ag/v6/price?ids={args.token.strip()}&vsToken={SOL_ADDRESS}'
     initial_price = None
     last_price = None
     max_price = None

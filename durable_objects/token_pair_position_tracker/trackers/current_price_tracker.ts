@@ -47,7 +47,7 @@ export class CurrentPriceTracker {
         return (Date.now() - this.priceLastRefreshed.value) > 1000;
     }
     private async getPriceFromJupiter(tokenAddress : string, vsTokenAddress : string) : Promise<DecimalizedAmount|undefined> {
-        const url = `https://price.jup.ag/v4/price?ids=${tokenAddress}&vsToken=${vsTokenAddress}`;
+        const url = `https://price.jup.ag/v6/price?ids=${tokenAddress}&vsToken=${vsTokenAddress}`;
         const response = await fetch(url);
         if (!response.ok) {
             logError("Response from jupiter price API not ok.", this);
