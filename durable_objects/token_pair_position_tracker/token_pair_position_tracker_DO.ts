@@ -14,7 +14,7 @@ import { ensureTokenPairIsRegistered } from "../heartbeat/heartbeat_DO_interop";
 import { EditTriggerPercentOnOpenPositionResponse } from "../user/actions/edit_trigger_percent_on_open_position";
 import { SetSellAutoDoubleOnOpenPositionResponse } from "../user/actions/set_sell_auto_double_on_open_position";
 import { SellSellSlippagePercentageOnOpenPositionResponse } from "../user/actions/set_sell_slippage_percent_on_open_position";
-import { sendClosePositionOrdersToUserDOs } from "../user/userDO_interop";
+import { registerPositionAsClosed, sendClosePositionOrdersToUserDOs } from "../user/userDO_interop";
 import { ReactivatePositionInTrackerRequest, ReactivatePositionInTrackerResponse } from "./actions/activate_position_in_tracker";
 import { AdminDeleteAllInTrackerRequest, AdminDeleteAllInTrackerResponse } from "./actions/admin_delete_all_positions_in_tracker";
 import { AdminDeleteClosedPositionsForUserInTrackerRequest, AdminDeleteClosedPositionsForUserInTrackerResponse } from "./actions/admin_delete_closed_positions_for_user_in_tracker";
@@ -808,6 +808,7 @@ export class TokenPairPositionTrackerDO {
                     // TODO: update with PnL               
                     const netPNL = dSub(confirmedSellStatus.swapSummary.outTokenAmt, pos.vsTokenAmt);
                     this.tokenPairPositionTracker.closePosition(pos.positionID, netPNL);
+                    await this.registerPositionAsClosedForUser(pos);
                     await TGStatusMessage.finalMessage(channel, `The sale was confirmed! You made ${asTokenPriceDelta(netPNL)} SOL.`, MenuCode.ViewPNLHistory); 
                 }
                 else {
@@ -820,10 +821,16 @@ export class TokenPairPositionTrackerDO {
         }
     }
 
+    async registerPositionAsClosedForUser(pos : Position) : Promise<void> {
+        await registerPositionAsClosed(pos.userID, pos.chatID, pos.positionID, pos.token.address, pos.vsToken.address, this.env).catch(e => {
+            logError("Failed to register position as closed for user.", pos);
+        });
+    }
+
     async handleMarkPositionAsClosed(body: MarkPositionAsClosedRequest) : Promise<Response> {
         this.ensureIsInitialized(body);
         this.tokenPairPositionTracker.closePosition(body.positionID, body.netPNL);
-        const responseBody : MarkPositionAsClosedResponse = {};
+        const responseBody : MarkPositionAsClosedResponse = { success: true };
         return makeJSONResponse(responseBody);
     }
 

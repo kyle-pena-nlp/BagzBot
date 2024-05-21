@@ -29,6 +29,8 @@ import { ListPositionsFromUserDORequest, ListPositionsFromUserDOResponse } from 
 import { ManuallyClosePositionRequest, ManuallyClosePositionResponse } from "./actions/manually_close_position";
 import { OpenPositionRequest, OpenPositionResponse } from "./actions/open_new_position";
 import { ReactivatePositionRequest, ReactivatePositionResponse } from "./actions/reactivate_position";
+import { RegisterPositionAsClosedRequest, RegisterPositionAsClosedResponse } from "./actions/register_position_as_closed";
+import { RegisterPositionAsDeactivatedRequest, RegisterPositionAsDeactivatedResponse } from "./actions/register_position_as_deactivated";
 import { DefaultTrailingStopLossRequestRequest, DefaultTrailingStopLossRequestResponse } from "./actions/request_default_position_request";
 import { SendMessageToUserRequest, SendMessageToUserResponse } from "./actions/send_message_to_user";
 import { SetOpenPositionSellPriorityFeeMultiplierRequest, SetOpenPositionSellPriorityFeeMultiplierResponse } from "./actions/set_open_position_sell_priority_fee_multiplier";
@@ -73,10 +75,27 @@ export enum UserDOFetchMethod {
 	reactivatePosition = "reactivatePosition",
 	getDeactivatedPosition = "getDeactivatedPosition",
 	doubleSellSlippage = "doubleSellSlippage",
-	setOpenPositionSellPriorityFee = "setOpenPositionSellPriorityFee"
+	setOpenPositionSellPriorityFee = "setOpenPositionSellPriorityFee",
+	registerPositionAsClosed = "registerPositionAsClosed",
+	registerPositionAsDeactivated = "registerPositionAsDeactivated"
+}
+
+export async function registerPositionAsClosed(telegramUserID: number, chatID : number, positionID : string, tokenAddress : string, vsTokenAddress : string, env : Env) : Promise<RegisterPositionAsClosedResponse> {
+	const request : RegisterPositionAsClosedRequest = { telegramUserID, chatID, positionID, tokenAddress, vsTokenAddress };
+	const method = UserDOFetchMethod.registerPositionAsClosed;
+	const response = await sendJSONRequestToUserDO<RegisterPositionAsClosedRequest,RegisterPositionAsClosedResponse>(telegramUserID, method, request, env);
+	return response;
+}
+
+export async function registerPositionAsDeactivated(telegramUserID : number, chatID : number, positionID : string, tokenAddress : string, vsTokenAddress : string, env : Env) : Promise<RegisterPositionAsDeactivatedResponse> {
+	const request : RegisterPositionAsDeactivatedRequest = { telegramUserID, chatID, positionID, tokenAddress, vsTokenAddress };
+	const method = UserDOFetchMethod.registerPositionAsDeactivated;
+	const response = await sendJSONRequestToUserDO<RegisterPositionAsDeactivatedRequest,RegisterPositionAsDeactivatedResponse>(telegramUserID, method, request, env);
+	return response;
 }
 
 export async function setOpenPositionSellPriorityFeeMultiplier(telegramUserID : number, chatID : number, positionID : string, multiplier : 'auto'|number, env : Env) : Promise<SetOpenPositionSellPriorityFeeMultiplierResponse> {
+	 
 	const request: SetOpenPositionSellPriorityFeeMultiplierRequest = { telegramUserID, chatID, positionID, multiplier };
 	const method = UserDOFetchMethod.setOpenPositionSellPriorityFee;
 	const response = await sendJSONRequestToUserDO<SetOpenPositionSellPriorityFeeMultiplierRequest,SetOpenPositionSellPriorityFeeMultiplierResponse>(telegramUserID, method, request, env);

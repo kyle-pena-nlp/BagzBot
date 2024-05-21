@@ -9,4 +9,5 @@ export interface MarkPositionAsClosedRequest extends HasPairAddresses {
 }
 
 export interface MarkPositionAsClosedResponse {
+    success: boolean
 }

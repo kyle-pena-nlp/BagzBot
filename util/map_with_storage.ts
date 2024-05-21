@@ -1,3 +1,4 @@
+// don't mess this critical class
 export class MapWithStorage<TValue> {
     storageKeyPrefix : string;
     items : Map<string,TValue> = new Map<string,TValue>();

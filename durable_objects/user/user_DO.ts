@@ -39,6 +39,8 @@ import { ListPositionsFromUserDORequest, ListPositionsFromUserDOResponse } from 
 import { ManuallyClosePositionRequest, ManuallyClosePositionResponse } from "./actions/manually_close_position";
 import { OpenPositionRequest, OpenPositionResponse } from "./actions/open_new_position";
 import { ReactivatePositionRequest, ReactivatePositionResponse } from "./actions/reactivate_position";
+import { RegisterPositionAsClosedRequest, RegisterPositionAsClosedResponse } from "./actions/register_position_as_closed";
+import { RegisterPositionAsDeactivatedRequest, RegisterPositionAsDeactivatedResponse } from "./actions/register_position_as_deactivated";
 import { DefaultTrailingStopLossRequestRequest, DefaultTrailingStopLossRequestResponse } from "./actions/request_default_position_request";
 import { SendMessageToUserRequest, SendMessageToUserResponse, isSendMessageToUserRequest } from "./actions/send_message_to_user";
 import { SetOpenPositionSellPriorityFeeMultiplierRequest, SetOpenPositionSellPriorityFeeMultiplierResponse } from "./actions/set_open_position_sell_priority_fee_multiplier";
@@ -54,8 +56,9 @@ import { PositionBuyer } from "./position_buyer";
 import { PositionSeller } from "./position_seller";
 import { SessionTracker } from "./trackers/session_tracker";
 import { SOLBalanceTracker } from "./trackers/sol_balance_tracker";
+import { TokenPairTracker } from "./trackers/token_pair_tracker";
 import { TokenPairsForPositionIDsTracker } from "./trackers/token_pairs_for_position_ids_tracker";
-import { UserPNLTracker } from "./trackers/user_pnl_tracker";
+import { UserOpenPNLTracker } from "./trackers/user_open_pnl_tracker";
 import { UserDOFetchMethod, parseUserDOFetchMethod } from "./userDO_interop";
 
 const DEFAULT_POSITION_PREREQUEST : PositionPreRequest = {
@@ -106,10 +109,17 @@ export class UserDO {
     // has the user signed legal?
     legalAgreementStatus : ChangeTrackedValue<'agreed'|'refused'|'has-not-responded'> = new ChangeTrackedValue<'agreed'|'refused'|'has-not-responded'>('hasSignedLegal', 'has-not-responded');
 
-    // stores just the positionID / tokenAddress / vsTokenAddress
+    // stores just the positionID / tokenAddress / vsTokenAddress for open/closing positions
     tokenPairsForPositionIDsTracker : TokenPairsForPositionIDsTracker = new TokenPairsForPositionIDsTracker();
 
-    userPNLTracker : UserPNLTracker = new UserPNLTracker();
+    // stores the list of positions IDs (and respective token pair trackers) for the closed positions for this user
+    tokenPairsForClosedPositions : TokenPairTracker = new TokenPairTracker("closedPosition");
+
+    // stores the list of positions IDs (and respective token pair trackers) for the deactivated positions for this user
+    tokenPairsForDeactivatedPositions : TokenPairTracker = new TokenPairTracker("deactivatedPosition");
+
+    // the unrealized PNL from open positions
+    userOpenPNLTracker : UserOpenPNLTracker = new UserOpenPNLTracker();
 
     inbox: { from : string, message : string }[] = [];
     // TODO: way to make arrays compatible with ChangeTrackedValue?
@@ -139,7 +149,9 @@ export class UserDO {
         this.legalAgreementStatus.initialize(storage);
         this.defaultTrailingStopLossRequest.initialize(storage);
         this.tokenPairsForPositionIDsTracker.initialize(storage);
-        this.userPNLTracker.initialize(storage);
+        this.tokenPairsForClosedPositions.initialize(storage);
+        this.tokenPairsForDeactivatedPositions.initialize(storage);
+        this.userOpenPNLTracker.initialize(storage);
         this.chatID.initialize(storage);
         //logInfo("Loaded userDO from storage: ", this.telegramUserID.value);
     }
@@ -154,7 +166,9 @@ export class UserDO {
             this.legalAgreementStatus.flushToStorage(this.state.storage),
             this.defaultTrailingStopLossRequest.flushToStorage(this.state.storage),
             this.tokenPairsForPositionIDsTracker.flushToStorage(this.state.storage),
-            this.userPNLTracker.flushToStorage(this.state.storage),
+            this.tokenPairsForClosedPositions.flushToStorage(this.state.storage),
+            this.tokenPairsForDeactivatedPositions.flushToStorage(this.state.storage),
+            this.userOpenPNLTracker.flushToStorage(this.state.storage),
             this.chatID.flushToStorage(this.state.storage)
         ]);
     }
@@ -354,11 +368,41 @@ export class UserDO {
             case UserDOFetchMethod.setOpenPositionSellPriorityFee:
                 response = await this.handleSetOpenPositionPriorityFee(userAction);
                 break;
+            case UserDOFetchMethod.registerPositionAsClosed:
+                response = await this.handleRegisterPositionAsClosed(userAction);
+                break;
+            case UserDOFetchMethod.registerPositionAsDeactivated:
+                response = await this.handleRegisterPositionAsDeactivated(userAction);
+                break;
             default:
                 assertNever(method);
         }
 
         return [method,userAction,response];
+    }
+
+    async handleRegisterPositionAsClosed(userAction : RegisterPositionAsClosedRequest) : Promise<Response> {
+        await this.registerPositionAsClosed(userAction.positionID, userAction.tokenAddress, userAction.vsTokenAddress);
+        return makeJSONResponse<RegisterPositionAsClosedResponse>({ success: true });
+    }
+    
+    async registerPositionAsClosed(positionID : string, tokenAddress : string, vsTokenAddress : string) {
+        this.tokenPairsForPositionIDsTracker.removePositions([positionID]);
+        const tokenPair = { positionID: positionID, token : { address : tokenAddress }, vsToken: { address : vsTokenAddress } };
+        this.tokenPairsForClosedPositions.registerPosition(tokenPair);
+    }
+
+    async handleRegisterPositionAsDeactivated(userAction: RegisterPositionAsDeactivatedRequest) : Promise<Response> {
+        const response = await this.handleRegisterPositionAsDeactivatedInternal(userAction);
+        return makeJSONResponse<RegisterPositionAsDeactivatedResponse>(response);
+    }
+
+    // If a position was automatically deactivated by the price tracker, we must mark it as deactivated here.
+    async handleRegisterPositionAsDeactivatedInternal(userAction : RegisterPositionAsDeactivatedRequest) : Promise<RegisterPositionAsDeactivatedResponse> {
+        this.tokenPairsForPositionIDsTracker.removePositions([userAction.positionID]);
+        const tokenPair = { positionID: userAction.positionID, token : { address : userAction.tokenAddress }, vsToken: { address : userAction.vsTokenAddress } };
+        this.tokenPairsForDeactivatedPositions.registerPosition(tokenPair);
+        return { success: true };
     }
 
     async handleSetOpenPositionPriorityFee(userAction : SetOpenPositionSellPriorityFeeMultiplierRequest) : Promise<Response> {
@@ -399,7 +443,7 @@ export class UserDO {
     }
 
     async handleGetDeactivatedPositionInternal(userAction : GetDeactivatedPositionRequest) : Promise<GetDeactivatedPositionResponse> {
-        const tokenPair = this.tokenPairsForPositionIDsTracker.getPositionPair(userAction.positionID);
+        const tokenPair = this.tokenPairsForDeactivatedPositions.getPositionPair(userAction.positionID);
         if (tokenPair == null) {
             return { deactivatedPosition : undefined };
         }
@@ -416,7 +460,7 @@ export class UserDO {
 
     async handleListDeactivatedPositionsInternal(userAction : ListDeactivatedPositionsRequest) : Promise<ListDeactivatedPositionsResponse> {
         const userID = userAction.telegramUserID;
-        const tokenPairs = this.tokenPairsForPositionIDsTracker.listUniqueTokenPairs()
+        const tokenPairs = await this.tokenPairsForDeactivatedPositions.listUniqueTokenPairs();
         const allDeactivatedPositions : Position[] = [];
         for (const tokenPair of tokenPairs) {
             const tokenAddress = tokenPair.tokenAddress;
@@ -443,6 +487,9 @@ export class UserDO {
         // so, if status is currently Closing, upon reactivation, we want to check the last sale attempt with the SellConfirmer
         const markAsOpenBeforeDeactivating = false;
         const response = await deactivatePositionInTracker(userAction.positionID, tokenAddress, vsTokenAddress, markAsOpenBeforeDeactivating, this.env);
+        if (response.success) {
+            this.tokenPairsForDeactivatedPositions.registerPosition(tokenPair);
+        }
         return { success : response.success };
     }
 
@@ -452,13 +499,16 @@ export class UserDO {
     }        
 
     async handleReactivatePositionInternal(userAction : ReactivatePositionRequest) : Promise<ReactivatePositionResponse> {
-        const tokenPair = this.tokenPairsForPositionIDsTracker.getPositionPair(userAction.positionID);
+        const tokenPair = this.tokenPairsForDeactivatedPositions.getPositionPair(userAction.positionID);
         if (tokenPair == null) {
             return { success : false };
         }
         const tokenAddress = tokenPair.token.address;
         const vsTokenAddress = tokenPair.vsToken.address;
         const response = await reactivatePositionInTracker(userAction.telegramUserID, userAction.positionID, tokenAddress, vsTokenAddress, this.env);
+        if (response.success) {
+            this.tokenPairsForPositionIDsTracker.registerPosition(tokenPair);
+        }
         return { success : response.success };
     }
 
@@ -475,7 +525,8 @@ export class UserDO {
     }
 
     async handleDeleteClosedPositions(userAction : AdminDeleteClosedPositionsRequest) : Promise<Response> {
-        const uniqueTokenPairs = this.tokenPairsForPositionIDsTracker.listUniqueTokenPairs();
+        const userID = userAction.telegramUserID;
+        const uniqueTokenPairs = await this.tokenPairsForClosedPositions.listUniqueTokenPairs();
         for (const pair of uniqueTokenPairs) {
             await adminDeleteClosedPositionsForUser(userAction.telegramUserID, pair.tokenAddress, pair.vsTokenAddress, this.env);
         }
@@ -495,7 +546,8 @@ export class UserDO {
     }
 
     async handleGetClosedPositionsAndPNLSummaryInternal(userAction : GetClosedPositionsAndPNLSummaryRequest) : Promise<GetClosedPositionsAndPNLSummaryResponse> {
-        const tokenPairs = this.tokenPairsForPositionIDsTracker.listUniqueTokenPairs();
+        const userID  = userAction.telegramUserID;
+        const tokenPairs = await this.tokenPairsForClosedPositions.listUniqueTokenPairs();
         const closedPositionPNLSummarizer = new ClosedPositionPNLSummarizer();
         for (const tokenPair of tokenPairs) {
             const { tokenAddress, vsTokenAddress } = tokenPair;
@@ -657,7 +709,7 @@ export class UserDO {
     async listPositionsFromUserDO(userID : number) : Promise<PositionAndMaybePNL[]> {
 
         // fetch positions from all relevant trackers
-        const uniqueTokenPairs : TokenPair[] = this.tokenPairsForPositionIDsTracker.listUniqueTokenPairs();
+        const uniqueTokenPairs : TokenPair[] = await this.tokenPairsForPositionIDsTracker.listUniqueTokenPairs(userID, this.env, this.wallet.value?.publicKey);
         const positions : PositionAndMaybePNL[]  = [];
         for (const tokenPair of uniqueTokenPairs) {
             const positionsForTokenPair = await listPositionsByUser(userID, tokenPair.tokenAddress, tokenPair.vsTokenAddress, this.env);
@@ -675,7 +727,7 @@ export class UserDO {
 
         // likewise, if for whatever reason the pair for this position is missing, this would rectify it
         for (const position of positions) {
-            this.tokenPairsForPositionIDsTracker.storePosition({
+            this.tokenPairsForPositionIDsTracker.registerPosition({
                 positionID: position.position.positionID,
                 token : { address : position.position.token.address },
                 vsToken : { address : position.position.vsToken.address }
@@ -855,7 +907,7 @@ export class UserDO {
     async handleOpenNewPosition(openPositionRequest : OpenPositionRequest) : Promise<Response> {
         const startTimeMS = Date.now();
         const positionRequest = openPositionRequest.positionRequest;       
-        this.tokenPairsForPositionIDsTracker.storePosition({
+        this.tokenPairsForPositionIDsTracker.registerPosition({
             positionID: openPositionRequest.positionRequest.positionID,
             token: { address : openPositionRequest.positionRequest.token.address },
             vsToken: { address : openPositionRequest.positionRequest.vsToken.address }
@@ -923,7 +975,11 @@ export class UserDO {
         const connection = new Connection(getRPCUrl(this.env));
         const positionSeller = new PositionSeller(connection, this.wallet.value!!, 'manual-sell', startTimeMS, channel, this.env);
         // deliberate lack of await here (fire-and-forget). But still writes to storage.
-        positionSeller.sell(position).finally(async () => {
+        positionSeller.sell(position).then(async status => {
+            if (status === 'confirmed') {
+                await this.registerPositionAsClosed(position.positionID, position.token.address, position.vsToken.address);
+            }
+        }).finally(async () => {
             await this.flushToStorage();
         });
         // success is indeterminate (by design) (explanation: depends on what happens with the positionSeller.sell, which is unawaited.)
@@ -953,7 +1009,11 @@ export class UserDO {
                     return;
                 }
                 // deliberate lack of await here, but still writes to storage afterwards
-                const sellPromise = positionSeller.sell(position).finally(async () => {
+                const sellPromise = positionSeller.sell(position).then(async status => {
+                    if (status === 'confirmed') {
+                        await this.registerPositionAsClosed(position.positionID, position.token.address, position.vsToken.address);
+                    }
+                }).finally(async () => {
                     await this.flushToStorage();
                 });
                 return await sellPromise;
@@ -1006,8 +1066,8 @@ export class UserDO {
         const hasWallet = !!(this.wallet.value);
         const address = this.wallet.value?.publicKey;
         const maybeSOLBalance = await this.solBalanceTracker.maybeGetBalance(address, forceRefreshBalance, this.env);
-        const uniqueTokenPairs = this.tokenPairsForPositionIDsTracker.listUniqueTokenPairs();
-        const maybePNL = await this.userPNLTracker.maybeGetPNL(telegramUserID, uniqueTokenPairs, forceRefreshBalance, this.env)
+        const uniqueTokenPairs = await this.tokenPairsForPositionIDsTracker.listUniqueTokenPairs(telegramUserID, this.env, this.wallet.value?.publicKey);
+        const maybePNL = await this.userOpenPNLTracker.maybeGetPNL(telegramUserID, uniqueTokenPairs, forceRefreshBalance, this.env)
         return {
             hasWallet: hasWallet,
             address : address,

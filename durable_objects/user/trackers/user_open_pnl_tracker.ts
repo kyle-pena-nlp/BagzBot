@@ -9,8 +9,8 @@ import { listPositionsByUser } from "../../token_pair_position_tracker/token_pai
 import { TokenPair } from "../model/token_pair";
 import { UserPNL } from "../model/user_data";
 
-// provides persisted and rate-limited access to wallet SOL balance.
-export class UserPNLTracker {
+// provides persisted and rate-limited access to wallet SOL balance and unrealized PNL.
+export class UserOpenPNLTracker {
     
     maybeUserPNL : ChangeTrackedValue<UserPNL|null> = new ChangeTrackedValue<UserPNL|null>('maybeUserPNL', null);
     lastRefreshedSOLBalance : number = 0; //ChangeTrackedValue<number> = new ChangeTrackedValue<number>('lastRefreshedSOLBalance', 0); // ms since epoch

@@ -47,3 +47,19 @@ export function shuffle<T>(array :T[]) : T[] {
         .sort((a, b) => a.sort - b.sort)
         .map(({ value }) => value);
 }
+
+export function deduplicate<T>(array : T[], keyFn : (a : T) => string) : T[] {
+    const uniqueItems : T[] = [];
+    const keySet = new Set<string>();
+    for (const item of array) {
+        const key = keyFn(item);
+        if (keySet.has(key)) {
+            continue;
+        }
+        else {
+            keySet.add(key);
+        }
+        uniqueItems.push(item);
+    }
+    return uniqueItems;
+}

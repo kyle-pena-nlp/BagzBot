@@ -19,12 +19,13 @@ type DeactivatedPosition = Position & { peakPrice : DecimalizedAmount };
 export class TokenPairPositionTracker {
 
     // special-purpose datastructure for tracking peak prices
-    pricePeaks : PeakPricePositionTracker = new PeakPricePositionTracker("pricePeaks");
+    private pricePeaks : PeakPricePositionTracker = new PeakPricePositionTracker("pricePeaks");
 
-    // positions confirmed as closed - may be resurrected under unusual circumstances
-    closedPositions : MapWithStorage<Position> = new MapWithStorage<Position>("closedPositions");
+    // positions closed (completed sales)
+    private closedPositions : MapWithStorage<Position> = new MapWithStorage<Position>("closedPositions");
 
-    deactivatedPositions : TwoLevelMapWithStorage<number,string,DeactivatedPosition> = new TwoLevelMapWithStorage<number,string,DeactivatedPosition>("deactivatedPositions", 'Integer', 'string');
+    // positions deactivated (when certain kinds of sell failures occur, or by user request)
+    private deactivatedPositions : TwoLevelMapWithStorage<number,string,DeactivatedPosition> = new TwoLevelMapWithStorage<number,string,DeactivatedPosition>("deactivatedPositions", 'Integer', 'string');
     
     constructor() {
     }

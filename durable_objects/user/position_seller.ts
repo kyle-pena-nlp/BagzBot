@@ -41,17 +41,19 @@ export class PositionSeller {
     isTimedOut() : boolean {
         return Date.now() > (this.startTimeMS + strictParseInt(this.env.TX_TIMEOUT_MS));
     }
-    async sell(position : Position) : Promise<void> {
+    async sell(position : Position) : Promise<TxPreparationFailure|TxSimFailure|TxExecutionFailure|'confirmed'|'unexpected-exception'> {
         try {
             const status = await this.sellInternal(position);
             const statusMessage = this.makeFinalStatusMessage(position, status);
             const menuCode = this.makeFinalMenuCode(status);
             TGStatusMessage.queue(this.channel, statusMessage, menuCode, position.positionID);
+            return status;
         }
         catch (e) {
             logError(e);
             const menuCode = this.type === 'manual-sell' ? MenuCode.ViewOpenPosition : MenuCode.Close;
             TGStatusMessage.queue(this.channel, "There was an unexpected error.", menuCode, position.positionID);
+            return 'unexpected-exception';
         }
     }
 
