@@ -28,7 +28,7 @@ def get_bot_token(env : str):
     return bot_token
 
 def maybe_delete_webhook(env : str):
-    url = make_telegram_api_method_url('deleteWebhook')
+    url = make_telegram_api_method_url('deleteWebhook', env)
     response = input("Do you want to delete the webhook?").lower().strip()
     if response == 'y':
         requests.post(url)

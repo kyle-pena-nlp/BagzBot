@@ -21,10 +21,11 @@ def parse_args():
     parser.add_argument("--env", type=str, required=True, description="Environment of worker")
     parser.add_argument("--name", type=str, required=True, description="Name of worker in cloudflare")
     parser.add_argument("--dry", type=str, required=False, default="True")
+    return parser.parse_args()
 
 if __name__ == "__main__":
     args : Namespace = parse_args()
     env : str = args.env.strip()
     name : str = args.name.strip()
     dry : bool = strict_parse_bool(args.dry.strip())
-    wrangler_deploy(env,name,dry)
+    wrangler_deploy(env,dry)

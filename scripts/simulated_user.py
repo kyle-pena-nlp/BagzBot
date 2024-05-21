@@ -49,11 +49,13 @@ def load_user_messages(user_id : int):
         messages = json.load(f)
     return messages
 
-def try_accept_TOS(messages, user_metadata):
+def try_click_on_legal_agreement_agree(messages, user_metadata):
     recent_messages = messages[::-1]
+    # If the legal agreement is pulled up, click on it
     for recent_message in recent_messages:
         if has_menu_code(recent_message, "LegalAgreementAgree"):
             return make_click_menu_code_button_webhook_request("LegalAgreementAgree", recent_message, user_metadata)
+    # Otherwise, issue a command to open the legal agreement
     return None
 
 def get_simulated_user_webhook_response(args, messages, user_metadata) -> Union[Any,None]:
@@ -66,10 +68,10 @@ def get_simulated_user_webhook_response(args, messages, user_metadata) -> Union[
         return make_command_webhook_request('legal_agreement', messages, user_metadata)
     
     if not user_metadata["agreed_TOS"]:
-        accept_TOS_webhook_request = try_accept_TOS(messages, user_metadata)
-        if accept_TOS_webhook_request is not None:
+        accept_TOS_click_request = try_click_on_legal_agreement_agree(messages, user_metadata)
+        if accept_TOS_click_request is not None:
             user_metadata["agreed_TOS"] = True
-            return accept_TOS_webhook_request
+            return accept_TOS_click_request
         else:
             return make_command_webhook_request('legal_agreement', messages, user_metadata)
 
@@ -318,7 +320,7 @@ def random_token():
     return random.choice(["WENWENvqqNya429ubCdR81ZmD69brwQaaBYY6p3LCpk"])
 
 def get_reply_question_type(reply_question):
-    text = reply_question.get("message").get("text").lower()
+    text = reply_question.get("text").lower()
     if "address" in text:
         return "token"
     elif "trigger" in text:
@@ -440,7 +442,6 @@ def release_file_locks(user_id):
 
 def do_it(args : Namespace):
     user_id = args.user_id
-    acquire_file_locks(user_id)
     try:
         messages = load_user_messages(user_id)
         user_metadata = load_user_metadata(user_id)
@@ -470,5 +471,6 @@ def next_message_id(messages : List[Any]) -> int:
 
 if __name__ == "__main__":
     args = parse_args()
+    acquire_file_locks(args.user_id)
     maybe_attach_debugger("simulated_user", SIMULATED_USER_DEBUG_PORT)
     do_it(args)

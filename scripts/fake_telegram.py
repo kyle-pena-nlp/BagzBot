@@ -2,25 +2,18 @@ from flask import Flask, request, jsonify
 import os, json, time
 from argparse import ArgumentParser
 from dev.local_dev_common import *
+from wrangler_common import get_environment_variable
 
 """
 
     The purpose of this server is to provide a miniature fake telegram implementation
 
-    It is used to stand in for the telegram server, in order to perform simulation / load testing.
+    It receives calls from the wrangler worker and 'stores' them in a fake 'telegram database'
 
     We handle calls made by the CF worker to telegram, including:
         sendMessage
         editMessageText
         deleteMessage
-    
-    
-    It interprets these calls and writes changes indicated by them out to {user_id}.messages files.
-
-    Separately (not in this file), I am watching for changes to these files and simulating the user's "reaction" to the message
-
-    Note: For simplicity, i assume that the chat_id is the same as the user_id
-        (Thus, you may see lines like user_id = body.chat_id - and that's ok)
 
 """
 
@@ -72,6 +65,7 @@ def get_message_id_from_message_in_user_file(message):
 def handleEditMessageText(bot_token):
     print("---editMessageText")
     data = request.json
+    add_from(data)
     found = edit_message_in_user_file(data)
     return jsonify(make_edit_message_response(data, found))
 
@@ -127,6 +121,7 @@ def make_edit_message_response(data, found : bool):
 def handleSendMessage(bot_token):
     print("---sendMessage")
     data = request.json
+    add_from(data)
     if is_reply_question(data):
         message_id = append_reply_question_to_user_file(data)
         return jsonify(make_reply_question_response(data, message_id))
@@ -170,7 +165,11 @@ def make_send_message_response(data, message_id):
         }
     }
 
-
+def add_from(data):
+    telegram_bot_id = get_environment_variable("TELEGRAM_BOT_ID", 'sim')
+    data["from"] = {
+        "id": telegram_bot_id
+    }
 
 def append_reply_question_to_user_file(data):
     return append_message_to_user_file(data)
@@ -204,7 +203,6 @@ def parse_args():
     return parser.parse_args()
 
 if __name__ == '__main__':
-
     args = parse_args()
     maybe_attach_debugger("fake_telegram", FAKE_TELEGRAM_DEBUG_PORT)
     app.run(debug=False, host = "localhost", port = FAKE_TELEGRAM_SERVER_PORT)

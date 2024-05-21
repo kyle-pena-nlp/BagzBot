@@ -57,6 +57,7 @@ def do_it(args):
             ensure_simdir_exists()
             child_procs.append(start_fake_telegram_server())
             child_procs.append(start_user_messages_file_watcher())
+            child_procs.append(start_simulated_user_viewer())
 
         print("Starting local cloudflare worker")
         child_procs.append(run_cloudflare_worker(args))
@@ -67,6 +68,7 @@ def do_it(args):
             api_id   = get_secret("SECRET__TELEGRAM_API_ID", "dev")
             api_hash = get_secret("SECRET__TELEGRAM_API_HASH", "dev")
             child_procs.append(fork_shell_telegram_bot_api_local_server(api_id = api_id, api_hash = api_hash))
+            child_procs.append(start_simulated_user_viewer())
 
             print("Setting up bot locally")
             bot_token = get_secret("SECRET__TELEGRAM_BOT_TOKEN", "dev")
