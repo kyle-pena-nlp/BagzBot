@@ -1,7 +1,11 @@
 import { DurableObjectStorage } from "@cloudflare/workers-types";
 import { DecimalizedAmount, MATH_DECIMAL_PLACES, fromNumber } from "../../../decimalized";
+import { Env } from "../../../env";
 import { logError } from "../../../logging";
-import { ChangeTrackedValue } from "../../../util";
+import { calculatePriceUsingQuote } from "../../../rpc/jupiter_quotes";
+import { isGetQuoteFailure } from "../../../rpc/rpc_types";
+import { TokenInfo, getVsTokenInfo } from "../../../tokens";
+import { ChangeTrackedValue, strictParseBoolean } from "../../../util";
 
 export class CurrentPriceTracker {
     private currentPrice : ChangeTrackedValue<DecimalizedAmount|null> = new ChangeTrackedValue<DecimalizedAmount|null>("currentPrice", null);
@@ -26,9 +30,9 @@ export class CurrentPriceTracker {
         }
         return null;
     }
-    async getPrice(tokenAddress : string, vsTokenAddress : string) : Promise<[DecimalizedAmount,boolean]|null> {
+    async getPrice(token : TokenInfo, vsTokenAddress : string, env : Env) : Promise<[DecimalizedAmount,boolean]|null> {
         if (this.priceIsStale()) {
-            const price = await this.getPriceFromJupiter(tokenAddress,vsTokenAddress);
+            const price = await this.getPriceInternal(token,getVsTokenInfo(vsTokenAddress), env);
             if (price != null) {
                 this.currentPrice.value = price;
                 this.priceLastRefreshed.value = Date.now();
@@ -45,6 +49,21 @@ export class CurrentPriceTracker {
     }
     private priceIsStale() {
         return (Date.now() - this.priceLastRefreshed.value) > 1000;
+    }
+    private async getPriceInternal(token : TokenInfo, vsToken : TokenInfo, env : Env) : Promise<DecimalizedAmount|undefined> {
+        if (strictParseBoolean(env.POLL_PRICE_USING_JUPITER_QUOTE_API)) {
+            return await this.getPriceUsingJupiterQuoteAPI(token,vsToken,env);
+        }
+        else {
+            return await this.getPriceFromJupiter(token.address, vsToken.address);
+        }
+    }
+    private async getPriceUsingJupiterQuoteAPI(token: TokenInfo, vsToken : TokenInfo, env : Env) : Promise<DecimalizedAmount|undefined> {
+        const price = await calculatePriceUsingQuote(token, vsToken, env);
+        if (isGetQuoteFailure(price)) {
+            return undefined;
+        }
+        return price;
     }
     private async getPriceFromJupiter(tokenAddress : string, vsTokenAddress : string) : Promise<DecimalizedAmount|undefined> {
         const url = `https://price.jup.ag/v6/price?ids=${tokenAddress}&vsToken=${vsTokenAddress}`;

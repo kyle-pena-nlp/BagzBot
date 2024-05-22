@@ -22,6 +22,29 @@ export async function quoteSell(position : Position, env : Env) : Promise<GetQuo
     return makeQuote(swapRoute, inTokenInfo, outTokenInfo);
 }
 
+export async function calculatePriceUsingQuote(token : TokenInfo, vsToken : TokenInfo, env : Env) : Promise<GetQuoteFailure|DecimalizedAmount> {
+    // My hope is that with a slippageBps of 500 and 0.1 SOL, that will be enough to avoid slippage errors and consistently return a value
+    const decimalizedVsTokenAmount = Math.floor(0.1 * getVsTokenDecimalsMultiplier('SOL')).toString(10);
+    const quoteAPIParams : JupiterQuoteAPIParams = {
+        inputTokenAddress: vsToken.address, 
+        outputTokenAddress: token.address, 
+        decimalizedAmount: decimalizedVsTokenAmount, 
+        slippageBps: 500, 
+        platformFeeBps: 0,
+        swapMode: 'ExactIn' 
+    };
+    const swapRoute = await getSwapRoute(quoteAPIParams, env);
+    if (isGetQuoteFailure(swapRoute)) {
+        return swapRoute;
+    }
+    const route = swapRoute.route;
+    
+    const inAmount : DecimalizedAmount = { tokenAmount: route["inAmount"] as string, decimals: vsToken.decimals };
+    const outAmount : DecimalizedAmount = { tokenAmount : route["outAmount"] as string, decimals : token.decimals };
+    const price = dDiv(inAmount,outAmount,MATH_DECIMAL_PLACES)||dZero();
+    return price;
+}
+
 async function makeQuote(swapRoute : GetQuoteFailure|SwapRoute, inTokenInfo : TokenInfo, outTokenInfo : TokenInfo) : Promise<GetQuoteFailure|Quote> {
     if (isGetQuoteFailure(swapRoute)) {
         return swapRoute;

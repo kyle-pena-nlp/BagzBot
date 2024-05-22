@@ -9,8 +9,11 @@ import { MenuCode } from "../../menus";
 import { Position, PositionStatus } from "../../positions";
 import { isSuccessfullyParsedSwapSummary } from "../../rpc/rpc_swap_parse_result_types";
 import { TGStatusMessage } from "../../telegram";
+import { TokenInfo } from "../../tokens";
 import { ChangeTrackedValue, assertNever, strictParseBoolean, strictParseInt } from "../../util";
 import { ensureTokenPairIsRegistered } from "../heartbeat/heartbeat_DO_interop";
+import { isValidTokenInfoResponse } from "../polled_token_pair_list/actions/get_token_info";
+import { getTokenInfo } from "../polled_token_pair_list/polled_token_pair_list_DO_interop";
 import { EditTriggerPercentOnOpenPositionResponse } from "../user/actions/edit_trigger_percent_on_open_position";
 import { SetSellAutoDoubleOnOpenPositionResponse } from "../user/actions/set_sell_auto_double_on_open_position";
 import { SellSellSlippagePercentageOnOpenPositionResponse } from "../user/actions/set_sell_slippage_percent_on_open_position";
@@ -76,6 +79,8 @@ export class TokenPairPositionTrackerDO {
     // initialized properties - token and the 'swap-from' vsToken (i.e; USDC)
     tokenAddress :   ChangeTrackedValue<string|null> = new ChangeTrackedValue<string|null>("tokenAddress",null);
     vsTokenAddress : ChangeTrackedValue<string|null> = new ChangeTrackedValue<string|null>("vsTokenAddress",null);
+
+    tokenInfo : ChangeTrackedValue<TokenInfo|null> = new ChangeTrackedValue<TokenInfo|null>("tokenInfo", null);
     
     
     // this performs all the book keeping and determines what RPC actions to take
@@ -110,6 +115,7 @@ export class TokenPairPositionTrackerDO {
         const entries = await storage.list();
         this.tokenAddress.initialize(entries);
         this.vsTokenAddress.initialize(entries);
+        this.tokenInfo.initialize(entries);
         this.tokenPairPositionTracker.initialize(entries);
         this.currentPriceTracker.initialize(entries);
         //logDebug("Loaded token_pair_position_tracker from storage");
@@ -124,6 +130,7 @@ export class TokenPairPositionTrackerDO {
         await Promise.allSettled([
             await this.tokenAddress.flushToStorage(this.state.storage).catch(captureError("tokenAddress")),
             await this.vsTokenAddress.flushToStorage(this.state.storage).catch(captureError("vsTokenAddress")),
+            await this.tokenInfo.flushToStorage(this.state.storage).catch(captureError("tokenInfo")),
             await this.tokenPairPositionTracker.flushToStorage(this.state.storage).catch(captureError("tokenPairPositionTracker")),
             await this.currentPriceTracker.flushToStorage(this.state.storage).catch(captureError("currentPriceTracker"))
         ]).then(() => {
@@ -139,7 +146,7 @@ export class TokenPairPositionTrackerDO {
             //logDebug(`${this.tokenPairID()} Price polling is turned off AND should not be price polling.`)
             return false;
         }
-        if (!this.initialized()) {
+        if (!this.hasTokenAddresses()) {
             //logDebug(`${this.tokenPairID()} not initialized AND should not be price polling.`)
             return false;
         }
@@ -151,7 +158,7 @@ export class TokenPairPositionTrackerDO {
         return true;
     }
 
-    initialized() : this is { vsTokenAddress : { value : string }, tokenAddress : { value : string } } {
+    hasTokenAddresses() : this is { vsTokenAddress : { value : string }, tokenAddress : { value : string } } {
         return  this.vsTokenAddress.value != null && 
                 this.tokenAddress.value != null;
     }
@@ -202,7 +209,11 @@ export class TokenPairPositionTrackerDO {
         if (this.tokenAddress.value == null || this.vsTokenAddress.value == null) {
             return null;
         }
-        const result = await this.currentPriceTracker.getPrice(this.tokenAddress.value, this.vsTokenAddress.value)
+        await this.tryEnsureTokenInfo();
+        if (this.tokenInfo.value == null) {
+            return null;
+        }
+        const result = await this.currentPriceTracker.getPrice(this.tokenInfo.value, this.vsTokenAddress.value, this.env)
         if (result != null) {
             const [price,isNew] = result;
             if (isNew) {
@@ -211,6 +222,15 @@ export class TokenPairPositionTrackerDO {
             return price;
         } 
         return null;
+    }
+
+    private async tryEnsureTokenInfo() : Promise<void> {
+        if (this.tokenInfo.value == null && this.tokenAddress.value != null) {
+            const tokenInfoResponse = await getTokenInfo(this.tokenAddress.value, this.env);
+            if (isValidTokenInfoResponse(tokenInfoResponse)) {
+                this.tokenInfo.value = tokenInfoResponse.tokenInfo;
+            }
+        }
     }
 
     tokenPairID() : string {
@@ -568,7 +588,7 @@ export class TokenPairPositionTrackerDO {
         if (percent <= 0 || percent >= 100) {
             return 'invalid-percent';
         }
-        if (!this.initialized()) {
+        if (!this.hasTokenAddresses()) {
             throw new Error("Not initialized");
         }
         const currentPrice = await this.getPrice();
@@ -605,7 +625,7 @@ export class TokenPairPositionTrackerDO {
     }
 
     async handleGetPositionAndMaybePNLInternal(body: GetPositionAndMaybePNLFromPriceTrackerRequest) : Promise<PositionAndMaybePNL|undefined> {
-        if (!this.initialized()) {
+        if (!this.hasTokenAddresses()) {
             return undefined;
         }
         const positionID = body.positionID;
@@ -630,7 +650,7 @@ export class TokenPairPositionTrackerDO {
     }
 
     async handleListPositionsByUserInternal(body: ListPositionsByUserRequest) : Promise<PositionAndMaybePNL[]> {
-        if (!this.initialized()) {
+        if (!this.hasTokenAddresses()) {
             logError("Tried to list positions yet tokenPairPositionTracker wasn't initialized", this);
             return [];
         }
@@ -873,7 +893,7 @@ export class TokenPairPositionTrackerDO {
     }
 
     assertIsInitialized() {
-        if (!this.initialized()) {
+        if (!this.hasTokenAddresses()) {
             throw new Error("Must initialized before using");
         }
     }

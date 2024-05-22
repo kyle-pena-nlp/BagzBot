@@ -28,7 +28,7 @@ export class TokenPairTracker {
             }
         }
     }
-    async listUniqueTokenPairs() : Promise<TokenPair[]> {
+    listUniqueTokenPairs() : TokenPair[] {
         const uniqueKeys : Set<string> = new Set<string>();
         const tokenPairs : TokenPair[] = [];
         for (const positionID of Object.keys(this.tokenPairsForPositionIDs)) {

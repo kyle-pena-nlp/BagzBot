@@ -17,11 +17,14 @@ export class TokenPairsForPositionIDsTracker {
     dirtyTracking : Set<string> = new Set<string>();
     deletedKeys : Set<string> = new Set<string>();
     lastTimeWalletChecked : ChangeTrackedValue<number> = new ChangeTrackedValue<number>("tokenPairsLastTimeWalletChecked", 0);
+    
     constructor() {
     }
+
     any() : boolean {
         return Object.keys(this.tokenPairsForPositionIDs).length > 0;
     }
+
     initialize(entries : Map<string,any>) {
         this.lastTimeWalletChecked.initialize(entries);
         const entryKeys = [...entries.keys()];
@@ -32,74 +35,6 @@ export class TokenPairsForPositionIDsTracker {
                 this.tokenPairsForPositionIDs[positionIDKey.toString()] = tokenPairForPosition;
             }
         }
-    }
-    async listUniqueTokenPairs(telegramUserID : number, env : Env, walletPublicKey : string|undefined) : Promise<TokenPair[]> {
-        const uniqueKeys : Set<string> = new Set<string>();
-        if (this.tooLongSinceTokenPairListTrimmed(env) && walletPublicKey != null) {
-            await this.tryTrimmingTokenPairList(telegramUserID, walletPublicKey, env);
-        }
-        const tokenPairs : TokenPair[] = [];
-        for (const positionID of Object.keys(this.tokenPairsForPositionIDs)) {
-            const tokenPairForPosition = this.tokenPairsForPositionIDs[positionID];
-            const key = `${tokenPairForPosition.token.address}:${tokenPairForPosition.vsToken.address}`;
-            if (!uniqueKeys.has(key)) {
-                uniqueKeys.add(key);
-                tokenPairs.push({
-                    tokenAddress : tokenPairForPosition.token.address,
-                    vsTokenAddress: tokenPairForPosition.vsToken.address
-                });
-            }
-        }
-        return tokenPairs;
-    }
-
-    private tooLongSinceTokenPairListTrimmed(env : Env) : boolean {
-        if ((Date.now() - this.lastTimeWalletChecked.value) > strictParseInt(env.WALLET_BALANCE_REFRESH_INTERVAL_MS)) {
-            return true;
-        }
-        else {
-            return false;
-        }
-    }
-
-    private async tryTrimmingTokenPairList(telegramUserID : number, walletPublicKey : string, env: Env) {
-        
-        // Query the wallet for a list of non-zero balance tokens
-        const nonZeroWalletTokenAccounts : Set<string>|null = await this.getNonZeroWalletTokenAccounts(walletPublicKey, env).catch(r => {
-            logError(`Could not fetch list of non-zero balance tokens from ${walletPublicKey}`);
-            return null;
-        });
-        
-        // If the query failed, early-out
-        if (nonZeroWalletTokenAccounts == null) {
-            return;
-        }
-        
-        // Get the list of unique token pairs where the token is not in the wallet
-        const keyFn = (x : TokenPairForAPosition) => `${x.token.address}:${x.vsToken.address}`;
-        const tokenPairsToRemove = new SetWithKeyFn(Object.values(this.tokenPairsForPositionIDs).filter(tokenPair => !nonZeroWalletTokenAccounts.has(tokenPair.token.address)), keyFn);
-
-        // For each one of those, double check that the token pair position tracker has no positions for this user 
-        // (This would be the case if there is a buy which is still exectuing)
-        for (const tokenPair of [...tokenPairsToRemove]) {
-            const shouldRemove = (await listPositionsByUser(telegramUserID, tokenPair.token.address, tokenPair.vsToken.address, env)).length === 0;
-            if (!shouldRemove) {
-                tokenPairsToRemove.delete(tokenPair)
-            }
-        }
-
-        // Finally, remove the pairs that we have confirmed can be removed
-        for (const positionID of [...Object.keys(this.tokenPairsForPositionIDs)]) {
-            const tokenPair = this.tokenPairsForPositionIDs[positionID];
-            if (tokenPairsToRemove.has(tokenPair)) {
-                delete this.tokenPairsForPositionIDs[positionID];
-                this.markAsDeleted(new PositionIDKey(positionID));
-            }
-        }
-    }
-
-    private async getNonZeroWalletTokenAccounts(walletAddress : string, env : Env) : Promise<Set<string>> {
-        return await findNonZeroBalanceTokenAccounts(walletAddress, env);
     }
 
     async flushToStorage(storage : DurableObjectStorage) {
@@ -120,6 +55,80 @@ export class TokenPairsForPositionIDsTracker {
         });
         await Promise.allSettled([lastTimeWalletCheckedPromise, putPromise, deletePromise]);
     }
+
+    async listUniqueTokenPairs() : Promise<TokenPair[]> {
+        const uniqueKeys : Set<string> = new Set<string>();
+        const tokenPairs : TokenPair[] = [];
+        for (const positionID of Object.keys(this.tokenPairsForPositionIDs)) {
+            const tokenPairForPosition = this.tokenPairsForPositionIDs[positionID];
+            const key = `${tokenPairForPosition.token.address}:${tokenPairForPosition.vsToken.address}`;
+            if (!uniqueKeys.has(key)) {
+                uniqueKeys.add(key);
+                tokenPairs.push({
+                    tokenAddress : tokenPairForPosition.token.address,
+                    vsTokenAddress: tokenPairForPosition.vsToken.address
+                });
+            }
+        }
+        return tokenPairs;
+    }
+
+    async maybeTrimTokenPairList(telegramUserID : number, walletPublicKey : string, env : Env) {
+        if (this.tooLongSinceTokenPairListTrimmed(env)) {
+            await this.tryTrimmingTokenPairList(telegramUserID, walletPublicKey, env);
+        }
+    }
+
+    private tooLongSinceTokenPairListTrimmed(env : Env) : boolean {
+        if ((Date.now() - this.lastTimeWalletChecked.value) > strictParseInt(env.WALLET_BALANCE_REFRESH_INTERVAL_MS)) {
+            return true;
+        }
+        else {
+            return false;
+        }
+    }
+
+    // Expensive operation: Thoroughly check to see if certain token pair trackers still need to be queried for this user.
+    private async tryTrimmingTokenPairList(telegramUserID : number, walletPublicKey : string, env: Env) {
+        
+        // Query the wallet for a list of non-zero balance tokens
+        const nonZeroWalletTokenAccounts : Set<string>|null = await this.getNonZeroWalletTokenAccounts(walletPublicKey, env).catch(r => {
+            logError(`Could not fetch list of non-zero balance tokens from ${walletPublicKey}`);
+            return null;
+        });
+        
+        // If the query failed, early-out
+        if (nonZeroWalletTokenAccounts == null) {
+            return;
+        }
+        
+        // Get the list of unique token pairs where there's none of this token in the wallet - these are candidates for removal
+        const keyFn = (x : TokenPair) => `${x.tokenAddress}:${x.vsTokenAddress}`;
+        const tokenPairRemovalCandidates = new SetWithKeyFn(Object.values(this.tokenPairsForPositionIDs)
+            .map(tokenPairForPosition => { return { tokenAddress : tokenPairForPosition.token.address, vsTokenAddress : tokenPairForPosition.vsToken.address } })
+            .filter(tokenPair => !nonZeroWalletTokenAccounts.has(tokenPair.tokenAddress)), keyFn);
+
+        // For each, double check that there aren't any positions in the tracker for this user (can happen if the position is in a weird state like an unconfirmed buy)
+        for (const tokenPairRemovalCandidate of [...tokenPairRemovalCandidates]) {
+            const positionsForTokenPair = (await listPositionsByUser(telegramUserID, tokenPairRemovalCandidate.tokenAddress, tokenPairRemovalCandidate.vsTokenAddress, env));
+            if (positionsForTokenPair.length == 0) {
+                // If we are in the clear (no positions for this user in the tracker), remove any that are for this token pair
+                for (const positionID of [...Object.keys(this.tokenPairsForPositionIDs)]) {
+                    const tokenPairForPosition = this.tokenPairsForPositionIDs[positionID];
+                    const tokenPair = { tokenAddress : tokenPairForPosition.token.address, vsTokenAddress: tokenPairForPosition.vsToken.address };
+                    if (keyFn(tokenPair) == keyFn(tokenPairRemovalCandidate)) {
+                        delete this.tokenPairsForPositionIDs[positionID];
+                        this.markAsDeleted(new PositionIDKey(positionID));
+                    }
+                } 
+            }
+        }
+    }
+
+    private async getNonZeroWalletTokenAccounts(walletAddress : string, env : Env) : Promise<Set<string>> {
+        return await findNonZeroBalanceTokenAccounts(walletAddress, env);
+    }
+
     registerPosition(position: TokenPairForAPosition) {
         const positionIDKey = new PositionIDKey(position.positionID);
         this.tokenPairsForPositionIDs[positionIDKey.toString()] = position;

@@ -9,8 +9,6 @@ export enum PolledTokenPairListDOFetchMethod {
 	rebuildTokensList = "rebuildTokensList"
 }
 
-
-
 export function parsePolledTokenPairListDOFetchMethod(value : string) : PolledTokenPairListDOFetchMethod|null {
 	return Object.values(PolledTokenPairListDOFetchMethod).find(x => x === value)||null;
 }

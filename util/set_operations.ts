@@ -26,6 +26,7 @@ export class SetWithKeyFn<T> implements SetLike<T> {
         const key = this.keyFn(x);
         if (!this.keySet.has(key)) {
             this.items.push(x);
+            this.keySet.add(key);
         }
         return this;
     }

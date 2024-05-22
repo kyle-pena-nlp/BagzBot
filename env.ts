@@ -83,6 +83,7 @@ export interface EnvironmentVariables {
 	ALLOW_PRIORITY_FEE_MULTIPLIERS : string
 	PRIORITY_FEE_MULTIPLIER_OPTIONS : string
 	QUESTION_TIMEOUT_MS : string
+	POLL_PRICE_USING_JUPITER_QUOTE_API : string
 }
 
 interface DurableObjects {

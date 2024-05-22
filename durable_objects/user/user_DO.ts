@@ -174,13 +174,23 @@ export class UserDO {
     }
 
     async alarm() {
-        //logDebug(`Invoking alarm for ${this.telegramUserID.value}`);
+        
         try {
             await this.state.storage.deleteAlarm();
+            
+            this.state.blockConcurrencyWhile(async () => {
+                if (this.telegramUserID.value != null && this.wallet.value?.publicKey != null) {
+                    await this.tokenPairsForPositionIDsTracker.maybeTrimTokenPairList(this.telegramUserID.value, this.wallet.value?.publicKey, this.env);
+                }
+            });
+            
             await this.maybeScheduleAlarm();
         }
         catch {
             logError(`Problem rescheduling alarm for ${this.telegramUserID.value}`);
+        }
+        finally {
+            await this.flushToStorage();
         }
     }
 
@@ -385,7 +395,7 @@ export class UserDO {
         await this.registerPositionAsClosed(userAction.positionID, userAction.tokenAddress, userAction.vsTokenAddress);
         return makeJSONResponse<RegisterPositionAsClosedResponse>({ success: true });
     }
-    
+
     async registerPositionAsClosed(positionID : string, tokenAddress : string, vsTokenAddress : string) {
         this.tokenPairsForPositionIDsTracker.removePositions([positionID]);
         const tokenPair = { positionID: positionID, token : { address : tokenAddress }, vsToken: { address : vsTokenAddress } };
@@ -460,7 +470,7 @@ export class UserDO {
 
     async handleListDeactivatedPositionsInternal(userAction : ListDeactivatedPositionsRequest) : Promise<ListDeactivatedPositionsResponse> {
         const userID = userAction.telegramUserID;
-        const tokenPairs = await this.tokenPairsForDeactivatedPositions.listUniqueTokenPairs();
+        const tokenPairs = this.tokenPairsForDeactivatedPositions.listUniqueTokenPairs();
         const allDeactivatedPositions : Position[] = [];
         for (const tokenPair of tokenPairs) {
             const tokenAddress = tokenPair.tokenAddress;
@@ -526,7 +536,7 @@ export class UserDO {
 
     async handleDeleteClosedPositions(userAction : AdminDeleteClosedPositionsRequest) : Promise<Response> {
         const userID = userAction.telegramUserID;
-        const uniqueTokenPairs = await this.tokenPairsForClosedPositions.listUniqueTokenPairs();
+        const uniqueTokenPairs = this.tokenPairsForClosedPositions.listUniqueTokenPairs();
         for (const pair of uniqueTokenPairs) {
             await adminDeleteClosedPositionsForUser(userAction.telegramUserID, pair.tokenAddress, pair.vsTokenAddress, this.env);
         }
@@ -547,7 +557,7 @@ export class UserDO {
 
     async handleGetClosedPositionsAndPNLSummaryInternal(userAction : GetClosedPositionsAndPNLSummaryRequest) : Promise<GetClosedPositionsAndPNLSummaryResponse> {
         const userID  = userAction.telegramUserID;
-        const tokenPairs = await this.tokenPairsForClosedPositions.listUniqueTokenPairs();
+        const tokenPairs = this.tokenPairsForClosedPositions.listUniqueTokenPairs();
         const closedPositionPNLSummarizer = new ClosedPositionPNLSummarizer();
         for (const tokenPair of tokenPairs) {
             const { tokenAddress, vsTokenAddress } = tokenPair;
@@ -709,7 +719,7 @@ export class UserDO {
     async listPositionsFromUserDO(userID : number) : Promise<PositionAndMaybePNL[]> {
 
         // fetch positions from all relevant trackers
-        const uniqueTokenPairs : TokenPair[] = await this.tokenPairsForPositionIDsTracker.listUniqueTokenPairs(userID, this.env, this.wallet.value?.publicKey);
+        const uniqueTokenPairs : TokenPair[] = await this.tokenPairsForPositionIDsTracker.listUniqueTokenPairs();
         const positions : PositionAndMaybePNL[]  = [];
         for (const tokenPair of uniqueTokenPairs) {
             const positionsForTokenPair = await listPositionsByUser(userID, tokenPair.tokenAddress, tokenPair.vsTokenAddress, this.env);
@@ -1066,7 +1076,7 @@ export class UserDO {
         const hasWallet = !!(this.wallet.value);
         const address = this.wallet.value?.publicKey;
         const maybeSOLBalance = await this.solBalanceTracker.maybeGetBalance(address, forceRefreshBalance, this.env);
-        const uniqueTokenPairs = await this.tokenPairsForPositionIDsTracker.listUniqueTokenPairs(telegramUserID, this.env, this.wallet.value?.publicKey);
+        const uniqueTokenPairs = await this.tokenPairsForPositionIDsTracker.listUniqueTokenPairs();
         const maybePNL = await this.userOpenPNLTracker.maybeGetPNL(telegramUserID, uniqueTokenPairs, forceRefreshBalance, this.env)
         return {
             hasWallet: hasWallet,
