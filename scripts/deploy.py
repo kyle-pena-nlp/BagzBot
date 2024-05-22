@@ -1,4 +1,4 @@
-import requests
+import requests, subprocess
 from argparse import ArgumentParser
 
 from deployment.bot_configure_info import configure_bot_info
@@ -35,7 +35,30 @@ def maybe_delete_webhook(env : str):
     else:
         print("Ok! Continuing onwards.")
 
+def assert_clean_main():
+    
+    # Check if the current branch is main
+    current_branch = subprocess.check_output(
+        ["git", "rev-parse", "--abbrev-ref", "HEAD"]
+    ).strip().decode('utf-8')
+    assert current_branch == "main", "Not on main branch"
+    
+    # Check if the working directory is clean
+    status = subprocess.check_output(
+        ["git", "status", "--porcelain"]
+    ).strip().decode('utf-8')
+    assert status == "", "Working directory is dirty"
+    
+    # Check if all commits are pushed
+    status_ahead_behind = subprocess.check_output(
+        ["git", "status", "-sb"]
+    ).strip().decode('utf-8')
+    assert "ahead" not in status_ahead_behind and "behind" not in status_ahead_behind, "Commits are not pushed"
+
+
 def deploy(env : str):
+
+    assert_clean_main()
 
     if do_you_want_to("Wrangler login?"):
         do_wrangler_login()
