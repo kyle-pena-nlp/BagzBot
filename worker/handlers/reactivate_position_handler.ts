@@ -15,7 +15,7 @@ export class ReactivatePositionHandler extends BaseMenuCodeHandler<MenuCode.Reac
         const callbackData = params.callbackData;
         const reactivatePositionResponse = await reactivatePosition(params.getTelegramUserID(), params.chatID, callbackData.menuArg||'', env);
         if (reactivatePositionResponse.success) {
-            return new Menus.MenuContinueMessage("This position will now be price monitored", MenuCode.ListPositions, env);
+            return new Menus.MenuContinueMessage("This position will now be price monitored", MenuCode.ViewDeactivatedPositions, env);
         }
         else {
             return new Menus.MenuContinueMessage("This position could not be activated", MenuCode.ViewDeactivatedPosition, env, 'HTML', callbackData.menuArg);

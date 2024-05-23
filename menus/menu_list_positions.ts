@@ -36,8 +36,8 @@ export class MenuListPositions extends PaginatedMenu<PositionAndMaybePNL,{ items
             this.insertButtonNextLine(options, positionLabel, callbackData);
         }
         this.insertPaginationButtons(options, MenuCode.ListPositions);
-        this.insertButtonNextLine(options, ':refresh: Refresh', this.menuCallback(MenuCode.ListPositions))
-        this.insertBackToMainButtonOnNewLine(options);
+        this.insertButtonNextLine(options, ':back: Back', this.menuCallback(MenuCode.Main));        
+        this.insertButtonSameLine(options, ':refresh: Refresh', this.menuCallback(MenuCode.ListPositions))
         return options;
     }
     maybeCalcTotalPNL() : DecimalizedAmount|undefined {

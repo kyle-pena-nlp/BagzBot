@@ -61,8 +61,8 @@ export class MenuViewOpenPosition extends Menu<MenuData> implements MenuCapabili
         }
 
         const refreshPositionCallbackData = new CallbackData(MenuCode.ViewOpenPosition, this.position().positionID);
-        this.insertButtonNextLine(options, ":refresh: Refresh", refreshPositionCallbackData);
-        this.insertButtonSameLine(options, ":back: Back", this.menuCallback(MenuCode.ListPositions));
+        this.insertButtonNextLine(options, ":back: Back", this.menuCallback(MenuCode.ListPositions));
+        this.insertButtonSameLine(options, ":refresh: Refresh", refreshPositionCallbackData);
         this.insertButtonSameLine(options, "Close", this.menuCallback(MenuCode.Close));
 
         return options;
@@ -109,7 +109,7 @@ export class MenuViewOpenPosition extends Menu<MenuData> implements MenuCapabili
         }         
 
 
-        lines.push("<code><u><b>Note</b>: All price tracking is in SOL (price tracking in fiat coming soon)</u></code>")
+        lines.push("<code><u><b>Note</b>: All price tracking is in SOL</u></code>")
         lines.push("");
 
         lines.push(`<b><u>Status</u></b>:`)
@@ -156,11 +156,11 @@ export class MenuViewOpenPosition extends Menu<MenuData> implements MenuCapabili
             const peakPriceComparison = this.lessThanPeakPrice() ? `${asPercentString(this.percentBelowPeak())} &lt;` : '=';
             
             lines.push("<u><b>Price Movement</b></u>:");
-            lines.push(`:bullet: <code><b>Fill Price</b>:      </code>${asTokenPrice(this.position().fillPrice)} SOL`);
-            lines.push(`:bullet: <code><b>Current Price</b>:   </code>${asTokenPrice(this.currentPrice())} SOL (${asPercentDeltaString(this.pnlDeltaPct())}) (${peakPriceComparison} Peak Price)`);
+            //lines.push(`:bullet: <code><b>Fill Price</b>:      </code>${asTokenPrice(this.position().fillPrice)} SOL`);
+            lines.push(`:bullet: <code><b>Current Price</b>:   </code>${asTokenPrice(this.currentPrice())} SOL (${peakPriceComparison} Peak Price)`);
             lines.push(`:bullet: <code><b>Peak Price</b>:      </code>${asTokenPrice(this.menuData.data.peakPrice)} SOL`)
-            lines.push(`:bullet: <code><b>Trigger Percent</b>: </code>${this.position().triggerPercent.toFixed(1)}%`)
-            lines.push(`:bullet: <code><b>PnL</b>:             </code>${asTokenPriceDelta(this.PNL().PNL)} SOL`);
+            //lines.push(`:bullet: <code><b>Trigger Percent</b>: </code>${this.position().triggerPercent.toFixed(1)}%`)
+            lines.push(`:bullet: <code><b>Profit</b>:          </code>${asTokenPriceDelta(this.PNL().PNL)} SOL (${asPercentDeltaString(this.pnlDeltaPct())})`);
         }
 
         if (this.buyIsConfirmed() && this.isCloseToBeingTriggered() && !this.isClosingOrClosed() && !this.triggerConditionMet()) {

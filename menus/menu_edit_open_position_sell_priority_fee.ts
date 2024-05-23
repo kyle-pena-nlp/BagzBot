@@ -32,7 +32,7 @@ export class MenuEditOpenPositionSellPriorityFee extends Menu<{ positionID : str
             const multiplierCallbackData = new PositionIDAndPriorityFeeMultiplier(this.menuData.positionID, multiplier);
             this.insertButtonSameLine(options, `${multiplierName}`, new CallbackData(MenuCode.EditOpenPositionSubmitPriorityFee, multiplierCallbackData.asMenuArg()));
         }
-        this.insertButtonNextLine(options, ':cancel: Cancel', new CallbackData(MenuCode.ViewOpenPosition, this.menuData.positionID));
+        this.insertButtonNextLine(options, ':back: Back', new CallbackData(MenuCode.ViewOpenPosition, this.menuData.positionID));
         return options;
     }
 }

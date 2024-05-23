@@ -50,10 +50,12 @@ export class MenuEditPositionRequest extends Menu< { positionRequest: PositionRe
         }
 
 
-        this.insertButtonNextLine(options, `:refresh: Refresh Quote`, new CallbackData(MenuCode.ReturnToPositionRequestEditor));
+        this.insertButtonNextLine(options, ':back: Back', new CallbackData(MenuCode.Main));
+        this.insertButtonSameLine(options, `:refresh: Refresh`, new CallbackData(MenuCode.ReturnToPositionRequestEditor));
         //this.insertButtonSameLine(options, `:cancel: Cancel`, new CallbackData(MenuCode.Main));
         this.insertButtonSameLine(options, `Close`, new CallbackData(MenuCode.Close));
         //this.insertButtonSameLine(options, ':help: Help', new CallbackData(MenuCode.EditPositionHelp));
+
         this.insertButtonNextLine(options, `:sparkle: Submit :sparkle:`, new CallbackData(MenuCode.TrailingStopLossEditorFinalSubmit));
         return options;
     }

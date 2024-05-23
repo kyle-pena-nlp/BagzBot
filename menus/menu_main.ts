@@ -28,7 +28,6 @@ export class MenuMain extends Menu<UserData & AdminInfo> implements MenuCapabili
         if (envVars.isBeta) {
             lines.push("");
             lines.push(`<blockquote>${envVars.botName} is in BETA - USE AT YOUR OWN RISK!`);
-            lines.push(`Maintenance window will be from 12:00 AM to 2:00 AM EST.</blockquote>`);
             lines.push("");
         }
         

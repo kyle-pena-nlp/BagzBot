@@ -14,7 +14,7 @@ def wrangler_deploy(env : str, dry : bool):
     command = f'npx wrangler deploy --env "{env}"'
     if dry:
         command += " --dry-run "
-    subprocess.run(shlex.split(command), capture_output=False, text=True, shell=True)
+    subprocess.run(command, capture_output=False, text=True, shell=True)
 
 def parse_args():
     parser = ArgumentParser()

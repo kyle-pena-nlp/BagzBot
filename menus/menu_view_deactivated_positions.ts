@@ -22,8 +22,8 @@ export class MenuViewDeactivatedPositions extends PaginatedMenu<Position, { item
             this.insertViewDeactivatedPositionButton(options, position);
         }
         this.insertPaginationButtons(options, MenuCode.ViewDeactivatedPositions);
-        this.insertButtonNextLine(options, ':refresh: Refresh', this.menuCallback(MenuCode.ViewDeactivatedPositions));
-        this.insertButtonNextLine(options, ':back: Back', this.menuCallback(MenuCode.Main));
+        this.insertButtonNextLine(options, ':back: Back', this.menuCallback(MenuCode.Main));        
+        this.insertButtonSameLine(options, ':refresh: Refresh', this.menuCallback(MenuCode.ViewDeactivatedPositions));
         return options;
     }
 

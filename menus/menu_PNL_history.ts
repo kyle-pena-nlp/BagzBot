@@ -63,8 +63,8 @@ export class MenuPNLHistory extends PaginatedMenu<Position[],{ items : Position[
     renderOptions(): CallbackButton[][] {
         const options = this.emptyMenu();
         this.insertPaginationButtons(options, MenuCode.ViewPNLHistory);
-        this.insertButtonNextLine(options, `:refresh: Refresh`, new CallbackData(MenuCode.ViewPNLHistory));
-        this.insertButtonSameLine(options, `:back: Back`, new CallbackData(MenuCode.Main));
+        this.insertButtonNextLine(options, `:back: Back`, new CallbackData(MenuCode.Main));        
+        this.insertButtonSameLine(options, `:refresh: Refresh`, new CallbackData(MenuCode.ViewPNLHistory));
         this.insertButtonSameLine(options, `Close`, new CallbackData(MenuCode.Close));
         return options;
     }

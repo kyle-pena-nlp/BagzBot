@@ -15,7 +15,7 @@ export class DeactivatePositionHandler extends BaseMenuCodeHandler<MenuCode.Deac
         const callbackData = params.callbackData;
         const deactivatePositionResponse = await deactivatePosition(params.getTelegramUserID(), params.chatID, callbackData.menuArg||'', env);
         if (deactivatePositionResponse.success) {
-            return new Menus.MenuContinueMessage("This position has been deactivated and will no longer be price monitored", MenuCode.ViewDeactivatedPositions, env);
+            return new Menus.MenuContinueMessage("This position has been deactivated and will no longer be price monitored", MenuCode.ListPositions, env);
         }
         else {
             return new Menus.MenuContinueMessage("This position could not be deactivated", MenuCode.ViewOpenPosition, env, 'HTML', callbackData.menuArg);

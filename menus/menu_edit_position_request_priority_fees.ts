@@ -30,7 +30,7 @@ export class MenuEditPositionRequestPriorityFees extends Menu<undefined> impleme
         for (const [multiplier,multiplierName] of parsePriorityFeeOptions(this.env)) {
             this.insertButtonSameLine(options, `${multiplierName}`, new CallbackData(MenuCode.EditPositionRequestSubmitPriorityFees, multiplier.toString()));
         }
-        this.insertButtonNextLine(options, ':cancel: Cancel', this.menuCallback(MenuCode.ReturnToPositionRequestEditor))
+        this.insertButtonNextLine(options, ':back: Back', this.menuCallback(MenuCode.ReturnToPositionRequestEditor))
         return options;
     }
     
