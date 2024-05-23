@@ -36,7 +36,7 @@ def push_secrets(env : str):
 def _pipe_to_command(command, input_string):
     # Start the subprocess with stdin and stdout as PIPE
     # Ensure universal_newlines=True for text mode
-    process = subprocess.Popen(shlex.split(command), stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding='utf-8', text=True, shell=True)
+    process = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding='utf-8', text=True, shell=True)
     # Send the input_string to the subprocess and get the output
     output, errors = process.communicate(input=input_string)
     return output, errors
