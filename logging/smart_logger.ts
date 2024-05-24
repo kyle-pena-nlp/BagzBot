@@ -147,5 +147,5 @@ export function logInfo(...xs : any[]) {
 }
 
 export function logDebug(...xs : any[]) {
-    logItSafe(xs, 'debug');
+    logItSafe(xs, 'info');
 }
