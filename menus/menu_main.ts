@@ -27,7 +27,7 @@ export class MenuMain extends Menu<UserData & AdminInfo> implements MenuCapabili
 
         if (envVars.isBeta) {
             lines.push("");
-            lines.push(`<blockquote>${envVars.botName} is in BETA - USE AT YOUR OWN RISK!`);
+            lines.push(`<blockquote>${envVars.botName} is in BETA - USE AT YOUR OWN RISK!</blockquote>`);
             lines.push("");
         }
         
