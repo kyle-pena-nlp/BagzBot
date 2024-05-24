@@ -1,4 +1,5 @@
 import { DecimalizedAmount } from "../../decimalized";
+import { getUserData } from "../../durable_objects/user/userDO_interop";
 import { Env } from "../../env";
 import * as Menus from "../../menus";
 import { BaseMenu, MenuCode } from "../../menus";
@@ -11,6 +12,11 @@ export class WelcomeScreenPart1Handler extends BaseMenuCodeHandler<MenuCode.Welc
         super(menuCode);
     }
     async handleCallback(params : CallbackHandlerParams, maybeSOLBalance : DecimalizedAmount|null, context: FetchEvent, env: Env) : Promise<BaseMenu|ReplyQuestion|void> {
+        await this.touchUserDO(params, env);
         return new Menus.WelcomeScreenPart1(undefined, env);
+    }
+    private async touchUserDO(params : CallbackHandlerParams, env : Env) {
+        // call out to the userDO once so that the wallet is ready for next request
+        const userData = getUserData(params.getTelegramUserID(), params.chatID, params.messageID, true, env);
     }
 }
