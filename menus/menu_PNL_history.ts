@@ -49,7 +49,7 @@ export class MenuPNLHistory extends PaginatedMenu<Position[],{ items : Position[
         
         const pos = closedPositionsForToken[0];
         const pnlPercentDelta = dMult(fromNumber(100), dDiv(netPNL, totalInvested, MATH_DECIMAL_PLACES)||dZero());
-        const heading = `<b><u>${pos.token.symbol}</u></b> ${asChartEmoji(toNumber(netPNL))} (${asPercentDeltaString(pnlPercentDelta)})`;
+        const heading = `<b><u>${pos.token.symbol}</u></b> ${asChartEmoji(toNumber(netPNL))} (${asPercentDeltaString(pnlPercentDelta)}) (${numPositions} closed positions)`;
         lines.push(heading);
         lines.push(`<code>${pos.token.address}</code>`);        
         const table = new FormattedTable([10], 'bulleted');
