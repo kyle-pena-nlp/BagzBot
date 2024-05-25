@@ -20,14 +20,17 @@ export class PositionBuyer {
     env : Env
     startTimeMS : number
     channel : UpdateableNotification
+    registerPositionLocallyCallback : (p : Position) => void;
     constructor(wallet : Wallet, 
         env : Env,  
         startTimeMS : number,
-        channel : UpdateableNotification) {
+        channel : UpdateableNotification,
+        registerPositionLocallyCallback : (p : Position) => void) {
         this.wallet = wallet;
         this.env = env;
         this.startTimeMS = startTimeMS;
         this.channel = channel;
+        this.registerPositionLocallyCallback = registerPositionLocallyCallback;
     }
 
     async buy(positionRequest : PositionRequest) : Promise<void> {
@@ -108,6 +111,10 @@ export class PositionBuyer {
         if(!insertPositionResponse.success) {
             return 'could-not-create-tx'; // TODO: more appropriate code.
         }
+
+        // (NASTY HACK) add the token to the token pair list
+        // done here to avoid the position getting "cleaned out" by the periodic token pair trim
+        this.registerPositionLocallyCallback(unconfirmedPosition);
 
         // try to do the swap.
         const result = await this.executeAndParseSwap(positionRequest, signedTx, lastValidBH, connection);
@@ -337,7 +344,7 @@ export class PositionBuyer {
 
             case 'tx-sim-frozen-token-account':
             case 'frozen-token-account':
-                return 'This token has been frozen due to suspicious activity! Please try a different token.';
+                return 'This token has been frozen due to suspicious activity or low liquidity / volume!';
 
             case 'tx-sim-failed-slippage': 
             case 'slippage-failed':

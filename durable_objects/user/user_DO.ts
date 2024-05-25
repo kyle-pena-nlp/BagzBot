@@ -933,16 +933,20 @@ export class UserDO {
             this.env,
             'HTML',
             `<a href="${positionRequest.token.logoURI}">\u200B</a><b>${positionRequest.vsTokenAmt} SOL purchase of $${positionRequest.token.symbol}</b>: `);        
-        /*
-            This is deliberately not awaited.
-            Durable Objects will continue processing requests for up to 30 seconds
-            (Which means the buy has to happen in 30 secs, or it is considered unconfirmed!!!)
-        */
-        const positionBuyer = new PositionBuyer(this.wallet.value!!, this.env, startTimeMS, channel);    
+
+
+        // a horrible little hack ... when the position is successfully inserted into the tracker, this gets called
+        const registerTokenPairCallback = (p : Position) => {
+            this.tokenPairsForPositionIDsTracker.registerPosition({ positionID: p.positionID, token: { address : p.token.address }, vsToken : { address : p.vsToken.address } });
+        }
+
+        const positionBuyer = new PositionBuyer(this.wallet.value!!, this.env, startTimeMS, channel, registerTokenPairCallback);    
+        
         // deliberate lack of await, but writes to storage when complete
         positionBuyer.buy(positionRequest).finally(async () => {
             await this.flushToStorage();
         });
+        
         return makeJSONResponse<OpenPositionResponse>({});
     }
 
