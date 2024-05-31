@@ -64,7 +64,7 @@ async function makeQuote(swapRoute : GetQuoteFailure|SwapRoute, inTokenInfo : To
     const estimatedFee = dSub(inTokenAmt, exactInAmt);
     // For the buy:
     // in / out <-> SOL / chonky <-> $$ / taco <-> a taco cost $1.50
-    const fillPrice = dDiv(exactInAmt, outTokenAmt, MATH_DECIMAL_PLACES) || dZero();
+    const fillPrice = dDiv(inTokenAmt, outTokenAmt, MATH_DECIMAL_PLACES) || dZero();
     const quote : Quote = {
         inToken: inTokenInfo,
         inTokenAmt: inTokenAmt,

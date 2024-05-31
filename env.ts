@@ -106,7 +106,7 @@ export interface CommonEnvironmentVariables {
 
 export function getCommonEnvironmentVariables(env : EnvironmentVariables) : CommonEnvironmentVariables {
 	return {
-		botName : `${env.TELEGRAM_BOT_DISPLAY_NAME} - (${env.TELEGRAM_BOT_INSTANCE_DISPLAY_NAME})`,
+		botName : `${env.TELEGRAM_BOT_DISPLAY_NAME}`,
 		botTagline: env.TELEGRAM_BOT_TAGLINE,
 		isDev: env.ENVIRONMENT === 'dev',
 		isBeta: env.ENVIRONMENT === 'beta',
