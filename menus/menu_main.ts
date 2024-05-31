@@ -24,12 +24,6 @@ export class MenuMain extends Menu<UserData & AdminInfo> implements MenuCapabili
         if (!this.menuData.hasWallet) {
             lines.push("<blockquote>We are creating your wallet! Refresh in a few seconds to see the full menu.</blockquote>")
         }        
-
-        if (envVars.isBeta) {
-            lines.push("");
-            lines.push(`<blockquote>${envVars.botName} is in BETA - USE AT YOUR OWN RISK!</blockquote>`);
-            lines.push("");
-        }
         
         if (this.menuData.maybeSOLBalance != null) {
             lines.push(
