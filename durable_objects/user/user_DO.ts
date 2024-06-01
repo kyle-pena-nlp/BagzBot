@@ -1,11 +1,11 @@
 import { Connection } from "@solana/web3.js";
 import { isAdminOrSuperAdmin } from "../../admins";
 import { Wallet, encryptPrivateKey, generateEd25519Keypair } from "../../crypto";
-import { asTokenPrice } from "../../decimalized/decimalized_amount";
+import { DecimalizedAmount, asTokenPrice } from "../../decimalized/decimalized_amount";
 import { Env, allowChooseAutoDoubleSlippage, allowChoosePriorityFees, getRPCUrl } from "../../env";
 import { makeFailureResponse, makeJSONResponse, makeSuccessResponse, maybeGetJson } from "../../http";
 import { logDebug, logError, logInfo } from "../../logging";
-import { PositionPreRequest, PositionRequest, PositionStatus, PositionType } from "../../positions";
+import { Position, PositionPreRequest, PositionRequest, PositionStatus, PositionType } from "../../positions";
 import { POSITION_REQUEST_STORAGE_KEY } from "../../storage_keys";
 import { TGStatusMessage, UpdateableNotification, sendMessageToTG } from "../../telegram";
 import { WEN_ADDRESS, getVsTokenInfo } from "../../tokens";
@@ -13,6 +13,7 @@ import { ChangeTrackedValue, Intersect, Structural, Subtract, assertNever, ensur
 import { assertIs } from "../../util/enums";
 import { listUnclaimedBetaInviteCodes } from "../beta_invite_codes/beta_invite_code_interop";
 import { PositionAndMaybePNL } from "../token_pair_position_tracker/model/position_and_PNL";
+import { getTokenPrice } from "../token_pair_position_tracker/token_pair_position_tracker_DO_interop";
 import { AdminDeleteAllPositionsRequest, AdminDeleteAllPositionsResponse } from "./actions/admin_delete_all_positions";
 import { AdminDeleteClosedPositionsRequest } from "./actions/admin_delete_closed_positions";
 import { AdminDeletePositionByIDRequest, AdminDeletePositionByIDResponse } from "./actions/admin_delete_position_by_id";
@@ -49,12 +50,15 @@ import { StoreLegalAgreementStatusRequest, StoreLegalAgreementStatusResponse } f
 import { StoreSessionValuesRequest, StoreSessionValuesResponse } from "./actions/store_session_values";
 import { UnimpersonateUserRequest, UnimpersonateUserResponse } from "./actions/unimpersonate_user";
 import { ClosedPositionPNLSummarizer } from "./aggregators/closed_positions_pnl_summarizer";
+import { UserDOBuyConfirmer } from "./confirmers/user_do_buy_confirmer";
+import { UserDOSellConfirmer } from "./confirmers/user_do_sell_confirmer";
+import { TokenPair } from "./model/token_pair";
 import { UserData } from "./model/user_data";
 import { PositionBuyer } from "./position_buyer";
 import { PositionSeller } from "./position_seller";
 import { ClosedPositionsTracker } from "./trackers/closed_positions_tracker";
 import { DeactivatedPositionsTracker } from "./trackers/deactivated_positions_tracker";
-import { OpenPositionsTracker } from "./trackers/open_positions_tracker";
+import { OpenPositionsTracker, UpdatePriceResult } from "./trackers/open_positions_tracker";
 import { SessionTracker } from "./trackers/session_tracker";
 import { SOLBalanceTracker } from "./trackers/sol_balance_tracker";
 import { UserDOFetchMethod, parseUserDOFetchMethod } from "./userDO_interop";
@@ -175,11 +179,11 @@ export class UserDO {
         ]);
     }
 
-    async alarm() {
+    async alarm(req : any, env : Env, context: FetchEvent) {
         
         try {
             await this.state.storage.deleteAlarm();
-            
+            await this.performAlarmActions(context);
             await this.maybeScheduleAlarm();
         }
         catch {
@@ -199,7 +203,7 @@ export class UserDO {
     async maybeScheduleAlarm() {
         if (this.shouldScheduleNextAlarm()) {
             this.isAlarming = true;
-            await this.state.storage.setAlarm(Date.now() + 10000);
+            await this.state.storage.setAlarm(Date.now() + 1000);
         }
         else {
             this.isAlarming = false;
@@ -210,7 +214,96 @@ export class UserDO {
         if (strictParseBoolean(this.env.DOWN_FOR_MAINTENANCE)) {
             return false;
         }
-        return this.openPositions.listOpenConfirmedPositions().length > 0;
+        return this.openPositions.listPositions({ includeClosing: true, includeOpen : true, includeUnconfirmed : true, includeClosed : false }).length > 0;
+    }
+
+    async performAlarmActions(context : FetchEvent) {
+        const tokenPairs = this.openPositions.listUniqueTokenPairs({ includeOpen: true, includeUnconfirmed : true, includeClosing : true, includeClosed : false });
+        for (const tokenPair of tokenPairs) {
+            const price = await this.getLatestPrice(tokenPair);
+            if (price != null)  {
+                const automaticActions = this.openPositions.updatePrice({ tokenPair, price, markTriggeredAsClosing: true });
+                await this.initiateAutomaticActions(automaticActions, context);
+            }
+            else {
+                logError("Unable to retrieve price", tokenPair);
+            }
+        }
+    }
+
+    async getLatestPrice(tokenPair : TokenPair) : Promise<DecimalizedAmount|null> {
+        const response = await getTokenPrice(tokenPair.tokenAddress, tokenPair.vsTokenAddress, this.env);
+        return response;
+    }
+
+    async initiateAutomaticActions(automaticAction : UpdatePriceResult, context: FetchEvent) {
+
+        // all the actions performed here must be initiated within a certain time window.
+        const startTimeMS = Date.now();
+        
+        // perform automatic sales, most expensive first.
+        // TODO: timing out, concurrency, etc?
+        automaticAction.triggeredTSLPositions.sort(p => -p.vsTokenAmt);
+        for (const triggeredTSLPosition of automaticAction.triggeredTSLPositions) {
+            await this.initiateAutomaticSale(triggeredTSLPosition.positionID, startTimeMS, context);
+        }
+
+        const allThingsToConfirm = this.combineConfirmationTasks({ buys: automaticAction.unconfirmedBuys, sells: automaticAction.unconfirmedSells })
+        const connection = new Connection(getRPCUrl(this.env));
+        const buyConfirmer = new UserDOBuyConfirmer(connection, startTimeMS, this.env, this.openPositions, this.closedPositions, this.deactivatedPositions);
+        const sellConfirmer = new UserDOSellConfirmer(connection, startTimeMS, this.env, this.openPositions, this.closedPositions, this.deactivatedPositions);
+ 
+        automaticAction.unconfirmedBuys.sort(p => -p.vsTokenAmt);
+        for (const { type, position } of allThingsToConfirm) {
+            if (type === 'buy') {
+                if (buyConfirmer.isTimedOut()) {
+                    continue;
+                }
+                const confirmedBuy = await buyConfirmer.maybeConfirmBuy(position.positionID);
+                if (confirmedBuy === 'do-not-continue') {
+                    break;
+                }
+            }
+            else if (type === 'sell') {
+                if (sellConfirmer.isTimedOut()) {
+                    continue;
+                }
+                const confirmedSell = await sellConfirmer.maybeConfirmSell(position.positionID);
+                if (confirmedSell === 'do-not-continue') {
+                    break;
+                }
+            }
+        }
+    }
+
+    combineConfirmationTasks(params: { buys: Position[], sells: Position[] }) : { type: 'buy'|'sell', position : Position }[] {
+        const combinedList : { type: 'buy'|'sell', position : Position }[] = [];
+        for (const buy of params.buys) {
+            combinedList.push({ type: 'buy', position: buy });
+        }
+        for (const sell of params.sells) {  
+            combinedList.push({ type: 'sell', position: sell });
+        }
+        combinedList.sort(item => -item.position.vsTokenAmt);
+        return combinedList;
+    }
+
+    // TODO: batching and awaiting of batches (to limit the number of concurrent auto-sells)
+    async initiateAutomaticSale(positionID : string, startTimeMS : number, context: FetchEvent) {
+        const position = this.openPositions.getOpenConfirmedPosition(positionID);
+        if (position == null) {
+            return;
+        }
+        const channel = TGStatusMessage.createAndSend(`Initiating sale.`, false, position.chatID, this.env, 'HTML', `<a href="${position.token.logoURI}">\u200B</a><b>Manual Sale of ${asTokenPrice(position.tokenAmt)} ${position.token.symbol}</b>: `);
+        const connection = new Connection(getRPCUrl(this.env));
+        const timedOut = () => (Date.now() - startTimeMS) > strictParseInt(this.env.TX_TIMEOUT_MS);
+        if (timedOut()) {
+            return;
+        }
+        const positionSeller = new PositionSeller(connection, this.wallet.value!!, 'auto-sell', startTimeMS, channel, this.env, this.openPositions, this.closedPositions, this.deactivatedPositions);
+        context.waitUntil(positionSeller.sell(positionID).finally(async () => {
+            await this.flushToStorage();
+        }));
     }
 
     initialized() : boolean {
@@ -900,9 +993,10 @@ export class UserDO {
         const channel = TGStatusMessage.createAndSend(`Initiating sale.`, false, position.chatID, this.env, 'HTML', `<a href="${position.token.logoURI}">\u200B</a><b>Manual Sale of ${asTokenPrice(position.tokenAmt)} ${position.token.symbol}</b>: `);
         const connection = new Connection(getRPCUrl(this.env));
         const positionSeller = new PositionSeller(connection, this.wallet.value!!, 'manual-sell', startTimeMS, channel, this.env, this.openPositions, this.closedPositions, this.deactivatedPositions);
-        // TODO: MARK AS CLOSING prior to selling
-        // TODO: context wait
-        // deliberate lack of await here (fire-and-forget). But still writes to storage.        
+        this.openPositions.mutatePosition(positionID, p => {
+            p.status = PositionStatus.Closing;
+        });
+        // deliberate lack of await here (fire-and-forget). But still writes to storage.  
         context.waitUntil(positionSeller.sell(position.positionID).finally(async () => {
             await this.flushToStorage();
         }));

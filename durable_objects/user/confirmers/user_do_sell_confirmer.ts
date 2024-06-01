@@ -1,0 +1,176 @@
+import { Connection, ParsedTransactionWithMeta } from "@solana/web3.js";
+import { Env } from "../../../env";
+import { logDebug, logError } from "../../../logging";
+import { Position } from "../../../positions";
+import { parseParsedTransactionWithMeta } from "../../../rpc/rpc_parse";
+import { ParsedSuccessfulSwapSummary, ParsedSwapSummary, UnknownTransactionParseSummary, isFrozenTokenAccountSwapExecutionErrorParseSummary, isInsufficientNativeTokensSwapExecutionErrorParseSummary, isInsufficientTokensBalanceErrorParseSummary, isOtherKindOfSwapExecutionError, isSlippageSwapExecutionErrorParseSummary, isSuccessfulSwapSummary, isTokenFeeAccountNotInitializedSwapExecutionErrorParseSummary } from "../../../rpc/rpc_swap_parse_result_types";
+import { assertNever, strictParseInt } from "../../../util";
+import { ClosedPositionsTracker } from "../trackers/closed_positions_tracker";
+import { DeactivatedPositionsTracker } from "../trackers/deactivated_positions_tracker";
+import { OpenPositionsTracker } from "../trackers/open_positions_tracker";
+
+export class UserDOSellConfirmer {
+    connection : Connection
+    startTimeMS : number
+    env : Env
+    openPositions : OpenPositionsTracker;
+    closedPositions : ClosedPositionsTracker;
+    deactivatedPositions : DeactivatedPositionsTracker;
+    constructor(connection : Connection, startTimeMS : number, env : Env,
+        openPositions : OpenPositionsTracker,
+        closedPositions : ClosedPositionsTracker,
+        deactivatedPositions : DeactivatedPositionsTracker
+    ) {
+        this.connection = connection;
+        this.startTimeMS = startTimeMS;
+        this.env = env;
+        this.openPositions = openPositions;
+        this.closedPositions = closedPositions;
+        this.deactivatedPositions = deactivatedPositions;
+    }
+    isTimedOut() : boolean {
+        return (Date.now() > this.startTimeMS + strictParseInt(this.env.CONFIRM_TIMEOUT_MS));
+    }    
+    async maybeConfirmSell(position : Position & { sellConfirmed : false }) : Promise<
+        'api-error'|
+        'tx-was-dropped'|
+        'slippage-failed'|
+        'other-failed'|
+        'unconfirmed'|
+        'token-fee-account-not-initialized'|
+        'frozen-token-account'|
+        'insufficient-sol'|
+        'insufficient-tokens-balance'|
+        ParsedSuccessfulSwapSummary> {
+
+        if (this.isTimedOut()) {
+            return 'unconfirmed';
+        }
+
+        if (position.txSellSignature == null) {
+            return 'other-failed';
+        }
+
+        if (position.sellLastValidBlockheight == null) {
+            return 'other-failed';
+        }      
+
+        const blockheight : number | 'api-call-error' | '429' = await this.connection.getBlockHeight('confirmed').catch(r => {
+            if (is429(r)) {
+                logDebug('429 retrieving blockheight');
+                return '429';
+            }
+            else {
+                logError(r);
+                return 'api-call-error';
+            }
+        });
+
+        if (blockheight === '429') {
+            return 'api-error';
+        }
+        else if (blockheight === 'api-call-error') {
+            return 'api-error';
+        }
+        else if (typeof blockheight === 'number') {
+            return await this.attemptConfirmation(position, blockheight);
+        }
+        else {
+            assertNever(blockheight);
+        }
+    }
+
+    private async attemptConfirmation(unconfirmedPosition : Position & { sellConfirmed : false }, blockheight : number) : Promise<
+        ParsedSuccessfulSwapSummary|
+        'tx-was-dropped'|
+        'slippage-failed'|
+        'other-failed'|
+        'unconfirmed'|
+        'frozen-token-account'|
+        'token-fee-account-not-initialized'|
+        'insufficient-sol'|
+        'insufficient-tokens-balance'> {
+        
+        const parsedTx = await this.getParsedTransaction(unconfirmedPosition);
+        
+        // if we couldn't find the TX
+        if (parsedTx === 'tx-DNE') {
+            // and the blockhash was finalized (as determined via blockheight)
+            if (blockheight > unconfirmedPosition.sellLastValidBlockheight!!) {
+                // the tx never happened.
+                return 'tx-was-dropped';
+            }
+            else {
+                // otherwise, who knows? we have to try again later.
+                return 'unconfirmed';
+            }
+        }
+        else if (parsedTx === 'api-error') {
+            return 'unconfirmed';
+        }
+        else if (isSlippageSwapExecutionErrorParseSummary(parsedTx)) {
+            return 'slippage-failed';
+        }
+        else if (isFrozenTokenAccountSwapExecutionErrorParseSummary(parsedTx)) {
+            return 'frozen-token-account';
+        }
+        else if (isInsufficientNativeTokensSwapExecutionErrorParseSummary(parsedTx)) {
+            return 'insufficient-sol';
+        }
+        else if (isTokenFeeAccountNotInitializedSwapExecutionErrorParseSummary(parsedTx)) {
+            return 'token-fee-account-not-initialized';
+        }
+        else if (isOtherKindOfSwapExecutionError(parsedTx)) {
+            return 'other-failed';
+        }
+        else if (isInsufficientTokensBalanceErrorParseSummary(parsedTx)) {
+            return 'insufficient-tokens-balance';
+        }
+        else if (isSuccessfulSwapSummary(parsedTx)) {
+            return parsedTx;
+        }
+        else {
+            assertNever(parsedTx);
+        }
+    }    
+
+    private async getParsedTransaction(position : Position) : Promise<'api-error'|'tx-DNE'|Exclude<ParsedSwapSummary,UnknownTransactionParseSummary>> {
+
+        if (position.txSellSignature == null) {
+            logError(`Attempted to confirm transaction with no sell signature set on position: ${position.positionID}`);
+            return 'tx-DNE';
+        }
+
+        const parsedTransaction : 'api-error'|ParsedTransactionWithMeta|null = await this.connection.getParsedTransaction(position.txSellSignature!!, {
+            maxSupportedTransactionVersion: 0,
+            commitment: 'confirmed'
+        }).catch(e => {
+            if (is429(e)) {
+                return 'api-error';
+            }
+            else {
+                logError(e);
+                return 'api-error';
+            }
+        });
+
+        if (parsedTransaction === 'api-error') {
+            return 'api-error';
+        }
+        else if (parsedTransaction == null) {
+            return 'tx-DNE';
+        }
+        else if ('meta' in parsedTransaction) {
+            const inTokenAddress = position.token.address;
+            const outTokenAddress = position.vsToken.address;
+            return parseParsedTransactionWithMeta(parsedTransaction, inTokenAddress, outTokenAddress, position.txSellSignature!!, position.userAddress, this.env);
+        }
+        else {
+            assertNever(parsedTransaction);
+        }
+    }    
+}
+
+function is429(e : any) {
+    return (e?.message||'').includes('429');
+}

@@ -1,7 +1,7 @@
 import { DecimalizedAmount, MATH_DECIMAL_PLACES, dAdd, dCompare, dDiv, dMult, dSub } from "../../../decimalized";
 import { dZero, fromNumber, toNumber } from "../../../decimalized/decimalized_amount";
 import { Position, PositionStatus, PositionType } from "../../../positions";
-import { setDifference, setIntersection, structuralEquals } from "../../../util";
+import { SetWithKeyFn, setDifference, setIntersection, structuralEquals } from "../../../util";
 import { PositionAndMaybePNL } from "../../token_pair_position_tracker/model/position_and_PNL";
 import { TokenPair } from "../model/token_pair";
 import { UserPNL } from "../model/user_data";
@@ -17,6 +17,12 @@ export interface ListPositionFlags {
     includeClosing : boolean
     includeUnconfirmed: boolean
     includeClosed : boolean /* These won't exist here, but just for completeness I've included the flag */
+}
+
+export interface UpdatePriceParams {
+    tokenPair : TokenPair
+    price : DecimalizedAmount
+    markTriggeredAsClosing : true
 }
 
 export class OpenPositionsTracker {
@@ -50,26 +56,39 @@ export class OpenPositionsTracker {
         }
         return position;
     }
-    updatePrice(tokenPair : TokenPair, price : DecimalizedAmount) : UpdatePriceResult {
+    updatePrice(params : UpdatePriceParams) : UpdatePriceResult {
         const timestamp = Date.now();
         const triggeredTSLPositions : Position[] = [];
         const unconfirmedBuys : Position[] = [];
-        // update peak prices
+        const unconfirmedSells : Position[] = [];
+
+        // update peak prices, gather triggered / unconfirmed buys / unconfirmed sells
         for (const key of Object.keys(this.positions)) {
             const position = this.positions[key];
-            if (this.hasThisTokenPair(position, tokenPair)) {
-                position.currentPrice = price;
+            if (this.hasThisTokenPair(position, params.tokenPair)) {
+                
+                position.currentPrice = params.price;
                 position.currentPriceMS = timestamp;
-                if (dCompare(price, position.peakPrice) > 0) {
-                    position.peakPrice = price;
+                if (dCompare(params.price, position.peakPrice) > 0) {
+                    position.peakPrice = params.price;
                 }
-                if (this.meetsTSLTriggerCondition(price, position)) {
+                
+                if (this.canBeTriggeredAndMeetsTSLTriggerCondition(params.price, position)) {
+                    if (params.markTriggeredAsClosing) {
+                        position.status = PositionStatus.Closing;
+                    }
                     triggeredTSLPositions.push(position);
                 }
+
+                // TODO: unconfirmed buys
+
+                // TODO: unconfirmed sells
             }
         }
-        this.markTriggeredTSLsAsClosing(triggeredTSLPositions);
-        return { triggeredTSLPositions: triggeredTSLPositions, unconfirmedBuys: unconfirmedBuys, unconfirmedSells: [] };
+        return { 
+            triggeredTSLPositions: triggeredTSLPositions, 
+            unconfirmedBuys: unconfirmedBuys, 
+            unconfirmedSells: unconfirmedSells };
     }
     clear() {
         for (const key in this.positions) {
@@ -164,6 +183,16 @@ export class OpenPositionsTracker {
         positions.sort(p => p.fillPriceMS);
         return positions;
     }
+    listUniqueTokenPairs(flags: ListPositionFlags) : TokenPair[] {
+        const uniqueTokenPairs = new SetWithKeyFn<TokenPair>([], tp => {
+            return `${tp.tokenAddress}:${tp.vsTokenAddress}`;
+        });
+        const positions = this.listPositions(flags);
+        for (const position of positions) {
+            uniqueTokenPairs.add({ tokenAddress : position.token.address, vsTokenAddress: position.vsToken.address });
+        }
+        return [...uniqueTokenPairs];
+    }
     getProperty<T extends Exclude<any,undefined>>(positionID : string, accessor : (position : Position) => T) : T|undefined {
         const key = new PKey(this.prefix, positionID).toString();
         if (key in this.positions) {
@@ -255,7 +284,7 @@ export class OpenPositionsTracker {
     private hasThisTokenPair(position : Position, tokenPair : TokenPair) : boolean {
         return position.token.address == tokenPair.tokenAddress && position.vsToken.address === tokenPair.vsTokenAddress;
     }
-    private meetsTSLTriggerCondition(price : DecimalizedAmount, position : Position) {
+    private canBeTriggeredAndMeetsTSLTriggerCondition(price : DecimalizedAmount, position : Position) {
         if (!position.buyConfirmed) {
             return false;
         }
@@ -268,11 +297,6 @@ export class OpenPositionsTracker {
         const pctBelowPeak = 100 * toNumber(dDiv(dSub(price, position.peakPrice), position.peakPrice, MATH_DECIMAL_PLACES) || dZero());
         if (pctBelowPeak > position.triggerPercent) {
             return true;
-        }
-    }
-    private markTriggeredTSLsAsClosing(positions : Position[]) {
-        for (const position of positions) {
-            this.positions[position.positionID].status = PositionStatus.Closing;
         }
     }
     getPositionAndMaybePnL(positionID : string) : PositionAndMaybePNL|undefined {

@@ -1,11 +1,6 @@
 import { Position } from "../../../positions";
 import { setDifference, setIntersection, structuralEquals } from "../../../util";
 
-export interface UpdatePriceResult {
-    triggeredTSLPositions : Position[]
-    unconfirmedBuys : Position[]
-}
-
 export class DeactivatedPositionsTracker {
     prefix : string = "deactivatedPositions";
     positions : Record<string,Position> = {};
