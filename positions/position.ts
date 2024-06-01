@@ -42,6 +42,10 @@ export interface Position {
 	fillPrice : DecimalizedAmount
 	fillPriceMS : number
 
+	peakPrice : DecimalizedAmount
+
+	currentPrice : DecimalizedAmount
+	currentPriceMS : number
 
 	// user sell settings
     triggerPercent : number

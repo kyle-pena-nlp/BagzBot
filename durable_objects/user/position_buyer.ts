@@ -11,26 +11,36 @@ import { signatureOf } from "../../rpc/rpc_sign_tx";
 import { ParsedSuccessfulSwapSummary, SwapExecutionError, isFrozenTokenAccountSwapExecutionErrorParseSummary, isInsufficientNativeTokensSwapExecutionErrorParseSummary, isInsufficientTokensBalanceErrorParseSummary, isOtherKindOfSwapExecutionError, isSlippageSwapExecutionErrorParseSummary, isSuccessfulSwapSummary, isTokenFeeAccountNotInitializedSwapExecutionErrorParseSummary, isUnknownTransactionParseSummary } from "../../rpc/rpc_swap_parse_result_types";
 import { TGStatusMessage, UpdateableNotification } from "../../telegram";
 import { assertNever, strictParseBoolean } from "../../util";
-import { insertPosition, positionExistsInTracker, removePosition, updatePosition } from "../token_pair_position_tracker/token_pair_position_tracker_DO_interop";
+//import { insertPosition, positionExistsInTracker, removePosition, updatePosition } from "../token_pair_position_tracker/token_pair_position_tracker_DO_interop";
+import { dZero } from "../../decimalized/decimalized_amount";
 import { SwapExecutor } from "./swap_executor";
 import { SwapTransactionSigner } from "./swap_transaction_signer";
+import { ClosedPositionsTracker } from "./trackers/closed_positions_tracker";
+import { DeactivatedPositionsTracker } from "./trackers/deactivated_positions_tracker";
+import { OpenPositionsTracker } from "./trackers/open_positions_tracker";
 
 export class PositionBuyer {
     wallet : Wallet
     env : Env
     startTimeMS : number
     channel : UpdateableNotification
-    registerPositionLocallyCallback : (p : Position) => void;
+    openPositions : OpenPositionsTracker;
+    closedPositions : ClosedPositionsTracker;
+    deactivatedPositions : DeactivatedPositionsTracker;
     constructor(wallet : Wallet, 
         env : Env,  
         startTimeMS : number,
         channel : UpdateableNotification,
-        registerPositionLocallyCallback : (p : Position) => void) {
+        openPositions : OpenPositionsTracker,
+        closedPositions : ClosedPositionsTracker,
+        deactivatedPositions : DeactivatedPositionsTracker) {
         this.wallet = wallet;
         this.env = env;
         this.startTimeMS = startTimeMS;
         this.channel = channel;
-        this.registerPositionLocallyCallback = registerPositionLocallyCallback;
+        this.openPositions = openPositions;
+        this.closedPositions = closedPositions;
+        this.deactivatedPositions = deactivatedPositions;
     }
 
     async buy(positionRequest : PositionRequest) : Promise<void> {
@@ -73,8 +83,8 @@ export class PositionBuyer {
         // RPC connection
         const connection = new Connection(getRPCUrl(this.env));
 
-        // idempotency
-        if (await positionExistsInTracker(positionRequest.positionID, positionRequest.token.address, positionRequest.vsToken.address, this.env)) {
+        // idempotency (NOTE: should we also check deactivated / closed?)
+        if (this.positionExistsInTracker(positionRequest.positionID, positionRequest.token.address, positionRequest.vsToken.address, this.env)) {
             return 'already-processed';
         }
 
@@ -87,6 +97,7 @@ export class PositionBuyer {
             return 'could-not-create-tx';
         }
 
+        // if we sim the tx before buy, run the sim of the tx
         if (strictParseBoolean(this.env.TX_SIM_BEFORE_BUY)) {
             const txSimResult = await this.simulateTx(signedTx, connection);
             if (txSimResult !== 'success') {
@@ -107,14 +118,10 @@ export class PositionBuyer {
         // edge-case: trigger condition met between here and tx execution.
         // can we back-date tracker activity? this is tricky.  to be revisited.
         const unconfirmedPosition = this.convertRequestToUnconfirmedPosition(positionRequest, signatureOf(signedTx), lastValidBH);
-        const insertPositionResponse = await insertPosition(unconfirmedPosition, this.env);
+        const insertPositionResponse = this.insertPosition(unconfirmedPosition);
         if(!insertPositionResponse.success) {
-            return 'could-not-create-tx'; // TODO: more appropriate code.
+            return 'could-not-create-tx'; // TODO: more appropriate return code.
         }
-
-        // (NASTY HACK) add the token to the token pair list
-        // done here to avoid the position getting "cleaned out" by the periodic token pair trim
-        this.registerPositionLocallyCallback(unconfirmedPosition);
 
         // try to do the swap.
         const result = await this.executeAndParseSwap(positionRequest, signedTx, lastValidBH, connection);
@@ -122,7 +129,7 @@ export class PositionBuyer {
         // no guarantees that anything after this point executes... CF may drop it.
 
         if (result === 'failed' || result === 'slippage-failed' || result === 'insufficient-sol' || result === 'frozen-token-account' || result === 'token-fee-account-not-initialized' || result === 'insufficient-tokens-balance') {
-            await removePosition(positionRequest.positionID, positionRequest.token.address, positionRequest.vsToken.address, this.env);
+            this.removePosition(positionRequest.positionID, positionRequest.token.address, positionRequest.vsToken.address, this.env);
             return result;
         }
         else if (result === 'unconfirmed') {
@@ -130,12 +137,25 @@ export class PositionBuyer {
         }
         else if ('confirmedPosition' in result) {
             const { confirmedPosition } = result;
-            await updatePosition(confirmedPosition, this.env);
+            this.updatePosition(confirmedPosition);
             return 'confirmed';
         }
         else {
             assertNever(result);
         }
+    }
+    updatePosition(confirmedPosition: Position & { buyConfirmed: true; }) {
+        this.openPositions.upsertPosition(confirmedPosition);
+    }
+    removePosition(positionID: string, address: string, address1: string, env: Env) {
+        this.openPositions.deletePosition(positionID);
+    }
+    insertPosition(unconfirmedPosition: Position & { buyConfirmed: false; }) : { success : boolean } {
+        const success = this.openPositions.insertPosition(unconfirmedPosition);
+        return { success }; // cruft
+    }
+    positionExistsInTracker(positionID: string, address: string, address1: string, env: Env) : boolean {
+        return this.openPositions.has(positionID) || this.closedPositions.has(positionID) || this.deactivatedPositions.has(positionID);
     }
 
     private async simulateTx(signedTx : VersionedTransaction, connection : Connection) : Promise<
@@ -210,6 +230,11 @@ export class PositionBuyer {
             vsToken: positionRequest.vsToken,
             vsTokenAmt : fromNumber(positionRequest.vsTokenAmt), // don't use the quote, it includes fees.
             tokenAmt: positionRequest.quote.outTokenAmt,
+
+            // TODO: think about this. A better way that is not a big refactor?
+            currentPrice: dZero(),
+            currentPriceMS: 0,
+            peakPrice: dZero(),
     
             sellSlippagePercent: positionRequest.slippagePercent,
             triggerPercent : positionRequest.triggerPercent,
@@ -277,7 +302,7 @@ export class PositionBuyer {
             return 'insufficient-tokens-balance';
         }
         else if (isSuccessfulSwapSummary(parsedSwapSummary)) {
-            const confirmedPosition = await this.makeConfirmedPositionFromSwapResult(positionRequest, signatureOf(signedTx), lastValidBH, parsedSwapSummary);
+            const confirmedPosition = this.makeConfirmedPositionFromSwapResult(positionRequest, signatureOf(signedTx), lastValidBH, parsedSwapSummary);
             return { confirmedPosition };
         }
         else {
@@ -285,11 +310,11 @@ export class PositionBuyer {
         }
     }
 
-    private async makeConfirmedPositionFromSwapResult(
+    private  makeConfirmedPositionFromSwapResult(
         positionRequest : PositionRequest, 
         signature : string,
         lastValidBH: number,
-        successfulSwapParsed : ParsedSuccessfulSwapSummary) : Promise<Position & { buyConfirmed : true }> {
+        successfulSwapParsed : ParsedSuccessfulSwapSummary) : Position & { buyConfirmed : true } {
         
         const newPosition = convertToConfirmedPosition(positionRequest, 
             signature, 
@@ -459,6 +484,10 @@ function convertToConfirmedPosition(positionRequest: PositionRequest,
         fillPriceMS : parsedSuccessfulSwap.swapSummary.swapTimeMS,
         netPNL: null, // to be set when position is sold
         otherSellFailureCount: 0,
+
+        currentPrice: parsedSuccessfulSwap.swapSummary.fillPrice,
+        currentPriceMS: parsedSuccessfulSwap.swapSummary.swapTimeMS,
+        peakPrice: parsedSuccessfulSwap.swapSummary.fillPrice, // TODO: think about this
 
         buyPriorityFeeAutoMultiplier: positionRequest.priorityFeeAutoMultiplier,
         sellPriorityFeeAutoMultiplier: positionRequest.priorityFeeAutoMultiplier
