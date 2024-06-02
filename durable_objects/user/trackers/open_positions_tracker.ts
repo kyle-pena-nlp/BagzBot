@@ -1,6 +1,7 @@
 import { DecimalizedAmount, MATH_DECIMAL_PLACES, dAdd, dCompare, dDiv, dMult, dSub } from "../../../decimalized";
 import { dZero, fromNumber, toNumber } from "../../../decimalized/decimalized_amount";
 import { Env } from "../../../env";
+import { logDebug } from "../../../logging";
 import { Position, PositionStatus, PositionType } from "../../../positions";
 import { SetWithKeyFn, setDifference, setIntersection, strictParseInt, structuralEquals } from "../../../util";
 import { PositionAndMaybePNL } from "../../token_pair_position_tracker/model/position_and_PNL";
@@ -89,7 +90,8 @@ export class OpenPositionsTracker {
         return { 
             triggeredTSLPositions: triggeredTSLPositions, 
             unconfirmedBuys: unconfirmedBuys, 
-            unconfirmedSells: unconfirmedSells };
+            unconfirmedSells: unconfirmedSells 
+        };
     }
     isStaleUnconfirmedBuy(position: Position, env : Env) : boolean {
         if (position.buyConfirmed) {
@@ -106,19 +108,22 @@ export class OpenPositionsTracker {
     }
     isStaleUnconfirmedSell(position : Position, env : Env) : boolean {
         if (position.status !== PositionStatus.Closing) {
+            logDebug("Not closing");
             return false;
         }
         if (position.sellConfirmed) {
+            logDebug("Sell confirmed");
             return false;
         }
         const elapsedTimeMS = Date.now() - (position.txSellAttemptTimeMS||0);
         if (elapsedTimeMS > strictParseInt(env.TX_TIMEOUT_MS) * 1.25) {
             return true;
         }
+        logDebug("Not enough elapsed time", elapsedTimeMS, strictParseInt(env.TX_TIMEOUT_MS) * 1.25);
         return false;
     }
     clear() {
-        for (const key in this.positions) {
+        for (const key of Object.keys(this.positions)) {
             if (this.positions.hasOwnProperty(key)) {
                 delete this.positions[key];
             }
@@ -266,8 +271,10 @@ export class OpenPositionsTracker {
         for (const [key,value] of entries) {
             if (this.matchesPrefix(key)) {
                 this.positions[key] = value;
+                this._buffer[key] = value;
             }
         }
+        this.overwriteBufferWithCurrentState();
     }
     insertPosition(position : Position, currentPrice : DecimalizedAmount, currentPriceMS : number) : boolean {
         const key = new PKey(this.prefix, position.positionID).toString();
@@ -291,8 +298,18 @@ export class OpenPositionsTracker {
     }
     async flushToStorage(storage : DurableObjectStorage) {
         const [puts,deletes] = this.gen_diff();
-        await storage.put(puts);
-        await storage.delete(deletes);
+        await Promise.allSettled([storage.put(puts),storage.delete(deletes)])
+            .then(() => {
+                this.overwriteBufferWithCurrentState();
+            });
+    }
+    overwriteBufferWithCurrentState() {
+        this._buffer = {};
+        for (const key of Object.keys(this.positions)) {
+            if (this.positions.hasOwnProperty(key)) {
+                this._buffer[key] = structuredClone(this.positions[key]);
+            }
+        }
     }
     private matchesPrefix(key : string) : boolean {
         return key.startsWith(`${this.prefix}:`);
@@ -324,7 +341,7 @@ export class OpenPositionsTracker {
     private isThisTokenPair(position : Position, tokenPair : TokenPair) : boolean {
         return position.token.address == tokenPair.tokenAddress && position.vsToken.address === tokenPair.vsTokenAddress;
     }
-    private canBeTriggeredAndMeetsTSLTriggerCondition(price : DecimalizedAmount, position : Position) {
+    private canBeTriggeredAndMeetsTSLTriggerCondition(price : DecimalizedAmount, position : Position) : boolean {
         if (!position.buyConfirmed) {
             return false;
         }
@@ -334,10 +351,11 @@ export class OpenPositionsTracker {
         if (position.status !== PositionStatus.Open) {
             return false;
         }
-        const pctBelowPeak = 100 * toNumber(dDiv(dSub(price, position.peakPrice), position.peakPrice, MATH_DECIMAL_PLACES) || dZero());
+        const pctBelowPeak = -100 * toNumber(dDiv(dSub(price, position.peakPrice), position.peakPrice, MATH_DECIMAL_PLACES) || dZero());
         if (pctBelowPeak > position.triggerPercent) {
             return true;
         }
+        return false;
     }
     getPositionAndMaybePnL(positionID : string) : PositionAndMaybePNL|undefined {
         const key = new PKey(this.prefix, positionID).toString();

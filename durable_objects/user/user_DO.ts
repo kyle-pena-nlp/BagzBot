@@ -292,11 +292,12 @@ export class UserDO {
 
     // TODO: batching and awaiting of batches (to limit the number of concurrent auto-sells)
     async initiateAutomaticSale(positionID : string, startTimeMS : number) {
-        const position = this.openPositions.getOpenConfirmedPosition(positionID);
+        logDebug(`Trying: ${positionID}`);
+        const position = this.openPositions.get(positionID);
         if (position == null) {
             return;
         }
-        const channel = TGStatusMessage.createAndSend(`Initiating sale.`, false, position.chatID, this.env, 'HTML', `<a href="${position.token.logoURI}">\u200B</a><b>Manual Sale of ${asTokenPrice(position.tokenAmt)} ${position.token.symbol}</b>: `);
+        const channel = TGStatusMessage.createAndSend(`Initiating sale.`, false, position.chatID, this.env, 'HTML', `<a href="${position.token.logoURI}">\u200B</a><b>Automatic Sale of ${asTokenPrice(position.tokenAmt)} ${position.token.symbol}</b>: `);
         const connection = new Connection(getRPCUrl(this.env));
         const timedOut = () => (Date.now() - startTimeMS) > strictParseInt(this.env.TX_TIMEOUT_MS);
         if (timedOut()) {
@@ -577,6 +578,7 @@ export class UserDO {
                 return { success : false };
             }
             this.openPositions.reactivatePosition(position, tokenPriceResult.price, tokenPriceResult.currentPriceMS);
+            this.deactivatedPositions.deleteAndReturn(position.positionID);
             registerUserWithHearbeat(userAction.telegramUserID, userAction.chatID, this.env);
             return { success : true };
         }

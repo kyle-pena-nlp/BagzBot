@@ -8,7 +8,8 @@ import { HeartbeatWakeupRequest } from "./actions/hearbeat_wake_up";
 import { RegisterUserDORequest, RegisterUserDOResponse } from "./actions/register_user_do";
 import { HeartbeatDOFetchMethod, parseHeartbeatDOFetchMethod } from "./heartbeat_DO_interop";
 
-const HALF_WAKEUP_CRON_JOB_INTERVAL_MS = 15000;
+// the heartbeat runs on the "* * * * *" CRON job -> 60 seconds.
+const HALF_WAKEUP_CRON_JOB_INTERVAL_MS = 30000;
 
 interface UserInfo {
     telegramUserID : number
@@ -50,19 +51,19 @@ export class HeartbeatDO {
         ]);
     }
 
-    async fetch(request : Request, env : Env, context: FetchEvent) : Promise<Response> {
-        const response = await this._fetch(request, context);
+    async fetch(request : Request) : Promise<Response> {
+        const response = await this._fetch(request);
         await this.flushToStorage();
         return response;
     }
 
-    async _fetch(request : Request, context: FetchEvent) : Promise<Response> {
+    async _fetch(request : Request) : Promise<Response> {
         const [method,jsonRequestBody] = await this.validateFetchRequest(request);
         logDebug(`[[${method}]] :: heartbeat_do`);
         switch(method) {
             case HeartbeatDOFetchMethod.Wakeup:
                 // deliberate fire-and-forget here.
-                context.waitUntil(this.handleWakeup(jsonRequestBody));
+                this.handleWakeup(jsonRequestBody);
                 return makeJSONResponse<{}>({});
             case HeartbeatDOFetchMethod.RegisterUserDO:
                 return await this.handleRegisterUser(jsonRequestBody);

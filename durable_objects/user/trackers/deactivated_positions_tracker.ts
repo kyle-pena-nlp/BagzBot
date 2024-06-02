@@ -13,6 +13,7 @@ export class DeactivatedPositionsTracker {
                 this.positions[key] = value;
             }
         }
+        this.overwriteBufferWithCurrentState();
     }
     has(positionID : string) : boolean {
         const key = new PKey(this.prefix, positionID).toString();
@@ -47,9 +48,19 @@ export class DeactivatedPositionsTracker {
     }
     async flushToStorage(storage : DurableObjectStorage) {
         const [puts,deletes] = this.gen_diff();
-        await storage.put(puts);
-        await storage.delete(deletes);
+        await Promise.allSettled([storage.put(puts),storage.delete(deletes)])
+            .then(() => {
+                this.overwriteBufferWithCurrentState();
+            });
     }
+    overwriteBufferWithCurrentState() {
+        this._buffer = {};
+        for (const key of Object.keys(this.positions)) {
+            if (this.positions.hasOwnProperty(key)) {
+                this._buffer[key] = structuredClone(this.positions[key]);
+            }
+        }
+    }    
     private matchesPrefix(key : string) : boolean {
         return key.startsWith(`${this.prefix}:`);
     }

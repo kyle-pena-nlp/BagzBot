@@ -27,6 +27,7 @@ export class ClosedPositionsTracker {
                 this.positions[key] = value;
             }
         }
+        this.overwriteBufferWithCurrentState();
     }
     upsert(position : Position & { netPNL : DecimalizedAmount }) {
         const key = new PKey(this.prefix, position.positionID).toString();
@@ -40,7 +41,7 @@ export class ClosedPositionsTracker {
         return positions;
     }
     clear() {
-        for (const key in this.positions) {
+        for (const key of Object.keys(this.positions)) {
             if (this.positions.hasOwnProperty(key)) {
                 delete this.positions[key];
             }
@@ -48,9 +49,19 @@ export class ClosedPositionsTracker {
     }
     async flushToStorage(storage : DurableObjectStorage) {
         const [puts,deletes] = this.gen_diff();
-        await storage.put(puts);
-        await storage.delete(deletes);
+        await Promise.allSettled([storage.put(puts),storage.delete(deletes)])
+            .then(() => {
+                this.overwriteBufferWithCurrentState();
+            });
     }
+    overwriteBufferWithCurrentState() {
+        this._buffer = {};
+        for (const key of Object.keys(this.positions)) {
+            if (this.positions.hasOwnProperty(key)) {
+                this._buffer[key] = structuredClone(this.positions[key]);
+            }
+        }
+    }    
     private matchesPrefix(key : string) : boolean {
         return key.startsWith(`${this.prefix}:`);
     }
