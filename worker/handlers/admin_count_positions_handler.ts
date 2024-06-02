@@ -1,9 +1,7 @@
 import { DecimalizedAmount } from "../../decimalized";
-import { adminCountAllPositions } from "../../durable_objects/heartbeat/heartbeat_DO_interop";
 import { Env } from "../../env";
 import { BaseMenu, MenuCode } from "../../menus";
 import { ReplyQuestion } from "../../reply_question";
-import { TGStatusMessage } from "../../telegram";
 import { CallbackHandlerParams } from "../model/callback_handler_params";
 import { BaseMenuCodeHandler, MenuCodeHandlerCapabilities } from "./base_menu_code_handler";
 
@@ -12,8 +10,8 @@ export class AdminCountPositionsHandler extends BaseMenuCodeHandler<MenuCode.Adm
         super(menuCode);
     }
     async handleCallback(params : CallbackHandlerParams, maybeSOLBalance : DecimalizedAmount|null, context: FetchEvent, env: Env) : Promise<BaseMenu|ReplyQuestion|void> {
-        const positionCounts = await adminCountAllPositions(env);
-        await TGStatusMessage.createAndSend(JSON.stringify(positionCounts), true, params.chatID, env);
+        //const positionCounts = await adminCountAllPositions(env);
+        //await TGStatusMessage.createAndSend(JSON.stringify(positionCounts), true, params.chatID, env);
         return;
     }
 }

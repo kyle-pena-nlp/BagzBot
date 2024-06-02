@@ -13,6 +13,7 @@ import { TGStatusMessage, UpdateableNotification } from "../../telegram";
 import { assertNever, strictParseBoolean } from "../../util";
 //import { insertPosition, positionExistsInTracker, removePosition, updatePosition } from "../token_pair_position_tracker/token_pair_position_tracker_DO_interop";
 import { dZero } from "../../decimalized/decimalized_amount";
+import { registerUser } from "../heartbeat/heartbeat_DO_interop";
 import { SwapExecutor } from "./swap_executor";
 import { SwapTransactionSigner } from "./swap_transaction_signer";
 import { ClosedPositionsTracker } from "./trackers/closed_positions_tracker";
@@ -27,13 +28,15 @@ export class PositionBuyer {
     openPositions : OpenPositionsTracker;
     closedPositions : ClosedPositionsTracker;
     deactivatedPositions : DeactivatedPositionsTracker;
+    context: FetchEvent
     constructor(wallet : Wallet, 
         env : Env,  
         startTimeMS : number,
         channel : UpdateableNotification,
         openPositions : OpenPositionsTracker,
         closedPositions : ClosedPositionsTracker,
-        deactivatedPositions : DeactivatedPositionsTracker) {
+        deactivatedPositions : DeactivatedPositionsTracker,
+        context: FetchEvent) {
         this.wallet = wallet;
         this.env = env;
         this.startTimeMS = startTimeMS;
@@ -41,6 +44,7 @@ export class PositionBuyer {
         this.openPositions = openPositions;
         this.closedPositions = closedPositions;
         this.deactivatedPositions = deactivatedPositions;
+        this.context = context;
     }
 
     async buy(positionRequest : PositionRequest) : Promise<void> {
@@ -146,12 +150,14 @@ export class PositionBuyer {
     }
     updatePosition(confirmedPosition: Position & { buyConfirmed: true; }) {
         this.openPositions.upsertPosition(confirmedPosition);
+        this.context.waitUntil(registerUser(confirmedPosition.userID, confirmedPosition.chatID, this.env));
     }
     removePosition(positionID: string, address: string, address1: string, env: Env) {
         this.openPositions.deletePosition(positionID);
     }
     insertPosition(unconfirmedPosition: Position & { buyConfirmed: false; }) : { success : boolean } {
         const success = this.openPositions.insertPosition(unconfirmedPosition);
+        this.context.waitUntil(registerUser(unconfirmedPosition.userID, unconfirmedPosition.chatID, this.env));
         return { success }; // cruft
     }
     positionExistsInTracker(positionID: string, address: string, address1: string, env: Env) : boolean {

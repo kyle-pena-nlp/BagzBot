@@ -10,6 +10,7 @@ import { UpdateableMessage } from "../../../telegram/telegram_status_message";
 import { assertNever, strictParseInt } from "../../../util";
 import { SubsetOf } from "../../../util/builder_types";
 import { assertIs } from "../../../util/enums";
+import { registerUser } from "../../heartbeat/heartbeat_DO_interop";
 import { ClosedPositionsTracker } from "../trackers/closed_positions_tracker";
 import { DeactivatedPositionsTracker } from "../trackers/deactivated_positions_tracker";
 import { OpenPositionsTracker } from "../trackers/open_positions_tracker";
@@ -26,10 +27,12 @@ export class UserDOBuyConfirmer {
     openPositions : OpenPositionsTracker;
     closedPositions : ClosedPositionsTracker;
     deactivatedPositions : DeactivatedPositionsTracker;
+    context: FetchEvent
     constructor(connection : Connection, startTimeMS : number, env : Env,
         openPositions : OpenPositionsTracker,
         closedPositions : ClosedPositionsTracker,
         deactivatedPositions : DeactivatedPositionsTracker,
+        context: FetchEvent
     ) {
         this.connection = connection;
         this.startTimeMS = startTimeMS;
@@ -37,6 +40,7 @@ export class UserDOBuyConfirmer {
         this.openPositions = openPositions;
         this.closedPositions = closedPositions;
         this.deactivatedPositions = deactivatedPositions;
+        this.context = context;
     }
     isTimedOut() : boolean {
         return (Date.now() > this.startTimeMS + strictParseInt(this.env.CONFIRM_TIMEOUT_MS));
@@ -189,6 +193,7 @@ export class UserDOBuyConfirmer {
 
     updatePosition(position : Position) {
         this.openPositions.upsertPosition(position);
+        this.context.waitUntil(registerUser(position.userID, position.chatID, this.env));
     }
 
     private isPositionStillConfirmable(positionID : string) : 'position-DNE'|'position-already-confirmed'|'position-not-open'|'confirmable' {

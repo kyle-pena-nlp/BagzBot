@@ -12,6 +12,7 @@ import { WEN_ADDRESS, getVsTokenInfo } from "../../tokens";
 import { ChangeTrackedValue, Intersect, Structural, Subtract, assertNever, ensureArrayIsAllAndOnlyPropsOf, ensureArrayIsOnlyPropsOf, sleep, strictParseBoolean, strictParseInt } from "../../util";
 import { assertIs } from "../../util/enums";
 import { listUnclaimedBetaInviteCodes } from "../beta_invite_codes/beta_invite_code_interop";
+import { registerUser as registerUserWithHearbeat } from "../heartbeat/heartbeat_DO_interop";
 import { PositionAndMaybePNL } from "../token_pair_position_tracker/model/position_and_PNL";
 import { getTokenPrice } from "../token_pair_position_tracker/token_pair_position_tracker_DO_interop";
 import { AdminDeleteAllPositionsRequest, AdminDeleteAllPositionsResponse } from "./actions/admin_delete_all_positions";
@@ -47,6 +48,7 @@ import { SellSellSlippagePercentageOnOpenPositionRequest, SellSellSlippagePercen
 import { StoreLegalAgreementStatusRequest, StoreLegalAgreementStatusResponse } from "./actions/store_legal_agreement_status";
 import { StoreSessionValuesRequest, StoreSessionValuesResponse } from "./actions/store_session_values";
 import { UnimpersonateUserRequest, UnimpersonateUserResponse } from "./actions/unimpersonate_user";
+import { WakeUpRequest, WakeUpResponse } from "./actions/wake_up_request";
 import { ClosedPositionPNLSummarizer } from "./aggregators/closed_positions_pnl_summarizer";
 import { UserDOBuyConfirmer } from "./confirmers/user_do_buy_confirmer";
 import { UserDOSellConfirmer } from "./confirmers/user_do_sell_confirmer";
@@ -177,8 +179,7 @@ export class UserDO {
         ]);
     }
 
-    async alarm(req : any, env : Env, context: FetchEvent) {
-        
+    async alarm(req : any, env : Env, context: FetchEvent) {  
         try {
             await this.state.storage.deleteAlarm();
             await this.performAlarmActions(context);
@@ -246,7 +247,7 @@ export class UserDO {
 
         const allThingsToConfirm = this.combineConfirmationTasks({ buys: automaticAction.unconfirmedBuys, sells: automaticAction.unconfirmedSells })
         const connection = new Connection(getRPCUrl(this.env));
-        const buyConfirmer = new UserDOBuyConfirmer(connection, startTimeMS, this.env, this.openPositions, this.closedPositions, this.deactivatedPositions);
+        const buyConfirmer = new UserDOBuyConfirmer(connection, startTimeMS, this.env, this.openPositions, this.closedPositions, this.deactivatedPositions, context);
         const sellConfirmer = new UserDOSellConfirmer(connection, startTimeMS, this.env, this.openPositions, this.closedPositions, this.deactivatedPositions);
  
         automaticAction.unconfirmedBuys.sort(p => -p.vsTokenAmt);
@@ -448,7 +449,7 @@ export class UserDO {
                 response = await this.handleDeactivatePosition(userAction);
                 break;
             case UserDOFetchMethod.reactivatePosition:
-                response = await this.handleReactivatePosition(userAction);
+                response = await this.handleReactivatePosition(userAction, context);
                 break;
             case UserDOFetchMethod.getDeactivatedPosition:
                 response = await this.handleGetDeactivatedPosition(userAction);
@@ -462,6 +463,9 @@ export class UserDO {
             case UserDOFetchMethod.registerPositionAsDeactivated:
                 response = await this.handleRegisterPositionAsDeactivated(userAction);
                 break;
+            case UserDOFetchMethod.wakeUp:
+                response = await this.handleWakeUp(userAction);
+                break;
             default:
                 assertNever(method);
         }
@@ -470,7 +474,10 @@ export class UserDO {
     }
 
 
-
+    async handleWakeUp(userAction : WakeUpRequest) : Promise<Response> {
+        const keepInWakeUpList = this.openPositions.listPositions({ includeClosed: false, includeClosing: true, includeOpen: true, includeUnconfirmed: true }).length > 0;
+        return makeJSONResponse<WakeUpResponse>({ keepInWakeUpList: keepInWakeUpList });
+    }
 
     async handleRegisterPositionAsDeactivated(userAction: RegisterPositionAsDeactivatedRequest) : Promise<Response> {
         const response = await this.handleRegisterPositionAsDeactivatedInternal(userAction);
@@ -551,15 +558,16 @@ export class UserDO {
         return { success: true };
     }
 
-    async handleReactivatePosition(userAction : ReactivatePositionRequest) : Promise<Response> {
-        const response = await this.handleReactivatePositionInternal(userAction);
+    async handleReactivatePosition(userAction : ReactivatePositionRequest, context: FetchEvent) : Promise<Response> {
+        const response = await this.handleReactivatePositionInternal(userAction, context);
         return makeJSONResponse<ReactivatePositionResponse>(response);
     }        
 
-    async handleReactivatePositionInternal(userAction : ReactivatePositionRequest) : Promise<ReactivatePositionResponse> {
+    async handleReactivatePositionInternal(userAction : ReactivatePositionRequest, context: FetchEvent) : Promise<ReactivatePositionResponse> {
         const position = this.deactivatedPositions.get(userAction.positionID);
         if (position != null) {
             this.openPositions.reactivatePosition(position);
+            context.waitUntil(registerUserWithHearbeat(userAction.telegramUserID, userAction.chatID, this.env));
             return { success : true };
         }
         return { success : false };
@@ -920,7 +928,7 @@ export class UserDO {
             'HTML',
             `<a href="${positionRequest.token.logoURI}">\u200B</a><b>${positionRequest.vsTokenAmt} SOL purchase of $${positionRequest.token.symbol}</b>: `);
 
-        const positionBuyer = new PositionBuyer(this.wallet.value!!, this.env, startTimeMS, channel, this.openPositions, this.closedPositions, this.deactivatedPositions);    
+        const positionBuyer = new PositionBuyer(this.wallet.value!!, this.env, startTimeMS, channel, this.openPositions, this.closedPositions, this.deactivatedPositions, context);    
         
         // fire-and-forget here, lack of await, but writes to storage when complete
         context.waitUntil(

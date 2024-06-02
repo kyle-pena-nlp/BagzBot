@@ -5,7 +5,6 @@ import { makeJSONResponse, makeSuccessResponse } from "../../http";
 import { logDebug, logError } from "../../logging";
 import { TokenInfo } from "../../tokens";
 import { ChangeTrackedValue, assertNever } from "../../util";
-import { ensureTokenPairIsRegistered } from "../heartbeat/heartbeat_DO_interop";
 import { isValidTokenInfoResponse } from "../polled_token_pair_list/actions/get_token_info";
 import { getTokenInfo } from "../polled_token_pair_list/polled_token_pair_list_DO_interop";
 import { AdminDeleteAllInTrackerRequest, AdminDeleteAllInTrackerResponse } from "./actions/admin_delete_all_positions_in_tracker";
@@ -155,10 +154,6 @@ export class TokenPairPositionTrackerDO {
         const [method,body] = await this.validateFetchRequest(request);
         logDebug(`[[${method}]] :: tracker :: ${(this.tokenAddress.value||'').slice(0,10)}`);
         try {
-            // ensure the token is registered with heartbeatDO
-            if (!isHeartbeatRequest(body)) {
-                this.tryToEnsureTokenPairIsRegistered();
-            }
             // ONLY DEV! this.__xDELETE_ALL_POSITIONSx(); // ONLY DEV!
             const response = await this._fetch(method,body);
             return response;
@@ -185,35 +180,6 @@ export class TokenPairPositionTrackerDO {
             this.tokenPairPositionTracker.removePosition(positionID);
         }
     }*/
-
-    async tryToEnsureTokenPairIsRegistered() {
-        if (this.needsToEnsureIsRegistered()) {
-            const tokenAddress = this.tokenAddress.value;
-            const vsTokenAddress = this.vsTokenAddress.value;
-            if (tokenAddress == null) {
-                logError(`Could not register ${this.tokenPairID()} with heartBeat - tokenAddress was null`);
-                return;
-            }
-            if (vsTokenAddress == null) {
-                logError(`Could not register ${this.tokenPairID()} with heartBeat - vsTokenAddress was null`);
-                return;
-            }
-            //logDebug(`Registering token pair ${this.tokenPairID()}`);
-            await ensureTokenPairIsRegistered(tokenAddress, vsTokenAddress, this.env).then(() => {
-                //this.needsToEnsureIsRegistered = false;
-                this.lastTimeMSRegisteredWithHeartbeat.value = Date.now();
-                //logDebug(`Token pair ${tokenAddress}:${vsTokenAddress} is now registered with heartbeat!`);
-            })
-        }
-    }
-
-    needsToEnsureIsRegistered() : boolean {
-        // Only need to ensure registered with heartbeat if haven't done so in 1 min
-        // heartbeat touches the tracker to make sure it is scheduling alarms if it needs to
-        // if only DO's had CRON jobs :(
-        // TODO: configurable?
-        return (Date.now() - this.lastTimeMSRegisteredWithHeartbeat.value) > 60000;
-    }
 
     async _fetch(method : TokenPairPositionTrackerDOFetchMethod, body : any) : Promise<Response> {
         switch(method) {                

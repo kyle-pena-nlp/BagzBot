@@ -37,10 +37,12 @@ import { SellSellSlippagePercentageOnOpenPositionRequest, SellSellSlippagePercen
 import { StoreLegalAgreementStatusRequest, StoreLegalAgreementStatusResponse } from "./actions/store_legal_agreement_status";
 import { StoreSessionValuesRequest, StoreSessionValuesResponse } from "./actions/store_session_values";
 import { UnimpersonateUserRequest, UnimpersonateUserResponse } from "./actions/unimpersonate_user";
+import { WakeUpRequest, WakeUpResponse } from "./actions/wake_up_request";
 import { SessionKey } from "./model/session";
 import { UserData } from "./model/user_data";
 
 export enum UserDOFetchMethod {
+	wakeUp = "wakeUp",
 	get = "get",
 	storeSessionValues = "storeSessionValues",
 	getSessionValues = "getSessionValues",
@@ -74,6 +76,13 @@ export enum UserDOFetchMethod {
 	doubleSellSlippage = "doubleSellSlippage",
 	setOpenPositionSellPriorityFee = "setOpenPositionSellPriorityFee",
 	registerPositionAsDeactivated = "registerPositionAsDeactivated"
+}
+
+export async function wakeUp(telegramUserID : number, chatID : number, env : Env) : Promise<WakeUpResponse> {
+	const request : WakeUpRequest = { telegramUserID, chatID };
+	const method = UserDOFetchMethod.wakeUp;
+	const response = await sendJSONRequestToUserDO<WakeUpRequest,WakeUpResponse>(telegramUserID, method, request, env);
+	return response;
 }
 
 export async function registerPositionAsDeactivated(telegramUserID : number, chatID : number, positionID : string, tokenAddress : string, vsTokenAddress : string, env : Env) : Promise<RegisterPositionAsDeactivatedResponse> {
