@@ -17,7 +17,7 @@ export interface StagedTokenInfo {
 	symbol : string
     logoURI: string
     decimals : number
-    tokenType : 'token'|'token-2022'|null
+    tokenType : 'token'|'token-2022'
 }
 
 export interface TokenInfo extends StagedTokenInfo {

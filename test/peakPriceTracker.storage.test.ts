@@ -273,7 +273,8 @@ function fakeToken() : TokenInfo {
         name: 'goofies',
         symbol: 'GOOF',
         logoURI: 'schema://goofy-picture.png',
-        decimals: 6
+        decimals: 6,
+        tokenType: 'token'
     };
 }
 

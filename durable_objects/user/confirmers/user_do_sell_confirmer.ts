@@ -5,7 +5,7 @@ import { Env } from "../../../env";
 import { logDebug, logError } from "../../../logging";
 import { MenuCode } from "../../../menus";
 import { Position, PositionStatus } from "../../../positions";
-import { parseParsedTransactionWithMeta } from "../../../rpc/rpc_parse";
+import { ParseTransactionParams, parseParsedTransactionWithMeta } from "../../../rpc/rpc_parse";
 import { ParsedSuccessfulSwapSummary, ParsedSwapSummary, UnknownTransactionParseSummary, isFrozenTokenAccountSwapExecutionErrorParseSummary, isInsufficientNativeTokensSwapExecutionErrorParseSummary, isInsufficientTokensBalanceErrorParseSummary, isOtherKindOfSwapExecutionError, isSlippageSwapExecutionErrorParseSummary, isSuccessfulSwapSummary, isSuccessfullyParsedSwapSummary, isTokenFeeAccountNotInitializedSwapExecutionErrorParseSummary } from "../../../rpc/rpc_swap_parse_result_types";
 import { TGStatusMessage } from "../../../telegram";
 import { UpdateableMessage } from "../../../telegram/telegram_status_message";
@@ -331,9 +331,16 @@ export class UserDOSellConfirmer {
             return 'tx-DNE';
         }
         else if ('meta' in parsedTransaction) {
-            const inTokenAddress = position.token.address;
-            const outTokenAddress = position.vsToken.address;
-            return parseParsedTransactionWithMeta(parsedTransaction, inTokenAddress, outTokenAddress, position.txSellSignature!!, position.userAddress, this.env);
+            const params : ParseTransactionParams = {
+                parsedTransaction,
+                inTokenAddress : position.token.address,
+                inTokenType : position.token.tokenType,
+                outTokenAddress : position.vsToken.address,
+                outTokenType : position.vsToken.tokenType,
+                signature: position.txSellSignature!!,
+                userAddress: position.userAddress
+            }
+            return parseParsedTransactionWithMeta(params, this.env);
         }
         else {
             assertNever(parsedTransaction);

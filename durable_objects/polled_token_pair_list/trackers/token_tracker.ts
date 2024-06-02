@@ -1,7 +1,7 @@
 import { Env } from "../../../env";
 import { logDebug, logError } from "../../../logging";
 import { TokenInfo } from "../../../tokens";
-import { strictParseInt } from "../../../util";
+import { ChangeTrackedValue, strictParseInt } from "../../../util";
 
 export class TokenTracker {
     tokenInfos : Record<string,TokenInfo> = {};
@@ -9,6 +9,7 @@ export class TokenTracker {
     deletedKeys : Set<string> = new Set<string>();
     lastRefreshedMS : number = 0;
     isRebuilding : boolean = false;
+    version : ChangeTrackedValue<string> = new ChangeTrackedValue<string>("tokenTrackerVersion","no-token-type");
     constructor() {
     }
     initialize(entries : Map<string,any>) {
@@ -27,7 +28,7 @@ export class TokenTracker {
             // deliberate fire and forget - next person will have accurate list.
             this.rebuildTokenList(storage);
             maybeTokenInfo = this.tokenInfos[tokenAddressKey.toString()];
-        }        
+        }       
         return maybeTokenInfo;
     }
     upsertToken(tokenInfo : TokenInfo) {

@@ -312,9 +312,9 @@ export class UserDOBuyConfirmer {
         }
         else if ('meta' in parsedTransaction) {
             const inTokenAddress = position.vsToken.address;
-            const inTokenType = position.vsToken.tokenType!!;
+            const inTokenType = position.vsToken.tokenType;
             const outTokenAddress = position.token.address;
-            const outTokenType = position.token.tokenType!!;
+            const outTokenType = position.token.tokenType;
             const params : ParseTransactionParams = {
                 parsedTransaction,
                 inTokenAddress,
