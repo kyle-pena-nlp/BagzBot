@@ -17,6 +17,7 @@ import { adminDeleteClosedPositionsForUser, adminDeletePositionByIDFromTracker, 
 import { AdminDeleteAllPositionsRequest, AdminDeleteAllPositionsResponse } from "./actions/admin_delete_all_positions";
 import { AdminDeleteClosedPositionsRequest } from "./actions/admin_delete_closed_positions";
 import { AdminDeletePositionByIDRequest, AdminDeletePositionByIDResponse } from "./actions/admin_delete_position_by_id";
+import { AdminGetInfoRequest, isAdminGetInfoRequest } from "./actions/admin_get_info";
 import { AdminResetDefaultPositionRequest, AdminResetDefaultPositionResponse } from "./actions/admin_reset_default_position_request";
 import { AutomaticallyClosePositionsRequest, AutomaticallyClosePositionsResponse } from "./actions/automatically_close_positions";
 import { BaseUserDORequest, isBaseUserDORequest } from "./actions/base_user_do_request";
@@ -230,8 +231,8 @@ export class UserDO {
             });
             return response;
         }
-        catch(e) {
-            logError("Error in userDO fetch", e, this.telegramUserID);
+        catch(e : any) {
+            logError("Error in userDO fetch", e.toString(), this.telegramUserID);
             return makeSuccessResponse();
         }
         finally {
@@ -275,6 +276,9 @@ export class UserDO {
         let response : Response|null = null;
 
         switch(method) {
+            case UserDOFetchMethod.adminGetInfo:
+                response = await this.handleAdminGetInfo(userAction);
+                break;
             case UserDOFetchMethod.get:
                 response = await this.handleGet(userAction);            
                 break;
@@ -389,6 +393,19 @@ export class UserDO {
         }
 
         return [method,userAction,response];
+    }
+    async handleAdminGetInfo(userAction: AdminGetInfoRequest): Promise<Response> {
+        if (this.telegramUserID.value == null) {
+            return makeJSONResponse({ msg: "Not initialized" });
+        }
+        let positions = await this.listPositionsFromUserDO(this.telegramUserID.value);
+        positions = positions.filter(p => p.position.status !== PositionStatus.Closed);
+        const adminInfo = {
+            telegramUserID: this.telegramUserID.value,
+            chatID : this.chatID.value,
+            posCount: positions.length
+        };
+        return makeJSONResponse(adminInfo);
     }
 
     async handleRegisterPositionAsClosed(userAction : RegisterPositionAsClosedRequest) : Promise<Response> {
@@ -1062,8 +1079,11 @@ export class UserDO {
         else if (method === UserDOFetchMethod.sendMessageToUser && isSendMessageToUserRequest(jsonBody)) {
             logInfo("Message received", jsonBody);
         }
+        else if (isAdminGetInfoRequest(jsonBody)) {
+            logInfo("Get admin get info request");
+        }
         else {
-            throw new Error(`UserDO method must either be a ${UserDOFetchMethod.sendMessageToUser} or be a BaseUserDORequest`);
+            throw new Error(`UserDO method must either be a ${UserDOFetchMethod.sendMessageToUser} or ${UserDOFetchMethod.adminGetInfo} or be a BaseUserDORequest`);
         }
         
         return [method,jsonBody];

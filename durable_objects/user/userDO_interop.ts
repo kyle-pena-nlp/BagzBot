@@ -43,6 +43,7 @@ import { SessionKey } from "./model/session";
 import { UserData } from "./model/user_data";
 
 export enum UserDOFetchMethod {
+	adminGetInfo = "adminGetInfo",
 	get = "get",
 	storeSessionValues = "storeSessionValues",
 	getSessionValues = "getSessionValues",

@@ -20,6 +20,8 @@ export enum MenuCode {
 	ComingSoon = "CS", // as short as possible to make room for the coming soon message
 	AdminCountPositions = "AdminCountPositions",
 	MenuWhatIsTSL = "MenuWhatIsTSL",
+	AdminViewObject = "AdminViewObject",
+	SubmitAdminViewObject = "SubmitAdminViewObject",
 	AdminResetPositionRequestDefaults = "AdminResetPositionRequestDefaults",
 	AdminDeleteClosedPositions = "AdminDeleteClosedPositions",
 	AdminViewClosedPositions = "AdminViewClosedPositions",

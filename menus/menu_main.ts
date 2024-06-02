@@ -75,6 +75,9 @@ export class MenuMain extends Menu<UserData & AdminInfo> implements MenuCapabili
                 this.insertButtonNextLine(options, 'ADMIN: End User Support', this.menuCallback(MenuCode.UnimpersonateUser));
             }
             if (this.menuData.isAdminOrSuperAdmin) {
+                this.insertButtonNextLine(options, 'ADMIN: View Object', this.menuCallback(MenuCode.AdminViewObject));
+            }
+            if (this.menuData.isAdminOrSuperAdmin) {
                 this.insertButtonNextLine(options, 'ADMIN: Invoke Alarm', this.menuCallback(MenuCode.AdminInvokeAlarm));
             }
             if (this.menuData.isAdminOrSuperAdmin && !this.menuData.isImpersonatingUser) {

@@ -78,4 +78,6 @@ export const MenuCodeHandlerMap : HandlerMap<MenuCode,BaseMenuCodeHandler<MenuCo
     [MenuCode.AdminInvokeAlarm]: new handlers.AdminInvokeAlarmHandler(MenuCode.AdminInvokeAlarm),
     [MenuCode.SubmitAdminInvokeAlarm]: new handlers.SubmitAdminInvokeAlarmHandler(MenuCode.SubmitAdminInvokeAlarm),
     [MenuCode.Close]: new handlers.CloseHandler(MenuCode.Close),
+    [MenuCode.AdminViewObject]: new handlers.AdminViewObjectHandler(MenuCode.AdminViewObject),
+    [MenuCode.SubmitAdminViewObject]: new handlers.SubmitAdminViewObjectHandler(MenuCode.SubmitAdminViewObject)
 }
