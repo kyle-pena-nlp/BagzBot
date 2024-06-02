@@ -117,7 +117,7 @@ export class TokenPairPositionTrackerDO {
                 this.tokenAddress.value != null;
     }
 
-    async getPrice() : Promise<DecimalizedAmount|null> {
+    async getPrice() : Promise<{ price : DecimalizedAmount, currentPriceMS : number }|null> {
         if (this.tokenAddress.value == null || this.vsTokenAddress.value == null) {
             return null;
         }
@@ -127,11 +127,11 @@ export class TokenPairPositionTrackerDO {
         }
         const result = await this.currentPriceTracker.getPrice(this.tokenInfo.value, this.vsTokenAddress.value, this.env)
         if (result != null) {
-            const [price,isNew] = result;
+            const { price,newPrice,currentPriceMS } = result;
             /*if (isNew) {
                 this.tokenPairPositionTracker.updatePrice(price);
             }*/
-            return price;
+            return { price, currentPriceMS };
         } 
         return null;
     }
@@ -266,11 +266,12 @@ export class TokenPairPositionTrackerDO {
     }
 
     async handleInsertPosition(body: InsertPositionRequest) : Promise<Response> {
-        const currentPrice = await this.getPrice();
-        if (currentPrice == null) {
+        const result = await this.getPrice();
+        if (result == null) {
             return makeJSONResponse<InsertPositionResponse>({ success: false });
         }
-        const success = this.tokenPairPositionTracker.insertPosition(body.position, currentPrice);
+        const { price, currentPriceMS } = result;
+        const success = this.tokenPairPositionTracker.insertPosition(body.position, price);
         return makeJSONResponse<InsertPositionResponse>({ success });
     }
 
@@ -322,7 +323,11 @@ export class TokenPairPositionTrackerDO {
             return undefined;
         }
         const positionID = body.positionID;
-        const currentPrice = await this.getPrice();
+        const result = await this.getPrice();
+        let currentPrice : DecimalizedAmount|null = null;
+        if (result != null) {
+            currentPrice = result.price;
+        }
         const maybePosition = this.tokenPairPositionTracker.getPositionAndMaybePNL(positionID, currentPrice);
         return maybePosition;
     }
@@ -347,7 +352,11 @@ export class TokenPairPositionTrackerDO {
             logError("Tried to list positions yet tokenPairPositionTracker wasn't initialized", this);
             return [];
         }
-        const currentPrice = await this.getPrice();
+        const result = await this.getPrice();
+        let currentPrice : DecimalizedAmount|null = null;
+        if (result != null) {
+            currentPrice = result.price;
+        }
         const userID = body.telegramUserID;
         const positions = this.tokenPairPositionTracker.listByUser(userID, currentPrice);
         return positions;
@@ -357,8 +366,13 @@ export class TokenPairPositionTrackerDO {
         if (this.tokenAddress.value == null || this.vsTokenAddress.value == null) {
             throw new Error("Couldn't get token price because token pair addresses not initialized");
         }
-        const price = await this.getPrice();
-        return makeJSONResponse<GetTokenPriceResponse>({ price : price });
+        const result = await this.getPrice();
+        if (result != null) {
+            return makeJSONResponse<GetTokenPriceResponse>({ price : result.price, currentPriceMS: result.currentPriceMS });
+        }
+        else {
+            return makeJSONResponse<GetTokenPriceResponse>({ price : null, currentPriceMS: 0 });
+        }
     }
 
     async handleWakeup(body : WakeupTokenPairPositionTrackerRequest) {

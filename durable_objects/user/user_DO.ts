@@ -1,7 +1,7 @@
 import { Connection } from "@solana/web3.js";
 import { isAdminOrSuperAdmin } from "../../admins";
 import { Wallet, encryptPrivateKey, generateEd25519Keypair } from "../../crypto";
-import { DecimalizedAmount, asTokenPrice } from "../../decimalized/decimalized_amount";
+import { asTokenPrice } from "../../decimalized/decimalized_amount";
 import { Env, allowChooseAutoDoubleSlippage, allowChoosePriorityFees, getRPCUrl } from "../../env";
 import { makeFailureResponse, makeJSONResponse, makeSuccessResponse, maybeGetJson } from "../../http";
 import { logDebug, logError, logInfo } from "../../logging";
@@ -13,6 +13,7 @@ import { ChangeTrackedValue, Intersect, Structural, Subtract, assertNever, ensur
 import { assertIs } from "../../util/enums";
 import { listUnclaimedBetaInviteCodes } from "../beta_invite_codes/beta_invite_code_interop";
 import { registerUser as registerUserWithHearbeat } from "../heartbeat/heartbeat_DO_interop";
+import { GetTokenPriceResponse } from "../token_pair_position_tracker/actions/get_token_price";
 import { PositionAndMaybePNL } from "../token_pair_position_tracker/model/position_and_PNL";
 import { getTokenPrice } from "../token_pair_position_tracker/token_pair_position_tracker_DO_interop";
 import { AdminDeleteAllPositionsRequest, AdminDeleteAllPositionsResponse } from "./actions/admin_delete_all_positions";
@@ -220,9 +221,13 @@ export class UserDO {
         const startTimeMS = Date.now();
         const tokenPairs = this.openPositions.listUniqueTokenPairs({ includeOpen: true, includeUnconfirmed : true, includeClosing : true, includeClosed : false });
         for (const tokenPair of tokenPairs) {
-            const price = await this.getLatestPrice(tokenPair);
-            if (price != null)  {
-                const automaticActions = this.openPositions.updatePrice({ tokenPair, price, markTriggeredAsClosing: true }, this.env);
+            const getTokenPriceResult = await this.getLatestPrice(tokenPair);
+            if (getTokenPriceResult.price != null)  {
+                const automaticActions = this.openPositions.updatePrice({ 
+                    tokenPair, 
+                    price: getTokenPriceResult.price, 
+                    currentPriceMS: getTokenPriceResult.currentPriceMS,
+                    markTriggeredAsClosing: true }, this.env);
                 await this.initiateAutomaticActions(automaticActions, context, startTimeMS);
             }
             else {
@@ -231,7 +236,7 @@ export class UserDO {
         }
     }
 
-    async getLatestPrice(tokenPair : TokenPair) : Promise<DecimalizedAmount|null> {
+    async getLatestPrice(tokenPair : TokenPair) : Promise<GetTokenPriceResponse> {
         const response = await getTokenPrice(tokenPair.tokenAddress, tokenPair.vsTokenAddress, this.env);
         return response;
     }
@@ -566,7 +571,11 @@ export class UserDO {
     async handleReactivatePositionInternal(userAction : ReactivatePositionRequest, context: FetchEvent) : Promise<ReactivatePositionResponse> {
         const position = this.deactivatedPositions.get(userAction.positionID);
         if (position != null) {
-            this.openPositions.reactivatePosition(position);
+            const tokenPriceResult = await getTokenPrice(position.token.address, position.vsToken.address, this.env);
+            if (tokenPriceResult.price == null) {
+                return { success : false };
+            }
+            this.openPositions.reactivatePosition(position, tokenPriceResult.price, tokenPriceResult.currentPriceMS);
             context.waitUntil(registerUserWithHearbeat(userAction.telegramUserID, userAction.chatID, this.env));
             return { success : true };
         }

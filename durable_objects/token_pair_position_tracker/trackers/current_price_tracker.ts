@@ -30,13 +30,13 @@ export class CurrentPriceTracker {
         }
         return null;
     }
-    async getPrice(token : TokenInfo, vsTokenAddress : string, env : Env) : Promise<[DecimalizedAmount,boolean]|null> {
+    async getPrice(token : TokenInfo, vsTokenAddress : string, env : Env) : Promise< { price : DecimalizedAmount, newPrice : boolean, currentPriceMS : number }|null> {
         if (this.priceIsStale()) {
             const price = await this.getPriceInternal(token,getVsTokenInfo(vsTokenAddress), env);
             if (price != null) {
                 this.currentPrice.value = price;
                 this.priceLastRefreshed.value = Date.now();
-                return [price,true]
+                return { price, newPrice : true, currentPriceMS: this.priceLastRefreshed.value };
             }
             return null;
         }
@@ -44,7 +44,7 @@ export class CurrentPriceTracker {
             return null;
         }
         else {
-            return [this.currentPrice.value,false];
+            return { price : this.currentPrice.value, newPrice : false, currentPriceMS: this.priceLastRefreshed.value };
         }
     }
     private priceIsStale() {

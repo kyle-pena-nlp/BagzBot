@@ -23,6 +23,7 @@ export interface ListPositionFlags {
 export interface UpdatePriceParams {
     tokenPair : TokenPair
     price : DecimalizedAmount
+    currentPriceMS : number
     markTriggeredAsClosing : true
 }
 
@@ -58,7 +59,6 @@ export class OpenPositionsTracker {
         return position;
     }
     updatePrice(params : UpdatePriceParams, env : Env) : UpdatePriceResult {
-        const timestamp = Date.now();
         const triggeredTSLPositions : Position[] = [];
         const unconfirmedBuys : Position[] = [];
         const unconfirmedSells : Position[] = [];
@@ -67,7 +67,7 @@ export class OpenPositionsTracker {
         for (const key of Object.keys(this.positions)) {
             const position = this.positions[key];
             if (this.isThisTokenPair(position, params.tokenPair)) {
-                this.updatePositionPriceTracking(position, params.price, timestamp);
+                this.updatePositionPriceTracking(position, params.price, params.currentPriceMS);
                 if (this.canBeTriggeredAndMeetsTSLTriggerCondition(params.price, position)) {
                     if (params.markTriggeredAsClosing) {
                         position.status = PositionStatus.Closing;
@@ -124,9 +124,9 @@ export class OpenPositionsTracker {
             }
         }
     }
-    private updatePositionPriceTracking(position : Position, price : DecimalizedAmount, timestampMS : number) {
+    private updatePositionPriceTracking(position : Position, price : DecimalizedAmount, currentPriceMS : number) {
         position.currentPrice = price;
-        position.currentPriceMS = timestampMS;
+        position.currentPriceMS = currentPriceMS;
         if (dCompare(price, position.peakPrice) > 0) {
             position.peakPrice = price;
         }
@@ -185,10 +185,11 @@ export class OpenPositionsTracker {
         }
         return undefined;
     }
-    reactivatePosition(position : Position) {
+    reactivatePosition(position : Position, currentPrice : DecimalizedAmount, currentPriceMS : number) {
         // i'm not setting closing as open here because we want to maybe trigger a sell confirmation
         const key = new PKey(this.prefix, position.positionID).toString();
         position.otherSellFailureCount = 0;
+        this.updatePositionPriceTracking(position, currentPrice, currentPriceMS);
         this.positions[key] = position;
     }
     listOpenConfirmedPositions() {
@@ -268,13 +269,14 @@ export class OpenPositionsTracker {
             }
         }
     }
-    insertPosition(position : Position) : boolean {
+    insertPosition(position : Position, currentPrice : DecimalizedAmount, currentPriceMS : number) : boolean {
         const key = new PKey(this.prefix, position.positionID).toString();
         // insert does not permit overwrites
         if (key in this.positions) {
             return false;
         }
         else {
+            this.updatePositionPriceTracking(position, currentPrice, currentPriceMS);
             this.positions[key] = position;
             return true;
         }

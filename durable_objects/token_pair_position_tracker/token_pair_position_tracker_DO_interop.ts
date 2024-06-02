@@ -1,4 +1,3 @@
-import { DecimalizedAmount } from "../../decimalized";
 import { Env } from "../../env";
 import { makeJSONRequest, makeRequest } from "../../http";
 import { Position, PositionStatus } from "../../positions";
@@ -146,11 +145,11 @@ async function sendJSONRequestToTokenPairPositionTracker<TRequestBody,TResponseB
 	return responseBody as TResponseBody;
 }
 
-export async function getTokenPrice(tokenAddress : string, vsTokenAddress : string, env : Env) : Promise<DecimalizedAmount|null> {
+export async function getTokenPrice(tokenAddress : string, vsTokenAddress : string, env : Env) : Promise<GetTokenPriceResponse> {
 	const method = TokenPairPositionTrackerDOFetchMethod.getTokenPrice;
 	const requestBody = { tokenAddress, vsTokenAddress };
 	const priceResponse = await sendJSONRequestToTokenPairPositionTracker<GetTokenPriceRequest,GetTokenPriceResponse>(method, requestBody, tokenAddress, vsTokenAddress, env);
-	return priceResponse.price;
+	return priceResponse;
 }
 
 export class TokenPairKey {

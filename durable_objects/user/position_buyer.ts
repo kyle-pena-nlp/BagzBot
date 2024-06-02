@@ -12,9 +12,10 @@ import { ParsedSuccessfulSwapSummary, SwapExecutionError, isFrozenTokenAccountSw
 import { TGStatusMessage, UpdateableNotification } from "../../telegram";
 import { assertNever, strictParseBoolean } from "../../util";
 //import { insertPosition, positionExistsInTracker, removePosition, updatePosition } from "../token_pair_position_tracker/token_pair_position_tracker_DO_interop";
-import { dZero } from "../../decimalized/decimalized_amount";
+import { DecimalizedAmount, dZero } from "../../decimalized/decimalized_amount";
 import { SubsetOf } from "../../util/builder_types";
 import { registerUser } from "../heartbeat/heartbeat_DO_interop";
+import { getTokenPrice } from "../token_pair_position_tracker/token_pair_position_tracker_DO_interop";
 import { SwapExecutor } from "./swap_executor";
 import { SwapTransactionSigner } from "./swap_transaction_signer";
 import { ClosedPositionsTracker } from "./trackers/closed_positions_tracker";
@@ -125,7 +126,13 @@ export class PositionBuyer {
         // edge-case: trigger condition met between here and tx execution.
         // can we back-date tracker activity? this is tricky.  to be revisited.
         const unconfirmedPosition = this.convertRequestToUnconfirmedPosition(positionRequest, signatureOf(signedTx), lastValidBH);
-        const insertPositionResponse = this.insertPosition(unconfirmedPosition);
+
+        const tokenPriceResult = await getTokenPrice(unconfirmedPosition.token.address, unconfirmedPosition.vsToken.address, this.env);
+        if (tokenPriceResult.price == null) {
+            return 'could-not-create-tx'; // TODO: more appropriate return code.
+        }
+
+        const insertPositionResponse = this.insertPosition(unconfirmedPosition, tokenPriceResult.price, tokenPriceResult.currentPriceMS);
         if(!insertPositionResponse.success) {
             return 'could-not-create-tx'; // TODO: more appropriate return code.
         }
@@ -162,8 +169,8 @@ export class PositionBuyer {
     removePosition(positionID: string, address: string, address1: string, env: Env) {
         this.openPositions.deletePosition(positionID);
     }
-    insertPosition(unconfirmedPosition: Position & { buyConfirmed: false; }) : { success : boolean } {
-        const success = this.openPositions.insertPosition(unconfirmedPosition);
+    insertPosition(unconfirmedPosition: Position & { buyConfirmed: false; }, price : DecimalizedAmount, currentPriceMS : number) : { success : boolean } {
+        const success = this.openPositions.insertPosition(unconfirmedPosition, price, currentPriceMS);
         this.context.waitUntil(registerUser(unconfirmedPosition.userID, unconfirmedPosition.chatID, this.env));
         return { success }; // cruft
     }
