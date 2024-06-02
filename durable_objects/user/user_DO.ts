@@ -216,12 +216,13 @@ export class UserDO {
     }
 
     async performAlarmActions(context : FetchEvent) {
+        const startTimeMS = Date.now();
         const tokenPairs = this.openPositions.listUniqueTokenPairs({ includeOpen: true, includeUnconfirmed : true, includeClosing : true, includeClosed : false });
         for (const tokenPair of tokenPairs) {
             const price = await this.getLatestPrice(tokenPair);
             if (price != null)  {
                 const automaticActions = this.openPositions.updatePrice({ tokenPair, price, markTriggeredAsClosing: true });
-                await this.initiateAutomaticActions(automaticActions, context);
+                await this.initiateAutomaticActions(automaticActions, context, startTimeMS);
             }
             else {
                 logError("Unable to retrieve price", tokenPair);
@@ -234,10 +235,7 @@ export class UserDO {
         return response;
     }
 
-    async initiateAutomaticActions(automaticAction : UpdatePriceResult, context: FetchEvent) {
-
-        // all the actions performed here must be initiated within a certain time window.
-        const startTimeMS = Date.now();
+    async initiateAutomaticActions(automaticAction : UpdatePriceResult, context: FetchEvent, startTimeMS : number) {
         
         // perform automatic sales, most expensive first.
         // TODO: timing out, concurrency, etc?
@@ -312,7 +310,7 @@ export class UserDO {
         try {
             const [method,jsonRequestBody,response] = await this._fetch(request, context);
             await this.maybeStartAlarming().catch(r => {
-                logError(`Problem scheduling alarm for UserDO ${this.telegramUserID.value}`)
+                logError(`Problem with maybe scheduling alarm for UserDO ${this.telegramUserID.value}`)
                 return null;
             });
             return response;
@@ -671,7 +669,7 @@ export class UserDO {
         if (percent <= 0 || percent >= 100) {
             return 'invalid-percent';
         }
-        const position = this.openPositions.mutateOpenConfirmedPosition(request.positionID, (position) => {
+        this.openPositions.mutateOpenConfirmedPosition(request.positionID, (position) => {
             position.triggerPercent = request.percent;
         });
         // 'position-DNE'|'is-closing'|'is-closed'|'invalid-percent'

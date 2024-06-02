@@ -10,12 +10,9 @@ import { ParsedSuccessfulSwapSummary, ParsedSwapSummary, UnknownTransactionParse
 import { TGStatusMessage } from "../../../telegram";
 import { UpdateableMessage } from "../../../telegram/telegram_status_message";
 import { assertNever, strictParseBoolean, strictParseInt } from "../../../util";
-import { SubsetOf } from "../../../util/builder_types";
 import { ClosedPositionsTracker } from "../trackers/closed_positions_tracker";
 import { DeactivatedPositionsTracker } from "../trackers/deactivated_positions_tracker";
 import { OpenPositionsTracker } from "../trackers/open_positions_tracker";
-
-type ConfirmationData = SubsetOf<Position>;
 
 export class UserDOSellConfirmer {
     connection : Connection

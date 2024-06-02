@@ -140,6 +140,12 @@ export class OpenPositionsTracker {
             //we don't want to do this. we want to try to confirm the sell upon reactivation, so we keep as closing.
             //this.positions[key].status = PositionStatus.Open;
             const pos = this.positions[key];
+            if (!pos.buyConfirmed) {
+                return undefined; // can't deactivate unconfirmed position
+            }
+            if (pos.status === PositionStatus.Closed) {
+                return undefined; // can't deactivate closed position
+            }
             delete this.positions[key];
             return pos;
         }
@@ -148,6 +154,7 @@ export class OpenPositionsTracker {
     reactivatePosition(position : Position) {
         // i'm not setting closing as open here because we want to maybe trigger a sell confirmation
         const key = new PKey(this.prefix, position.positionID).toString();
+        position.otherSellFailureCount = 0;
         this.positions[key] = position;
     }
     listOpenConfirmedPositions() {
