@@ -186,8 +186,8 @@ export class UserDO {
             await this.performAlarmActions();
             await this.maybeScheduleAlarm();
         }
-        catch {
-            logError(`Problem rescheduling alarm for ${this.telegramUserID.value}`);
+        catch (e : any) {
+            logError(`Problem rescheduling alarm for ${this.telegramUserID.value}`, e.toString());
         }
         finally {
             await this.flushToStorage();

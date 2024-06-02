@@ -98,7 +98,8 @@ export class TokenTracker {
                 name: tokenJSON.name as string,
                 symbol: tokenJSON.symbol as string,
                 logoURI: tokenJSON.logoURI as string,
-                decimals: tokenJSON.decimals as number
+                decimals: tokenJSON.decimals as number,
+                tokenType: 'token-2022' in tokenJSON.tags ? 'token-2022' : 'token'
             };
             tokenInfos[tokenInfo.address] = tokenInfo;
         }
@@ -135,7 +136,8 @@ export class TokenTracker {
         a.decimals === b.decimals && 
         a.logoURI === b.logoURI &&
         a.name === b.name &&
-        a.symbol === b.symbol;
+        a.symbol === b.symbol &&
+        a.tokenType === b.tokenType;
     }
 }
 

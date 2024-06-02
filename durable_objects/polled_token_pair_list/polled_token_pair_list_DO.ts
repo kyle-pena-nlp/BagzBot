@@ -1,5 +1,6 @@
 import { DurableObjectState } from "@cloudflare/workers-types";
 import { Env, getPriceAPIURL } from "../../env";
+import { makeJSONResponse, makeSuccessResponse, maybeGetJson } from "../../http";
 import { logDebug } from "../../logging";
 import { StagedTokenInfo, TokenInfo } from "../../tokens";
 import { assertNever } from "../../util";
@@ -7,7 +8,6 @@ import { ForceRefreshTokensRequest, ForceRefreshTokensResponse } from "./actions
 import { GetTokenInfoRequest, GetTokenInfoResponse } from "./actions/get_token_info";
 import { PolledTokenPairListDOFetchMethod, parsePolledTokenPairListDOFetchMethod } from "./polled_token_pair_list_DO_interop";
 import { TokenTracker } from "./trackers/token_tracker";
-import { makeJSONResponse, makeSuccessResponse, maybeGetJson } from "../../http";
 
 type TokensByVsToken = Map<string,string[]>;
 interface PriceAPIRequestSpec {
@@ -145,7 +145,8 @@ export class PolledTokenPairListDO {
                 name: tokenJSON.name as string,
                 symbol: tokenJSON.symbol as string,
                 logoURI: tokenJSON.logoURI as string,
-                decimals: tokenJSON.decimals as number
+                decimals: tokenJSON.decimals as number,
+                tokenType : 'token-2022' in tokenJSON.tags ? 'token-2022' : 'token'
             };
             tokenInfos[tokenInfo.address] = tokenInfo;
         }

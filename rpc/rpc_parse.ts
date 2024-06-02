@@ -12,9 +12,19 @@ import { ParsedSwapSummary, SwapSummary, UnknownTransactionParseSummary } from "
 // This may come in handy at some point: https://github.com/cocrafts/walless/blob/a05d20f8275c8167a26de976a3b6701d64472765/apps/wallet/src/engine/runners/solana/history/swapHistory.ts#L85
 // REFERENCE: https://github.com/StrataFoundation/strata-data-pipelines/blob/b42b07152c378151bcc722eee73e3102d1087a93/src/event-transformer/transformers/tokenAccounts.ts#L34
 
-export function parseParsedTransactionWithMeta(parsedTransaction : ParsedTransactionWithMeta, inTokenAddress : string, outTokenAddress : string, signature : string, userAddress : UserAddress, env : Env) : Exclude<ParsedSwapSummary,UnknownTransactionParseSummary> {
+export interface ParseTransactionParams {
+    parsedTransaction : ParsedTransactionWithMeta
+    inTokenAddress : string
+    inTokenType : 'token'|'token-2022'
+    outTokenAddress : string
+    outTokenType : 'token'|'token-2022'
+    signature : string
+    userAddress : UserAddress
+}
 
-    const err = parsedTransaction.meta?.err;
+export function parseParsedTransactionWithMeta(params : ParseTransactionParams, env : Env) : Exclude<ParsedSwapSummary,UnknownTransactionParseSummary> {
+
+    const err = params.parsedTransaction.meta?.err;
     if (err) {
         const swapExecutionError = parseInstructionError(err, env);
         return {
@@ -23,10 +33,10 @@ export function parseParsedTransactionWithMeta(parsedTransaction : ParsedTransac
     }    
 
     // another horrible hack.
-    const positionTokenAddress = inTokenAddress == SOL_ADDRESS ? outTokenAddress : inTokenAddress;
+    const positionTokenAddress = params.inTokenAddress == SOL_ADDRESS ? params.outTokenAddress : params.inTokenAddress;
 
-    const swapInTokenDiff = safe(dNegate)(calculateTokenBalanceChange(parsedTransaction, inTokenAddress, positionTokenAddress, userAddress));
-    const swapOutTokenDiff = calculateTokenBalanceChange(parsedTransaction, outTokenAddress, positionTokenAddress, userAddress);
+    const swapInTokenDiff = safe(dNegate)(calculateTokenBalanceChange(params.parsedTransaction, params.inTokenAddress, params.inTokenType, positionTokenAddress, params.userAddress));
+    const swapOutTokenDiff = calculateTokenBalanceChange(params.parsedTransaction, params.outTokenAddress, params.outTokenType, positionTokenAddress, params.userAddress);
 
     if (swapInTokenDiff == null || swapOutTokenDiff == null) {
         throw new Error("Programmer error.");
@@ -35,21 +45,21 @@ export function parseParsedTransactionWithMeta(parsedTransaction : ParsedTransac
     // in / out <-> SOL / CHONKY <-> $$ / taco <-> taco costs $1.50
     const fillPrice = dDiv(swapInTokenDiff, swapOutTokenDiff, MATH_DECIMAL_PLACES) || dZero();
 
-    const fees = parsedTransaction.meta?.fee || 0;
+    const fees = params.parsedTransaction.meta?.fee || 0;
 
-    const txSlot = parsedTransaction.slot;
+    const txSlot = params.parsedTransaction.slot;
 
-    const swapTimeMS = parsedTransaction.blockTime||0;
+    const swapTimeMS = params.parsedTransaction.blockTime||0;
 
     const swapSummary : SwapSummary = {
-        inTokenAddress: inTokenAddress,
+        inTokenAddress: params.inTokenAddress,
         inTokenAmt: swapInTokenDiff,
-        outTokenAddress: outTokenAddress,
+        outTokenAddress: params.outTokenAddress,
         outTokenAmt: swapOutTokenDiff,
         fees: fees,
         fillPrice: fillPrice,
         swapTimeMS: swapTimeMS,
-        txSignature: signature,
+        txSignature: params.signature,
         txSlot: txSlot
     };
 
@@ -63,18 +73,20 @@ export function parseParsedTransactionWithMeta(parsedTransaction : ParsedTransac
 
 function calculateTokenBalanceChange(parsedTransaction : ParsedTransactionWithMeta, 
     tokenAddress : string, 
+    tokenType : 'token'|'token-2022',
     positionTokenAddress : string,
     userAddress : UserAddress) : DecimalizedAmount|null {
     if (tokenAddress === SOL_ADDRESS) {
         return calculateNetSOLBalanceChangeExcludingFees(parsedTransaction, positionTokenAddress, userAddress);
     }
     else {
-        return calculateNetTokenBalanceChange(parsedTransaction, tokenAddress, userAddress)
+        return calculateNetTokenBalanceChange(parsedTransaction, tokenAddress, tokenType, userAddress)
     }
 }
 
 function calculateNetTokenBalanceChange(parsedTransaction : ParsedTransactionWithMeta,
     tokenAddress : string,
+    splTokenType : 'token'|'token-2022',
     userAddress : UserAddress) : DecimalizedAmount|null {
     // TODO: check that innerInstructions are loaded, per: 
     // https://www.quicknode.com/docs/solana/getParsedTransaction
@@ -85,8 +97,8 @@ function calculateNetTokenBalanceChange(parsedTransaction : ParsedTransactionWit
     const preTokenBalances = parsedTransaction.meta?.preTokenBalances||[];
     const postTokenBalances = parsedTransaction.meta?.postTokenBalances||[];
 
-    let preTokenBalance = findWithMintAndPubKey(preTokenBalances, accountKeys, tokenAddress, userAddress);
-    let postTokenBalance = findWithMintAndPubKey(postTokenBalances, accountKeys, tokenAddress, userAddress);
+    let preTokenBalance = findWithMintAndPubKey(preTokenBalances, accountKeys, tokenAddress, userAddress, splTokenType);
+    let postTokenBalance = findWithMintAndPubKey(postTokenBalances, accountKeys, tokenAddress, userAddress, splTokenType);
 
     // no balances in pre- or post-... something fishy is going on
     if (preTokenBalance == null && postTokenBalance == null) {
@@ -103,7 +115,7 @@ function calculateNetTokenBalanceChange(parsedTransaction : ParsedTransactionWit
 function calculateNetSOLBalanceChangeExcludingFees(parsedTransaction : ParsedTransactionWithMeta, tokenAddress : string, userAddress : UserAddress) : DecimalizedAmount|null {
     /* Here's the issue --- rent paid on new token accounts potentially needs to be taken into account,
     as well as fees.  So we need the position's token address to properly account for SOL balances diffs */
-    const tokenAccountAddress = deriveTokenAccount(tokenAddress, userAddress).toBase58();
+    const tokenAccountAddress = deriveTokenAccount(tokenAddress, userAddress, 'token').toBase58();
     const mainAccountSOLBalanceDiff = calculateSolTokenBalanceDiff(parsedTransaction, userAddress.address);
     // rent
     const tokenAccountSOLBalanceDiff = calculateSolTokenBalanceDiff(parsedTransaction, tokenAccountAddress); 
@@ -136,8 +148,8 @@ function convertToTokenAmount(tokenBalance : (TokenBalance & {accountAddress : s
     }
 }
 
-function findWithMintAndPubKey(tokenBalances : TokenBalance[], accountKeys : string[], tokenAddress : string, userAddress : UserAddress) : (TokenBalance & { accountAddress : string })|undefined {
-    const tokenAccountAddress = getTokenAccountAddress(tokenAddress, userAddress);
+function findWithMintAndPubKey(tokenBalances : TokenBalance[], accountKeys : string[], tokenAddress : string, userAddress : UserAddress, type : 'token'|'token-2022') : (TokenBalance & { accountAddress : string })|undefined {
+    const tokenAccountAddress = getTokenAccountAddress(tokenAddress, userAddress, type);
     const tokenBalance = tokenBalances
         .map(e => { 
             const t : TokenBalance & { accountAddress : string } = { ...e, accountAddress: accountKeys[e.accountIndex] }; 
@@ -147,8 +159,8 @@ function findWithMintAndPubKey(tokenBalances : TokenBalance[], accountKeys : str
     return tokenBalance;
 }
 
-function getTokenAccountAddress(tokenAddress : string, userAddress : UserAddress) : string {
-    const tokenAccountAddress = deriveTokenAccount(tokenAddress, userAddress).toBase58();
+function getTokenAccountAddress(tokenAddress : string, userAddress : UserAddress, type : 'token'|'token-2022') : string {
+    const tokenAccountAddress = deriveTokenAccount(tokenAddress, userAddress, type).toBase58();
     return tokenAccountAddress;
 }
 

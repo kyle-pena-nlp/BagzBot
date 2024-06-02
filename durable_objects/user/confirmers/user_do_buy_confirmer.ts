@@ -3,7 +3,7 @@ import { asTokenPrice } from "../../../decimalized/decimalized_amount";
 import { Env } from "../../../env";
 import { logDebug, logError } from "../../../logging";
 import { Position, PositionStatus } from "../../../positions";
-import { parseParsedTransactionWithMeta } from "../../../rpc/rpc_parse";
+import { ParseTransactionParams, parseParsedTransactionWithMeta } from "../../../rpc/rpc_parse";
 import { ParsedSuccessfulSwapSummary, ParsedSwapSummary, UnknownTransactionParseSummary, isFrozenTokenAccountSwapExecutionErrorParseSummary, isInsufficientNativeTokensSwapExecutionErrorParseSummary, isInsufficientTokensBalanceErrorParseSummary, isOtherKindOfSwapExecutionError, isSlippageSwapExecutionErrorParseSummary, isTokenFeeAccountNotInitializedSwapExecutionErrorParseSummary } from "../../../rpc/rpc_swap_parse_result_types";
 import { TGStatusMessage } from "../../../telegram";
 import { UpdateableMessage } from "../../../telegram/telegram_status_message";
@@ -312,8 +312,19 @@ export class UserDOBuyConfirmer {
         }
         else if ('meta' in parsedTransaction) {
             const inTokenAddress = position.vsToken.address;
+            const inTokenType = position.vsToken.tokenType!!;
             const outTokenAddress = position.token.address;
-            return parseParsedTransactionWithMeta(parsedTransaction, inTokenAddress, outTokenAddress, position.txBuySignature, position.userAddress, this.env);
+            const outTokenType = position.token.tokenType!!;
+            const params : ParseTransactionParams = {
+                parsedTransaction,
+                inTokenAddress,
+                inTokenType,
+                outTokenAddress,
+                outTokenType,
+                signature: position.txBuySignature,
+                userAddress: position.userAddress
+            };
+            return parseParsedTransactionWithMeta(params, this.env);
         }
         else {
             assertNever(parsedTransaction);
