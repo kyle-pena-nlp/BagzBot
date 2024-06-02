@@ -41,8 +41,7 @@ export class UserDOBuyConfirmer {
     isTimedOut() : boolean {
         return (Date.now() > this.startTimeMS + strictParseInt(this.env.CONFIRM_TIMEOUT_MS));
     }
-    async maybeConfirmBuy(positionID : string) : Promise<
-        'do-not-continue'|'continue'> {
+    async maybeConfirmBuy(positionID : string) : Promise<'do-not-continue'|'continue'> {
 
         // early out if no more time on request
         if (this.isTimedOut()) {

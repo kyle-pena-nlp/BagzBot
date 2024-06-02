@@ -1,7 +1,7 @@
 import { Connection, SimulateTransactionConfig, VersionedTransaction } from "@solana/web3.js";
 import { Wallet } from "../../crypto";
 import { dSub } from "../../decimalized";
-import { asTokenPrice } from "../../decimalized/decimalized_amount";
+import { DecimalizedAmount, asTokenPrice } from "../../decimalized/decimalized_amount";
 import { Env } from "../../env";
 import { logError } from "../../logging";
 import { MenuCode } from "../../menus";
@@ -303,7 +303,8 @@ export class PositionSeller {
             return;
         }
         const netPNL = dSub(swapSummary.swapSummary.outTokenAmt, position.vsTokenAmt);
-        this.closedPositions.upsert(position);
+        position.netPNL = netPNL;
+        this.closedPositions.upsert(position as (Position & { netPNL : DecimalizedAmount })); // not sure why TS couldn't figure this out
     }
 
 

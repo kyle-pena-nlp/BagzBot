@@ -1,3 +1,4 @@
+import { DecimalizedAmount } from "../../../decimalized";
 import { Position } from "../../../positions";
 import { setDifference, setIntersection, structuralEquals } from "../../../util";
 
@@ -27,7 +28,7 @@ export class ClosedPositionsTracker {
             }
         }
     }
-    upsert(position : Position) {
+    upsert(position : Position & { netPNL : DecimalizedAmount }) {
         const key = new PKey(this.prefix, position.positionID).toString();
         this.positions[key] = position;
     }

@@ -1,4 +1,3 @@
-import { isTheSuperAdminUserID } from "../../admins";
 import { DecimalizedAmount } from "../../decimalized";
 import { Env } from "../../env";
 import { makeJSONRequest, makeRequest } from "../../http";
@@ -18,7 +17,6 @@ import { GetPositionFromPriceTrackerRequest, GetPositionFromPriceTrackerResponse
 import { GetPositionAndMaybePNLFromPriceTrackerRequest, GetPositionAndMaybePNLFromPriceTrackerResponse } from "./actions/get_position_and_maybe_pnl";
 import { GetPositionCountsFromTrackerRequest, GetPositionCountsFromTrackerResponse } from "./actions/get_position_counts_from_tracker";
 import { GetTokenPriceRequest, GetTokenPriceResponse } from "./actions/get_token_price";
-import { HasPairAddresses } from "./actions/has_pair_addresses";
 import { IncrementOtherSellFailureCountInTrackerRequest, IncrementOtherSellFailureCountInTrackerResponse } from "./actions/increment_other_sell_failure_count_in_tracker";
 import { InsertPositionRequest, InsertPositionResponse } from "./actions/insert_position";
 import { ListClosedPositionsFromTrackerRequest, ListClosedPositionsFromTrackerResponse } from "./actions/list_closed_positions_from_tracker";
@@ -34,13 +32,11 @@ import { SetOpenPositionSellPriorityFeeInTrackerRequest, SetOpenPositionSellPrio
 import { SetSellAutoDoubleOnOpenPositionInTrackerRequest } from "./actions/set_sell_auto_double_on_open_position_in_tracker";
 import { SetSellSlippagePercentOnOpenPositionTrackerRequest } from "./actions/set_sell_slippage_percent_on_open_position";
 import { UpdatePositionRequest, UpdatePositionResponse } from "./actions/update_position";
-import { UpdatePriceRequest, UpdatePriceResponse } from "./actions/update_price";
 import { WakeupTokenPairPositionTrackerRequest, WakeupTokenPairPositionTrackerResponse } from "./actions/wake_up";
 import { PositionAndMaybePNL } from "./model/position_and_PNL";
 
 export enum TokenPairPositionTrackerDOFetchMethod {
 	wakeUp = "wakeUp",
-	updatePrice = "updatePrice",
 	markPositionAsClosing = "markPositionAsClosing",
 	markPositionAsClosed = "markPositionAsClosed",
 	markPositionAsOpen = "markPositionAsOpen",	
@@ -51,7 +47,6 @@ export enum TokenPairPositionTrackerDOFetchMethod {
 	listPositionsByUser = "listPositionsByUser",
 	editTriggerPercentOnOpenPosition = "editTriggerPercentOnOpenPosition",
 	setSellAutoDoubleOnOpenPosition = "setSellAutoDoubleOnOpenPosition",
-	adminInvokeAlarm = "adminInvokeAlarm",
 	adminDeleteAllInTracker = "adminDeleteAllInTracker",
 	positionExists = "positionExists",
 	markBuyAsConfirmed = "markBuyAsConfirmed",
@@ -163,26 +158,6 @@ export async function _adminDeleteAll(userID : number, tokenAddress : string, vs
 	const method = TokenPairPositionTrackerDOFetchMethod.adminDeleteAllInTracker;
 	return await sendJSONRequestToTokenPairPositionTracker<AdminDeleteAllInTrackerRequest,AdminDeleteAllInTrackerResponse>(method,request,tokenAddress,vsTokenAddress,env);
 }
-
-export async function adminInvokeAlarm(tokenAddress : string, vsTokenAddress : string, env : Env) {
-	const request : HasPairAddresses = { tokenAddress, vsTokenAddress };
-	const method = TokenPairPositionTrackerDOFetchMethod.adminInvokeAlarm;
-	return await sendJSONRequestToTokenPairPositionTracker<HasPairAddresses,{}>(method,request,tokenAddress,vsTokenAddress,env);
-}
-
-export async function _devOnlyFeatureUpdatePrice(telegramUserID : number, tokenAddress : string, vsTokenAddress : string, price : DecimalizedAmount, env : Env) {
-	if (!isTheSuperAdminUserID(telegramUserID,env)) {
-		throw new Error("Cannot do that if not the super admin");
-	}
-	if (env.ENVIRONMENT !== 'dev') {
-		throw new Error("Cannot do that if environment is not 'dev'");
-	}
-	const request : UpdatePriceRequest = { tokenAddress, vsTokenAddress, price };
-	const method = TokenPairPositionTrackerDOFetchMethod.updatePrice;
-	const response = await sendJSONRequestToTokenPairPositionTracker<UpdatePriceRequest,UpdatePriceResponse>(method,request,tokenAddress,vsTokenAddress,env);
-	return response;
-}
-
 
 export async function editTriggerPercentOnOpenPositionInTracker(positionID : string, tokenAddress : string, vsTokenAddress : string, percent : number, env : Env) : Promise<EditTriggerPercentOnOpenPositionResponse> {
 	const method = TokenPairPositionTrackerDOFetchMethod.editTriggerPercentOnOpenPosition;

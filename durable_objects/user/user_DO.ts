@@ -7,9 +7,9 @@ import { makeFailureResponse, makeJSONResponse, makeSuccessResponse, maybeGetJso
 import { logDebug, logError, logInfo } from "../../logging";
 import { Position, PositionPreRequest, PositionRequest, PositionStatus, PositionType } from "../../positions";
 import { POSITION_REQUEST_STORAGE_KEY } from "../../storage_keys";
-import { TGStatusMessage, UpdateableNotification, sendMessageToTG } from "../../telegram";
+import { TGStatusMessage, sendMessageToTG } from "../../telegram";
 import { WEN_ADDRESS, getVsTokenInfo } from "../../tokens";
-import { ChangeTrackedValue, Intersect, Structural, Subtract, assertNever, ensureArrayIsAllAndOnlyPropsOf, ensureArrayIsOnlyPropsOf, groupIntoBatches, sleep, strictParseBoolean, strictParseInt } from "../../util";
+import { ChangeTrackedValue, Intersect, Structural, Subtract, assertNever, ensureArrayIsAllAndOnlyPropsOf, ensureArrayIsOnlyPropsOf, sleep, strictParseBoolean, strictParseInt } from "../../util";
 import { assertIs } from "../../util/enums";
 import { listUnclaimedBetaInviteCodes } from "../beta_invite_codes/beta_invite_code_interop";
 import { PositionAndMaybePNL } from "../token_pair_position_tracker/model/position_and_PNL";
@@ -18,7 +18,6 @@ import { AdminDeleteAllPositionsRequest, AdminDeleteAllPositionsResponse } from 
 import { AdminDeleteClosedPositionsRequest } from "./actions/admin_delete_closed_positions";
 import { AdminDeletePositionByIDRequest, AdminDeletePositionByIDResponse } from "./actions/admin_delete_position_by_id";
 import { AdminResetDefaultPositionRequest, AdminResetDefaultPositionResponse } from "./actions/admin_reset_default_position_request";
-import { AutomaticallyClosePositionsRequest, AutomaticallyClosePositionsResponse } from "./actions/automatically_close_positions";
 import { BaseUserDORequest, isBaseUserDORequest } from "./actions/base_user_do_request";
 import { DeactivatePositionRequest, DeactivatePositionResponse } from "./actions/deactivate_position";
 import { DeleteSessionRequest, DeleteSessionResponse } from "./actions/delete_session";
@@ -39,7 +38,6 @@ import { ListPositionsFromUserDORequest, ListPositionsFromUserDOResponse } from 
 import { ManuallyClosePositionRequest, ManuallyClosePositionResponse } from "./actions/manually_close_position";
 import { OpenPositionRequest, OpenPositionResponse } from "./actions/open_new_position";
 import { ReactivatePositionRequest, ReactivatePositionResponse } from "./actions/reactivate_position";
-import { RegisterPositionAsClosedRequest, RegisterPositionAsClosedResponse } from "./actions/register_position_as_closed";
 import { RegisterPositionAsDeactivatedRequest, RegisterPositionAsDeactivatedResponse } from "./actions/register_position_as_deactivated";
 import { DefaultTrailingStopLossRequestRequest, DefaultTrailingStopLossRequestResponse } from "./actions/request_default_position_request";
 import { SendMessageToUserRequest, SendMessageToUserResponse, isSendMessageToUserRequest } from "./actions/send_message_to_user";
@@ -394,10 +392,6 @@ export class UserDO {
                 this.assertUserHasWallet();
                 response = await this.handleManuallyClosePositionRequest(userAction, context);
                 break;
-            case UserDOFetchMethod.automaticallyClosePositions:
-                this.assertUserHasWallet();
-                response = await this.handleAutomaticallyClosePositionsRequest(userAction);
-                break;
             case UserDOFetchMethod.getLegalAgreementStatus:
                 response = await this.handleGetLegalAgreementStatus(userAction);
                 break;
@@ -467,9 +461,6 @@ export class UserDO {
             case UserDOFetchMethod.setOpenPositionSellPriorityFee:
                 response = await this.handleSetOpenPositionPriorityFee(userAction);
                 break;
-            case UserDOFetchMethod.registerPositionAsClosed:
-                response = await this.handleRegisterPositionAsClosed(userAction);
-                break;
             case UserDOFetchMethod.registerPositionAsDeactivated:
                 response = await this.handleRegisterPositionAsDeactivated(userAction);
                 break;
@@ -480,25 +471,8 @@ export class UserDO {
         return [method,userAction,response];
     }
 
-    async handleRegisterPositionAsClosed(userAction : RegisterPositionAsClosedRequest) : Promise<Response> {
-        await this.registerPositionAsClosed(userAction.positionID, userAction.tokenAddress, userAction.vsTokenAddress);
-        return makeJSONResponse<RegisterPositionAsClosedResponse>({ success: true });
-    }
 
-    // CRUFT
-    async registerPositionAsClosed(positionID : string, tokenAddress : string, vsTokenAddress : string) {
-        //this.tokenPairsForPositionIDsTracker.removePositions([positionID]);
-        //const tokenPair = { positionID: positionID, token : { address : tokenAddress }, vsToken: { address : vsTokenAddress } };
-        //this.tokenPairsForClosedPositions.registerPosition(tokenPair);
-        this.closePosition(positionID);
-    }
 
-    closePosition(positionID : string) {
-        const position = this.openPositions.markAsClosedAndReturn(positionID);
-        if (position != null) {
-            this.closedPositions.upsert(position);
-        }
-    }
 
     async handleRegisterPositionAsDeactivated(userAction: RegisterPositionAsDeactivatedRequest) : Promise<Response> {
         const response = await this.handleRegisterPositionAsDeactivatedInternal(userAction);
@@ -1002,46 +976,6 @@ export class UserDO {
         }));
         // success is indeterminate (by design) (explanation: depends on what happens with the positionSeller.sell, which is unawaited, so we don't know the result yet, hence 'null')
         return { success: null, reason: 'attempting-sale' };
-    }
-
-    async handleAutomaticallyClosePositionsRequest(closePositionsRequest : AutomaticallyClosePositionsRequest) : Promise<Response> {
-        const startTimeMS = Date.now();
-        const positionsToClose = closePositionsRequest.positions;
-        if (positionsToClose.length == 0) {
-            return makeJSONResponse<AutomaticallyClosePositionsResponse>({});
-        }
-        const positionBatches = groupIntoBatches(positionsToClose,4);
-        const channels : UpdateableNotification[] = [ ];
-        const connection = new Connection(getRPCUrl(this.env));
-        const timedOut = () => (Date.now() - startTimeMS) > strictParseInt(this.env.TX_TIMEOUT_MS);
-        for (const positionBatch of positionBatches) {
-            // fire off a bunch of promises per batch (4)
-            if (timedOut()) {
-                continue;
-            }
-            let sellPositionPromises = positionBatch.map(async position => {
-                const channel = TGStatusMessage.createAndSend(`Initiating.`, false, this.chatID.value||0, this.env, 'HTML', `:notify: <b>Automatic Sale of ${asTokenPrice(position.tokenAmt)} $${position.token.symbol}</b>: `);
-                channels.push(channel);
-                const positionSeller = new PositionSeller(connection, this.wallet.value!!, 'auto-sell', startTimeMS, channel, this.env, this.openPositions, this.closedPositions, this.deactivatedPositions);
-                if (timedOut()) {
-                    return;
-                }
-                // deliberate lack of await here, but still writes to storage afterwards
-                const sellPromise = positionSeller.sell(position).then(async status => {
-                    if (status === 'confirmed') {
-                        await this.registerPositionAsClosed(position.positionID, position.token.address, position.vsToken.address);
-                    }
-                }).finally(async () => {
-                    await this.flushToStorage();
-                });
-                return await sellPromise;
-            });
-            // but wait for the entire batch to settle before doing the next batch
-            await Promise.allSettled(sellPositionPromises);
-        }
-        // fire and forget, finalize all channels
-        Promise.allSettled(channels.map(channel => TGStatusMessage.finalize(channel)));
-        return makeJSONResponse<AutomaticallyClosePositionsResponse>({});
     }
 
     async validateFetchRequest(request : Request) : Promise<[UserDOFetchMethod,any]> {

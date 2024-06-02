@@ -3,13 +3,12 @@ import { Env } from "../../env";
 import { makeJSONRequest, makeRequest } from "../../http";
 import { Position } from "../../positions";
 import { TokenInfo } from "../../tokens";
-import { Structural, groupIntoBatches, groupIntoMap } from "../../util";
+import { Structural } from "../../util";
 import { PositionAndMaybePNL } from "../token_pair_position_tracker/model/position_and_PNL";
 import { AdminDeleteAllPositionsRequest, AdminDeleteAllPositionsResponse } from "./actions/admin_delete_all_positions";
 import { AdminDeleteClosedPositionsRequest, AdminDeleteClosedPositionsResponse } from "./actions/admin_delete_closed_positions";
 import { AdminDeletePositionByIDRequest, AdminDeletePositionByIDResponse } from "./actions/admin_delete_position_by_id";
 import { AdminResetDefaultPositionRequest, AdminResetDefaultPositionResponse } from "./actions/admin_reset_default_position_request";
-import { AutomaticallyClosePositionsRequest, AutomaticallyClosePositionsResponse } from "./actions/automatically_close_positions";
 import { DeactivatePositionRequest, DeactivatePositionResponse } from "./actions/deactivate_position";
 import { DeleteSessionRequest } from "./actions/delete_session";
 import { DoubleSellSlippageRequest, DoubleSellSlippageResponse } from "./actions/double_sell_slippage";
@@ -29,7 +28,6 @@ import { ListPositionsFromUserDORequest, ListPositionsFromUserDOResponse } from 
 import { ManuallyClosePositionRequest, ManuallyClosePositionResponse } from "./actions/manually_close_position";
 import { OpenPositionRequest, OpenPositionResponse } from "./actions/open_new_position";
 import { ReactivatePositionRequest, ReactivatePositionResponse } from "./actions/reactivate_position";
-import { RegisterPositionAsClosedRequest, RegisterPositionAsClosedResponse } from "./actions/register_position_as_closed";
 import { RegisterPositionAsDeactivatedRequest, RegisterPositionAsDeactivatedResponse } from "./actions/register_position_as_deactivated";
 import { DefaultTrailingStopLossRequestRequest, DefaultTrailingStopLossRequestResponse } from "./actions/request_default_position_request";
 import { SendMessageToUserRequest, SendMessageToUserResponse } from "./actions/send_message_to_user";
@@ -51,7 +49,6 @@ export enum UserDOFetchMethod {
 	getWalletData = "getWalletData",
 	openNewPosition = "openNewPosition",
 	manuallyClosePosition = "manuallyClosePosition", // user initiated close position
-	automaticallyClosePositions = "automaticallyClosePositions", // system-initiated close position
 	getDefaultTrailingStopLossRequest = "getDefaultTrailingStopLossRequest",
 	storeLegalAgreementStatus = "storeLegalAgreementStatus",
 	getLegalAgreementStatus = "getLegalAgreementStatus",
@@ -76,15 +73,7 @@ export enum UserDOFetchMethod {
 	getDeactivatedPosition = "getDeactivatedPosition",
 	doubleSellSlippage = "doubleSellSlippage",
 	setOpenPositionSellPriorityFee = "setOpenPositionSellPriorityFee",
-	registerPositionAsClosed = "registerPositionAsClosed",
 	registerPositionAsDeactivated = "registerPositionAsDeactivated"
-}
-
-export async function registerPositionAsClosed(telegramUserID: number, chatID : number, positionID : string, tokenAddress : string, vsTokenAddress : string, env : Env) : Promise<RegisterPositionAsClosedResponse> {
-	const request : RegisterPositionAsClosedRequest = { telegramUserID, chatID, positionID, tokenAddress, vsTokenAddress };
-	const method = UserDOFetchMethod.registerPositionAsClosed;
-	const response = await sendJSONRequestToUserDO<RegisterPositionAsClosedRequest,RegisterPositionAsClosedResponse>(telegramUserID, method, request, env);
-	return response;
 }
 
 export async function registerPositionAsDeactivated(telegramUserID : number, chatID : number, positionID : string, tokenAddress : string, vsTokenAddress : string, env : Env) : Promise<RegisterPositionAsDeactivatedResponse> {
@@ -232,29 +221,6 @@ export async function adminDeleteAllPositions(telegramUserID : number, chatID : 
 	const method = UserDOFetchMethod.adminDeleteAllPositions;
 	const request : AdminDeleteAllPositionsRequest = { telegramUserID, chatID, realTelegramUserID };
 	return await sendJSONRequestToUserDO<AdminDeleteAllPositionsRequest,AdminDeleteAllPositionsResponse>(telegramUserID, method, request, env);
-}
-
-
-// care taken here not to exceed simultaneous subrequest limit
-export async function sendClosePositionOrdersToUserDOs(positionsToClose: Position[], env : Env) {
-	const positionsGroupedByUser = groupIntoMap(positionsToClose, (p : Position) => p.userID);
-	const pairs = [...positionsGroupedByUser];
-	const batchesOfUsers = groupIntoBatches(pairs,4);
-	for (const userBatch of batchesOfUsers) {
-		const promises = []
-		// let 4 subrequests go out at once, each containing a batch of positions
-		for (const [userID, group] of userBatch) {
-			promises.push(tryToClosePositions(userID,group,env));
-		}
-		await Promise.allSettled(promises);
-	}
-}
-
-export async function tryToClosePositions(userID : number, positions : Position[], env : Env) {
-	const method = UserDOFetchMethod.automaticallyClosePositions;
-	const chatID = positions[0].chatID;
-	const individualRequestForUserDO : AutomaticallyClosePositionsRequest = { telegramUserID: userID, chatID: chatID, positions: positions };
-	await sendJSONRequestToUserDO<AutomaticallyClosePositionsRequest,AutomaticallyClosePositionsResponse>(userID, method, individualRequestForUserDO, env);
 }
 
 export function parseUserDOFetchMethod(value : string) : UserDOFetchMethod|null {

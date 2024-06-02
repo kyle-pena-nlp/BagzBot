@@ -1,5 +1,6 @@
 import { DurableObjectStorage } from "@cloudflare/workers-types";
 import { DecimalizedAmount, dMult } from "../decimalized";
+import { dZero } from "../decimalized/decimalized_amount";
 import { PeakPricePositionTracker } from "../durable_objects/token_pair_position_tracker/trackers/peak_price_tracker";
 import { Position, PositionStatus, PositionType } from "../positions";
 import { TokenInfo, getVsTokenInfo } from "../tokens";
@@ -258,7 +259,10 @@ function posWithPrice(initPrice : DecimalizedAmount) : Position {
         txSellAttemptTimeMS: 0,
         otherSellFailureCount: 0,
         sellPriorityFeeAutoMultiplier: null,
-        buyPriorityFeeAutoMultiplier: null
+        buyPriorityFeeAutoMultiplier: null,
+        currentPrice: dZero(),
+        currentPriceMS: 0,
+        peakPrice: dZero()
     }
 }
 
