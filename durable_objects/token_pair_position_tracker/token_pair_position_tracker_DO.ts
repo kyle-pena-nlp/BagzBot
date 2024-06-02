@@ -16,7 +16,6 @@ import { GetPositionAndMaybePNLFromPriceTrackerRequest, GetPositionAndMaybePNLFr
 import { GetPositionCountsFromTrackerRequest, GetPositionCountsFromTrackerResponse } from "./actions/get_position_counts_from_tracker";
 import { GetTokenPriceRequest, GetTokenPriceResponse } from "./actions/get_token_price";
 import { HasPairAddresses } from "./actions/has_pair_addresses";
-import { isHeartbeatRequest } from "./actions/heartbeat_wake_up_for_token_pair_position_tracker";
 import { InsertPositionRequest, InsertPositionResponse } from "./actions/insert_position";
 import { ListClosedPositionsFromTrackerRequest, ListClosedPositionsFromTrackerResponse } from "./actions/list_closed_positions_from_tracker";
 import { ListDeactivatedPositionsInTrackerRequest, ListDeactivatedPositionsInTrackerResponse } from "./actions/list_frozen_positions_in_tracker";
@@ -377,18 +376,28 @@ export class TokenPairPositionTrackerDO {
         }
         // NOTE: A heartbeat request is the only exception to the rule
         // that all requests must have tokenAddress and vsTokenAddress identified.
-        if (!(isHeartbeatRequest(jsonBody))) {
-            const tokenAddress = jsonBody.tokenAddress;
-            const vsTokenAddress = jsonBody.vsTokenAddress;
-            if (this.tokenAddress.value != null && tokenAddress != this.tokenAddress.value) {
-                throw new Error(`tokenAddress did not match expected tokenAddress. Expected: ${this.tokenAddress.value} Was: ${tokenAddress}`);
-            }
-            if (this.vsTokenAddress.value != null && vsTokenAddress != this.vsTokenAddress.value) {
-                throw new Error(`vsTokenAddress did not match expected vsTokenAddress. Expected: ${this.vsTokenAddress.value} Was: ${vsTokenAddress}`);
-            }
-            this.tokenAddress.value = tokenAddress;
-            this.vsTokenAddress.value = vsTokenAddress;
+        
+        const tokenAddress = jsonBody?.tokenAddress;
+
+        if (tokenAddress == null) {
+            throw new Error("Request did not have tokenAddress");
         }
+
+        const vsTokenAddress = jsonBody?.vsTokenAddress;
+
+        if (vsTokenAddress == null) {
+            throw new Error("Request did not have vsTokenAddress");
+        }
+
+        if (this.tokenAddress.value != null && tokenAddress != this.tokenAddress.value) {
+            throw new Error(`tokenAddress did not match expected tokenAddress. Expected: ${this.tokenAddress.value} Was: ${tokenAddress}`);
+        }
+        if (this.vsTokenAddress.value != null && vsTokenAddress != this.vsTokenAddress.value) {
+            throw new Error(`vsTokenAddress did not match expected vsTokenAddress. Expected: ${this.vsTokenAddress.value} Was: ${vsTokenAddress}`);
+        }
+        this.tokenAddress.value = tokenAddress;
+        this.vsTokenAddress.value = vsTokenAddress;
+        
         return [method,jsonBody];
     }
 

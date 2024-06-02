@@ -18,34 +18,22 @@ import { RemovePositionRequest, RemovePositionResponse } from "./actions/remove_
 import { PositionAndMaybePNL } from "./model/position_and_PNL";
 
 export enum TokenPairPositionTrackerDOFetchMethod {
-	wakeUp = "wakeUp",
-	//markPositionAsClosing = "markPositionAsClosing",
-	//markPositionAsClosed = "markPositionAsClosed",
-	//markPositionAsOpen = "markPositionAsOpen",	
+	wakeUp = "wakeUp",	
 	removePosition = "removePosition",
 	getTokenPrice = "getTokenPrice",
 	getPositionAndMaybePNL = "getPositionAndMaybePNL",
 	getPosition = "getPosition",
 	listPositionsByUser = "listPositionsByUser",
-	//editTriggerPercentOnOpenPosition = "editTriggerPercentOnOpenPosition",
-	//setSellAutoDoubleOnOpenPosition = "setSellAutoDoubleOnOpenPosition",
 	adminDeleteAllInTracker = "adminDeleteAllInTracker",
 	positionExists = "positionExists",
-	//markBuyAsConfirmed = "markBuyAsConfirmed",
-	//setSellSlippagePercentOnOpenPosition = "setSellSlippagePercentOnOpenPosition",
 	listClosedPositionsFromTracker = "listClosedPositionsFromTracker",
 	insertPosition = "insertPosition",
 	updatePosition = "updatePosition",
 	getPositionCounts = "getPositionCounts",
 	adminDeleteClosedPositionsForUser = "adminDeleteClosedPositionsForUser",
 	adminDeletePositionByIDFromTracker = "adminDeletePositionByIDFromTracker",
-	//deactivatePosition = "deactivatePosition",
-	//reactivatePosition = "reactivatePosition",
 	listDeactivatedPositions = "listDeactivatedPositions",
 	getDeactivatedPosition = "getDeactivatedPosition",
-	//incrementOtherSellFailureCount = "incrementOtherSellFailureCount",
-	//doubleSellSlippage = "doubleSellSlippage",
-	//setOpenPositionSellPriorityFee = "setOpenPositionSellPriorityFee"
 }
 
 

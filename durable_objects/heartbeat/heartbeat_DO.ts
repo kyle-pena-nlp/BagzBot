@@ -3,8 +3,8 @@ import { Env } from "../../env";
 import { makeJSONResponse, maybeGetJson } from "../../http";
 import { logDebug, logError } from "../../logging";
 import { MapWithStorage, assertNever } from "../../util";
-import { HeartbeatWakeupRequestForTokenPairPositionTracker } from "../token_pair_position_tracker/actions/heartbeat_wake_up_for_token_pair_position_tracker";
 import { wakeUp } from "../user/userDO_interop";
+import { HeartbeatWakeupRequest } from "./actions/hearbeat_wake_up";
 import { RegisterUserDORequest, RegisterUserDOResponse } from "./actions/register_user_do";
 import { HeartbeatDOFetchMethod, parseHeartbeatDOFetchMethod } from "./heartbeat_DO_interop";
 
@@ -50,19 +50,19 @@ export class HeartbeatDO {
         ]);
     }
 
-    async fetch(request : Request) : Promise<Response> {
-        const response = await this._fetch(request);
+    async fetch(request : Request, env : Env, context: FetchEvent) : Promise<Response> {
+        const response = await this._fetch(request, context);
         await this.flushToStorage();
         return response;
     }
 
-    async _fetch(request : Request) : Promise<Response> {
+    async _fetch(request : Request, context: FetchEvent) : Promise<Response> {
         const [method,jsonRequestBody] = await this.validateFetchRequest(request);
         logDebug(`[[${method}]] :: heartbeat_do`);
         switch(method) {
             case HeartbeatDOFetchMethod.Wakeup:
                 // deliberate fire-and-forget here.
-                this.handleWakeup(jsonRequestBody);
+                context.waitUntil(this.handleWakeup(jsonRequestBody));
                 return makeJSONResponse<{}>({});
             case HeartbeatDOFetchMethod.RegisterUserDO:
                 return await this.handleRegisterUser(jsonRequestBody);
@@ -79,7 +79,7 @@ export class HeartbeatDO {
 
     // This method keeps the alarms scheduled for the token pair position trackers.
     // Invoking any method on the tracker causes it to check if it should be scheduling an alarm
-    async handleWakeup(request : HeartbeatWakeupRequestForTokenPairPositionTracker) : Promise<void> {
+    async handleWakeup(request : HeartbeatWakeupRequest) : Promise<void> {
         this.processing = true;
         try {
             const startTimeMS = Date.now();
