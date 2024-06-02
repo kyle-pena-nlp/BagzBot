@@ -222,7 +222,7 @@ export class UserDO {
         for (const tokenPair of tokenPairs) {
             const price = await this.getLatestPrice(tokenPair);
             if (price != null)  {
-                const automaticActions = this.openPositions.updatePrice({ tokenPair, price, markTriggeredAsClosing: true });
+                const automaticActions = this.openPositions.updatePrice({ tokenPair, price, markTriggeredAsClosing: true }, this.env);
                 await this.initiateAutomaticActions(automaticActions, context, startTimeMS);
             }
             else {

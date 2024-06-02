@@ -1,6 +1,6 @@
 
 import { Connection, SimulateTransactionConfig, VersionedTransaction } from "@solana/web3.js";
-import { UserAddress, Wallet, toUserAddress } from "../../crypto";
+import { Wallet, toUserAddress } from "../../crypto";
 import { fromNumber } from "../../decimalized";
 import { Env, getRPCUrl } from "../../env";
 import { MenuCode } from "../../menus";
@@ -13,12 +13,15 @@ import { TGStatusMessage, UpdateableNotification } from "../../telegram";
 import { assertNever, strictParseBoolean } from "../../util";
 //import { insertPosition, positionExistsInTracker, removePosition, updatePosition } from "../token_pair_position_tracker/token_pair_position_tracker_DO_interop";
 import { dZero } from "../../decimalized/decimalized_amount";
+import { SubsetOf } from "../../util/builder_types";
 import { registerUser } from "../heartbeat/heartbeat_DO_interop";
 import { SwapExecutor } from "./swap_executor";
 import { SwapTransactionSigner } from "./swap_transaction_signer";
 import { ClosedPositionsTracker } from "./trackers/closed_positions_tracker";
 import { DeactivatedPositionsTracker } from "./trackers/deactivated_positions_tracker";
 import { OpenPositionsTracker } from "./trackers/open_positions_tracker";
+
+type ConfirmationData = SubsetOf<Position>;
 
 export class PositionBuyer {
     wallet : Wallet
@@ -132,25 +135,29 @@ export class PositionBuyer {
 
         // no guarantees that anything after this point executes... CF may drop it.
 
+        // if the tx definetely failed, remove the position from tracking.
         if (result === 'failed' || result === 'slippage-failed' || result === 'insufficient-sol' || result === 'frozen-token-account' || result === 'token-fee-account-not-initialized' || result === 'insufficient-tokens-balance') {
             this.removePosition(positionRequest.positionID, positionRequest.token.address, positionRequest.vsToken.address, this.env);
             return result;
         }
+        // but if we can't determine what happened, we say so to the caller
         else if (result === 'unconfirmed') {
             return result;
         }
-        else if ('confirmedPosition' in result) {
-            const { confirmedPosition } = result;
-            this.updatePosition(confirmedPosition);
+        // but if it really is confirmed, we update the position in the tracker.
+        else if ('confirmationData' in result) {
+            const { confirmationData } = result;
+            this.updatePosition(positionRequest.positionID, confirmationData);
             return 'confirmed';
         }
         else {
             assertNever(result);
         }
     }
-    updatePosition(confirmedPosition: Position & { buyConfirmed: true; }) {
-        this.openPositions.upsertPosition(confirmedPosition);
-        this.context.waitUntil(registerUser(confirmedPosition.userID, confirmedPosition.chatID, this.env));
+    updatePosition(positionID : string, confirmationData: ConfirmationData) {
+        this.openPositions.mutatePosition(positionID, p => {
+            Object.assign(p, confirmationData);
+        });
     }
     removePosition(positionID: string, address: string, address1: string, env: Env) {
         this.openPositions.deletePosition(positionID);
@@ -269,7 +276,7 @@ export class PositionBuyer {
         'failed'|
         'unconfirmed'|
         'insufficient-tokens-balance'|
-        { confirmedPosition: Position & { buyConfirmed : true } }> {
+        { confirmationData : ConfirmationData }> {
         
         // create a time-limited tx executor and confirmer
         const swapExecutor = new SwapExecutor(this.wallet, 'buy', this.env, this.channel, connection, lastValidBH, this.startTimeMS);
@@ -308,28 +315,36 @@ export class PositionBuyer {
             return 'insufficient-tokens-balance';
         }
         else if (isSuccessfulSwapSummary(parsedSwapSummary)) {
-            const confirmedPosition = this.makeConfirmedPositionFromSwapResult(positionRequest, signatureOf(signedTx), lastValidBH, parsedSwapSummary);
-            return { confirmedPosition };
+            const confirmationData = this.makeConfirmationDataFromSwapResult(signatureOf(signedTx), lastValidBH, parsedSwapSummary);
+            return { confirmationData };
         }
         else {
             assertNever(parsedSwapSummary);
         }
     }
 
-    private  makeConfirmedPositionFromSwapResult(
-        positionRequest : PositionRequest, 
+    private  makeConfirmationDataFromSwapResult(
         signature : string,
         lastValidBH: number,
-        successfulSwapParsed : ParsedSuccessfulSwapSummary) : Position & { buyConfirmed : true } {
-        
-        const newPosition = convertToConfirmedPosition(positionRequest, 
-            signature, 
-            lastValidBH, 
-            toUserAddress(this.wallet), 
-            successfulSwapParsed);
-
-        // has or has not been set depending on above logic.
-        return newPosition;
+        parsedSuccessfulSwap : ParsedSuccessfulSwapSummary) : ConfirmationData {
+        return {
+                buyConfirmed: true, // <-------------
+                txBuyAttemptTimeMS: Date.now(), // TODO: This is wrong but will revisit.
+                txBuySignature: signature,  
+                buyLastValidBlockheight: lastValidBH,        
+                sellConfirmed: false,
+                txSellSignature: null,
+                txSellAttemptTimeMS: null,
+                sellLastValidBlockheight: null,
+                tokenAmt: parsedSuccessfulSwap.swapSummary.outTokenAmt,        
+                fillPrice: parsedSuccessfulSwap.swapSummary.fillPrice,
+                fillPriceMS : parsedSuccessfulSwap.swapSummary.swapTimeMS,
+                netPNL: null, // to be set when position is sold
+                otherSellFailureCount: 0,
+                currentPrice: parsedSuccessfulSwap.swapSummary.fillPrice,
+                currentPriceMS: parsedSuccessfulSwap.swapSummary.swapTimeMS,
+                peakPrice: parsedSuccessfulSwap.swapSummary.fillPrice, // TODO: think about this
+        };
     }
     
     private getFinalStatusMessage(status: 'tx-sim-failed-other'|
@@ -452,51 +467,4 @@ export class PositionBuyer {
                 assertNever(status);
         }
     }    
-}
-
-function convertToConfirmedPosition(positionRequest: PositionRequest, 
-    signature : string, 
-    lastValidBH : number, 
-    userAddress : UserAddress, 
-    parsedSuccessfulSwap : ParsedSuccessfulSwapSummary) : Position & { buyConfirmed : true } {
-    const position : Position & { buyConfirmed : true } = {
-        userID: positionRequest.userID,
-        chatID : positionRequest.chatID,
-        messageID : positionRequest.messageID,
-        positionID : positionRequest.positionID,
-        userAddress: userAddress,
-        type: positionRequest.positionType,
-        status: PositionStatus.Open,
-
-        buyConfirmed: true, // <-------------
-        txBuyAttemptTimeMS: Date.now(), // TODO: This is wrong but will revisit.
-        txBuySignature: signature,  
-        buyLastValidBlockheight: lastValidBH,        
-
-        sellConfirmed: false,
-        txSellSignature: null,
-        txSellAttemptTimeMS: null,
-        sellLastValidBlockheight: null,
-
-        token: positionRequest.token,
-        vsToken: positionRequest.vsToken,
-        sellSlippagePercent: positionRequest.slippagePercent,
-        triggerPercent : positionRequest.triggerPercent,
-        sellAutoDoubleSlippage : positionRequest.sellAutoDoubleSlippage,
-    
-        vsTokenAmt : fromNumber(positionRequest.vsTokenAmt),
-        tokenAmt: parsedSuccessfulSwap.swapSummary.outTokenAmt,        
-        fillPrice: parsedSuccessfulSwap.swapSummary.fillPrice,
-        fillPriceMS : parsedSuccessfulSwap.swapSummary.swapTimeMS,
-        netPNL: null, // to be set when position is sold
-        otherSellFailureCount: 0,
-
-        currentPrice: parsedSuccessfulSwap.swapSummary.fillPrice,
-        currentPriceMS: parsedSuccessfulSwap.swapSummary.swapTimeMS,
-        peakPrice: parsedSuccessfulSwap.swapSummary.fillPrice, // TODO: think about this
-
-        buyPriorityFeeAutoMultiplier: positionRequest.priorityFeeAutoMultiplier,
-        sellPriorityFeeAutoMultiplier: positionRequest.priorityFeeAutoMultiplier
-    };
-    return position;
 }

@@ -10,7 +10,6 @@ import { UpdateableMessage } from "../../../telegram/telegram_status_message";
 import { assertNever, strictParseInt } from "../../../util";
 import { SubsetOf } from "../../../util/builder_types";
 import { assertIs } from "../../../util/enums";
-import { registerUser } from "../../heartbeat/heartbeat_DO_interop";
 import { ClosedPositionsTracker } from "../trackers/closed_positions_tracker";
 import { DeactivatedPositionsTracker } from "../trackers/deactivated_positions_tracker";
 import { OpenPositionsTracker } from "../trackers/open_positions_tracker";
@@ -191,11 +190,6 @@ export class UserDOBuyConfirmer {
         this.openPositions.deletePosition(positionID);
     }
 
-    updatePosition(position : Position) {
-        this.openPositions.upsertPosition(position);
-        this.context.waitUntil(registerUser(position.userID, position.chatID, this.env));
-    }
-
     private isPositionStillConfirmable(positionID : string) : 'position-DNE'|'position-already-confirmed'|'position-not-open'|'confirmable' {
         const recheckPosition = this.openPositions.get(positionID);
         if (recheckPosition == null) {
@@ -277,48 +271,6 @@ export class UserDOBuyConfirmer {
         
         const confirmationData = this.getConfirmationData(parsedTx);
         return confirmationData;   
-    }
-
-    private convertToConfirmedPosition(unconfirmedPosition: Position, parsedSuccessfulSwap : ParsedSuccessfulSwapSummary) : Position & { buyConfirmed : true } {
-        const confirmedPosition : Position & { buyConfirmed : true } = {
-            userID: unconfirmedPosition.userID,
-            chatID : unconfirmedPosition.chatID,
-            messageID : unconfirmedPosition.messageID,
-            positionID : unconfirmedPosition.positionID,
-            userAddress: unconfirmedPosition.userAddress,
-            type: unconfirmedPosition.type,
-            status: PositionStatus.Open,
-    
-            buyConfirmed: true, // <-------------
-            txBuyAttemptTimeMS: unconfirmedPosition.txBuyAttemptTimeMS||0, // || for backwards compat
-            txBuySignature: unconfirmedPosition.txBuySignature,  
-            buyLastValidBlockheight: unconfirmedPosition.buyLastValidBlockheight,        
-    
-            sellConfirmed: false,
-            txSellSignature: null,
-            sellLastValidBlockheight: null,
-    
-            token: unconfirmedPosition.token,
-            vsToken: unconfirmedPosition.vsToken,
-            sellSlippagePercent: unconfirmedPosition.sellSlippagePercent,
-            triggerPercent : unconfirmedPosition.triggerPercent,
-            sellAutoDoubleSlippage : unconfirmedPosition.sellAutoDoubleSlippage,
-
-            currentPrice: parsedSuccessfulSwap.swapSummary.fillPrice,
-            currentPriceMS: parsedSuccessfulSwap.swapSummary.swapTimeMS,
-            peakPrice: parsedSuccessfulSwap.swapSummary.fillPrice, // TODO: think about this
-        
-            vsTokenAmt : unconfirmedPosition.vsTokenAmt,
-            tokenAmt: parsedSuccessfulSwap.swapSummary.outTokenAmt,        
-            fillPrice: parsedSuccessfulSwap.swapSummary.fillPrice,
-            fillPriceMS : parsedSuccessfulSwap.swapSummary.swapTimeMS,
-            txSellAttemptTimeMS: null,
-            netPNL: null, // to be set on sell
-            otherSellFailureCount: 0,
-            buyPriorityFeeAutoMultiplier: unconfirmedPosition.buyPriorityFeeAutoMultiplier,
-            sellPriorityFeeAutoMultiplier: unconfirmedPosition.sellPriorityFeeAutoMultiplier
-        };
-        return confirmedPosition;
     }
 
     private getConfirmationData(parsedSuccessfulSwap : ParsedSuccessfulSwapSummary) {

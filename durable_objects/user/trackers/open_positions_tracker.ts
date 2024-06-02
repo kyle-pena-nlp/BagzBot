@@ -1,7 +1,8 @@
 import { DecimalizedAmount, MATH_DECIMAL_PLACES, dAdd, dCompare, dDiv, dMult, dSub } from "../../../decimalized";
 import { dZero, fromNumber, toNumber } from "../../../decimalized/decimalized_amount";
+import { Env } from "../../../env";
 import { Position, PositionStatus, PositionType } from "../../../positions";
-import { SetWithKeyFn, setDifference, setIntersection, structuralEquals } from "../../../util";
+import { SetWithKeyFn, setDifference, setIntersection, strictParseInt, structuralEquals } from "../../../util";
 import { PositionAndMaybePNL } from "../../token_pair_position_tracker/model/position_and_PNL";
 import { TokenPair } from "../model/token_pair";
 import { UserPNL } from "../model/user_data";
@@ -56,7 +57,7 @@ export class OpenPositionsTracker {
         }
         return position;
     }
-    updatePrice(params : UpdatePriceParams) : UpdatePriceResult {
+    updatePrice(params : UpdatePriceParams, env : Env) : UpdatePriceResult {
         const timestamp = Date.now();
         const triggeredTSLPositions : Position[] = [];
         const unconfirmedBuys : Position[] = [];
@@ -65,14 +66,8 @@ export class OpenPositionsTracker {
         // update peak prices, gather triggered / unconfirmed buys / unconfirmed sells
         for (const key of Object.keys(this.positions)) {
             const position = this.positions[key];
-            if (this.hasThisTokenPair(position, params.tokenPair)) {
-                
-                position.currentPrice = params.price;
-                position.currentPriceMS = timestamp;
-                if (dCompare(params.price, position.peakPrice) > 0) {
-                    position.peakPrice = params.price;
-                }
-                
+            if (this.isThisTokenPair(position, params.tokenPair)) {
+                this.updatePositionPriceTracking(position, params.price, timestamp);
                 if (this.canBeTriggeredAndMeetsTSLTriggerCondition(params.price, position)) {
                     if (params.markTriggeredAsClosing) {
                         position.status = PositionStatus.Closing;
@@ -81,8 +76,14 @@ export class OpenPositionsTracker {
                 }
 
                 // TODO: unconfirmed buys
+                if (this.isStaleUnconfirmedBuy(position, env)) {
+                    unconfirmedBuys.push(position);
+                }
 
                 // TODO: unconfirmed sells
+                if (this.isStaleUnconfirmedSell(position, env)) {
+                    unconfirmedSells.push(position);
+                }
             }
         }
         return { 
@@ -90,11 +91,44 @@ export class OpenPositionsTracker {
             unconfirmedBuys: unconfirmedBuys, 
             unconfirmedSells: unconfirmedSells };
     }
+    isStaleUnconfirmedBuy(position: Position, env : Env) : boolean {
+        if (position.buyConfirmed) {
+            return false;
+        }
+        if (position.status === PositionStatus.Closed || position.status === PositionStatus.Closing) {
+            return false; // should never happen, but just in case
+        }
+        const elapsedTimeMS = Date.now() - position.txBuyAttemptTimeMS;
+        if (elapsedTimeMS > strictParseInt(env.TX_TIMEOUT_MS) * 1.25) {
+            return true;
+        }
+        return false;
+    }
+    isStaleUnconfirmedSell(position : Position, env : Env) : boolean {
+        if (position.status !== PositionStatus.Closing) {
+            return false;
+        }
+        if (position.sellConfirmed) {
+            return false;
+        }
+        const elapsedTimeMS = Date.now() - (position.txSellAttemptTimeMS||0);
+        if (elapsedTimeMS > strictParseInt(env.TX_TIMEOUT_MS) * 1.25) {
+            return true;
+        }
+        return false;
+    }
     clear() {
         for (const key in this.positions) {
             if (this.positions.hasOwnProperty(key)) {
                 delete this.positions[key];
             }
+        }
+    }
+    private updatePositionPriceTracking(position : Position, price : DecimalizedAmount, timestampMS : number) {
+        position.currentPrice = price;
+        position.currentPriceMS = timestampMS;
+        if (dCompare(price, position.peakPrice) > 0) {
+            position.peakPrice = price;
         }
     }
     getOpenPnL() : DecimalizedAmount {
@@ -234,9 +268,6 @@ export class OpenPositionsTracker {
             }
         }
     }
-    upsertPosition(position : Position) {
-        this.positions[new PKey(this.prefix, position.positionID).toString()] = position;
-    }
     insertPosition(position : Position) : boolean {
         const key = new PKey(this.prefix, position.positionID).toString();
         // insert does not permit overwrites
@@ -288,7 +319,7 @@ export class OpenPositionsTracker {
         }
         return [putEntries,[...deleteKeys]];
     }
-    private hasThisTokenPair(position : Position, tokenPair : TokenPair) : boolean {
+    private isThisTokenPair(position : Position, tokenPair : TokenPair) : boolean {
         return position.token.address == tokenPair.tokenAddress && position.vsToken.address === tokenPair.vsTokenAddress;
     }
     private canBeTriggeredAndMeetsTSLTriggerCondition(price : DecimalizedAmount, position : Position) {
