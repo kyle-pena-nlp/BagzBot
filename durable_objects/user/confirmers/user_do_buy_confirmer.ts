@@ -26,12 +26,10 @@ export class UserDOBuyConfirmer {
     openPositions : OpenPositionsTracker;
     closedPositions : ClosedPositionsTracker;
     deactivatedPositions : DeactivatedPositionsTracker;
-    context: FetchEvent
     constructor(connection : Connection, startTimeMS : number, env : Env,
         openPositions : OpenPositionsTracker,
         closedPositions : ClosedPositionsTracker,
         deactivatedPositions : DeactivatedPositionsTracker,
-        context: FetchEvent
     ) {
         this.connection = connection;
         this.startTimeMS = startTimeMS;
@@ -39,7 +37,6 @@ export class UserDOBuyConfirmer {
         this.openPositions = openPositions;
         this.closedPositions = closedPositions;
         this.deactivatedPositions = deactivatedPositions;
-        this.context = context;
     }
     isTimedOut() : boolean {
         return (Date.now() > this.startTimeMS + strictParseInt(this.env.CONFIRM_TIMEOUT_MS));

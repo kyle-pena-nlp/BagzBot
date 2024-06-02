@@ -180,10 +180,10 @@ export class UserDO {
         ]);
     }
 
-    async alarm(req : any, env : Env, context: FetchEvent) {  
+    async alarm(req : any, env : Env) {  
         try {
             await this.state.storage.deleteAlarm();
-            await this.performAlarmActions(context);
+            await this.performAlarmActions();
             await this.maybeScheduleAlarm();
         }
         catch {
@@ -217,7 +217,7 @@ export class UserDO {
         return this.openPositions.listPositions({ includeClosing: true, includeOpen : true, includeUnconfirmed : true, includeClosed : false }).length > 0;
     }
 
-    async performAlarmActions(context : FetchEvent) {
+    async performAlarmActions() {
         const startTimeMS = Date.now();
         const tokenPairs = this.openPositions.listUniqueTokenPairs({ includeOpen: true, includeUnconfirmed : true, includeClosing : true, includeClosed : false });
         for (const tokenPair of tokenPairs) {
@@ -228,7 +228,7 @@ export class UserDO {
                     price: getTokenPriceResult.price, 
                     currentPriceMS: getTokenPriceResult.currentPriceMS,
                     markTriggeredAsClosing: true }, this.env);
-                await this.initiateAutomaticActions(automaticActions, context, startTimeMS);
+                await this.initiateAutomaticActions(automaticActions, startTimeMS);
             }
             else {
                 logError("Unable to retrieve price", tokenPair);
@@ -241,18 +241,18 @@ export class UserDO {
         return response;
     }
 
-    async initiateAutomaticActions(automaticAction : UpdatePriceResult, context: FetchEvent, startTimeMS : number) {
+    async initiateAutomaticActions(automaticAction : UpdatePriceResult, startTimeMS : number) {
         
         // perform automatic sales, most expensive first.
         // TODO: timing out, concurrency, etc?
         automaticAction.triggeredTSLPositions.sort(p => -p.vsTokenAmt);
         for (const triggeredTSLPosition of automaticAction.triggeredTSLPositions) {
-            await this.initiateAutomaticSale(triggeredTSLPosition.positionID, startTimeMS, context);
+            await this.initiateAutomaticSale(triggeredTSLPosition.positionID, startTimeMS);
         }
 
         const allThingsToConfirm = this.combineConfirmationTasks({ buys: automaticAction.unconfirmedBuys, sells: automaticAction.unconfirmedSells })
         const connection = new Connection(getRPCUrl(this.env));
-        const buyConfirmer = new UserDOBuyConfirmer(connection, startTimeMS, this.env, this.openPositions, this.closedPositions, this.deactivatedPositions, context);
+        const buyConfirmer = new UserDOBuyConfirmer(connection, startTimeMS, this.env, this.openPositions, this.closedPositions, this.deactivatedPositions);
         const sellConfirmer = new UserDOSellConfirmer(connection, startTimeMS, this.env, this.openPositions, this.closedPositions, this.deactivatedPositions);
  
         automaticAction.unconfirmedBuys.sort(p => -p.vsTokenAmt);
@@ -291,7 +291,7 @@ export class UserDO {
     }
 
     // TODO: batching and awaiting of batches (to limit the number of concurrent auto-sells)
-    async initiateAutomaticSale(positionID : string, startTimeMS : number, context: FetchEvent) {
+    async initiateAutomaticSale(positionID : string, startTimeMS : number) {
         const position = this.openPositions.getOpenConfirmedPosition(positionID);
         if (position == null) {
             return;
@@ -303,18 +303,19 @@ export class UserDO {
             return;
         }
         const positionSeller = new PositionSeller(connection, this.wallet.value!!, 'auto-sell', startTimeMS, channel, this.env, this.openPositions, this.closedPositions, this.deactivatedPositions);
-        context.waitUntil(positionSeller.sell(positionID).finally(async () => {
+        // deliberate lack of await here.
+        positionSeller.sell(positionID).finally(async () => {
             await this.flushToStorage();
-        }));
+        });
     }
 
     initialized() : boolean {
         return (this.telegramUserID.value != null);
     }
 
-    async fetch(request : Request, env : Env, context : FetchEvent) : Promise<Response> {
+    async fetch(request : Request) : Promise<Response> {
         try {
-            const [method,jsonRequestBody,response] = await this._fetch(request, context);
+            const [method,jsonRequestBody,response] = await this._fetch(request);
             await this.maybeStartAlarming().catch(r => {
                 logError(`Problem with maybe scheduling alarm for UserDO ${this.telegramUserID.value}`)
                 return null;
@@ -357,7 +358,7 @@ export class UserDO {
         }
     }
 
-    async _fetch(request : Request, context : FetchEvent) : Promise<[UserDOFetchMethod,any,Response]> {
+    async _fetch(request : Request) : Promise<[UserDOFetchMethod,any,Response]> {
 
         const [method,userAction] = await this.validateFetchRequest(request);
 
@@ -390,11 +391,11 @@ export class UserDO {
                 break;
             case UserDOFetchMethod.openNewPosition:
                 this.assertUserHasWallet();
-                response = await this.handleOpenNewPosition(userAction, context);
+                response = await this.handleOpenNewPosition(userAction);
                 break;
             case UserDOFetchMethod.manuallyClosePosition:
                 this.assertUserHasWallet();
-                response = await this.handleManuallyClosePositionRequest(userAction, context);
+                response = await this.handleManuallyClosePositionRequest(userAction);
                 break;
             case UserDOFetchMethod.getLegalAgreementStatus:
                 response = await this.handleGetLegalAgreementStatus(userAction);
@@ -454,7 +455,7 @@ export class UserDO {
                 response = await this.handleDeactivatePosition(userAction);
                 break;
             case UserDOFetchMethod.reactivatePosition:
-                response = await this.handleReactivatePosition(userAction, context);
+                response = await this.handleReactivatePosition(userAction);
                 break;
             case UserDOFetchMethod.getDeactivatedPosition:
                 response = await this.handleGetDeactivatedPosition(userAction);
@@ -563,12 +564,12 @@ export class UserDO {
         return { success: true };
     }
 
-    async handleReactivatePosition(userAction : ReactivatePositionRequest, context: FetchEvent) : Promise<Response> {
-        const response = await this.handleReactivatePositionInternal(userAction, context);
+    async handleReactivatePosition(userAction : ReactivatePositionRequest) : Promise<Response> {
+        const response = await this.handleReactivatePositionInternal(userAction);
         return makeJSONResponse<ReactivatePositionResponse>(response);
     }        
 
-    async handleReactivatePositionInternal(userAction : ReactivatePositionRequest, context: FetchEvent) : Promise<ReactivatePositionResponse> {
+    async handleReactivatePositionInternal(userAction : ReactivatePositionRequest) : Promise<ReactivatePositionResponse> {
         const position = this.deactivatedPositions.get(userAction.positionID);
         if (position != null) {
             const tokenPriceResult = await getTokenPrice(position.token.address, position.vsToken.address, this.env);
@@ -576,7 +577,7 @@ export class UserDO {
                 return { success : false };
             }
             this.openPositions.reactivatePosition(position, tokenPriceResult.price, tokenPriceResult.currentPriceMS);
-            context.waitUntil(registerUserWithHearbeat(userAction.telegramUserID, userAction.chatID, this.env));
+            registerUserWithHearbeat(userAction.telegramUserID, userAction.chatID, this.env);
             return { success : true };
         }
         return { success : false };
@@ -923,7 +924,7 @@ export class UserDO {
         });
     }
 
-    async handleOpenNewPosition(openPositionRequest : OpenPositionRequest, context : FetchEvent) : Promise<Response> {
+    async handleOpenNewPosition(openPositionRequest : OpenPositionRequest) : Promise<Response> {
         const startTimeMS = Date.now();
         const positionRequest = openPositionRequest.positionRequest;       
 
@@ -937,26 +938,25 @@ export class UserDO {
             'HTML',
             `<a href="${positionRequest.token.logoURI}">\u200B</a><b>${positionRequest.vsTokenAmt} SOL purchase of $${positionRequest.token.symbol}</b>: `);
 
-        const positionBuyer = new PositionBuyer(this.wallet.value!!, this.env, startTimeMS, channel, this.openPositions, this.closedPositions, this.deactivatedPositions, context);    
+        const positionBuyer = new PositionBuyer(this.wallet.value!!, this.env, startTimeMS, channel, this.openPositions, this.closedPositions, this.deactivatedPositions);    
         
         // fire-and-forget here, lack of await, but writes to storage when complete
-        context.waitUntil(
-            positionBuyer.buy(positionRequest).finally(async () => {
-                await this.flushToStorage();
-        }));
+        positionBuyer.buy(positionRequest).finally(async () => {
+            await this.flushToStorage();
+        });
 
         
         return makeJSONResponse<OpenPositionResponse>({});
     }
 
-    async handleManuallyClosePositionRequest(manuallyClosePositionRequest : ManuallyClosePositionRequest, context: FetchEvent) : Promise<Response> {
-        const response = await this.handleManuallyClosePositionRequestInternal(manuallyClosePositionRequest, context);
+    async handleManuallyClosePositionRequest(manuallyClosePositionRequest : ManuallyClosePositionRequest) : Promise<Response> {
+        const response = await this.handleManuallyClosePositionRequestInternal(manuallyClosePositionRequest);
         return makeJSONResponse<ManuallyClosePositionResponse>(response);
     }
     
-    async handleManuallyClosePositionRequestInternal(manuallyClosePositionRequest : ManuallyClosePositionRequest, context : FetchEvent) : Promise<ManuallyClosePositionResponse> {
+    async handleManuallyClosePositionRequestInternal(manuallyClosePositionRequest : ManuallyClosePositionRequest) : Promise<ManuallyClosePositionResponse> {
         const startTimeMS = Date.now();
-        const result = await this.manuallyClosePosition(manuallyClosePositionRequest.positionID, startTimeMS, context);
+        const result = await this.manuallyClosePosition(manuallyClosePositionRequest.positionID, startTimeMS);
         if (result.success === false) {
             return result;
         }
@@ -964,7 +964,7 @@ export class UserDO {
         return { success: null, reason: 'attempting-sale' };
     }
 
-    async manuallyClosePosition(positionID  : string, startTimeMS : number, context : FetchEvent) : Promise<{ success: false, reason: 'position-DNE'|'position-closing'|'position-closed'|'buy-unconfirmed' }|{ success: null, reason: 'attempting-sale' }> {
+    async manuallyClosePosition(positionID  : string, startTimeMS : number) : Promise<{ success: false, reason: 'position-DNE'|'position-closing'|'position-closed'|'buy-unconfirmed' }|{ success: null, reason: 'attempting-sale' }> {
         const position = this.openPositions.get(positionID);
         if (position == null) {
             return { success: false, reason: "position-DNE" };
@@ -985,10 +985,11 @@ export class UserDO {
         this.openPositions.mutatePosition(positionID, p => {
             p.status = PositionStatus.Closing;
         });
-        // deliberate lack of await here (fire-and-forget). But still writes to storage.  
-        context.waitUntil(positionSeller.sell(position.positionID).finally(async () => {
+        // deliberate lack of await here (fire-and-forget). But still writes to storage. 
+        // The idea is that the DO is kept alive by the alarms 
+        positionSeller.sell(position.positionID).finally(async () => {
             await this.flushToStorage();
-        }));
+        });
         // success is indeterminate (by design) (explanation: depends on what happens with the positionSeller.sell, which is unawaited, so we don't know the result yet, hence 'null')
         return { success: null, reason: 'attempting-sale' };
     }

@@ -32,15 +32,13 @@ export class PositionBuyer {
     openPositions : OpenPositionsTracker;
     closedPositions : ClosedPositionsTracker;
     deactivatedPositions : DeactivatedPositionsTracker;
-    context: FetchEvent
     constructor(wallet : Wallet, 
         env : Env,  
         startTimeMS : number,
         channel : UpdateableNotification,
         openPositions : OpenPositionsTracker,
         closedPositions : ClosedPositionsTracker,
-        deactivatedPositions : DeactivatedPositionsTracker,
-        context: FetchEvent) {
+        deactivatedPositions : DeactivatedPositionsTracker) {
         this.wallet = wallet;
         this.env = env;
         this.startTimeMS = startTimeMS;
@@ -48,7 +46,6 @@ export class PositionBuyer {
         this.openPositions = openPositions;
         this.closedPositions = closedPositions;
         this.deactivatedPositions = deactivatedPositions;
-        this.context = context;
     }
 
     async buy(positionRequest : PositionRequest) : Promise<void> {
@@ -171,7 +168,7 @@ export class PositionBuyer {
     }
     insertPosition(unconfirmedPosition: Position & { buyConfirmed: false; }, price : DecimalizedAmount, currentPriceMS : number) : { success : boolean } {
         const success = this.openPositions.insertPosition(unconfirmedPosition, price, currentPriceMS);
-        this.context.waitUntil(registerUser(unconfirmedPosition.userID, unconfirmedPosition.chatID, this.env));
+        registerUser(unconfirmedPosition.userID, unconfirmedPosition.chatID, this.env);
         return { success }; // cruft
     }
     positionExistsInTracker(positionID: string, address: string, address1: string, env: Env) : boolean {

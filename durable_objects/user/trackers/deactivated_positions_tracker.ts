@@ -2,7 +2,7 @@ import { Position } from "../../../positions";
 import { setDifference, setIntersection, structuralEquals } from "../../../util";
 
 export class DeactivatedPositionsTracker {
-    prefix : string = "deactivatedPositions";
+    prefix : string = "deactivatedPositionsTracker";
     positions : Record<string,Position> = {};
     _buffer : Record<string,Position> = {};
     constructor() {

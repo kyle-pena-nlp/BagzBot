@@ -28,7 +28,7 @@ export interface UpdatePriceParams {
 }
 
 export class OpenPositionsTracker {
-    prefix : string = "openPositions";
+    prefix : string = "openPositionsTracker";
     positions : Record<string,Position> = {};
     _buffer : Record<string,Position> = {};
     constructor() {

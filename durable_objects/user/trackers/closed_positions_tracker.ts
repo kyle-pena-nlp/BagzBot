@@ -5,7 +5,7 @@ import { setDifference, setIntersection, structuralEquals } from "../../../util"
 
 
 export class ClosedPositionsTracker {
-    prefix : string = "closedPositions";
+    prefix : string = "closedPositionsTracker";
     positions : Record<string,Position> = {};
     _buffer : Record<string,Position> = {};
     constructor() {
