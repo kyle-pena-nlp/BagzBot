@@ -5,9 +5,10 @@ import { Env } from "../../env";
 import { logDebug, logError } from "../../logging";
 import { Swappable } from "../../positions";
 import { executeAndConfirmSignedTx } from "../../rpc/rpc_execute_signed_transaction";
-import { parseParsedTransactionWithMeta } from "../../rpc/rpc_parse";
+import { ParseTransactionParams, parseParsedTransactionWithMeta } from "../../rpc/rpc_parse";
 import { ParsedSwapSummary } from "../../rpc/rpc_swap_parse_result_types";
 import { TGStatusMessage, UpdateableNotification } from "../../telegram";
+import { TokenInfo } from "../../tokens";
 import { assertNever, sleep, strictParseInt } from "../../util";
 
 export class SwapExecutor {
@@ -55,9 +56,18 @@ export class SwapExecutor {
                 return 'unconfirmed';
             }
             else if ('slot' in rawParsedTx) {
-                const inTokenAddress = this.getInTokenAddress(s);
-                const outTokenAddress = this.getOutTokenAddress(s);
-                return parseParsedTransactionWithMeta(rawParsedTx, inTokenAddress, outTokenAddress, signature, toUserAddress(this.wallet), this.env)
+                const inTokenInfo = this.getInTokenInfo(s);
+                const outTokenInfo = this.getOutTokenInfo(s);
+                const params : ParseTransactionParams = {
+                    parsedTransaction: rawParsedTx,
+                    inTokenAddress: inTokenInfo.address,
+                    inTokenType: inTokenInfo.tokenType,
+                    outTokenAddress: outTokenInfo.address,
+                    outTokenType: outTokenInfo.tokenType,
+                    signature,
+                    userAddress: toUserAddress(this.wallet)
+                }
+                return parseParsedTransactionWithMeta(params, this.env)
             }
             else {
                 assertNever(rawParsedTx);
@@ -98,26 +108,26 @@ export class SwapExecutor {
             sleep(expBackoffFactor * 500);
         }
         return 'timed-out';
-    }   
+    }
 
-    getInTokenAddress(s : Swappable) : string {
+    getInTokenInfo(s : Swappable) : TokenInfo {
         if (this.type === 'buy') {
-            return s.vsToken.address;
+            return s.vsToken;
         }
         else if (this.type === 'sell') {
-            return s.token.address;
+            return s.token;
         }
         else {
             assertNever(this.type);
         }
     }
 
-    getOutTokenAddress(s : Swappable) : string {
+    getOutTokenInfo(s : Swappable) : TokenInfo {
         if (this.type === 'buy') {
-            return s.token.address;
+            return s.token;
         }
         else if (this.type === 'sell') {
-            return s.vsToken.address;
+            return s.vsToken;
         }
         else {
             assertNever(this.type);

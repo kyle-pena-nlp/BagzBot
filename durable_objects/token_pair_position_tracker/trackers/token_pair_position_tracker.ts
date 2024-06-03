@@ -45,17 +45,7 @@ export class TokenPairPositionTracker {
         }
     }
 
-    incrementOtherSellFailureCount(positionID : string) : { success : true, newCount: number }|{ success : false } {
-        const position = this.getPosition(positionID);
-        if (position == null) {
-            return { success : false }
-        }
-        else {
-            const newCount = (position.otherSellFailureCount||0)+1; // || for backwards compat with older objects
-            position.otherSellFailureCount = newCount;
-            return { success : true, newCount }
-        }
-    }
+
 
     deleteClosedPositionsForUser(telegramUserID : number) {
         // TODO: make 2-level lookup by user.

@@ -4,7 +4,7 @@ import { SwapExecutionError } from "./rpc_swap_parse_result_types";
 
 // Reference: https://github.com/solana-labs/solana-web3.js/blob/028bdcca60ca69897ea2131e4047c607ec354a3e/packages/rpc-types/src/transaction-error.ts
 
-export function parseInstructionError(err : any, env : Env) {
+export function parseInstructionError(logs : string[], err : any, env : Env) {
 
     // wallet with 0.0 SOL is considered 'not found' even if it had SOL previously
     if (err === 'AccountNotFound') {
@@ -43,6 +43,9 @@ export function parseInstructionError(err : any, env : Env) {
     }
     else if (Custom === strictParseInt(env.JUPITER_SWAP_PROGRAM_TOKEN_ACCOUNT_FROZEN_ERROR_CODE)) {
         return SwapExecutionError.FrozenTokenAccount;
+    }
+    else if (logs.filter(l => l.includes('Program log: Error: insufficient funds')).length > 0) {
+        return SwapExecutionError.InsufficientSOLBalance; // for the time being, this means is both insufficient sol and insufficient token
     }
     else {
         return SwapExecutionError.OtherSwapExecutionError;

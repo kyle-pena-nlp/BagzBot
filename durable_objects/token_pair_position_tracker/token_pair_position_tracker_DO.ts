@@ -1,56 +1,29 @@
-import { Connection } from "@solana/web3.js";
 import { isAdminOrSuperAdmin } from "../../admins";
-import { DecimalizedAmount, dSub } from "../../decimalized";
-import { asTokenPrice, asTokenPriceDelta, toNumber } from "../../decimalized/decimalized_amount";
-import { Env, getRPCUrl } from "../../env";
+import { DecimalizedAmount } from "../../decimalized";
+import { Env } from "../../env";
 import { makeJSONResponse, makeSuccessResponse } from "../../http";
-import { logDebug, logError, logInfo } from "../../logging";
-import { MenuCode } from "../../menus";
-import { Position, PositionStatus } from "../../positions";
-import { isSuccessfullyParsedSwapSummary } from "../../rpc/rpc_swap_parse_result_types";
-import { TGStatusMessage } from "../../telegram";
+import { logDebug, logError } from "../../logging";
 import { TokenInfo } from "../../tokens";
-import { ChangeTrackedValue, assertNever, strictParseBoolean, strictParseInt } from "../../util";
-import { ensureTokenPairIsRegistered } from "../heartbeat/heartbeat_DO_interop";
+import { ChangeTrackedValue, assertNever } from "../../util";
 import { isValidTokenInfoResponse } from "../polled_token_pair_list/actions/get_token_info";
 import { getTokenInfo } from "../polled_token_pair_list/polled_token_pair_list_DO_interop";
-import { EditTriggerPercentOnOpenPositionResponse } from "../user/actions/edit_trigger_percent_on_open_position";
-import { SetSellAutoDoubleOnOpenPositionResponse } from "../user/actions/set_sell_auto_double_on_open_position";
-import { SellSellSlippagePercentageOnOpenPositionResponse } from "../user/actions/set_sell_slippage_percent_on_open_position";
-import { registerPositionAsClosed, sendClosePositionOrdersToUserDOs } from "../user/userDO_interop";
-import { ReactivatePositionInTrackerRequest, ReactivatePositionInTrackerResponse } from "./actions/activate_position_in_tracker";
 import { AdminDeleteAllInTrackerRequest, AdminDeleteAllInTrackerResponse } from "./actions/admin_delete_all_positions_in_tracker";
 import { AdminDeleteClosedPositionsForUserInTrackerRequest, AdminDeleteClosedPositionsForUserInTrackerResponse } from "./actions/admin_delete_closed_positions_for_user_in_tracker";
 import { AdminDeletePositionByIDFromTrackerRequest, AdminDeletePositionByIDFromTrackerResponse } from "./actions/admin_delete_position_by_id_from_tracker";
-import { DeactivatePositionInTrackerRequest, DeactivatePositionInTrackerResponse } from "./actions/deactivate_position_in_tracker";
-import { DoubleSellSlippageInTrackerRequest, DoubleSellSlippageInTrackerResponse } from "./actions/double_sell_slippage_in_tracker";
-import { EditTriggerPercentOnOpenPositionInTrackerRequest } from "./actions/edit_trigger_percent_on_open_position_in_tracker";
 import { GetDeactivatedPositionFromTrackerRequest, GetDeactivatedPositionFromTrackerResponse } from "./actions/get_frozen_position";
 import { GetPositionFromPriceTrackerRequest, GetPositionFromPriceTrackerResponse } from "./actions/get_position";
 import { GetPositionAndMaybePNLFromPriceTrackerRequest, GetPositionAndMaybePNLFromPriceTrackerResponse } from "./actions/get_position_and_maybe_pnl";
 import { GetPositionCountsFromTrackerRequest, GetPositionCountsFromTrackerResponse } from "./actions/get_position_counts_from_tracker";
 import { GetTokenPriceRequest, GetTokenPriceResponse } from "./actions/get_token_price";
 import { HasPairAddresses } from "./actions/has_pair_addresses";
-import { isHeartbeatRequest } from "./actions/heartbeat_wake_up_for_token_pair_position_tracker";
-import { IncrementOtherSellFailureCountInTrackerRequest, IncrementOtherSellFailureCountInTrackerResponse } from "./actions/increment_other_sell_failure_count_in_tracker";
 import { InsertPositionRequest, InsertPositionResponse } from "./actions/insert_position";
 import { ListClosedPositionsFromTrackerRequest, ListClosedPositionsFromTrackerResponse } from "./actions/list_closed_positions_from_tracker";
 import { ListDeactivatedPositionsInTrackerRequest, ListDeactivatedPositionsInTrackerResponse } from "./actions/list_frozen_positions_in_tracker";
 import { ListPositionsByUserRequest, ListPositionsByUserResponse } from "./actions/list_positions_by_user";
-import { MarkBuyAsConfirmedRequest, MarkBuyAsConfirmedResponse } from "./actions/mark_buy_as_confirmed";
-import { MarkPositionAsClosedRequest, MarkPositionAsClosedResponse } from "./actions/mark_position_as_closed";
-import { MarkPositionAsClosingRequest, MarkPositionAsClosingResponse } from "./actions/mark_position_as_closing";
-import { MarkPositionAsOpenRequest, MarkPositionAsOpenResponse } from "./actions/mark_position_as_open";
 import { PositionExistsInTrackerRequest, PositionExistsInTrackerResponse } from "./actions/position_exists_in_tracker";
 import { RemovePositionRequest, RemovePositionResponse } from "./actions/remove_position";
-import { SetOpenPositionSellPriorityFeeInTrackerRequest, SetOpenPositionSellPriorityFeeInTrackerResponse } from "./actions/set_open_position_sell_priority_fee_in_tracker";
-import { SetSellAutoDoubleOnOpenPositionInTrackerRequest } from "./actions/set_sell_auto_double_on_open_position_in_tracker";
-import { SetSellSlippagePercentOnOpenPositionTrackerRequest } from "./actions/set_sell_slippage_percent_on_open_position";
 import { UpdatePositionRequest, UpdatePositionResponse } from "./actions/update_position";
-import { UpdatePriceRequest, UpdatePriceResponse } from "./actions/update_price";
 import { WakeupTokenPairPositionTrackerRequest, WakeupTokenPairPositionTrackerResponse } from "./actions/wake_up";
-import { BuyConfirmer } from "./confirmers/buy_confirmer";
-import { SellConfirmer } from "./confirmers/sell_confirmer";
 import { PositionAndMaybePNL } from "./model/position_and_PNL";
 import { TokenPairPositionTrackerDOFetchMethod, parseTokenPairPositionTrackerDOFetchMethod } from "./token_pair_position_tracker_DO_interop";
 import { CurrentPriceTracker } from "./trackers/current_price_tracker";
@@ -84,6 +57,7 @@ export class TokenPairPositionTrackerDO {
     
     
     // this performs all the book keeping and determines what RPC actions to take
+    // THIS WILL BE REMOVED SHORTLY.
     tokenPairPositionTracker : TokenPairPositionTracker = new TokenPairPositionTracker();
     
     // this contains (and queries for) the current price of the pair in $token/$vsToken
@@ -138,74 +112,12 @@ export class TokenPairPositionTrackerDO {
         });
     }
 
-    shouldBePolling() : boolean {
-        if (strictParseBoolean(this.env.DOWN_FOR_MAINTENANCE)) {
-            return false;
-        }
-        if (!strictParseBoolean(this.env.POLLING_ON)) {
-            //logDebug(`${this.tokenPairID()} Price polling is turned off AND should not be price polling.`)
-            return false;
-        }
-        if (!this.hasTokenAddresses()) {
-            //logDebug(`${this.tokenPairID()} not initialized AND should not be price polling.`)
-            return false;
-        }
-        const anyPositionsToTrack = this.tokenPairPositionTracker.any();
-        if (!anyPositionsToTrack) {
-            //logDebug(`${this.tokenPairID()} - No positions to track AND should not be price polling.`);
-            return false;
-        }
-        return true;
-    }
-
     hasTokenAddresses() : this is { vsTokenAddress : { value : string }, tokenAddress : { value : string } } {
         return  this.vsTokenAddress.value != null && 
                 this.tokenAddress.value != null;
     }
 
-    async alarm() {
-        //logDebug(`Invoking alarm. ${this.tokenAddress.value}`);        
-        try {
-            await this._alarm();
-        }
-        catch(e : any) {
-            logError("alarm execution failed", this.tokenPairID(), e);
-        }
-        finally {
-            await this.flushToStorage();
-            //logDebug(`Finished Invoking alarm. ${this.tokenAddress.value}`);
-        }
-    }
-
-    async _alarm() {
-        if (this.tokenAddress.value == null || this.vsTokenAddress.value == null) {
-            throw new Error("Couldn't get token price because token pair addresses not initialized");
-        }        
-        const beginExecutionTime = Date.now();
-        await this.state.storage.deleteAlarm();
-        try {
-            const price = await this.getPrice();
-            if (price != null) {
-                await this.performTriggeredPriceUpdateActions({ price, tokenAddress: this.tokenAddress.value, vsTokenAddress: this.vsTokenAddress.value });
-            }
-            else {
-                logError("Could not retrieve price", this);
-            }
-        }
-        catch(e) {
-            logError("Price polling failed.", e, this.tokenAddress, this.vsTokenAddress);
-        }
-        if (!this.shouldBePolling()) {
-            logDebug(`Turning off polling for ${this.tokenPairID()} - no longer needed`)
-            this.isPolling = false;
-            return;
-        }
-        else {
-            await this.scheduleNextPoll(beginExecutionTime);
-        }
-    }
-
-    async getPrice() : Promise<DecimalizedAmount|null> {
+    async getPrice() : Promise<{ price : DecimalizedAmount, currentPriceMS : number }|null> {
         if (this.tokenAddress.value == null || this.vsTokenAddress.value == null) {
             return null;
         }
@@ -215,11 +127,11 @@ export class TokenPairPositionTrackerDO {
         }
         const result = await this.currentPriceTracker.getPrice(this.tokenInfo.value, this.vsTokenAddress.value, this.env)
         if (result != null) {
-            const [price,isNew] = result;
-            if (isNew) {
+            const { price,newPrice,currentPriceMS } = result;
+            /*if (isNew) {
                 this.tokenPairPositionTracker.updatePrice(price);
-            }
-            return price;
+            }*/
+            return { price, currentPriceMS };
         } 
         return null;
     }
@@ -237,31 +149,12 @@ export class TokenPairPositionTrackerDO {
         return `${this.tokenAddress.value}:${this.vsTokenAddress.value}`;
     }
 
-    async scheduleNextPoll(begin : number) {
-        this.isPolling = true;
-        const end = Date.now();
-        const elapsed = end - begin;
-        const pricePollInterval = strictParseInt(this.env.PRICE_POLL_INTERVAL_MS);
-        if (elapsed > pricePollInterval) {
-            logInfo("Tracker ran longer than 1s", this.tokenAddress, this.vsTokenAddress);
-        }
-        const remainder = elapsed % pricePollInterval;
-        const nextAlarm = pricePollInterval - remainder;
-        const alarmTime = Date.now() + nextAlarm;
-        await this.state.storage.setAlarm(alarmTime);
-    }
-
     async fetch(request : Request) : Promise<Response> {
         const [method,body] = await this.validateFetchRequest(request);
         logDebug(`[[${method}]] :: tracker :: ${(this.tokenAddress.value||'').slice(0,10)}`);
         try {
-            // ensure the token is registered with heartbeatDO
-            if (!isHeartbeatRequest(body)) {
-                this.tryToEnsureTokenPairIsRegistered();
-            }
             // ONLY DEV! this.__xDELETE_ALL_POSITIONSx(); // ONLY DEV!
             const response = await this._fetch(method,body);
-            this.ensureIsPollingPrice();
             return response;
         }
         catch(e : any) {
@@ -287,64 +180,8 @@ export class TokenPairPositionTrackerDO {
         }
     }*/
 
-    async ensureIsPollingPrice() {
-        const shouldBePolling = this.shouldBePolling();
-        if (shouldBePolling && !this.isPolling) {
-            logDebug(`${this.tokenPairID()} - not price polling and should be. scheduling next price poll.`)
-            this.scheduleNextPoll(Date.now());
-        }
-        else if (shouldBePolling && this.isPolling) {
-            // too chatty
-            //logDebug("Price polling should be on and *is* on - no polling scheduling necessary");
-        }
-        else if (!shouldBePolling && this.isPolling) {
-            logDebug(`${this.tokenPairID()} - price polling is on but shouldn't be - not rescheduling polling`);
-        }
-        else if (!shouldBePolling && !this.isPolling) {
-            // too chatty
-            //logDebug(`${this.tokenPairID()} - price polling not activated, polling already turned off`);
-        }
-    }
-
-    async tryToEnsureTokenPairIsRegistered() {
-        if (this.needsToEnsureIsRegistered()) {
-            const tokenAddress = this.tokenAddress.value;
-            const vsTokenAddress = this.vsTokenAddress.value;
-            if (tokenAddress == null) {
-                logError(`Could not register ${this.tokenPairID()} with heartBeat - tokenAddress was null`);
-                return;
-            }
-            if (vsTokenAddress == null) {
-                logError(`Could not register ${this.tokenPairID()} with heartBeat - vsTokenAddress was null`);
-                return;
-            }
-            //logDebug(`Registering token pair ${this.tokenPairID()}`);
-            await ensureTokenPairIsRegistered(tokenAddress, vsTokenAddress, this.env).then(() => {
-                //this.needsToEnsureIsRegistered = false;
-                this.lastTimeMSRegisteredWithHeartbeat.value = Date.now();
-                //logDebug(`Token pair ${tokenAddress}:${vsTokenAddress} is now registered with heartbeat!`);
-            })
-        }
-    }
-
-    needsToEnsureIsRegistered() : boolean {
-        // Only need to ensure registered with heartbeat if haven't done so in 1 min
-        // heartbeat touches the tracker to make sure it is scheduling alarms if it needs to
-        // if only DO's had CRON jobs :(
-        // TODO: configurable?
-        return (Date.now() - this.lastTimeMSRegisteredWithHeartbeat.value) > 60000;
-    }
-
     async _fetch(method : TokenPairPositionTrackerDOFetchMethod, body : any) : Promise<Response> {
-        switch(method) {
-            case TokenPairPositionTrackerDOFetchMethod.updatePrice:
-                return await this.performTriggeredPriceUpdateActions(body);
-            case TokenPairPositionTrackerDOFetchMethod.markPositionAsClosing:
-                return await this.handleMarkPositionAsClosing(body);
-            case TokenPairPositionTrackerDOFetchMethod.markPositionAsClosed:
-                return await this.handleMarkPositionAsClosed(body);
-            case TokenPairPositionTrackerDOFetchMethod.markPositionAsOpen:
-                return await this.handleMarkPositionAsOpen(body);                
+        switch(method) {                
             case TokenPairPositionTrackerDOFetchMethod.wakeUp:
                 return await this.handleWakeup(body);
             case TokenPairPositionTrackerDOFetchMethod.getTokenPrice:
@@ -357,21 +194,10 @@ export class TokenPairPositionTrackerDO {
                 return await this.handleGetPositionAndMaybePNL(body);
             case TokenPairPositionTrackerDOFetchMethod.getPosition:
                 return await this.handleGetPosition(body);
-            case TokenPairPositionTrackerDOFetchMethod.editTriggerPercentOnOpenPosition:
-                return await this.handleEditTriggerPercentOnOpenPosition(body);
-            case TokenPairPositionTrackerDOFetchMethod.setSellAutoDoubleOnOpenPosition:
-                return await this.handleSetSellAutoDoubleOnOpenPosition(body);
-            case TokenPairPositionTrackerDOFetchMethod.adminInvokeAlarm:
-                await this.alarm();
-                return makeJSONResponse<{}>({});
             case TokenPairPositionTrackerDOFetchMethod.adminDeleteAllInTracker:
                 return await this.handleAdminDeleteAllInTracker(body);
             case TokenPairPositionTrackerDOFetchMethod.positionExists:
                 return await this.handlePositionExistsInTracker(body);
-            case TokenPairPositionTrackerDOFetchMethod.markBuyAsConfirmed:
-                return await this.handleMarkBuyAsConfirmed(body);
-            case TokenPairPositionTrackerDOFetchMethod.setSellSlippagePercentOnOpenPosition:
-                return await this.handleSetSellSlippagePercentOnOpenPosition(body);
             case TokenPairPositionTrackerDOFetchMethod.listClosedPositionsFromTracker:
                 return await this.handleListClosedPositionsFromTracker(body);
             case TokenPairPositionTrackerDOFetchMethod.insertPosition:
@@ -384,76 +210,19 @@ export class TokenPairPositionTrackerDO {
                 return await this.handleAdminDeleteClosedPositionsForUser(body);
             case TokenPairPositionTrackerDOFetchMethod.adminDeletePositionByIDFromTracker:
                 return await this.handleAdminDeletePositionByID(body);
-            case TokenPairPositionTrackerDOFetchMethod.deactivatePosition:
-                return await this.handleDeactivatePosition(body);
-            case TokenPairPositionTrackerDOFetchMethod.reactivatePosition:
-                return await this.handleReactivatePosition(body);
             case TokenPairPositionTrackerDOFetchMethod.listDeactivatedPositions:
                 return await this.handleListDeactivatedPositions(body);
             case TokenPairPositionTrackerDOFetchMethod.getDeactivatedPosition:
                 return await this.handleGetDeactivatedPosition(body);
-            case TokenPairPositionTrackerDOFetchMethod.incrementOtherSellFailureCount:
-                return await this.handleIncrementOtherSellFailureCount(body);
-            case TokenPairPositionTrackerDOFetchMethod.doubleSellSlippage:
-                return await this.handleDoubleSellSlippageInTracker(body);
-            case TokenPairPositionTrackerDOFetchMethod.setOpenPositionSellPriorityFee:
-                return await this.handleSetOpenPositionSellPriorityFee(body);
             default:
                 assertNever(method);
         }
     }
 
-    async handleSetOpenPositionSellPriorityFee(body : SetOpenPositionSellPriorityFeeInTrackerRequest) : Promise<Response> {
-        const response = await this.handleSetOpenPositionSellPriorityFeeInternal(body);
-        return makeJSONResponse<SetOpenPositionSellPriorityFeeInTrackerResponse>(response);
-    }
-
-    async handleSetOpenPositionSellPriorityFeeInternal(body: SetOpenPositionSellPriorityFeeInTrackerRequest) : Promise<SetOpenPositionSellPriorityFeeInTrackerResponse> {
-        const position = this.tokenPairPositionTracker.getPosition(body.positionID);
-        if (position == null) {
-            return {};
-        }
-        else if (position.status !== PositionStatus.Open) {
-            return {};
-        }
-        position.sellPriorityFeeAutoMultiplier = body.multiplier;
-        return {};
-    }
-
-    async handleDoubleSellSlippageInTracker(body: DoubleSellSlippageInTrackerRequest) : Promise<Response> {
-        if (body.markAsOpen) {
-            this.tokenPairPositionTracker.markPositionAsOpen(body.positionID);
-        }
-        this.tokenPairPositionTracker.doubleSellSlippage(body.positionID);
-        return makeJSONResponse<DoubleSellSlippageInTrackerResponse>({});
-    }
-
-    async handleIncrementOtherSellFailureCount(body : IncrementOtherSellFailureCountInTrackerRequest) : Promise<Response> {
-        const result = this.tokenPairPositionTracker.incrementOtherSellFailureCount(body.positionID);
-        return makeJSONResponse<IncrementOtherSellFailureCountInTrackerResponse>(result)
-    }
-
+    
     async handleGetDeactivatedPosition(body: GetDeactivatedPositionFromTrackerRequest) : Promise<Response> {
         const deactivatedPosition = this.tokenPairPositionTracker.getDeactivatedPosition(body.telegramUserID, body.positionID);
         return makeJSONResponse<GetDeactivatedPositionFromTrackerResponse>({ deactivatedPosition });
-    }
-
-    async handleDeactivatePosition(body: DeactivatePositionInTrackerRequest) : Promise<Response> {
-        // If the position is an auto-sell that's failing, mark as open first.
-        if (body.markOpenBeforeDeactivating) {
-            this.tokenPairPositionTracker.markPositionAsOpen(body.positionID);
-        }
-        const success = this.tokenPairPositionTracker.deactivatePosition(body.positionID);
-        return makeJSONResponse<DeactivatePositionInTrackerResponse>({ success });
-    }
-
-    async handleReactivatePosition(body: ReactivatePositionInTrackerRequest): Promise<Response> {
-        const currentPrice = await this.getPrice();
-        if (currentPrice == null) {
-            return makeJSONResponse<ReactivatePositionInTrackerResponse>({ success: false })
-        }
-        const success = this.tokenPairPositionTracker.reactivatePosition(body.userID, body.positionID, currentPrice);
-        return makeJSONResponse<ReactivatePositionInTrackerResponse>({ success });
     }
 
     async handleListDeactivatedPositions(body: ListDeactivatedPositionsInTrackerRequest) : Promise<Response> {
@@ -497,11 +266,12 @@ export class TokenPairPositionTrackerDO {
     }
 
     async handleInsertPosition(body: InsertPositionRequest) : Promise<Response> {
-        const currentPrice = await this.getPrice();
-        if (currentPrice == null) {
+        const result = await this.getPrice();
+        if (result == null) {
             return makeJSONResponse<InsertPositionResponse>({ success: false });
         }
-        const success = this.tokenPairPositionTracker.insertPosition(body.position, currentPrice);
+        const { price, currentPriceMS } = result;
+        const success = this.tokenPairPositionTracker.insertPosition(body.position, price);
         return makeJSONResponse<InsertPositionResponse>({ success });
     }
 
@@ -514,30 +284,6 @@ export class TokenPairPositionTrackerDO {
         const closedPositions = this.tokenPairPositionTracker.listClosedPositionsForUser(body.telegramUserID);
         const response : ListClosedPositionsFromTrackerResponse = { closedPositions: closedPositions };
         return makeJSONResponse<ListClosedPositionsFromTrackerResponse>(response);
-    }
-
-    async handleSetSellSlippagePercentOnOpenPosition(body : SetSellSlippagePercentOnOpenPositionTrackerRequest) : Promise<Response> {
-        const response = await this.handleSetSellSlippagePercentOnOpenPositionInternal(body);
-        return makeJSONResponse<SellSellSlippagePercentageOnOpenPositionResponse>(response);
-    }
-
-    async handleSetSellSlippagePercentOnOpenPositionInternal(body : SetSellSlippagePercentOnOpenPositionTrackerRequest) : Promise<SellSellSlippagePercentageOnOpenPositionResponse> {
-        const positionID = body.positionID;
-        const currentPrice = await this.getPrice();
-        const positionAndMaybePNL = this.tokenPairPositionTracker.getPositionAndMaybePNL(positionID,currentPrice);
-        if (positionAndMaybePNL != null && positionAndMaybePNL.position.status === PositionStatus.Open) {
-            positionAndMaybePNL.position.sellSlippagePercent = body.sellSlippagePercent;
-        }
-        return { positionAndMaybePNL: positionAndMaybePNL||null };
-    }
-
-    async handleMarkBuyAsConfirmed(body: MarkBuyAsConfirmedRequest) : Promise<Response> {
-        const pos = this.tokenPairPositionTracker.getPosition(body.positionID);
-        if (pos != null) {
-            pos.buyConfirmed = true;
-        }
-        const responseBody : MarkBuyAsConfirmedResponse = {};
-        return makeJSONResponse<MarkBuyAsConfirmedResponse>(responseBody);
     }
 
     async handlePositionExistsInTracker(body : PositionExistsInTrackerRequest) : Promise<Response> {
@@ -559,58 +305,6 @@ export class TokenPairPositionTrackerDO {
         return makeJSONResponse<AdminDeleteAllInTrackerResponse>({});
     }
 
-    async handleSetSellAutoDoubleOnOpenPosition(body : SetSellAutoDoubleOnOpenPositionInTrackerRequest) : Promise<Response> {
-        const response = this.handleSetSellAutoDoubleOnOpenPositionInternal(body);
-        return makeJSONResponse<SetSellAutoDoubleOnOpenPositionResponse>(response);
-    }
-
-    private async handleSetSellAutoDoubleOnOpenPositionInternal(body : SetSellAutoDoubleOnOpenPositionInTrackerRequest) : Promise<SetSellAutoDoubleOnOpenPositionResponse> {
-        const positionID = body.positionID;
-        const position = this.tokenPairPositionTracker.getPosition(positionID);
-        if (position == null) {
-            return {};
-        }
-        if (position.status !== PositionStatus.Open) {
-            return {}; // TODO: status
-        }
-        position.sellAutoDoubleSlippage = body.choice;
-        return {};
-    }
-
-    async handleEditTriggerPercentOnOpenPosition(body : EditTriggerPercentOnOpenPositionInTrackerRequest) : Promise<Response> {
-        const response = await this.handleEditTriggerPercentOnOpenPositionInternal(body);
-        return makeJSONResponse<EditTriggerPercentOnOpenPositionResponse>(response);
-    }
-
-    private async handleEditTriggerPercentOnOpenPositionInternal(body: EditTriggerPercentOnOpenPositionInTrackerRequest) : Promise<EditTriggerPercentOnOpenPositionResponse> {
-        const positionID = body.positionID;
-        const percent = body.percent;
-        if (percent <= 0 || percent >= 100) {
-            return 'invalid-percent';
-        }
-        if (!this.hasTokenAddresses()) {
-            throw new Error("Not initialized");
-        }
-        const currentPrice = await this.getPrice();
-        const positionAndMaybePNL = this.tokenPairPositionTracker.getPositionAndMaybePNL(positionID, currentPrice);
-        if (positionAndMaybePNL == null) {
-            return 'position-DNE';
-        }
-        else if (positionAndMaybePNL.position.status === PositionStatus.Closing) {
-            return 'is-closing';
-        }
-        else if (positionAndMaybePNL.position.status === PositionStatus.Closed) {
-            return 'is-closed';
-        }
-        else if (positionAndMaybePNL.position.status === PositionStatus.Open) {
-            positionAndMaybePNL.position.triggerPercent = percent;
-            return positionAndMaybePNL;
-        }
-        else {
-            assertNever(positionAndMaybePNL.position.status);
-        }
-    }
-
     async handleGetPosition(body: GetPositionFromPriceTrackerRequest) : Promise<Response> {
         const positionID = body.positionID;
         const maybePosition = this.tokenPairPositionTracker.getPosition(positionID);
@@ -629,7 +323,11 @@ export class TokenPairPositionTrackerDO {
             return undefined;
         }
         const positionID = body.positionID;
-        const currentPrice = await this.getPrice();
+        const result = await this.getPrice();
+        let currentPrice : DecimalizedAmount|null = null;
+        if (result != null) {
+            currentPrice = result.price;
+        }
         const maybePosition = this.tokenPairPositionTracker.getPositionAndMaybePNL(positionID, currentPrice);
         return maybePosition;
     }
@@ -654,7 +352,11 @@ export class TokenPairPositionTrackerDO {
             logError("Tried to list positions yet tokenPairPositionTracker wasn't initialized", this);
             return [];
         }
-        const currentPrice = await this.getPrice();
+        const result = await this.getPrice();
+        let currentPrice : DecimalizedAmount|null = null;
+        if (result != null) {
+            currentPrice = result.price;
+        }
         const userID = body.telegramUserID;
         const positions = this.tokenPairPositionTracker.listByUser(userID, currentPrice);
         return positions;
@@ -664,207 +366,18 @@ export class TokenPairPositionTrackerDO {
         if (this.tokenAddress.value == null || this.vsTokenAddress.value == null) {
             throw new Error("Couldn't get token price because token pair addresses not initialized");
         }
-        const price = await this.getPrice();
-        return makeJSONResponse<GetTokenPriceResponse>({ price : price });
+        const result = await this.getPrice();
+        if (result != null) {
+            return makeJSONResponse<GetTokenPriceResponse>({ price : result.price, currentPriceMS: result.currentPriceMS });
+        }
+        else {
+            return makeJSONResponse<GetTokenPriceResponse>({ price : null, currentPriceMS: 0 });
+        }
     }
 
     async handleWakeup(body : WakeupTokenPairPositionTrackerRequest) {
         // this is a no-op, because by simply calling a request we wake up the DO
         const responseBody : WakeupTokenPairPositionTrackerResponse = {};
-         // deliberate lack of await, but still writes to storage when complete.
-        this.performWakupActions().finally(async () => {
-            logDebug(`Finished wakeup. ${this.tokenAddress.value}`);
-            await this.flushToStorage();
-        });
-        return makeJSONResponse(responseBody);
-    }
-
-    async performWakupActions() {
-
-        const startTimeMS = Date.now();
-        const connection = new Connection(getRPCUrl(this.env));
-
-        const unconfirmedBuys : { type: 'buy', pos : Position & { buyConfirmed: false } }[] = this.tokenPairPositionTracker.getUnconfirmedBuys().map(x => { return { type : 'buy', pos: x }; });
-        const unconfirmedSells : { type : 'sell', pos: Position & { sellConfirmed : false } }[] = this.tokenPairPositionTracker.getUnconfirmedSells().map(x => { return { type : 'sell', pos : x }});
-        const allThingsToDo = [...unconfirmedBuys, ...unconfirmedSells];
-        allThingsToDo.sort(x => -toNumber(x.pos.vsTokenAmt));
-
-        const buyConfirmer = new BuyConfirmer(connection, startTimeMS, this.env);
-        const sellConfirmer = new SellConfirmer(connection, startTimeMS, this.env);
-
-        // TODO: put this case-by-case logic into the confirmer or a separate handler class
-
-        for (const { type, pos } of allThingsToDo) {
-            if (type === 'buy') {
-                if (buyConfirmer.isTimedOut()) {
-                    continue;
-                }
-                // hack to prevent confirm attempts from firing off during buy. TODO: less hacky way to do this.
-                const tooLittleTimeHasPassedSinceBuyAttempt = pos.txBuyAttemptTimeMS != null && pos.txBuyAttemptTimeMS > (Date.now() - strictParseInt(this.env.TX_TIMEOUT_MS));
-                if (tooLittleTimeHasPassedSinceBuyAttempt) {
-                    continue;
-                }                
-                const buyConfirmPrefix = `:notify: <b>Attempting to confirm your earlier purchase of ${asTokenPrice(pos.tokenAmt)} ${pos.token.symbol}</b>: `;
-                const channel = TGStatusMessage.createAndSend('In progress...', false, pos.chatID, this.env, 'HTML', buyConfirmPrefix);
-                const confirmedBuy = await buyConfirmer.confirmBuy(pos);
-                if (confirmedBuy === 'api-error') {
-                    TGStatusMessage.queue(channel, "We had a hard time confirming the purchase - sorry, we will retry confirmation again soon.", true);
-                    break;
-                }
-                else if (confirmedBuy === 'unconfirmed') {
-                    TGStatusMessage.queue(channel, "We had a hard time confirming the purchase because of network congestion or the transaction happened too recently - sorry, we will retry confirmation again soon.", true);
-                    continue;
-                }
-                else if (confirmedBuy === 'failed') {
-                    TGStatusMessage.queue(channel, "After checking, we found that the purchase didn't go through.", true);
-                    this.tokenPairPositionTracker.removePosition(pos.positionID);
-                }
-                else if (confirmedBuy === 'frozen-token-account') {
-                    TGStatusMessage.queue(channel, `After checking, we found that the purchase didn't go through because $${pos.token.symbol} has been frozen due to suspicious activity.`, true);
-                    this.tokenPairPositionTracker.removePosition(pos.positionID);
-                }
-                else if (confirmedBuy === 'insufficient-sol') {
-                    TGStatusMessage.queue(channel, `After checking, we found that the purchase didn't go through because there wasn't enough SOL in your account to cover the purchase`, true);
-                    this.tokenPairPositionTracker.removePosition(pos.positionID);
-                }
-                else if (confirmedBuy === 'slippage-failed') {
-                    TGStatusMessage.queue(channel, `After checking, we found that the purchase didn't go through because the slippage tolerance was exceeded`, true);
-                    this.tokenPairPositionTracker.removePosition(pos.positionID);
-                }
-                else if (confirmedBuy === 'token-fee-account-not-initialized') {
-                    TGStatusMessage.queue(channel, `After checking, we found that the purchase didn't complete.`, true);
-                    this.tokenPairPositionTracker.removePosition(pos.positionID);
-                }
-                else if (confirmedBuy === 'insufficient-tokens-balance') {
-                    // This shouldn't happen because we can't have too few of the tokens we are currently buying
-                    // But I include this case to make TS happy
-                    TGStatusMessage.queue(channel, `After checking, we found that there were not enough tokens to cover the purchase.`, true);
-                    this.tokenPairPositionTracker.removePosition(pos.positionID);
-                }
-                else if ('positionID' in confirmedBuy) {
-                    // TODO: specific method just to handle changes made by confirmer.
-                    TGStatusMessage.queue(channel, "We were able to confirm this purchase! It will be listed in your open positions.", true);
-                    this.tokenPairPositionTracker.updatePosition(confirmedBuy);
-                }
-                else {
-                    assertNever(confirmedBuy);
-                }
-                TGStatusMessage.finalize(channel);
-            }
-            else if (type === 'sell') {
-                // TODO: on confirm, too many errors
-                if (sellConfirmer.isTimedOut()) {
-                    continue;
-                }
-                // hack to prevent confirm attempts from firing off during sale. TODO: less hacky way to do this.
-                const tooLittleTimeHasPassedSinceSellAttempt = pos.txSellAttemptTimeMS != null && pos.txSellAttemptTimeMS > (Date.now() - strictParseInt(this.env.TX_TIMEOUT_MS));
-                if (tooLittleTimeHasPassedSinceSellAttempt) {
-                    continue;
-                }
-                const sellConfirmPrefix = `:notify: <b>Attempting to confirm the earlier sale of ${asTokenPrice(pos.tokenAmt)} $${pos.token.symbol}</b>: `;
-                const channel = TGStatusMessage.createAndSend('In progress...', false, pos.chatID, this.env, 'HTML', sellConfirmPrefix);
-                const confirmedSellStatus = await sellConfirmer.confirmSell(pos);
-                if (confirmedSellStatus === 'api-error') {
-                    await TGStatusMessage.finalMessage(channel, "Confirmation not complete - we will continue soon.", true);
-                    // no action on position in tracker because could not complete confirmation
-                    break;
-                }
-                else if (confirmedSellStatus === 'unconfirmed') {
-                    await TGStatusMessage.finalMessage(channel, "Confirmation not complete - we will continue soon.", true);
-                    // no action on position in tracker because could not confirm outcome
-                    continue;
-                }
-                else if (confirmedSellStatus === 'tx-was-dropped') {
-                    await TGStatusMessage.finalMessage(channel, "We found that the sale didn't go through.", true);
-                    this.tokenPairPositionTracker.markPositionAsOpen(pos.positionID);                
-                }
-                else if (confirmedSellStatus === 'other-failed') {
-                    const max_other_sell_failures = strictParseInt(this.env.OTHER_SELL_FAILURES_TO_DEACTIVATE);
-                    if ((pos.otherSellFailureCount)||0+1 >= max_other_sell_failures) {
-                        this.tokenPairPositionTracker.markPositionAsOpen(pos.positionID);
-                        this.tokenPairPositionTracker.deactivatePosition(pos.positionID);
-                        await TGStatusMessage.finalMessage(channel, `Sale of this position failed for an unknown reason ${max_other_sell_failures} or more times, so this position will be deactivated.`, MenuCode.ViewDeactivatedPositions);                        
-                    }
-                    else {
-                        this.tokenPairPositionTracker.incrementOtherSellFailureCount(pos.positionID);
-                        this.tokenPairPositionTracker.markPositionAsOpen(pos.positionID);
-                        await TGStatusMessage.finalMessage(channel, "We found that the sale didn't go through.", true);
-                    }
-                }
-                else if (confirmedSellStatus === 'slippage-failed') {
-                    if (pos.sellAutoDoubleSlippage && strictParseBoolean(this.env.ALLOW_CHOOSE_AUTO_DOUBLE_SLIPPAGE)) {
-                        const maxSlippage = 100;
-                        const sellSlippagePercent = Math.min(maxSlippage, 2 * pos.sellSlippagePercent);
-                        await TGStatusMessage.finalMessage(channel, "The sale failed due to slippage.  We have increased the slippage to ${sellSlippagePercent}% and will retry the sale if the trigger conditions holds.", true);
-                        this.tokenPairPositionTracker.updateSlippage(pos.positionID,sellSlippagePercent);
-                        this.tokenPairPositionTracker.markPositionAsOpen(pos.positionID);
-                    }
-                    else {
-                        await TGStatusMessage.finalMessage(channel, `The sale failed due to slippage. We will re-sell if the price continues to stay ${pos.triggerPercent.toFixed(1)}% below the peak.`, true);
-                        this.tokenPairPositionTracker.markPositionAsOpen(pos.positionID);
-                    }
-                }
-                else if (confirmedSellStatus === 'frozen-token-account') {
-                    await TGStatusMessage.finalMessage(channel, "The sale didn't go through because this token has been frozen (most likely it was rugged).  The position has been deactivated.", true);
-                    this.tokenPairPositionTracker.markPositionAsOpen(pos.positionID);
-                    this.tokenPairPositionTracker.deactivatePosition(pos.positionID);
-                }
-                else if (confirmedSellStatus === 'insufficient-sol') {
-                    await TGStatusMessage.finalMessage(channel, "We found that the sale didn't go through because there wasn't enough SOL in your wallet to cover transaction fees. The position has been deactivated.", true);
-                    this.tokenPairPositionTracker.markPositionAsOpen(pos.positionID);
-                    this.tokenPairPositionTracker.deactivatePosition(pos.positionID);
-                }
-                else if (confirmedSellStatus === 'token-fee-account-not-initialized') {
-                    this.tokenPairPositionTracker.markPositionAsOpen(pos.positionID);
-                    this.tokenPairPositionTracker.deactivatePosition(pos.positionID);
-                    await TGStatusMessage.finalMessage(channel, "We found that the sale didn't go through because of an error on our platform. The position has been deactivated.", true);
-                }
-                else if (confirmedSellStatus === 'insufficient-tokens-balance') {
-                    this.tokenPairPositionTracker.markPositionAsOpen(pos.positionID);
-                    this.tokenPairPositionTracker.deactivatePosition(pos.positionID);
-                    await TGStatusMessage.finalMessage(channel, "We found that the sale didn't go through because there were not enough tokens in your wallet to cover the sale. The position has been deactivated.", true);
-                }
-                else if (isSuccessfullyParsedSwapSummary(confirmedSellStatus)) {
-                    // TODO: update with PnL               
-                    const netPNL = dSub(confirmedSellStatus.swapSummary.outTokenAmt, pos.vsTokenAmt);
-                    this.tokenPairPositionTracker.closePosition(pos.positionID, netPNL);
-                    await this.registerPositionAsClosedForUser(pos);
-                    await TGStatusMessage.finalMessage(channel, `The sale was confirmed! You made ${asTokenPriceDelta(netPNL)} SOL.`, MenuCode.ViewPNLHistory); 
-                }
-                else {
-                    assertNever(confirmedSellStatus);
-                }
-            }
-            else {
-                assertNever(type);
-            }
-        }
-    }
-
-    async registerPositionAsClosedForUser(pos : Position) : Promise<void> {
-        await registerPositionAsClosed(pos.userID, pos.chatID, pos.positionID, pos.token.address, pos.vsToken.address, this.env).catch(e => {
-            logError("Failed to register position as closed for user.", pos);
-        });
-    }
-
-    async handleMarkPositionAsClosed(body: MarkPositionAsClosedRequest) : Promise<Response> {
-        this.ensureIsInitialized(body);
-        this.tokenPairPositionTracker.closePosition(body.positionID, body.netPNL);
-        const responseBody : MarkPositionAsClosedResponse = { success: true };
-        return makeJSONResponse(responseBody);
-    }
-
-    async handleMarkPositionAsClosing(body : MarkPositionAsClosingRequest): Promise<Response> {
-        this.ensureIsInitialized(body);
-        this.tokenPairPositionTracker.markPositionAsClosing(body.positionID);
-        const responseBody : MarkPositionAsClosingResponse = {};
-        return makeJSONResponse(responseBody);
-    }
-
-    async handleMarkPositionAsOpen(body: MarkPositionAsOpenRequest) : Promise<Response> {
-        this.ensureIsInitialized(body);
-        this.tokenPairPositionTracker.markPositionAsOpen(body.positionID);
-        const responseBody : MarkPositionAsOpenResponse = {};
         return makeJSONResponse(responseBody);
     }
 
@@ -877,18 +390,28 @@ export class TokenPairPositionTrackerDO {
         }
         // NOTE: A heartbeat request is the only exception to the rule
         // that all requests must have tokenAddress and vsTokenAddress identified.
-        if (!(isHeartbeatRequest(jsonBody))) {
-            const tokenAddress = jsonBody.tokenAddress;
-            const vsTokenAddress = jsonBody.vsTokenAddress;
-            if (this.tokenAddress.value != null && tokenAddress != this.tokenAddress.value) {
-                throw new Error(`tokenAddress did not match expected tokenAddress. Expected: ${this.tokenAddress.value} Was: ${tokenAddress}`);
-            }
-            if (this.vsTokenAddress.value != null && vsTokenAddress != this.vsTokenAddress.value) {
-                throw new Error(`vsTokenAddress did not match expected vsTokenAddress. Expected: ${this.vsTokenAddress.value} Was: ${vsTokenAddress}`);
-            }
-            this.tokenAddress.value = tokenAddress;
-            this.vsTokenAddress.value = vsTokenAddress;
+        
+        const tokenAddress = jsonBody?.tokenAddress;
+
+        if (tokenAddress == null) {
+            throw new Error("Request did not have tokenAddress");
         }
+
+        const vsTokenAddress = jsonBody?.vsTokenAddress;
+
+        if (vsTokenAddress == null) {
+            throw new Error("Request did not have vsTokenAddress");
+        }
+
+        if (this.tokenAddress.value != null && tokenAddress != this.tokenAddress.value) {
+            throw new Error(`tokenAddress did not match expected tokenAddress. Expected: ${this.tokenAddress.value} Was: ${tokenAddress}`);
+        }
+        if (this.vsTokenAddress.value != null && vsTokenAddress != this.vsTokenAddress.value) {
+            throw new Error(`vsTokenAddress did not match expected vsTokenAddress. Expected: ${this.vsTokenAddress.value} Was: ${vsTokenAddress}`);
+        }
+        this.tokenAddress.value = tokenAddress;
+        this.vsTokenAddress.value = vsTokenAddress;
+        
         return [method,jsonBody];
     }
 
@@ -896,26 +419,6 @@ export class TokenPairPositionTrackerDO {
         if (!this.hasTokenAddresses()) {
             throw new Error("Must initialized before using");
         }
-    }
-
-    async performTriggeredPriceUpdateActions(request : UpdatePriceRequest) : Promise<Response> {
-
-        this.ensureIsInitialized(request);
-        
-        const newPrice = request.price;
-        
-        this.tokenPairPositionTracker.updatePrice(newPrice);
-
-        const positionsToClose = this.tokenPairPositionTracker.collectPositionsToClose(newPrice);
-        
-        // biggest SOL purchase first (highest priority)
-        positionsToClose.sort(p => -toNumber(p.vsTokenAmt));
-        if (positionsToClose.length > 0) {
-            sendClosePositionOrdersToUserDOs(positionsToClose, this.env);
-        }
-
-        const responseBody : UpdatePriceResponse = {};
-        return makeJSONResponse(responseBody);
     }
 
     updatePositionTracker(newPrice : DecimalizedAmount) : ActionsToTake {

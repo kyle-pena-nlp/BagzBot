@@ -1,20 +1,17 @@
 import { Env } from "../../env";
 import { makeJSONRequest } from "../../http";
-import { AdminCountPositionsRequest, AdminCountPositionsResponse } from "./actions/admin_count_positions";
 import { HeartbeatWakeupRequest, HeartbeatWakeupResponse } from "./actions/hearbeat_wake_up";
-import { RegisterTokenPairRequest, RegisterTokenPairResponse } from "./actions/register_token_pair";
+import { RegisterUserDORequest, RegisterUserDOResponse } from "./actions/register_user_do";
 
 export enum HeartbeatDOFetchMethod {
     Wakeup = "Wakeup",
-    RegisterTokenPair = "RegisterTokenPair",
-    adminCountPositions = "adminCountPositions"
+    RegisterUserDO = "RegisterUserDO"
 }
 
-// TODO: move this to heartbeat DO.
-export async function adminCountAllPositions(env : Env) : Promise<AdminCountPositionsResponse> {
-	const request : AdminCountPositionsRequest = {};
-	const method = HeartbeatDOFetchMethod.adminCountPositions;
-	const response = await sendJSONRequestToHeartbeatDO<AdminCountPositionsRequest,AdminCountPositionsResponse>(method,request,env);
+export async function registerUser(telegramUserID : number, chatID : number, env : Env) : Promise<RegisterUserDOResponse> {
+    const request : RegisterUserDORequest = { telegramUserID, chatID };
+    const method = HeartbeatDOFetchMethod.RegisterUserDO;
+    const response = sendJSONRequestToHeartbeatDO<RegisterUserDORequest,RegisterUserDOResponse>(method,request,env);
     return response;
 }
 
@@ -26,12 +23,6 @@ export async function doHeartbeatWakeup(env : Env) {
     const method = HeartbeatDOFetchMethod.Wakeup;
     const request : HeartbeatWakeupRequest = {};
     await sendJSONRequestToHeartbeatDO<HeartbeatWakeupRequest,HeartbeatWakeupResponse>(method, request, env);
-}
-
-export async function ensureTokenPairIsRegistered(tokenAddress : string, vsTokenAddress : string, env : Env) : Promise<void> {
-    const method = HeartbeatDOFetchMethod.RegisterTokenPair;
-    const request : RegisterTokenPairRequest = { tokenAddress, vsTokenAddress };
-    await sendJSONRequestToHeartbeatDO<RegisterTokenPairRequest,RegisterTokenPairResponse>(method,request,env);
 }
 
 async function sendJSONRequestToHeartbeatDO<TRequest,TResponse>(method : HeartbeatDOFetchMethod, request : TRequest, env : Env) : Promise<TResponse> {

@@ -49,4 +49,9 @@ export function ensureNoProperties<TObj>() {
     }
 }
 
+export type SubsetOf<T> = Partial<T> & {
+    [K in keyof T]?: T[K];
+  };
+  
+
 

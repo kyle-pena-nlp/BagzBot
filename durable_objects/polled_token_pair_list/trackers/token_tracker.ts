@@ -1,7 +1,9 @@
 import { Env } from "../../../env";
 import { logDebug, logError } from "../../../logging";
 import { TokenInfo } from "../../../tokens";
-import { strictParseInt } from "../../../util";
+import { ChangeTrackedValue, strictParseInt } from "../../../util";
+
+type MIGRATION_FLAG = 'no-token-type'|'has-token-type';
 
 export class TokenTracker {
     tokenInfos : Record<string,TokenInfo> = {};
@@ -9,6 +11,7 @@ export class TokenTracker {
     deletedKeys : Set<string> = new Set<string>();
     lastRefreshedMS : number = 0;
     isRebuilding : boolean = false;
+    migrationFlag : ChangeTrackedValue<MIGRATION_FLAG> = new ChangeTrackedValue<MIGRATION_FLAG>("tokenTrackerMigrationFlagStatus",'no-token-type');
     constructor() {
     }
     initialize(entries : Map<string,any>) {
@@ -19,15 +22,22 @@ export class TokenTracker {
                 this.tokenInfos[new TokenAddressKey(tokenInfo.address).toString()] = tokenInfo;
             }
         }
+        this.migrationFlag.initialize(entries);
     }
     async getTokenInfo(tokenAddress : string, env : Env, storage : DurableObjectStorage) : Promise<TokenInfo|undefined> {
+
+        const migrationResult = await this.maybePerformMigration(storage);
+        if (migrationResult === 'early-out') {
+            logDebug("Early out - migration hasn't happened yet.")
+            return undefined;
+        }
+        
         const tokenAddressKey = new TokenAddressKey(tokenAddress);
         let maybeTokenInfo = this.tokenInfos[tokenAddressKey.toString()];
         if (maybeTokenInfo == null && (this.isTimeoutExpired(env))) {
             // deliberate fire and forget - next person will have accurate list.
             this.rebuildTokenList(storage);
-            maybeTokenInfo = this.tokenInfos[tokenAddressKey.toString()];
-        }        
+        }       
         return maybeTokenInfo;
     }
     upsertToken(tokenInfo : TokenInfo) {
@@ -54,35 +64,43 @@ export class TokenTracker {
             return false;
         }
     }
-    async rebuildTokenList(storage : DurableObjectStorage) : Promise<void> {
+    async rebuildTokenList(storage : DurableObjectStorage) : Promise<boolean> {
+
         // bounce requests to rebuild if already rebuilding
         if (this.isRebuilding) {
-            return;
+            return false;
         }
-        else {
-            this.isRebuilding = true;
-            try {
-                const jupTokens = await this.getAllTokensFromJupiter();
-                if (jupTokens != null) {
-                    // originally: drop tokens that drop off the list.
-                    // but I changed my mind: will keep them so that people can still execute their trades
-                    const tokenCount = Object.keys(jupTokens).length;
-                    logDebug(`Beginning upsert of tokens.  Total tokens: ${tokenCount}`);
-                    for (const tokenInfo of Object.values(jupTokens)) {
-                        this.upsertToken(tokenInfo);
-                    }
-                    this.lastRefreshedMS = Date.now(); 
-                    logDebug(`Done upsert tokens list.  Total tokens: ${tokenCount}`);
-                    await this.flushToStorage(storage);
-                }
+
+        this.isRebuilding = true;
+        try {
+
+            const jupTokens = await this.getAllTokensFromJupiter();
+            if (jupTokens == null) {
+                return false;
             }
-            catch(e) {
-                logError("Unable to rebuild token list");
+
+            // originally: drop tokens that drop off the list.
+            // but I changed my mind: will keep them so that people can still execute their trades
+            const tokenCount = Object.keys(jupTokens).length;
+            logDebug(`Beginning upsert of tokens.  Total tokens: ${tokenCount}`);
+            const startMS = Date.now();
+            for (const tokenInfo of Object.values(jupTokens)) {
+                this.upsertToken(tokenInfo);
             }
-            finally {
-                this.isRebuilding = false;
-            }
+            this.lastRefreshedMS = Date.now(); 
+            logDebug("Writing to storage.");
+            await this.flushToStorage(storage);
+            logDebug(`Done upsert tokens list.  Total tokens: ${tokenCount}, Elapsed Time; ${Date.now() - startMS}`);
+            return true;
         }
+        catch(e) {
+            logError("Unable to rebuild token list");
+            return false;
+        }
+        finally {
+            this.isRebuilding = false;
+        }
+        
     }
     private async getAllTokensFromJupiter() : Promise<Record<string,TokenInfo>|undefined> {
         const url = "https://token.jup.ag/all";
@@ -98,16 +116,14 @@ export class TokenTracker {
                 name: tokenJSON.name as string,
                 symbol: tokenJSON.symbol as string,
                 logoURI: tokenJSON.logoURI as string,
-                decimals: tokenJSON.decimals as number
+                decimals: tokenJSON.decimals as number,
+                tokenType: ((tokenJSON.tags||[]) as string[]).includes('token-2022') ? 'token-2022' : 'token'
             };
             tokenInfos[tokenInfo.address] = tokenInfo;
         }
         return tokenInfos;   
     }
     async flushToStorage(storage : DurableObjectStorage) {
-        if (this.deletedKeys.size == 0 && this.dirtyTracking.size == 0) {
-            return;
-        }
         //logDebug(`Token Tracker storage flush: ${this.dirtyTracking.size} puts.  ${this.deletedKeys.size} deletes.`);
         const putEntries : Record<string,TokenInfo> = {};
         for (const key of this.dirtyTracking) {
@@ -119,8 +135,10 @@ export class TokenTracker {
         const deletePromise = storage.delete([...this.deletedKeys]).then(() => {
             this.deletedKeys.clear();
         });
-        
-        await Promise.all([putPromise, deletePromise]);
+
+        const versionPromise = this.migrationFlag.flushToStorage(storage);
+
+        await Promise.all([putPromise, deletePromise, versionPromise]);
     }
     markDirty(key : string) {
         this.deletedKeys.delete(key);
@@ -135,7 +153,25 @@ export class TokenTracker {
         a.decimals === b.decimals && 
         a.logoURI === b.logoURI &&
         a.name === b.name &&
-        a.symbol === b.symbol;
+        a.symbol === b.symbol &&
+        a.tokenType === b.tokenType;
+    }
+    private async maybePerformMigration(storage : DurableObjectStorage) : Promise<'proceed'|'early-out'> {
+        // version migration
+        if (this.migrationFlag.value === 'no-token-type') {
+            logDebug("Performing version migration");
+            await this.rebuildTokenList(storage).then(async (success) => {
+                if (success) {
+                    this.migrationFlag.value = 'has-token-type';
+                    await this.flushToStorage(storage);
+                    logDebug('Completed version migration')
+                }
+            }).catch((r : any) => {
+                logDebug(`Version migration failed: ${r.toString()}`);
+            });
+            return 'early-out';
+        }
+        return 'proceed';
     }
 }
 

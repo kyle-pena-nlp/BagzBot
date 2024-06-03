@@ -1,15 +1,21 @@
 import { DurableObjectState, DurableObjectStorage } from "@cloudflare/workers-types";
 import { Env } from "../../env";
+import { makeJSONResponse, maybeGetJson } from "../../http";
 import { logDebug, logError } from "../../logging";
-import { PositionStatus } from "../../positions";
-import { SOL_ADDRESS } from "../../tokens";
 import { MapWithStorage, assertNever } from "../../util";
-import { HeartbeatWakeupRequestForTokenPairPositionTracker } from "../token_pair_position_tracker/actions/heartbeat_wake_up_for_token_pair_position_tracker";
-import { TokenPairKey, TokenPairPositionTrackerDOFetchMethod, getPositionCountsFromTracker } from "../token_pair_position_tracker/token_pair_position_tracker_DO_interop";
-import { AdminCountPositionsRequest, AdminCountPositionsResponse } from "./actions/admin_count_positions";
-import { RegisterTokenPairRequest, RegisterTokenPairResponse } from "./actions/register_token_pair";
+import { wakeUp } from "../user/userDO_interop";
+import { HeartbeatWakeupRequest } from "./actions/hearbeat_wake_up";
+import { RegisterUserDORequest, RegisterUserDOResponse } from "./actions/register_user_do";
 import { HeartbeatDOFetchMethod, parseHeartbeatDOFetchMethod } from "./heartbeat_DO_interop";
-import { makeJSONRequest, makeJSONResponse, maybeGetJson } from "../../http";
+
+// the heartbeat runs on the "* * * * *" CRON job -> 60 seconds.
+const HALF_WAKEUP_CRON_JOB_INTERVAL_MS = 30000;
+
+interface UserInfo {
+    telegramUserID : number
+    chatID : number,
+    lastPinged : number
+}
 
 export class HeartbeatDO {
     /*
@@ -19,7 +25,8 @@ export class HeartbeatDO {
     state: DurableObjectState;
     env : Env;
     processing: boolean = false;
-    tokenPairPositionTrackerInstances : MapWithStorage<boolean> = new MapWithStorage<boolean>("tokenPairPositionTrackerInstanceIDs");
+    //tokenPairPositionTrackerInstances : MapWithStorage<boolean> = new MapWithStorage<boolean>("tokenPairPositionTrackerInstanceIDs");
+    userDOsToWakeUp : MapWithStorage<UserInfo> = new MapWithStorage<UserInfo>("userDOsToWakeUp");
 
     constructor(state : DurableObjectState, env : Env) {
         this.state = state;
@@ -32,13 +39,15 @@ export class HeartbeatDO {
     async loadStateFromStorage(storage : DurableObjectStorage) {
         //logDebug("Loading heartbeatDO from storage");
         const storageEntries = await storage.list();   
-        this.tokenPairPositionTrackerInstances.initialize(storageEntries);
+        //this.tokenPairPositionTrackerInstances.initialize(storageEntries);
+        this.userDOsToWakeUp.initialize(storageEntries);
         //logDebug("Loaded loading heartbeatDO from storage")
     }
 
     async flushToStorage() {
         await Promise.allSettled([
-            this.tokenPairPositionTrackerInstances.flushToStorage(this.state.storage)
+            //this.tokenPairPositionTrackerInstances.flushToStorage(this.state.storage),
+            this.userDOsToWakeUp.flushToStorage(this.state.storage)
         ]);
     }
 
@@ -56,61 +65,41 @@ export class HeartbeatDO {
                 // deliberate fire-and-forget here.
                 this.handleWakeup(jsonRequestBody);
                 return makeJSONResponse<{}>({});
-            case HeartbeatDOFetchMethod.RegisterTokenPair:
-                return await this.handleRegisterToken(jsonRequestBody);
-            case HeartbeatDOFetchMethod.adminCountPositions:
-                return await this.handleAdminCountPositions(jsonRequestBody);
+            case HeartbeatDOFetchMethod.RegisterUserDO:
+                return await this.handleRegisterUser(jsonRequestBody);
             default:
                 assertNever(method);
         }
-    }
+    }  
 
-    async handleAdminCountPositions(request: AdminCountPositionsRequest) : Promise<Response> {
-        const vsTokenAddress = SOL_ADDRESS;
-        const positionCounts : Record<string,Record<PositionStatus,number>> = {};
-        const countsByUser : Record<number,number> = {};
-        const ids = [...this.tokenPairPositionTrackerInstances.keys()];
-        const pairs = ids.map(id => TokenPairKey.parse(id));
-        for (const pair of pairs) {
-            if (pair != null) {
-                const tokenAddress = pair.tokenAddress;
-                const positionCount = await getPositionCountsFromTracker(tokenAddress, vsTokenAddress, this.env);
-                if (Object.keys(positionCount).length > 0) {
-                    positionCounts[tokenAddress] = positionCount;
-                }
-            }
-        }
-        return makeJSONResponse<AdminCountPositionsResponse>({ positionCounts });
-    }    
-
-    // Token pair position trackers register themselves
-    async handleRegisterToken(request : RegisterTokenPairRequest) : Promise<Response> {
-        const tokenPairKey = new TokenPairKey(request.tokenAddress, request.vsTokenAddress);
-        this.tokenPairPositionTrackerInstances.set(tokenPairKey.toString(), true);
-        const response : RegisterTokenPairResponse = {};
-        return makeJSONResponse<RegisterTokenPairResponse>(response);
+    async handleRegisterUser(request : RegisterUserDORequest) : Promise<Response> {
+        const userInfo : UserInfo = { telegramUserID: request.telegramUserID, chatID : request.chatID, lastPinged : 0 };
+        this.userDOsToWakeUp.set(request.telegramUserID.toString(10), userInfo);
+        return makeJSONResponse<RegisterUserDOResponse>({});
     }
 
     // This method keeps the alarms scheduled for the token pair position trackers.
     // Invoking any method on the tracker causes it to check if it should be scheduling an alarm
-    async handleWakeup(request : HeartbeatWakeupRequestForTokenPairPositionTracker) : Promise<void> {
+    async handleWakeup(request : HeartbeatWakeupRequest) : Promise<void> {
         this.processing = true;
         try {
-            const namespace = this.env.TokenPairPositionTrackerDO;
-            // What should we do if this list gets too long and can't complete? Should I add in a shuffle or something?
-            const tokenPairIDs = [...this.tokenPairPositionTrackerInstances.keys()];
-            let any : boolean = false;
-            for (const tokenPairID of tokenPairIDs) {
-                any = true;
-                const durableObjectID = namespace.idFromName(tokenPairID);
-                const stub = namespace.get(durableObjectID);
-                const requestBody : HeartbeatWakeupRequestForTokenPairPositionTracker = { isHeartbeat : true };
-                const method = TokenPairPositionTrackerDOFetchMethod.wakeUp;
-                const jsonRequest = makeJSONRequest(`http://tokenPairPositionTracker/${method.toString()}`, requestBody);
-                const response = await stub.fetch(jsonRequest);
-            }
-            if (!any) {
-                logError("HeartbeatDO: No token pairs found to track!");
+            const startTimeMS = Date.now();
+            const userInfos = [...this.userDOsToWakeUp.values()];
+            userInfos.sort(u => u.lastPinged);
+            for (const userInfo of userInfos) {
+                const response = await wakeUp(userInfo.telegramUserID, userInfo.chatID, this.env);
+                const key = userInfo.telegramUserID.toString(10);
+                if (!response.keepInWakeUpList) {
+                    this.userDOsToWakeUp.delete(key);
+                }
+                else {
+                    userInfo.lastPinged = Date.now();
+                    this.userDOsToWakeUp.set(key, userInfo);
+                }
+                const elapsedMS = Date.now() - startTimeMS;
+                if (elapsedMS > HALF_WAKEUP_CRON_JOB_INTERVAL_MS) {
+                    break;
+                }
             }
         }
         catch(e) {

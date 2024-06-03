@@ -5,21 +5,22 @@ import { asTokenPrice } from "../../decimalized/decimalized_amount";
 import { Env, allowChooseAutoDoubleSlippage, allowChoosePriorityFees, getRPCUrl } from "../../env";
 import { makeFailureResponse, makeJSONResponse, makeSuccessResponse, maybeGetJson } from "../../http";
 import { logDebug, logError, logInfo } from "../../logging";
-import { Position, PositionPreRequest, PositionRequest, PositionStatus, PositionType } from "../../positions";
+import { PositionPreRequest, PositionRequest, PositionStatus, PositionType } from "../../positions";
 import { POSITION_REQUEST_STORAGE_KEY } from "../../storage_keys";
-import { TGStatusMessage, UpdateableNotification, sendMessageToTG } from "../../telegram";
+import { TGStatusMessage, sendMessageToTG } from "../../telegram";
 import { WEN_ADDRESS, getVsTokenInfo } from "../../tokens";
-import { ChangeTrackedValue, Intersect, Structural, Subtract, assertNever, ensureArrayIsAllAndOnlyPropsOf, ensureArrayIsOnlyPropsOf, groupIntoBatches, sleep, strictParseBoolean, strictParseInt } from "../../util";
+import { ChangeTrackedValue, Intersect, Structural, Subtract, assertNever, ensureArrayIsAllAndOnlyPropsOf, ensureArrayIsOnlyPropsOf, sleep, strictParseBoolean } from "../../util";
 import { assertIs } from "../../util/enums";
 import { listUnclaimedBetaInviteCodes } from "../beta_invite_codes/beta_invite_code_interop";
+import { registerUser as registerUserWithHearbeat } from "../heartbeat/heartbeat_DO_interop";
+import { GetTokenPriceResponse } from "../token_pair_position_tracker/actions/get_token_price";
 import { PositionAndMaybePNL } from "../token_pair_position_tracker/model/position_and_PNL";
-import { adminDeleteClosedPositionsForUser, adminDeletePositionByIDFromTracker, deactivatePositionInTracker, doubleSellSlippageInTracker, editTriggerPercentOnOpenPositionInTracker, getDeactivatedPositionFromTracker, getPositionAndMaybePNL, listClosedPositionsFromTracker, listDeactivatedPositionsInTracker, listPositionsByUser, reactivatePositionInTracker, removePosition, setOpenPositionSellPriorityFeeInTracker, setSellAutoDoubleOnOpenPositionInPositionTracker, setSellSlippagePercentOnOpenPositionInTracker } from "../token_pair_position_tracker/token_pair_position_tracker_DO_interop";
+import { getTokenPrice } from "../token_pair_position_tracker/token_pair_position_tracker_DO_interop";
 import { AdminDeleteAllPositionsRequest, AdminDeleteAllPositionsResponse } from "./actions/admin_delete_all_positions";
 import { AdminDeleteClosedPositionsRequest } from "./actions/admin_delete_closed_positions";
 import { AdminDeletePositionByIDRequest, AdminDeletePositionByIDResponse } from "./actions/admin_delete_position_by_id";
 import { AdminGetInfoRequest, isAdminGetInfoRequest } from "./actions/admin_get_info";
 import { AdminResetDefaultPositionRequest, AdminResetDefaultPositionResponse } from "./actions/admin_reset_default_position_request";
-import { AutomaticallyClosePositionsRequest, AutomaticallyClosePositionsResponse } from "./actions/automatically_close_positions";
 import { BaseUserDORequest, isBaseUserDORequest } from "./actions/base_user_do_request";
 import { DeactivatePositionRequest, DeactivatePositionResponse } from "./actions/deactivate_position";
 import { DeleteSessionRequest, DeleteSessionResponse } from "./actions/delete_session";
@@ -40,7 +41,6 @@ import { ListPositionsFromUserDORequest, ListPositionsFromUserDOResponse } from 
 import { ManuallyClosePositionRequest, ManuallyClosePositionResponse } from "./actions/manually_close_position";
 import { OpenPositionRequest, OpenPositionResponse } from "./actions/open_new_position";
 import { ReactivatePositionRequest, ReactivatePositionResponse } from "./actions/reactivate_position";
-import { RegisterPositionAsClosedRequest, RegisterPositionAsClosedResponse } from "./actions/register_position_as_closed";
 import { RegisterPositionAsDeactivatedRequest, RegisterPositionAsDeactivatedResponse } from "./actions/register_position_as_deactivated";
 import { DefaultTrailingStopLossRequestRequest, DefaultTrailingStopLossRequestResponse } from "./actions/request_default_position_request";
 import { SendMessageToUserRequest, SendMessageToUserResponse, isSendMessageToUserRequest } from "./actions/send_message_to_user";
@@ -50,17 +50,23 @@ import { SellSellSlippagePercentageOnOpenPositionRequest, SellSellSlippagePercen
 import { StoreLegalAgreementStatusRequest, StoreLegalAgreementStatusResponse } from "./actions/store_legal_agreement_status";
 import { StoreSessionValuesRequest, StoreSessionValuesResponse } from "./actions/store_session_values";
 import { UnimpersonateUserRequest, UnimpersonateUserResponse } from "./actions/unimpersonate_user";
+import { WakeUpRequest, WakeUpResponse } from "./actions/wake_up_request";
 import { ClosedPositionPNLSummarizer } from "./aggregators/closed_positions_pnl_summarizer";
+import { UserDOBuyConfirmer } from "./confirmers/user_do_buy_confirmer";
+import { UserDOSellConfirmer } from "./confirmers/user_do_sell_confirmer";
+import { AutomaticActions, AutomaticTask } from "./model/automatic_actions";
 import { TokenPair } from "./model/token_pair";
 import { UserData } from "./model/user_data";
-import { PositionBuyer } from "./position_buyer";
-import { PositionSeller } from "./position_seller";
+import { PositionBuyer, isPreparedBuyTx } from "./position_buyer";
+import { PositionSeller, isPreparedSellTx } from "./position_seller";
+import { ClosedPositionsTracker } from "./trackers/closed_positions_tracker";
+import { DeactivatedPositionsTracker } from "./trackers/deactivated_positions_tracker";
+import { OpenPositionsTracker } from "./trackers/open_positions_tracker";
 import { SessionTracker } from "./trackers/session_tracker";
 import { SOLBalanceTracker } from "./trackers/sol_balance_tracker";
-import { TokenPairTracker } from "./trackers/token_pair_tracker";
-import { TokenPairsForPositionIDsTracker } from "./trackers/token_pairs_for_position_ids_tracker";
-import { UserOpenPNLTracker } from "./trackers/user_open_pnl_tracker";
 import { UserDOFetchMethod, parseUserDOFetchMethod } from "./userDO_interop";
+
+type MIGRATION_FLAG = 'unmigrated'|'migrated_1';
 
 const DEFAULT_POSITION_PREREQUEST : PositionPreRequest = {
     userID: -1,
@@ -70,11 +76,11 @@ const DEFAULT_POSITION_PREREQUEST : PositionPreRequest = {
     positionType : PositionType.LongTrailingStopLoss,
     tokenAddress : WEN_ADDRESS, // to be subbed in
     vsToken : getVsTokenInfo('SOL'),
-    vsTokenAmt : 1.0,
-    slippagePercent : 5.0,
-    triggerPercent : 5,
+    vsTokenAmt : 0.5,
+    slippagePercent : 1.0,
+    triggerPercent : 10,
     sellAutoDoubleSlippage : false,
-    priorityFeeAutoMultiplier: null, // TODO: set to 'auto' if feature flag on
+    priorityFeeAutoMultiplier: 5, // TODO: set to 'auto' if feature flag on
 };
 
 /* Durable Object storing state of user */
@@ -82,7 +88,9 @@ export class UserDO {
 
     // boilerplate DO stuff
     env : Env;
+
     state: DurableObjectState;
+    
     loadFromStorageFailed : boolean|undefined = undefined
 
     // user's ID
@@ -110,17 +118,19 @@ export class UserDO {
     // has the user signed legal?
     legalAgreementStatus : ChangeTrackedValue<'agreed'|'refused'|'has-not-responded'> = new ChangeTrackedValue<'agreed'|'refused'|'has-not-responded'>('hasSignedLegal', 'has-not-responded');
 
+    migrationFlag : ChangeTrackedValue<MIGRATION_FLAG> = new ChangeTrackedValue<MIGRATION_FLAG>("migration-flag", 'unmigrated');
+
     // stores just the positionID / tokenAddress / vsTokenAddress for open/closing positions
-    tokenPairsForPositionIDsTracker : TokenPairsForPositionIDsTracker = new TokenPairsForPositionIDsTracker();
+    //tokenPairsForPositionIDsTracker : TokenPairsForPositionIDsTracker = new TokenPairsForPositionIDsTracker();
 
     // stores the list of positions IDs (and respective token pair trackers) for the closed positions for this user
-    tokenPairsForClosedPositions : TokenPairTracker = new TokenPairTracker("closedPosition");
+    //tokenPairsForClosedPositions : TokenPairTracker = new TokenPairTracker("closedPosition");
 
     // stores the list of positions IDs (and respective token pair trackers) for the deactivated positions for this user
-    tokenPairsForDeactivatedPositions : TokenPairTracker = new TokenPairTracker("deactivatedPosition");
+    //tokenPairsForDeactivatedPositions : TokenPairTracker = new TokenPairTracker("deactivatedPosition");
 
     // the unrealized PNL from open positions
-    userOpenPNLTracker : UserOpenPNLTracker = new UserOpenPNLTracker();
+    //userOpenPNLTracker : UserOpenPNLTracker = new UserOpenPNLTracker();
 
     inbox: { from : string, message : string }[] = [];
     // TODO: way to make arrays compatible with ChangeTrackedValue?
@@ -131,12 +141,26 @@ export class UserDO {
     // This allows for longer-running processes.
     isAlarming : boolean = false;
 
+    openPositions : OpenPositionsTracker = new OpenPositionsTracker();
+
+    closedPositions : ClosedPositionsTracker = new ClosedPositionsTracker();
+
+    deactivatedPositions : DeactivatedPositionsTracker = new DeactivatedPositionsTracker();
+
     constructor(state : DurableObjectState, env : any) {
         this.env                = env;
         this.state              = state;
         this.state.blockConcurrencyWhile(async () => {
             await this.loadStateFromStorage();
+            await this.maybePerformMigration();
         });
+    }
+
+    async maybePerformMigration() {
+        if (this.migrationFlag.value === 'unmigrated') {
+            this.defaultTrailingStopLossRequest.value = structuredClone(DEFAULT_POSITION_PREREQUEST);
+            this.migrationFlag.value = 'migrated_1';
+        }
     }
 
     async loadStateFromStorage() {
@@ -149,11 +173,11 @@ export class UserDO {
         this.solBalanceTracker.initialize(storage); // rate limits RPC calls. will refresh on access.
         this.legalAgreementStatus.initialize(storage);
         this.defaultTrailingStopLossRequest.initialize(storage);
-        this.tokenPairsForPositionIDsTracker.initialize(storage);
-        this.tokenPairsForClosedPositions.initialize(storage);
-        this.tokenPairsForDeactivatedPositions.initialize(storage);
-        this.userOpenPNLTracker.initialize(storage);
         this.chatID.initialize(storage);
+        this.openPositions.initialize(storage);
+        this.closedPositions.initialize(storage);
+        this.deactivatedPositions.initialize(storage);
+        this.migrationFlag.initialize(storage);
         //logInfo("Loaded userDO from storage: ", this.telegramUserID.value);
     }
 
@@ -166,29 +190,22 @@ export class UserDO {
             this.solBalanceTracker.flushToStorage(this.state.storage),
             this.legalAgreementStatus.flushToStorage(this.state.storage),
             this.defaultTrailingStopLossRequest.flushToStorage(this.state.storage),
-            this.tokenPairsForPositionIDsTracker.flushToStorage(this.state.storage),
-            this.tokenPairsForClosedPositions.flushToStorage(this.state.storage),
-            this.tokenPairsForDeactivatedPositions.flushToStorage(this.state.storage),
-            this.userOpenPNLTracker.flushToStorage(this.state.storage),
-            this.chatID.flushToStorage(this.state.storage)
+            this.openPositions.flushToStorage(this.state.storage),
+            this.closedPositions.flushToStorage(this.state.storage),
+            this.deactivatedPositions.flushToStorage(this.state.storage),
+            this.chatID.flushToStorage(this.state.storage),
+            this.migrationFlag.flushToStorage(this.state.storage)
         ]);
     }
 
-    async alarm() {
-        
+    async alarm() {  
         try {
             await this.state.storage.deleteAlarm();
-            
-            this.state.blockConcurrencyWhile(async () => {
-                if (this.telegramUserID.value != null && this.wallet.value?.publicKey != null) {
-                    await this.tokenPairsForPositionIDsTracker.maybeTrimTokenPairList(this.telegramUserID.value, this.wallet.value?.publicKey, this.env);
-                }
-            });
-            
+            await this.performAlarmActions();
             await this.maybeScheduleAlarm();
         }
-        catch {
-            logError(`Problem rescheduling alarm for ${this.telegramUserID.value}`);
+        catch (e : any) {
+            logError(`Problem rescheduling alarm for ${this.telegramUserID.value}`, e.toString());
         }
         finally {
             await this.flushToStorage();
@@ -203,10 +220,14 @@ export class UserDO {
 
     async maybeScheduleAlarm() {
         if (this.shouldScheduleNextAlarm()) {
+            if (!this.isAlarming) {
+                logDebug(`Turning on alarm for ${this.telegramUserID.value}`);
+            }
             this.isAlarming = true;
-            await this.state.storage.setAlarm(Date.now() + 10000);
+            await this.state.storage.setAlarm(Date.now() + 1000);
         }
         else {
+            logDebug(`Turning off alarm for ${this.telegramUserID.value}`);
             this.isAlarming = false;
         }
     }
@@ -215,7 +236,160 @@ export class UserDO {
         if (strictParseBoolean(this.env.DOWN_FOR_MAINTENANCE)) {
             return false;
         }
-        return this.tokenPairsForPositionIDsTracker.any();
+        return this.openPositions.listPositions({ includeClosing: true, includeOpen : true, includeUnconfirmed : true, includeClosed : false }).length > 0;
+    }
+
+    async getLatestPrice(tokenPair : TokenPair) : Promise<GetTokenPriceResponse> {
+        const response = await getTokenPrice(tokenPair.tokenAddress, tokenPair.vsTokenAddress, this.env);
+        return response;
+    }
+
+    async performAlarmActions() {
+
+        // gather automatic actions to perform
+        const startTimeMS = Date.now();
+        const tokenPairs = this.openPositions.listUniqueTokenPairs({ includeOpen: true, includeUnconfirmed : true, includeClosing : true, includeClosed : false });
+        const automaticActions = new AutomaticActions();
+        for (const tokenPair of tokenPairs) {
+            const getTokenPriceResult = await this.getLatestPrice(tokenPair);
+            if (getTokenPriceResult.price != null)  {
+                automaticActions.update(this.openPositions.updatePrice({ 
+                    tokenPair, 
+                    price: getTokenPriceResult.price, 
+                    currentPriceMS: getTokenPriceResult.currentPriceMS,
+                    markTriggeredAsClosing: true,
+                    markUnconfirmedBuysAsConfirming : true,
+                    markUnconfirmedSellsAsConfirming : true 
+                }, this.env));
+            }
+            else {
+                logError("Unable to retrieve price", tokenPair);
+            }
+        }
+
+        // turn them into a task list
+        const tasks = automaticActions.getTasks();
+
+        // if there are no tasks to be done, early out
+        if (tasks.length === 0) {
+            return;
+        }
+
+        // put the rest of them back in a not-executing state so they can be picked up next go-around
+        for (const task of tasks.slice(1)) {
+            this.undoPendingProcessingState(task)
+        }
+
+        // execute just the first one (next will be picked up again next time)
+        await this.performAutomaticAction(tasks[0], startTimeMS);
+    }
+
+    private undoPendingProcessingState(task : AutomaticTask) {
+        if (task.type === 'automatic-sell') {
+            this.openPositions.mutatePosition(task.positionID, p => {
+                p.status = PositionStatus.Open;
+                p.txSellAttemptTimeMS = 0;
+            });
+        }
+        else if (task.type === 'confirm-buy') {
+            this.openPositions.mutatePosition(task.positionID, p => {
+                p.buyConfirming = false;
+            });
+        }
+        else if (task.type === 'confirm-sell') {
+            this.openPositions.mutatePosition(task.positionID, p => {
+                p.sellConfirming = false;
+            });
+        }
+    }
+
+    private async performAutomaticAction(task : AutomaticTask, startTimeMS : number) {
+        switch(task.type) {
+            case 'automatic-sell':
+                await this.performAutomaticSell(task.positionID, startTimeMS);
+            case 'confirm-buy':
+                await this.performConfirmBuy(task.positionID, startTimeMS);
+            case 'confirm-sell':
+                await this.performConfirmSell(task.positionID, startTimeMS);
+                break;
+            default:
+                assertNever(task.type);
+        }
+    }
+
+    
+    private async performAutomaticSell(positionID : string, startTimeMS : number) {
+        
+        // double check it's still eligible for automatic sell, since we just entered an async
+        const position = this.openPositions.get(positionID);
+        if (position == null || position.status !== PositionStatus.Closing || !position.buyConfirmed) {
+            return;
+        }
+        
+        const channel = TGStatusMessage.createAndSend(`Initiating sale.`, false, position.chatID, this.env, 'HTML', `<a href="${position.token.logoURI}">\u200B</a><b>Automatic Sale of ${asTokenPrice(position.tokenAmt)} ${position.token.symbol}</b>: `);
+        const connection = new Connection(getRPCUrl(this.env));
+        const positionSeller = new PositionSeller(connection, this.wallet.value!!, 'auto-sell', startTimeMS, channel, this.env, this.openPositions, this.closedPositions, this.deactivatedPositions);
+    
+        const preparedSellTx = await positionSeller.prepareAndSimTx(position.positionID);
+        if (isPreparedSellTx(preparedSellTx)) {
+            // deliberate fire-and-forget, with flushToStorage guaranteed in 'finally'
+            positionSeller.executeTx(positionID, preparedSellTx)
+                .then(async status => await positionSeller.finalize(positionID, status))
+                .catch(async r => await positionSeller.finalize(positionID, 'unexpected-failure'))
+                .then(() => this.invalidateWalletBalanceCache())
+                .finally(async () => await this.flushToStorage());
+        }
+        else {
+            await positionSeller.finalize(positionID, preparedSellTx);
+        }
+    }
+
+    private async performConfirmBuy(positionID : string, startTimeMS : number) {
+
+        // double check it's still eligible for buy confirmation, since we just entered an async
+        const position = this.openPositions.get(positionID);
+        if (position == null || position.status !== PositionStatus.Open || position.buyConfirmed || !position.buyConfirming) {
+            return;
+        }
+
+        const unconfirmedPosition = this.openPositions.get(positionID)!!;
+        const buyConfirmPrefix = `:notify: <b>Attempting to confirm your earlier purchase of ${asTokenPrice(unconfirmedPosition.tokenAmt)} ${unconfirmedPosition.token.symbol}</b>: `;
+        const channel = TGStatusMessage.createAndSend('In progress...', false, unconfirmedPosition.chatID, this.env, 'HTML', buyConfirmPrefix);   
+        const connection = new Connection(getRPCUrl(this.env));
+        const buyConfirmer = new UserDOBuyConfirmer(channel, connection, startTimeMS, this.env, this.openPositions, this.closedPositions, this.deactivatedPositions);
+        
+        // deliberate fire-and-forget
+        buyConfirmer.maybeConfirmBuy(positionID)
+            .then(async status => await buyConfirmer.finalize(positionID, status))
+            .catch(async r => await buyConfirmer.handleUnexpectedFailure(positionID, r))
+            .then(() => this.invalidateWalletBalanceCache())
+            .finally(async () => {
+                await this.flushToStorage();
+            });
+    }
+
+    private async performConfirmSell(positionID : string, startTimeMS : number) {
+
+        // double check it's still eligible for sell confirmation, since we just entered an async
+        const position = this.openPositions.get(positionID);
+        if (position == null || position.status !== PositionStatus.Closing || !position.sellConfirming) {
+            return;
+        }
+
+        const pos = this.openPositions.get(positionID)!!;
+        const sellConfirmPrefix = `:notify: <b>Attempting to confirm the earlier sale of ${asTokenPrice(pos.tokenAmt)} $${pos.token.symbol}</b>: `;
+        const channel = TGStatusMessage.createAndSend('In progress...', false, pos.chatID, this.env, 'HTML', sellConfirmPrefix);
+        const connection = new Connection(getRPCUrl(this.env));
+        const sellConfirmer = new UserDOSellConfirmer(channel, connection, startTimeMS, this.env, this.openPositions, this.closedPositions, this.deactivatedPositions);
+        
+        // deliberate fire-and-forget
+        sellConfirmer.maybeConfirmSell(positionID)
+            .then(async status => await sellConfirmer.finalize(positionID, status))
+            .catch(async r => await sellConfirmer.handleUnexpectedFailure(positionID, r))
+            .then(() => this.invalidateWalletBalanceCache())
+            .finally(async () => {
+                this.flushToStorage();
+            });
     }
 
     initialized() : boolean {
@@ -226,7 +400,7 @@ export class UserDO {
         try {
             const [method,jsonRequestBody,response] = await this._fetch(request);
             await this.maybeStartAlarming().catch(r => {
-                logError(`Problem scheduling alarm for UserDO ${this.telegramUserID.value}`)
+                logError(`Problem with maybe scheduling alarm for UserDO ${this.telegramUserID.value}`)
                 return null;
             });
             return response;
@@ -309,10 +483,6 @@ export class UserDO {
                 this.assertUserHasWallet();
                 response = await this.handleManuallyClosePositionRequest(userAction);
                 break;
-            case UserDOFetchMethod.automaticallyClosePositions:
-                this.assertUserHasWallet();
-                response = await this.handleAutomaticallyClosePositionsRequest(userAction);
-                break;
             case UserDOFetchMethod.getLegalAgreementStatus:
                 response = await this.handleGetLegalAgreementStatus(userAction);
                 break;
@@ -382,11 +552,11 @@ export class UserDO {
             case UserDOFetchMethod.setOpenPositionSellPriorityFee:
                 response = await this.handleSetOpenPositionPriorityFee(userAction);
                 break;
-            case UserDOFetchMethod.registerPositionAsClosed:
-                response = await this.handleRegisterPositionAsClosed(userAction);
-                break;
             case UserDOFetchMethod.registerPositionAsDeactivated:
                 response = await this.handleRegisterPositionAsDeactivated(userAction);
+                break;
+            case UserDOFetchMethod.wakeUp:
+                response = await this.handleWakeUp(userAction);
                 break;
             default:
                 assertNever(method);
@@ -398,8 +568,7 @@ export class UserDO {
         if (this.telegramUserID.value == null) {
             return makeJSONResponse({ msg: "Not initialized" });
         }
-        let positions = await this.listPositionsFromUserDO(this.telegramUserID.value);
-        positions = positions.filter(p => p.position.status !== PositionStatus.Closed);
+        const positions = this.openPositions.listPositions({ includeClosed: false, includeClosing: true, includeOpen: true, includeUnconfirmed: true });
         const adminInfo = {
             telegramUserID: this.telegramUserID.value,
             chatID : this.chatID.value,
@@ -408,15 +577,10 @@ export class UserDO {
         return makeJSONResponse(adminInfo);
     }
 
-    async handleRegisterPositionAsClosed(userAction : RegisterPositionAsClosedRequest) : Promise<Response> {
-        await this.registerPositionAsClosed(userAction.positionID, userAction.tokenAddress, userAction.vsTokenAddress);
-        return makeJSONResponse<RegisterPositionAsClosedResponse>({ success: true });
-    }
 
-    async registerPositionAsClosed(positionID : string, tokenAddress : string, vsTokenAddress : string) {
-        this.tokenPairsForPositionIDsTracker.removePositions([positionID]);
-        const tokenPair = { positionID: positionID, token : { address : tokenAddress }, vsToken: { address : vsTokenAddress } };
-        this.tokenPairsForClosedPositions.registerPosition(tokenPair);
+    async handleWakeUp(userAction : WakeUpRequest) : Promise<Response> {
+        const keepInWakeUpList = this.openPositions.listPositions({ includeClosed: false, includeClosing: true, includeOpen: true, includeUnconfirmed: true }).length > 0;
+        return makeJSONResponse<WakeUpResponse>({ keepInWakeUpList: keepInWakeUpList });
     }
 
     async handleRegisterPositionAsDeactivated(userAction: RegisterPositionAsDeactivatedRequest) : Promise<Response> {
@@ -424,12 +588,19 @@ export class UserDO {
         return makeJSONResponse<RegisterPositionAsDeactivatedResponse>(response);
     }
 
+    // CRUFT
     // If a position was automatically deactivated by the price tracker, we must mark it as deactivated here.
     async handleRegisterPositionAsDeactivatedInternal(userAction : RegisterPositionAsDeactivatedRequest) : Promise<RegisterPositionAsDeactivatedResponse> {
-        this.tokenPairsForPositionIDsTracker.removePositions([userAction.positionID]);
-        const tokenPair = { positionID: userAction.positionID, token : { address : userAction.tokenAddress }, vsToken: { address : userAction.vsTokenAddress } };
-        this.tokenPairsForDeactivatedPositions.registerPosition(tokenPair);
-        return { success: true };
+        const position = this.openPositions.deactivateAndReturn(userAction.positionID);
+        if (position != null) {
+            this.deactivatedPositions.upsert(position);
+            return { success: true };
+        }
+        return { success: false };
+        //this.tokenPairsForPositionIDsTracker.removePositions([userAction.positionID]);
+        //const tokenPair = { positionID: userAction.positionID, token : { address : userAction.tokenAddress }, vsToken: { address : userAction.vsTokenAddress } };
+        //this.tokenPairsForDeactivatedPositions.registerPosition(tokenPair);
+        //return { success: true };
     }
 
     async handleSetOpenPositionPriorityFee(userAction : SetOpenPositionSellPriorityFeeMultiplierRequest) : Promise<Response> {
@@ -438,14 +609,10 @@ export class UserDO {
     }
 
     async handleSetOpenPositionPriorityFeeInternal(userAction : SetOpenPositionSellPriorityFeeMultiplierRequest) : Promise<SetOpenPositionSellPriorityFeeMultiplierResponse> {
-        const tokenPair = this.tokenPairsForPositionIDsTracker.getPositionPair(userAction.positionID);
-        if (tokenPair == null) {
-            return {};
-        }
-        const tokenAddress = tokenPair.token.address;
-        const vsTokenAddress = tokenPair.vsToken.address;
-        const response = await setOpenPositionSellPriorityFeeInTracker(userAction.positionID, tokenAddress, vsTokenAddress, userAction.multiplier, this.env);
-        return { ...response };
+        this.openPositions.mutateOpenConfirmedPosition(userAction.positionID, p => {
+            p.sellPriorityFeeAutoMultiplier = userAction.multiplier;
+        });
+        return { };
     }
 
     async handleDoubleSellSlippage(userAction : DoubleSellSlippageRequest) : Promise<Response> {
@@ -454,14 +621,10 @@ export class UserDO {
     }
 
     async handleDoubleSellSlippageInternal(userAction : DoubleSellSlippageRequest) : Promise<DoubleSellSlippageResponse> {
-        const tokenPair = this.tokenPairsForPositionIDsTracker.getPositionPair(userAction.positionID);
-        if (tokenPair == null) {
-            return {};
-        }
-        const tokenAddress = tokenPair.token.address;
-        const vsTokenAddress = tokenPair.vsToken.address;
-        const response = await doubleSellSlippageInTracker(userAction.positionID, userAction.markAsOpen, tokenAddress, vsTokenAddress, this.env);
-        return response;
+        this.openPositions.mutateOpenConfirmedPosition(userAction.positionID, p => {
+            p.sellSlippagePercent = Math.min(p.sellSlippagePercent * 2);
+        });
+        return { };
     }
 
     async handleGetDeactivatedPosition(userAction : GetDeactivatedPositionRequest) : Promise<Response> {
@@ -470,32 +633,19 @@ export class UserDO {
     }
 
     async handleGetDeactivatedPositionInternal(userAction : GetDeactivatedPositionRequest) : Promise<GetDeactivatedPositionResponse> {
-        const tokenPair = this.tokenPairsForDeactivatedPositions.getPositionPair(userAction.positionID);
-        if (tokenPair == null) {
-            return { deactivatedPosition : undefined };
-        }
-        const tokenAddress = tokenPair.token.address;
-        const vsTokenAddress = tokenPair.vsToken.address;
-        const deactivatedPositionResponse = await getDeactivatedPositionFromTracker(userAction.telegramUserID, userAction.positionID, tokenAddress, vsTokenAddress, this.env);
-        return { deactivatedPosition : deactivatedPositionResponse.deactivatedPosition };
+        const deactivatedPosition = this.deactivatedPositions.get(userAction.positionID);
+        return { deactivatedPosition : deactivatedPosition };
     }
 
     async handleListDeactivatedPositions(userAction : ListDeactivatedPositionsRequest) : Promise<Response> {
-        const response = await this.handleListDeactivatedPositionsInternal(userAction);
+        const response = this.handleListDeactivatedPositionsInternal(userAction);
         return makeJSONResponse<ListDeactivatedPositionsResponse>(response);
     }
 
-    async handleListDeactivatedPositionsInternal(userAction : ListDeactivatedPositionsRequest) : Promise<ListDeactivatedPositionsResponse> {
-        const userID = userAction.telegramUserID;
-        const tokenPairs = this.tokenPairsForDeactivatedPositions.listUniqueTokenPairs();
-        const allDeactivatedPositions : Position[] = [];
-        for (const tokenPair of tokenPairs) {
-            const tokenAddress = tokenPair.tokenAddress;
-            const vsTokenAddress = tokenPair.vsTokenAddress;
-            const response = await listDeactivatedPositionsInTracker(userID, tokenAddress, vsTokenAddress, this.env);
-            allDeactivatedPositions.push(...response.deactivatedPositions);
-        }
-        return { deactivatedPositions : allDeactivatedPositions };
+    handleListDeactivatedPositionsInternal(userAction : ListDeactivatedPositionsRequest) : ListDeactivatedPositionsResponse {
+        return  {
+            deactivatedPositions: this.deactivatedPositions.listDeactivatedPositions()
+        };
     }
 
     async handleDeactivatePosition(userAction : DeactivatePositionRequest) : Promise<Response> {
@@ -504,20 +654,12 @@ export class UserDO {
     }    
 
     async handleDeactivatePositionInternal(userAction : DeactivatePositionRequest) : Promise<DeactivatePositionResponse> {
-        const tokenPair = this.tokenPairsForPositionIDsTracker.getPositionPair(userAction.positionID);
-        if (tokenPair == null) {
+        const position = this.openPositions.deactivateAndReturn(userAction.positionID);
+        if (position == null) {
             return { success: false };
         }
-        const tokenAddress = tokenPair.token.address;
-        const vsTokenAddress = tokenPair.vsToken.address;
-        // we don't want to mark as open, because the closing flag means a sale might have been attempted.
-        // so, if status is currently Closing, upon reactivation, we want to check the last sale attempt with the SellConfirmer
-        const markAsOpenBeforeDeactivating = false;
-        const response = await deactivatePositionInTracker(userAction.positionID, tokenAddress, vsTokenAddress, markAsOpenBeforeDeactivating, this.env);
-        if (response.success) {
-            this.tokenPairsForDeactivatedPositions.registerPosition(tokenPair);
-        }
-        return { success : response.success };
+        this.deactivatedPositions.upsert(position);
+        return { success: true };
     }
 
     async handleReactivatePosition(userAction : ReactivatePositionRequest) : Promise<Response> {
@@ -526,39 +668,35 @@ export class UserDO {
     }        
 
     async handleReactivatePositionInternal(userAction : ReactivatePositionRequest) : Promise<ReactivatePositionResponse> {
-        const tokenPair = this.tokenPairsForDeactivatedPositions.getPositionPair(userAction.positionID);
-        if (tokenPair == null) {
-            return { success : false };
+        const position = this.deactivatedPositions.get(userAction.positionID);
+        if (position != null) {
+            const tokenPriceResult = await getTokenPrice(position.token.address, position.vsToken.address, this.env);
+            if (tokenPriceResult.price == null) {
+                return { success : false };
+            }
+            this.openPositions.reactivatePosition(position, tokenPriceResult.price, tokenPriceResult.currentPriceMS);
+            this.deactivatedPositions.deleteAndReturn(position.positionID);
+            registerUserWithHearbeat(userAction.telegramUserID, userAction.chatID, this.env);
+            return { success : true };
         }
-        const tokenAddress = tokenPair.token.address;
-        const vsTokenAddress = tokenPair.vsToken.address;
-        const response = await reactivatePositionInTracker(userAction.telegramUserID, userAction.positionID, tokenAddress, vsTokenAddress, this.env);
-        if (response.success) {
-            this.tokenPairsForPositionIDsTracker.registerPosition(tokenPair);
-        }
-        return { success : response.success };
+        return { success : false };
     }
 
     async handleAdminDeletePositionByID(userAction: AdminDeletePositionByIDRequest) : Promise<Response> {
-        const positionID = userAction.positionID;
-        const tokenPair = this.tokenPairsForPositionIDsTracker.getPositionPair(positionID);
-        if (tokenPair == null) {
-            return makeJSONResponse<AdminDeletePositionByIDResponse>({ success : false });
-        }
-        const tokenAddress = tokenPair.token.address;
-        const vsTokenAddress = tokenPair.vsToken.address;
-        const response = await adminDeletePositionByIDFromTracker(positionID, tokenAddress, vsTokenAddress, this.env);
-        return makeJSONResponse<AdminDeletePositionByIDResponse>({ success: response.success });
+        const success = this.openPositions.deletePosition(userAction.positionID);
+        return makeJSONResponse<AdminDeletePositionByIDResponse>({ success });
     }
 
     async handleDeleteClosedPositions(userAction : AdminDeleteClosedPositionsRequest) : Promise<Response> {
-        const userID = userAction.telegramUserID;
+        /*const userID = userAction.telegramUserID;
         const uniqueTokenPairs = this.tokenPairsForClosedPositions.listUniqueTokenPairs();
         for (const pair of uniqueTokenPairs) {
             await adminDeleteClosedPositionsForUser(userAction.telegramUserID, pair.tokenAddress, pair.vsTokenAddress, this.env);
         }
         const response : AdminDeleteAllPositionsResponse = {};
-        return makeJSONResponse<AdminDeleteAllPositionsResponse>(response);
+        return makeJSONResponse<AdminDeleteAllPositionsResponse>(response);*/
+        this.closedPositions.clear();
+        return makeJSONResponse<AdminDeleteAllPositionsResponse>({});
     }
 
     async handleResetDefaultPositionRequest(userAction: AdminResetDefaultPositionRequest) : Promise<Response> {
@@ -573,18 +711,12 @@ export class UserDO {
     }
 
     async handleGetClosedPositionsAndPNLSummaryInternal(userAction : GetClosedPositionsAndPNLSummaryRequest) : Promise<GetClosedPositionsAndPNLSummaryResponse> {
-        const userID  = userAction.telegramUserID;
-        const tokenPairs = this.tokenPairsForClosedPositions.listUniqueTokenPairs();
+        const closedPositions = this.closedPositions.listClosedPositions();
         const closedPositionPNLSummarizer = new ClosedPositionPNLSummarizer();
-        for (const tokenPair of tokenPairs) {
-            const { tokenAddress, vsTokenAddress } = tokenPair;
-            const closedPositions = await listClosedPositionsFromTracker(userAction.telegramUserID, tokenAddress, vsTokenAddress, this.env);
-            for (const closedPosition of closedPositions.closedPositions) {
-                closedPositionPNLSummarizer.update(closedPosition)
-            }
+        for (const closedPosition of closedPositions) {
+            closedPositionPNLSummarizer.update(closedPosition);
         }
         const closedPositionsPNLSummary = closedPositionPNLSummarizer.getSummary();
-        const closedPositions = closedPositionPNLSummarizer.listContributingPositions();
         return { closedPositions, closedPositionsPNLSummary }
     }
 
@@ -602,25 +734,22 @@ export class UserDO {
     }
 
     async handleSellSlippagePercentOnOpenPositionInternal(userAction : SellSellSlippagePercentageOnOpenPositionRequest) : Promise<SellSellSlippagePercentageOnOpenPositionResponse> {
-        const positionID = userAction.positionID;
-        const tokenPair = this.tokenPairsForPositionIDsTracker.getPositionPair(positionID);
-        if (tokenPair == null) {
-            return { positionAndMaybePNL: null };
+        const position = this.openPositions.mutateOpenConfirmedPosition(userAction.positionID, (position) => {
+            position.sellSlippagePercent = userAction.sellSlippagePercent;
+        });
+        if (position != null) {
+            return { positionAndMaybePNL: this.openPositions.getPositionAndMaybePnL(userAction.positionID)||null };
         }
-        const tokenAddress = tokenPair.token.address;
-        const vsTokenAddress = tokenPair.vsToken.address;
-        const response = await setSellSlippagePercentOnOpenPositionInTracker(positionID, tokenAddress, vsTokenAddress, userAction.sellSlippagePercent, this.env);
-        return response;
+        return { positionAndMaybePNL: null };
     }
 
     async handleAdminDeleteAllPositions(userAction : AdminDeleteAllPositionsRequest) : Promise<Response> {
-        const result = this.handleAdminDeleteAllPositionsInternal(userAction);
-        return makeJSONResponse<AdminDeleteAllPositionsResponse>(result);
+        const response = this.handleAdminDeleteAllPositionsInternal(userAction);
+        return makeJSONResponse<AdminDeleteAllPositionsResponse>(response);
     }
 
     async handleAdminDeleteAllPositionsInternal(userAction : AdminDeleteAllPositionsRequest) : Promise<AdminDeleteAllPositionsResponse> {
         const realUserID = userAction.realTelegramUserID;
-        const userID = userAction.telegramUserID;
 
         if (!isAdminOrSuperAdmin(realUserID, this.env)) {
             logError(`Only admin user can delete all positions - was ${realUserID}`);
@@ -628,12 +757,7 @@ export class UserDO {
         }
 
         if (this.env.ENVIRONMENT === 'dev' || this.env.ENVIRONMENT === 'beta') {
-            const positions = await this.listPositionsFromUserDO(userID);
-            for (const posAndMaybePNL of positions) {
-                const position = posAndMaybePNL.position;
-                logInfo(`Removing position with ID ${position.positionID}`);
-                await removePosition(position.positionID, position.token.address, position.vsToken.address, this.env);
-            }
+            this.openPositions.clear();
             return {};
         }
         
@@ -645,37 +769,39 @@ export class UserDO {
         return makeJSONResponse<SetSellAutoDoubleOnOpenPositionResponse>(response);
     }
 
-    private async handleSetSellAutoDoubleOnOpenPositionRequestInternal(userAction: SetSellAutoDoubleOnOpenPositionRequest) : Promise<SetSellAutoDoubleOnOpenPositionResponse> {
-        const positionID = userAction.positionID;
-        const tokenPair = this.tokenPairsForPositionIDsTracker.getPositionPair(positionID);
-        if (tokenPair == null) {
-            return {};
-        }
-        const tokenAddress = tokenPair.token.address;
-        const vsTokenAddress = tokenPair.vsToken.address;
-        const choice = userAction.choice;
-        return await setSellAutoDoubleOnOpenPositionInPositionTracker(positionID, tokenAddress, vsTokenAddress, choice, this.env);
+    private handleSetSellAutoDoubleOnOpenPositionRequestInternal(userAction: SetSellAutoDoubleOnOpenPositionRequest) : SetSellAutoDoubleOnOpenPositionResponse {
+        this.openPositions.mutateOpenConfirmedPosition(userAction.positionID, (position) => { 
+            position.sellAutoDoubleSlippage = userAction.choice
+        });
+        return {};
     }
 
     async handleEditTriggerPercentOnOpenPosition(request: EditTriggerPercentOnOpenPositionRequest) : Promise<Response> {
-        const response = await this.handleEditTriggerPercentOnOpenPositionInternal(request);
+        const response = this.handleEditTriggerPercentOnOpenPositionInternal(request);
         return makeJSONResponse<EditTriggerPercentOnOpenPositionResponse>(response);
     }
 
-    async handleEditTriggerPercentOnOpenPositionInternal(request : EditTriggerPercentOnOpenPositionRequest) : Promise<EditTriggerPercentOnOpenPositionResponse> {
-        const positionID = request.positionID;
-        const tokenPair = this.tokenPairsForPositionIDsTracker.getPositionPair(positionID);
-        if (tokenPair == null) {
-            throw new Error(`Unable to find TokenPair when editing trigger percent on open position with ID ${positionID}`);
-        }
-        const tokenAddress = tokenPair.token.address;
-        const vsTokenAddress = tokenPair.vsToken.address;
+    handleEditTriggerPercentOnOpenPositionInternal(request : EditTriggerPercentOnOpenPositionRequest) : EditTriggerPercentOnOpenPositionResponse {
         const percent = request.percent;
         if (percent <= 0 || percent >= 100) {
             return 'invalid-percent';
         }
-        const response = await editTriggerPercentOnOpenPositionInTracker(positionID, tokenAddress, vsTokenAddress, percent, this.env);
-        return response;
+        this.openPositions.mutateOpenConfirmedPosition(request.positionID, (position) => {
+            position.triggerPercent = request.percent;
+        });
+        // 'position-DNE'|'is-closing'|'is-closed'|'invalid-percent'
+        if (this.closedPositions.has(request.positionID)) {
+            return 'is-closed';
+        }
+        const status = this.openPositions.getProperty(request.positionID, (p) => p.status);
+        if (status == PositionStatus.Closing) {
+            return 'is-closing';
+        }
+        const positionAndMaybePnL = this.openPositions.getPositionAndMaybePnL(request.positionID);
+        if (positionAndMaybePnL == null) {
+            return 'position-DNE';
+        }
+        return positionAndMaybePnL;
     }
 
     async handleSendMessageToUser(request : SendMessageToUserRequest) : Promise<Response> {
@@ -714,57 +840,23 @@ export class UserDO {
     }
 
     async handleGetPositionFromUserDO(request : GetPositionFromUserDORequest) : Promise<Response> {
-        const positionID = request.positionID;
-        const tokenPair = this.tokenPairsForPositionIDsTracker.getPositionPair(positionID);
-        let position : PositionAndMaybePNL|undefined = undefined;
-        if (tokenPair != null) {
-            const tokenAddress = tokenPair.token.address;
-            const vsTokenAddress = tokenPair.vsToken.address;
-            position = await getPositionAndMaybePNL(positionID, tokenAddress, vsTokenAddress, this.env);
-        }
-        const response : GetPositionFromUserDOResponse = { position : position };
-        return makeJSONResponse(response);
+        const position = this.openPositions.getPositionAndMaybePnL(request.positionID);
+        return makeJSONResponse<GetPositionFromUserDOResponse>({ position });
     }
 
     async handleListPositionsFromUserDO(request : ListPositionsFromUserDORequest) : Promise<Response> {
-        const userID = request.telegramUserID;
-        const positions = await this.listPositionsFromUserDO(userID);
-        const response : ListPositionsFromUserDOResponse = { positions: positions };
+        const positions = this.openPositions.listPositions({ includeUnconfirmed: true, includeClosing: true, includeOpen: true, includeClosed: false  });
+        const maybeResults = positions.map(p => this.openPositions.getPositionAndMaybePnL(p.positionID));
+        const results : PositionAndMaybePNL[] = [];
+        for (const maybeResult of maybeResults) {
+            if (maybeResult != null) {
+                results.push(maybeResult);
+            }
+        }
+        const response : ListPositionsFromUserDOResponse = { positions: results };
         return makeJSONResponse(response);
     }
-
-    async listPositionsFromUserDO(userID : number) : Promise<PositionAndMaybePNL[]> {
-
-        // fetch positions from all relevant trackers
-        const uniqueTokenPairs : TokenPair[] = await this.tokenPairsForPositionIDsTracker.listUniqueTokenPairs();
-        const positions : PositionAndMaybePNL[]  = [];
-        for (const tokenPair of uniqueTokenPairs) {
-            const positionsForTokenPair = await listPositionsByUser(userID, tokenPair.tokenAddress, tokenPair.vsTokenAddress, this.env);
-            positions.push(...positionsForTokenPair);
-        }
-
-        // the tracker is the source of truth.  if the userDO has a token pair for a position that doesn't exist in the tracker, remove it
-        // TODO: removed temporarily.  
-        // The problem was... if we remove here, we can't use this to know where to fetch closed positions from.
-        // How should we track which token pairs have closed positions?  It's a tough one.
-        /*const currentPositionIDs = new Set<string>(positions.map(p => p.position.positionID));
-        const positionIDsInTracker = new Set<string>(this.tokenPairsForPositionIDsTracker.listPositionIDs());
-        const deletedPositionIDs = setDifference(positionIDsInTracker, currentPositionIDs, Set<string>);
-        this.tokenPairsForPositionIDsTracker.removePositions([...deletedPositionIDs]);*/
-
-        // likewise, if for whatever reason the pair for this position is missing, this would rectify it
-        for (const position of positions) {
-            this.tokenPairsForPositionIDsTracker.registerPosition({
-                positionID: position.position.positionID,
-                token : { address : position.position.token.address },
-                vsToken : { address : position.position.vsToken.address }
-            });
-        }
-        // if on the other hand, a position has disappeared from the tracker, remove it.
-
-        return positions;
-    }
-
+    
     async handleImpersonateUser(request : ImpersonateUserRequest) : Promise<Response> {
         this.impersonatedUserID.value = request.userIDToImpersonate;
         const responseBody : ImpersonateUserResponse = { };
@@ -933,13 +1025,8 @@ export class UserDO {
 
     async handleOpenNewPosition(openPositionRequest : OpenPositionRequest) : Promise<Response> {
         const startTimeMS = Date.now();
-        const positionRequest = openPositionRequest.positionRequest;       
-        this.tokenPairsForPositionIDsTracker.registerPosition({
-            positionID: openPositionRequest.positionRequest.positionID,
-            token: { address : openPositionRequest.positionRequest.token.address },
-            vsToken: { address : openPositionRequest.positionRequest.vsToken.address }
-        });
-
+        const positionRequest = openPositionRequest.positionRequest;
+        const positionID = positionRequest.positionID;
 
         // non-blocking notification channel to push update messages to TG
         const channel = TGStatusMessage.replaceWithNotification(
@@ -949,20 +1036,24 @@ export class UserDO {
             positionRequest.chatID, 
             this.env,
             'HTML',
-            `<a href="${positionRequest.token.logoURI}">\u200B</a><b>${positionRequest.vsTokenAmt} SOL purchase of $${positionRequest.token.symbol}</b>: `);        
+            `<a href="${positionRequest.token.logoURI}">\u200B</a><b>${positionRequest.vsTokenAmt} SOL purchase of $${positionRequest.token.symbol}</b>: `);
 
-
-        // a horrible little hack ... when the position is successfully inserted into the tracker, this gets called
-        const registerTokenPairCallback = (p : Position) => {
-            this.tokenPairsForPositionIDsTracker.registerPosition({ positionID: p.positionID, token: { address : p.token.address }, vsToken : { address : p.vsToken.address } });
-        }
-
-        const positionBuyer = new PositionBuyer(this.wallet.value!!, this.env, startTimeMS, channel, registerTokenPairCallback);    
+        const positionBuyer = new PositionBuyer(this.wallet.value!!, this.env, startTimeMS, channel, this.openPositions, this.closedPositions, this.deactivatedPositions);    
         
-        // deliberate lack of await, but writes to storage when complete
-        positionBuyer.buy(positionRequest).finally(async () => {
-            await this.flushToStorage();
-        });
+        // this is awaited so that we are certain to flush the new position to storage no matter how long the tx takes
+        const preparedTx = await positionBuyer.prepareTx(positionRequest);
+
+        if (isPreparedBuyTx(preparedTx)) {
+            // deliberate fire-and-forget here, lack of await, but writes to storage when complete
+            positionBuyer.executeTx(positionRequest, preparedTx)
+                .then(async status => await positionBuyer.finalizeChannel(positionID, status))
+                .catch(async r => await positionBuyer.finalizeChannel(positionID, 'failed'))
+                .then(() => this.invalidateWalletBalanceCache())
+                .finally(async () => await this.flushToStorage());
+        }
+        else {
+            positionBuyer.finalizeChannel(positionID, preparedTx);
+        }
         
         return makeJSONResponse<OpenPositionResponse>({});
     }
@@ -974,24 +1065,21 @@ export class UserDO {
     
     async handleManuallyClosePositionRequestInternal(manuallyClosePositionRequest : ManuallyClosePositionRequest) : Promise<ManuallyClosePositionResponse> {
         const startTimeMS = Date.now();
-        const positionID = manuallyClosePositionRequest.positionID;
-        const tokenPair = this.tokenPairsForPositionIDsTracker.getPositionPair(positionID);
-        if (tokenPair == null) {
-            logError(`Could not find tokenPair for position ID ${positionID}`, this.telegramUserID);
-            return { success: false, reason: 'no-token-pair' };
+        const result = await this.manuallyClosePosition(manuallyClosePositionRequest.positionID, startTimeMS);
+        if (result.success === false) {
+            return result;
         }
-        const tokenAddress = tokenPair.token.address;
-        const vsTokenAddress = tokenPair.vsToken.address;
-        const positionAndMaybePNL = await getPositionAndMaybePNL(positionID, tokenAddress, vsTokenAddress, this.env);
-        if (positionAndMaybePNL == null) {
-            return { success: false, reason: "position-DNE" };
-        }
-        const position = positionAndMaybePNL.position;
-        const result = await this.manuallyClosePosition(position, startTimeMS);
+        // This may seem weird, but really we have to wait until later for the sale to be confirmed.
         return { success: null, reason: 'attempting-sale' };
     }
 
-    async manuallyClosePosition(position : Position, startTimeMS : number) : Promise<{ success: false, reason: 'position-closing'|'position-closed'|'buy-unconfirmed' }|{ success: null, reason: 'attempting-sale' }> {
+    async manuallyClosePosition(positionID  : string, startTimeMS : number) : Promise<{ success: false, reason: 'position-DNE'|'position-closing'|'position-closed'|'buy-unconfirmed' }|{ success: null, reason: 'attempting-sale' }> {
+        
+        const position = this.openPositions.get(positionID);
+        
+        if (position == null) {
+            return { success: false, reason: "position-DNE" };
+        }
         if (position.status == PositionStatus.Closing) {
             return { success: false, reason: 'position-closing' };
         }
@@ -1001,60 +1089,35 @@ export class UserDO {
         else if (!position.buyConfirmed) {
             return { success: false, reason: 'buy-unconfirmed' };
         }
+
+        // this prevents against race conditions / double selling
+        // TODO: make a set of methods that encapsulated these "locks" for auto sells, manual sells, etc.
+        this.openPositions.mutatePosition(positionID, p => {
+            p.status = PositionStatus.Closing;
+            p.txSellAttemptTimeMS = Date.now();
+        });
+
         assertIs<PositionStatus.Open,typeof position.status>();
         const channel = TGStatusMessage.createAndSend(`Initiating sale.`, false, position.chatID, this.env, 'HTML', `<a href="${position.token.logoURI}">\u200B</a><b>Manual Sale of ${asTokenPrice(position.tokenAmt)} ${position.token.symbol}</b>: `);
         const connection = new Connection(getRPCUrl(this.env));
-        const positionSeller = new PositionSeller(connection, this.wallet.value!!, 'manual-sell', startTimeMS, channel, this.env);
-        // deliberate lack of await here (fire-and-forget). But still writes to storage.
-        positionSeller.sell(position).then(async status => {
-            if (status === 'confirmed') {
-                await this.registerPositionAsClosed(position.positionID, position.token.address, position.vsToken.address);
-            }
-        }).finally(async () => {
-            await this.flushToStorage();
-        });
-        // success is indeterminate (by design) (explanation: depends on what happens with the positionSeller.sell, which is unawaited.)
-        return { success: null, reason: 'attempting-sale' };
-    }
+        const positionSeller = new PositionSeller(connection, this.wallet.value!!, 'manual-sell', startTimeMS, channel, this.env, this.openPositions, this.closedPositions, this.deactivatedPositions);
 
-    async handleAutomaticallyClosePositionsRequest(closePositionsRequest : AutomaticallyClosePositionsRequest) : Promise<Response> {
-        const startTimeMS = Date.now();
-        const positionsToClose = closePositionsRequest.positions;
-        if (positionsToClose.length == 0) {
-            return makeJSONResponse<AutomaticallyClosePositionsResponse>({});
+        const preparedSellTx = await positionSeller.prepareAndSimTx(position.positionID);
+
+        if (isPreparedSellTx(preparedSellTx)) {
+            // deliberate fire-and-forget, with flushToStorage guaranteed in 'finally'
+            positionSeller.executeTx(positionID, preparedSellTx)
+                .then(async status => await positionSeller.finalize(positionID, status))
+                .catch(async r => await positionSeller.finalize(positionID, 'unexpected-failure'))
+                .then(() => this.invalidateWalletBalanceCache())
+                .finally(async () => await this.flushToStorage());
         }
-        const positionBatches = groupIntoBatches(positionsToClose,4);
-        const channels : UpdateableNotification[] = [ ];
-        const connection = new Connection(getRPCUrl(this.env));
-        const timedOut = () => (Date.now() - startTimeMS) > strictParseInt(this.env.TX_TIMEOUT_MS);
-        for (const positionBatch of positionBatches) {
-            // fire off a bunch of promises per batch (4)
-            if (timedOut()) {
-                continue;
-            }
-            let sellPositionPromises = positionBatch.map(async position => {
-                const channel = TGStatusMessage.createAndSend(`Initiating.`, false, this.chatID.value||0, this.env, 'HTML', `:notify: <b>Automatic Sale of ${asTokenPrice(position.tokenAmt)} $${position.token.symbol}</b>: `);
-                channels.push(channel);
-                const positionSeller = new PositionSeller(connection, this.wallet.value!!, 'auto-sell', startTimeMS, channel, this.env);
-                if (timedOut()) {
-                    return;
-                }
-                // deliberate lack of await here, but still writes to storage afterwards
-                const sellPromise = positionSeller.sell(position).then(async status => {
-                    if (status === 'confirmed') {
-                        await this.registerPositionAsClosed(position.positionID, position.token.address, position.vsToken.address);
-                    }
-                }).finally(async () => {
-                    await this.flushToStorage();
-                });
-                return await sellPromise;
-            });
-            // but wait for the entire batch to settle before doing the next batch
-            await Promise.allSettled(sellPositionPromises);
+        else {
+            await positionSeller.finalize(positionID, preparedSellTx);
         }
-        // fire and forget, finalize all channels
-        Promise.allSettled(channels.map(channel => TGStatusMessage.finalize(channel)));
-        return makeJSONResponse<AutomaticallyClosePositionsResponse>({});
+
+        // success is indeterminate (by design) (explanation: depends on what happens with the positionSeller.sell, which is unawaited, so we don't know the result yet, hence 'null')
+        return { success: null, reason: 'attempting-sale' };
     }
 
     async validateFetchRequest(request : Request) : Promise<[UserDOFetchMethod,any]> {
@@ -1100,8 +1163,7 @@ export class UserDO {
         const hasWallet = !!(this.wallet.value);
         const address = this.wallet.value?.publicKey;
         const maybeSOLBalance = await this.solBalanceTracker.maybeGetBalance(address, forceRefreshBalance, this.env);
-        const uniqueTokenPairs = await this.tokenPairsForPositionIDsTracker.listUniqueTokenPairs();
-        const maybePNL = await this.userOpenPNLTracker.maybeGetPNL(telegramUserID, uniqueTokenPairs, forceRefreshBalance, this.env)
+        const maybePNL = this.openPositions.maybeGetUserPnL();
         return {
             hasWallet: hasWallet,
             address : address,
@@ -1121,5 +1183,9 @@ export class UserDO {
             }
         }
         return false;
+    }
+
+    invalidateWalletBalanceCache() {
+        this.solBalanceTracker.lastRefreshedSOLBalance = 0;
     }
 }

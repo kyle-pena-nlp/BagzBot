@@ -1,6 +1,6 @@
 
 import { Connection, SimulateTransactionConfig, VersionedTransaction } from "@solana/web3.js";
-import { UserAddress, Wallet, toUserAddress } from "../../crypto";
+import { Wallet, toUserAddress } from "../../crypto";
 import { fromNumber } from "../../decimalized";
 import { Env, getRPCUrl } from "../../env";
 import { MenuCode } from "../../menus";
@@ -11,70 +11,82 @@ import { signatureOf } from "../../rpc/rpc_sign_tx";
 import { ParsedSuccessfulSwapSummary, SwapExecutionError, isFrozenTokenAccountSwapExecutionErrorParseSummary, isInsufficientNativeTokensSwapExecutionErrorParseSummary, isInsufficientTokensBalanceErrorParseSummary, isOtherKindOfSwapExecutionError, isSlippageSwapExecutionErrorParseSummary, isSuccessfulSwapSummary, isTokenFeeAccountNotInitializedSwapExecutionErrorParseSummary, isUnknownTransactionParseSummary } from "../../rpc/rpc_swap_parse_result_types";
 import { TGStatusMessage, UpdateableNotification } from "../../telegram";
 import { assertNever, strictParseBoolean } from "../../util";
-import { insertPosition, positionExistsInTracker, removePosition, updatePosition } from "../token_pair_position_tracker/token_pair_position_tracker_DO_interop";
+//import { insertPosition, positionExistsInTracker, removePosition, updatePosition } from "../token_pair_position_tracker/token_pair_position_tracker_DO_interop";
+import { DecimalizedAmount, dZero } from "../../decimalized/decimalized_amount";
+import { logError } from "../../logging";
+import { SubsetOf } from "../../util/builder_types";
+import { registerUser } from "../heartbeat/heartbeat_DO_interop";
+import { getTokenPrice } from "../token_pair_position_tracker/token_pair_position_tracker_DO_interop";
 import { SwapExecutor } from "./swap_executor";
 import { SwapTransactionSigner } from "./swap_transaction_signer";
+import { ClosedPositionsTracker } from "./trackers/closed_positions_tracker";
+import { DeactivatedPositionsTracker } from "./trackers/deactivated_positions_tracker";
+import { OpenPositionsTracker } from "./trackers/open_positions_tracker";
+
+type ConfirmationData = SubsetOf<Position>;
+
+type TxSimErrorCodes = 'tx-sim-failed-other'|
+    'tx-sim-insufficient-sol'|
+    'tx-sim-failed-slippage'|
+    'tx-sim-frozen-token-account'|
+    'tx-sim-failed-token-account-fee-not-initialized'|
+    'tx-sim-insufficient-tokens-balance';
+
+type PrepareTxErrorCodes = 'already-processed'|
+    'could-not-create-tx'|
+    TxSimErrorCodes;
+
+type ExecuteTxErrorCodes = 'insufficient-sol'|
+    'token-fee-account-not-initialized'|
+    'frozen-token-account'|
+    'slippage-failed'|
+    'failed'|
+    'unconfirmed'|
+    'insufficient-tokens-balance';
+
+type ExecuteTxResultCodes = ExecuteTxErrorCodes|'confirmed';
+
+export interface PreparedBuyTx {
+    signedTx: VersionedTransaction,
+    lastValidBH: number,
+    connection : Connection
+}
+
+export function isPreparedBuyTx(obj : PreparedBuyTx|string) : obj is PreparedBuyTx {
+    return typeof obj !== 'string';
+}
 
 export class PositionBuyer {
     wallet : Wallet
     env : Env
     startTimeMS : number
     channel : UpdateableNotification
-    registerPositionLocallyCallback : (p : Position) => void;
+    openPositions : OpenPositionsTracker;
+    closedPositions : ClosedPositionsTracker;
+    deactivatedPositions : DeactivatedPositionsTracker;
     constructor(wallet : Wallet, 
         env : Env,  
         startTimeMS : number,
         channel : UpdateableNotification,
-        registerPositionLocallyCallback : (p : Position) => void) {
+        openPositions : OpenPositionsTracker,
+        closedPositions : ClosedPositionsTracker,
+        deactivatedPositions : DeactivatedPositionsTracker) {
         this.wallet = wallet;
         this.env = env;
         this.startTimeMS = startTimeMS;
         this.channel = channel;
-        this.registerPositionLocallyCallback = registerPositionLocallyCallback;
+        this.openPositions = openPositions;
+        this.closedPositions = closedPositions;
+        this.deactivatedPositions = deactivatedPositions;
     }
 
-    async buy(positionRequest : PositionRequest) : Promise<void> {
-        try {
-            const finalStatus = await this.buyInternal(positionRequest);
-            const finalMessage = this.getFinalStatusMessage(finalStatus);
-            const finalMenuCode = this.getFinalMenuCode(finalStatus);
-            TGStatusMessage.queue(this.channel, 
-                finalMessage, 
-                finalMenuCode, 
-                positionRequest.positionID);
-        }
-        catch {
-            TGStatusMessage.queue(this.channel, 'There was an unexpected error with this purchase', MenuCode.ReturnToPositionRequestEditor, positionRequest.positionID);
-        }
-        finally {
-            await TGStatusMessage.finalize(this.channel);
-        }
-    }
-
-    // Lots of different kinds of things can go wrong. Hence the nasty return type.
-    async buyInternal(positionRequest : PositionRequest) : Promise<
-        'tx-sim-failed-other'|
-        'tx-sim-frozen-token-account'|
-        'tx-sim-failed-slippage'|
-        'tx-sim-insufficient-sol'|
-        'tx-sim-failed-token-account-fee-not-initialized'|
-        'tx-sim-insufficient-tokens-balance'|
-        'already-processed'|
-        'could-not-create-tx'|
-        'failed'|
-        'slippage-failed'|
-        'insufficient-sol'|
-        'frozen-token-account'|
-        'token-fee-account-not-initialized'|
-        'insufficient-tokens-balance'|
-        'unconfirmed'|
-        'confirmed'> {
-
+    async prepareTx(positionRequest : PositionRequest) : Promise<
+        PreparedBuyTx|PrepareTxErrorCodes> {
         // RPC connection
         const connection = new Connection(getRPCUrl(this.env));
 
-        // idempotency
-        if (await positionExistsInTracker(positionRequest.positionID, positionRequest.token.address, positionRequest.vsToken.address, this.env)) {
+        // idempotency (NOTE: should we also check deactivated / closed?)
+        if (this.positionExistsInTracker(positionRequest.positionID, positionRequest.token.address, positionRequest.vsToken.address, this.env)) {
             return 'already-processed';
         }
 
@@ -87,6 +99,7 @@ export class PositionBuyer {
             return 'could-not-create-tx';
         }
 
+        // if we sim the tx before buy, run the sim of the tx
         if (strictParseBoolean(this.env.TX_SIM_BEFORE_BUY)) {
             const txSimResult = await this.simulateTx(signedTx, connection);
             if (txSimResult !== 'success') {
@@ -107,45 +120,96 @@ export class PositionBuyer {
         // edge-case: trigger condition met between here and tx execution.
         // can we back-date tracker activity? this is tricky.  to be revisited.
         const unconfirmedPosition = this.convertRequestToUnconfirmedPosition(positionRequest, signatureOf(signedTx), lastValidBH);
-        const insertPositionResponse = await insertPosition(unconfirmedPosition, this.env);
-        if(!insertPositionResponse.success) {
-            return 'could-not-create-tx'; // TODO: more appropriate code.
+
+        const tokenPriceResult = await getTokenPrice(unconfirmedPosition.token.address, unconfirmedPosition.vsToken.address, this.env);
+        if (tokenPriceResult.price == null) {
+            return 'could-not-create-tx'; // TODO: more appropriate return code.
         }
 
-        // (NASTY HACK) add the token to the token pair list
-        // done here to avoid the position getting "cleaned out" by the periodic token pair trim
-        this.registerPositionLocallyCallback(unconfirmedPosition);
+        const insertPositionResponse = this.insertPosition(unconfirmedPosition, tokenPriceResult.price, tokenPriceResult.currentPriceMS);
+        if(!insertPositionResponse.success) {
+            return 'could-not-create-tx'; // TODO: more appropriate return code.
+        }
+
+        return {
+            signedTx, lastValidBH, connection
+        }
+    }
+
+    async executeTxAndFinalizeChannel(positionRequest : PositionRequest, preparedTx : PreparedBuyTx) : Promise<void> {
+        try {
+            const finalStatus = await this.executeTx(positionRequest, preparedTx);
+            const finalMessage = this.getFinalStatusMessage(finalStatus);
+            const finalMenuCode = this.getFinalMenuCode(finalStatus);
+            TGStatusMessage.queue(this.channel, 
+                finalMessage, 
+                finalMenuCode, 
+                positionRequest.positionID);
+        }
+        catch (e : any) {
+            logError(positionRequest.positionID, e.toString());
+            TGStatusMessage.queue(this.channel, 'There was an unexpected error with this purchase', MenuCode.Main); // should not return.  that would keep the same positionID, and submitting would just attempt to buy again.
+        }
+        finally {
+            await TGStatusMessage.finalize(this.channel);
+        }
+    }
+
+    async finalizeChannel(positionID : string, finalStatus : PrepareTxErrorCodes|ExecuteTxResultCodes) : Promise<void> {
+        const finalMessage = this.getFinalStatusMessage(finalStatus);
+        const finalMenuCode = this.getFinalMenuCode(finalStatus);
+        TGStatusMessage.queue(this.channel, 
+            finalMessage, 
+            finalMenuCode, 
+            positionID);
+        TGStatusMessage.finalize(this.channel);
+    }
+
+    // Lots of different kinds of things can go wrong. Hence the nasty return type.
+    async executeTx(positionRequest : PositionRequest, preparedTx : PreparedBuyTx) : Promise<ExecuteTxResultCodes> {
 
         // try to do the swap.
-        const result = await this.executeAndParseSwap(positionRequest, signedTx, lastValidBH, connection);
+        const result = await this.executeAndParseSwap(positionRequest, preparedTx.signedTx, preparedTx.lastValidBH, preparedTx.connection);
 
         // no guarantees that anything after this point executes... CF may drop it.
 
+        // if the tx definetely failed, remove the position from tracking.
         if (result === 'failed' || result === 'slippage-failed' || result === 'insufficient-sol' || result === 'frozen-token-account' || result === 'token-fee-account-not-initialized' || result === 'insufficient-tokens-balance') {
-            await removePosition(positionRequest.positionID, positionRequest.token.address, positionRequest.vsToken.address, this.env);
+            this.removePosition(positionRequest.positionID, positionRequest.token.address, positionRequest.vsToken.address, this.env);
             return result;
         }
+        // but if we can't determine what happened, we say so to the caller
         else if (result === 'unconfirmed') {
             return result;
         }
-        else if ('confirmedPosition' in result) {
-            const { confirmedPosition } = result;
-            await updatePosition(confirmedPosition, this.env);
+        // but if it really is confirmed, we update the position in the tracker.
+        else if ('confirmationData' in result) {
+            const { confirmationData } = result;
+            this.updatePosition(positionRequest.positionID, confirmationData);
             return 'confirmed';
         }
         else {
             assertNever(result);
         }
     }
+    updatePosition(positionID : string, confirmationData: ConfirmationData) {
+        this.openPositions.mutatePosition(positionID, p => {
+            Object.assign(p, confirmationData);
+        });
+    }
+    removePosition(positionID: string, address: string, address1: string, env: Env) {
+        this.openPositions.deletePosition(positionID);
+    }
+    insertPosition(unconfirmedPosition: Position & { buyConfirmed: false; }, price : DecimalizedAmount, currentPriceMS : number) : { success : boolean } {
+        const success = this.openPositions.insertPosition(unconfirmedPosition, price, currentPriceMS);
+        registerUser(unconfirmedPosition.userID, unconfirmedPosition.chatID, this.env);
+        return { success }; // cruft
+    }
+    positionExistsInTracker(positionID: string, address: string, address1: string, env: Env) : boolean {
+        return this.openPositions.has(positionID) || this.closedPositions.has(positionID) || this.deactivatedPositions.has(positionID);
+    }
 
-    private async simulateTx(signedTx : VersionedTransaction, connection : Connection) : Promise<
-        'success'|
-        'tx-sim-failed-other'|
-        'tx-sim-insufficient-sol'|
-        'tx-sim-failed-slippage'|
-        'tx-sim-frozen-token-account'|
-        'tx-sim-failed-token-account-fee-not-initialized'|
-        'tx-sim-insufficient-tokens-balance'> {
+    private async simulateTx(signedTx : VersionedTransaction, connection : Connection) : Promise<'success'|TxSimErrorCodes> {
         const config: SimulateTransactionConfig = {
             sigVerify: true, // use the signature of the signedTx to verify validity of tx, rather than fetching a new blockhash
             commitment: 'confirmed' // omitting this seems to cause simulation to fail.
@@ -157,7 +221,7 @@ export class PositionBuyer {
             return 'success';
         }
 
-        const swapExecutionError =  parseInstructionError(response.value.err, this.env);
+        const swapExecutionError =  parseInstructionError(response.value.logs||[], response.value.err, this.env);
 
         if (swapExecutionError === SwapExecutionError.InsufficientSOLBalance) {
             return 'tx-sim-insufficient-sol';
@@ -197,11 +261,13 @@ export class PositionBuyer {
             userAddress: toUserAddress(this.wallet),
     
             buyConfirmed: false, // <----------
+            buyConfirming: false,
             txBuyAttemptTimeMS: Date.now(),
             txBuySignature: signature,
             buyLastValidBlockheight: lastValidBH,
             
             sellConfirmed: false,
+            sellConfirming: false,
             txSellSignature: null,
             txSellAttemptTimeMS: null,
             sellLastValidBlockheight: null,
@@ -210,6 +276,11 @@ export class PositionBuyer {
             vsToken: positionRequest.vsToken,
             vsTokenAmt : fromNumber(positionRequest.vsTokenAmt), // don't use the quote, it includes fees.
             tokenAmt: positionRequest.quote.outTokenAmt,
+
+            // TODO: think about this. A better way that is not a big refactor?
+            currentPrice: dZero(),
+            currentPriceMS: 0,
+            peakPrice: dZero(),
     
             sellSlippagePercent: positionRequest.slippagePercent,
             triggerPercent : positionRequest.triggerPercent,
@@ -230,15 +301,7 @@ export class PositionBuyer {
         return signedTx;
     }
 
-    private async executeAndParseSwap(positionRequest: PositionRequest, signedTx : VersionedTransaction, lastValidBH : number, connection : Connection) : Promise<
-        'insufficient-sol'|
-        'token-fee-account-not-initialized'|
-        'frozen-token-account'|
-        'slippage-failed'|
-        'failed'|
-        'unconfirmed'|
-        'insufficient-tokens-balance'|
-        { confirmedPosition: Position & { buyConfirmed : true } }> {
+    private async executeAndParseSwap(positionRequest: PositionRequest, signedTx : VersionedTransaction, lastValidBH : number, connection : Connection) : Promise<ExecuteTxErrorCodes|{ confirmationData : ConfirmationData }> {
         
         // create a time-limited tx executor and confirmer
         const swapExecutor = new SwapExecutor(this.wallet, 'buy', this.env, this.channel, connection, lastValidBH, this.startTimeMS);
@@ -277,46 +340,39 @@ export class PositionBuyer {
             return 'insufficient-tokens-balance';
         }
         else if (isSuccessfulSwapSummary(parsedSwapSummary)) {
-            const confirmedPosition = await this.makeConfirmedPositionFromSwapResult(positionRequest, signatureOf(signedTx), lastValidBH, parsedSwapSummary);
-            return { confirmedPosition };
+            const confirmationData = this.makeConfirmationDataFromSwapResult(signatureOf(signedTx), lastValidBH, parsedSwapSummary);
+            return { confirmationData };
         }
         else {
             assertNever(parsedSwapSummary);
         }
     }
 
-    private async makeConfirmedPositionFromSwapResult(
-        positionRequest : PositionRequest, 
+    private  makeConfirmationDataFromSwapResult(
         signature : string,
         lastValidBH: number,
-        successfulSwapParsed : ParsedSuccessfulSwapSummary) : Promise<Position & { buyConfirmed : true }> {
-        
-        const newPosition = convertToConfirmedPosition(positionRequest, 
-            signature, 
-            lastValidBH, 
-            toUserAddress(this.wallet), 
-            successfulSwapParsed);
-
-        // has or has not been set depending on above logic.
-        return newPosition;
+        parsedSuccessfulSwap : ParsedSuccessfulSwapSummary) : ConfirmationData {
+        return {
+                buyConfirmed: true, // <-------------
+                txBuyAttemptTimeMS: Date.now(), // TODO: This is wrong but will revisit.
+                txBuySignature: signature,  
+                buyLastValidBlockheight: lastValidBH,        
+                sellConfirmed: false,
+                txSellSignature: null,
+                txSellAttemptTimeMS: null,
+                sellLastValidBlockheight: null,
+                tokenAmt: parsedSuccessfulSwap.swapSummary.outTokenAmt,        
+                fillPrice: parsedSuccessfulSwap.swapSummary.fillPrice,
+                fillPriceMS : parsedSuccessfulSwap.swapSummary.swapTimeMS,
+                netPNL: null, // to be set when position is sold
+                otherSellFailureCount: 0,
+                currentPrice: parsedSuccessfulSwap.swapSummary.fillPrice,
+                currentPriceMS: parsedSuccessfulSwap.swapSummary.swapTimeMS,
+                peakPrice: parsedSuccessfulSwap.swapSummary.fillPrice, // TODO: think about this
+        };
     }
     
-    private getFinalStatusMessage(status: 'tx-sim-failed-other'|
-    'tx-sim-frozen-token-account'|
-    'tx-sim-failed-slippage'|
-    'tx-sim-insufficient-sol'|
-    'tx-sim-failed-token-account-fee-not-initialized'|
-    'tx-sim-insufficient-tokens-balance'|
-    'already-processed'|
-    'could-not-create-tx'|
-    'failed'|
-    'slippage-failed'|
-    'insufficient-sol'|
-    'frozen-token-account'|
-    'token-fee-account-not-initialized'|
-    'insufficient-tokens-balance'|
-    'unconfirmed'|
-    'confirmed') : string {
+    private getFinalStatusMessage(status: PrepareTxErrorCodes|ExecuteTxResultCodes) : string {
         switch(status) {
             
             case 'already-processed':
@@ -362,22 +418,7 @@ export class PositionBuyer {
         }
     }
 
-    private getFinalMenuCode(status: 'tx-sim-failed-other'|
-    'tx-sim-frozen-token-account'|
-    'tx-sim-failed-slippage'|
-    'tx-sim-insufficient-sol'|
-    'tx-sim-failed-token-account-fee-not-initialized'|
-    'tx-sim-insufficient-tokens-balance'|
-    'already-processed'|
-    'could-not-create-tx'|
-    'failed'|
-    'slippage-failed'|
-    'insufficient-sol'|
-    'frozen-token-account'|
-    'token-fee-account-not-initialized'|
-    'insufficient-tokens-balance'|
-    'unconfirmed'|
-    'confirmed') : MenuCode {
+    private getFinalMenuCode(status: PrepareTxErrorCodes|ExecuteTxResultCodes) : MenuCode {
         switch(status) {
             case 'already-processed':
                 return MenuCode.Main;
@@ -388,6 +429,7 @@ export class PositionBuyer {
             case 'confirmed':
                 return MenuCode.ViewOpenPosition;
             
+            // what if it's an unexpected exception? the position might still be inserted. hmmm.
             case 'failed':
                 return MenuCode.ReturnToPositionRequestEditor;
             
@@ -421,47 +463,4 @@ export class PositionBuyer {
                 assertNever(status);
         }
     }    
-}
-
-function convertToConfirmedPosition(positionRequest: PositionRequest, 
-    signature : string, 
-    lastValidBH : number, 
-    userAddress : UserAddress, 
-    parsedSuccessfulSwap : ParsedSuccessfulSwapSummary) : Position & { buyConfirmed : true } {
-    const position : Position & { buyConfirmed : true } = {
-        userID: positionRequest.userID,
-        chatID : positionRequest.chatID,
-        messageID : positionRequest.messageID,
-        positionID : positionRequest.positionID,
-        userAddress: userAddress,
-        type: positionRequest.positionType,
-        status: PositionStatus.Open,
-
-        buyConfirmed: true, // <-------------
-        txBuyAttemptTimeMS: Date.now(), // TODO: This is wrong but will revisit.
-        txBuySignature: signature,  
-        buyLastValidBlockheight: lastValidBH,        
-
-        sellConfirmed: false,
-        txSellSignature: null,
-        txSellAttemptTimeMS: null,
-        sellLastValidBlockheight: null,
-
-        token: positionRequest.token,
-        vsToken: positionRequest.vsToken,
-        sellSlippagePercent: positionRequest.slippagePercent,
-        triggerPercent : positionRequest.triggerPercent,
-        sellAutoDoubleSlippage : positionRequest.sellAutoDoubleSlippage,
-    
-        vsTokenAmt : fromNumber(positionRequest.vsTokenAmt),
-        tokenAmt: parsedSuccessfulSwap.swapSummary.outTokenAmt,        
-        fillPrice: parsedSuccessfulSwap.swapSummary.fillPrice,
-        fillPriceMS : parsedSuccessfulSwap.swapSummary.swapTimeMS,
-        netPNL: null, // to be set when position is sold
-        otherSellFailureCount: 0,
-
-        buyPriorityFeeAutoMultiplier: positionRequest.priorityFeeAutoMultiplier,
-        sellPriorityFeeAutoMultiplier: positionRequest.priorityFeeAutoMultiplier
-    };
-    return position;
 }

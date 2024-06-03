@@ -6,4 +6,5 @@ export interface GetTokenPriceRequest extends HasPairAddresses {
 
 export interface GetTokenPriceResponse {
     price : DecimalizedAmount|null
+    currentPriceMS : number
 }

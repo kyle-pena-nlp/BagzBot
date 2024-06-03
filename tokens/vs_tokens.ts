@@ -10,12 +10,14 @@ export function getVsTokenInfo(vsToken : string) : TokenInfo {
     const symbol = getVsTokenSymbol(vsToken);
     const logoURI = getVsTokenLogoURI(vsToken);
     const decimals = getVsTokenDecimals(vsToken);
+    const tokenType = getVsTokenTokenType(vsToken);
     return {
         address : address,
         name : name,
         symbol : symbol,
         logoURI : logoURI,
         decimals : decimals,
+        tokenType: tokenType
     };
 }
 
@@ -73,4 +75,8 @@ export function getVsTokenDecimalsMultiplier(vsToken : string) : number {
     }
 }
 
+
+function getVsTokenTokenType(vsToken: string) : 'token'|'token-2022' {
+    return 'token';
+}
 
