@@ -5,7 +5,7 @@ import { logError } from "../../../logging";
 import { calculatePriceUsingQuote } from "../../../rpc/jupiter_quotes";
 import { isGetQuoteFailure } from "../../../rpc/rpc_types";
 import { TokenInfo, getVsTokenInfo } from "../../../tokens";
-import { ChangeTrackedValue, strictParseBoolean } from "../../../util";
+import { ChangeTrackedValue, strictParseBoolean, strictParseInt } from "../../../util";
 
 export class CurrentPriceTracker {
     private currentPrice : ChangeTrackedValue<DecimalizedAmount|null> = new ChangeTrackedValue<DecimalizedAmount|null>("currentPrice", null);
@@ -31,7 +31,7 @@ export class CurrentPriceTracker {
         return null;
     }
     async getPrice(token : TokenInfo, vsTokenAddress : string, env : Env) : Promise< { price : DecimalizedAmount, newPrice : boolean, currentPriceMS : number }|null> {
-        if (this.priceIsStale()) {
+        if (this.priceIsStale(env)) {
             const price = await this.getPriceInternal(token,getVsTokenInfo(vsTokenAddress), env);
             if (price != null) {
                 this.currentPrice.value = price;
@@ -47,8 +47,8 @@ export class CurrentPriceTracker {
             return { price : this.currentPrice.value, newPrice : false, currentPriceMS: this.priceLastRefreshed.value };
         }
     }
-    private priceIsStale() {
-        return (Date.now() - this.priceLastRefreshed.value) > 1000;
+    private priceIsStale(env : Env) {
+        return (Date.now() - this.priceLastRefreshed.value) > strictParseInt(env.PRICE_POLL_INTERVAL_MS);
     }
     private async getPriceInternal(token : TokenInfo, vsToken : TokenInfo, env : Env) : Promise<DecimalizedAmount|undefined> {
         if (strictParseBoolean(env.POLL_PRICE_USING_JUPITER_QUOTE_API)) {

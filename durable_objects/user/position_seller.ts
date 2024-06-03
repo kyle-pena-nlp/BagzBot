@@ -377,7 +377,7 @@ export class PositionSeller {
                 return 'This token has been frozen (most likely a rug) and the position has been deactivated.';
             case 'tx-sim-insufficient-sol':
             case 'insufficient-sol':
-                return 'There was not enough SOL in your account to cover transaction fees.  As a result, this position has been deactivated.  When you have deposited enough SOL to cover transaction fees you can reactivate the position.'
+                return 'There was not enough SOL in your account to cover transaction fees, or there were not enough tokens to cover the sale.  As a result, this position has been deactivated.  When you have deposited enough SOL to cover transaction fees you can reactivate the position.'
             case 'timed-out':
                 return 'The transaction ran out of time to execute.';
             case 'tx-sim-failed-token-account-fee-not-initialized':

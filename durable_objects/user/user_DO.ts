@@ -197,7 +197,7 @@ export class UserDO {
         ]);
     }
 
-    async alarm(req : any, env : Env) {  
+    async alarm() {  
         try {
             await this.state.storage.deleteAlarm();
             await this.performAlarmActions();
@@ -219,10 +219,14 @@ export class UserDO {
 
     async maybeScheduleAlarm() {
         if (this.shouldScheduleNextAlarm()) {
+            if (!this.isAlarming) {
+                logDebug(`Turning on alarm for ${this.telegramUserID.value}`);
+            }
             this.isAlarming = true;
             await this.state.storage.setAlarm(Date.now() + 1000);
         }
         else {
+            logDebug(`Turning off alarm for ${this.telegramUserID.value}`);
             this.isAlarming = false;
         }
     }

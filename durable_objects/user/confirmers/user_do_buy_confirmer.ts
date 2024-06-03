@@ -204,13 +204,16 @@ export class UserDOBuyConfirmer {
             this.removePosition(positionID);
         }
         else if (status === '429') {
-
+            TGStatusMessage.queue(this.channel, `We could not confirm the purchase because the RPC was temporarily unavailable.  We will try again soon.`, true);
+            this.markAsNotConfirmingBuy(positionID);
         }
         else if (status === 'api-call-error') {
-
+            TGStatusMessage.queue(this.channel, `We could not confirm the purchase because the RPC was temporarily unavailable.  We will try again soon.`, true);
+            this.markAsNotConfirmingBuy(positionID);
         }
         else if (status === 'timed-out') {
-            
+            TGStatusMessage.queue(this.channel, `We could not confirm the purchase because it took too long to confirm.  We will try again soon.`, true);
+            this.markAsNotConfirmingBuy(positionID);
         }
         else {
             assertIs<ConfirmationData, typeof status>();

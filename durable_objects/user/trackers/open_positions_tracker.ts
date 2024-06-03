@@ -1,7 +1,6 @@
 import { DecimalizedAmount, MATH_DECIMAL_PLACES, dAdd, dCompare, dDiv, dMult, dSub } from "../../../decimalized";
 import { dZero, fromNumber, toNumber } from "../../../decimalized/decimalized_amount";
 import { Env } from "../../../env";
-import { logDebug } from "../../../logging";
 import { Position, PositionStatus, PositionType } from "../../../positions";
 import { SetWithKeyFn, setDifference, setIntersection, strictParseInt, structuralEquals } from "../../../util";
 import { PositionAndMaybePNL } from "../../token_pair_position_tracker/model/position_and_PNL";
@@ -81,6 +80,7 @@ export class OpenPositionsTracker {
                 if (this.canBeTriggeredAndMeetsTSLTriggerCondition(params.price, position)) {
                     if (params.markTriggeredAsClosing) {
                         position.status = PositionStatus.Closing;
+                        position.txSellAttemptTimeMS = Date.now(); // hack to prevent the sell confirmer from firing off
                     }
                     automaticActions.add('automatic-sell', position);
                 }
@@ -123,11 +123,9 @@ export class OpenPositionsTracker {
     }
     isStaleUnconfirmedSell(position : Position, env : Env) : boolean {
         if (position.status !== PositionStatus.Closing) {
-            logDebug("Not closing");
             return false;
         }
         if (position.sellConfirmed) {
-            logDebug("Sell confirmed");
             return false;
         }
         if (position.sellConfirming) {
@@ -137,7 +135,6 @@ export class OpenPositionsTracker {
         if (elapsedTimeMS > strictParseInt(env.TX_TIMEOUT_MS) * 1.25) {
             return true;
         }
-        logDebug("Not enough elapsed time", elapsedTimeMS, strictParseInt(env.TX_TIMEOUT_MS) * 1.25);
         return false;
     }
     clear() {
