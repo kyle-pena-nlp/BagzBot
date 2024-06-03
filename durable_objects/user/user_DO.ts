@@ -64,6 +64,8 @@ import { SessionTracker } from "./trackers/session_tracker";
 import { SOLBalanceTracker } from "./trackers/sol_balance_tracker";
 import { UserDOFetchMethod, parseUserDOFetchMethod } from "./userDO_interop";
 
+type MIGRATION_FLAG = 'unmigrated'|'migrated_1';
+
 const DEFAULT_POSITION_PREREQUEST : PositionPreRequest = {
     userID: -1,
     chatID: -1,
@@ -112,6 +114,8 @@ export class UserDO {
     // has the user signed legal?
     legalAgreementStatus : ChangeTrackedValue<'agreed'|'refused'|'has-not-responded'> = new ChangeTrackedValue<'agreed'|'refused'|'has-not-responded'>('hasSignedLegal', 'has-not-responded');
 
+    migrationFlag : ChangeTrackedValue<MIGRATION_FLAG> = new ChangeTrackedValue<MIGRATION_FLAG>("migration-flag", 'unmigrated');
+
     // stores just the positionID / tokenAddress / vsTokenAddress for open/closing positions
     //tokenPairsForPositionIDsTracker : TokenPairsForPositionIDsTracker = new TokenPairsForPositionIDsTracker();
 
@@ -144,7 +148,15 @@ export class UserDO {
         this.state              = state;
         this.state.blockConcurrencyWhile(async () => {
             await this.loadStateFromStorage();
+            await this.maybePerformMigration();
         });
+    }
+
+    async maybePerformMigration() {
+        if (this.migrationFlag.value === 'unmigrated') {
+            this.defaultTrailingStopLossRequest.value = structuredClone(DEFAULT_POSITION_PREREQUEST);
+            this.migrationFlag.value = 'migrated_1';
+        }
     }
 
     async loadStateFromStorage() {
@@ -161,6 +173,7 @@ export class UserDO {
         this.openPositions.initialize(storage);
         this.closedPositions.initialize(storage);
         this.deactivatedPositions.initialize(storage);
+        this.migrationFlag.initialize(storage);
         //logInfo("Loaded userDO from storage: ", this.telegramUserID.value);
     }
 
@@ -176,7 +189,8 @@ export class UserDO {
             this.openPositions.flushToStorage(this.state.storage),
             this.closedPositions.flushToStorage(this.state.storage),
             this.deactivatedPositions.flushToStorage(this.state.storage),
-            this.chatID.flushToStorage(this.state.storage)
+            this.chatID.flushToStorage(this.state.storage),
+            this.migrationFlag.flushToStorage(this.state.storage)
         ]);
     }
 
@@ -928,7 +942,7 @@ export class UserDO {
 
     async handleOpenNewPosition(openPositionRequest : OpenPositionRequest) : Promise<Response> {
         const startTimeMS = Date.now();
-        const positionRequest = openPositionRequest.positionRequest;       
+        const positionRequest = openPositionRequest.positionRequest;
 
         // non-blocking notification channel to push update messages to TG
         const channel = TGStatusMessage.replaceWithNotification(

@@ -24,19 +24,21 @@ export interface ParseTransactionParams {
 
 export function parseParsedTransactionWithMeta(params : ParseTransactionParams, env : Env) : Exclude<ParsedSwapSummary,UnknownTransactionParseSummary> {
 
+    // if the tx has an error, early-out with the parsed error
     const err = params.parsedTransaction.meta?.err;
     if (err) {
         const swapExecutionError = parseInstructionError(err, env);
         return {
             status: swapExecutionError
         };
-    }    
+    }
 
-    // another horrible hack.
+    // get the position's token (these are horrible hacks to determine what kind of swap (buy vs sell), and i want to refactor all of this)
     const positionTokenAddress = params.inTokenAddress == SOL_ADDRESS ? params.outTokenAddress : params.inTokenAddress;
+    const positionTokenType = params.inTokenAddress == SOL_ADDRESS ? params.outTokenType : params.inTokenType;
 
-    const swapInTokenDiff = safe(dNegate)(calculateTokenBalanceChange(params.parsedTransaction, params.inTokenAddress, params.inTokenType, positionTokenAddress, params.userAddress));
-    const swapOutTokenDiff = calculateTokenBalanceChange(params.parsedTransaction, params.outTokenAddress, params.outTokenType, positionTokenAddress, params.userAddress);
+    const swapInTokenDiff = safe(dNegate)(calculateTokenBalanceChange(params.parsedTransaction, params.inTokenAddress, params.inTokenType, positionTokenAddress, positionTokenType, params.userAddress));
+    const swapOutTokenDiff = calculateTokenBalanceChange(params.parsedTransaction, params.outTokenAddress, params.outTokenType, positionTokenAddress, positionTokenType, params.userAddress);
 
     if (swapInTokenDiff == null || swapOutTokenDiff == null) {
         throw new Error("Programmer error.");
@@ -75,11 +77,14 @@ function calculateTokenBalanceChange(parsedTransaction : ParsedTransactionWithMe
     tokenAddress : string, 
     tokenType : 'token'|'token-2022',
     positionTokenAddress : string,
+    positionTokenType : 'token'|'token-2022',
     userAddress : UserAddress) : DecimalizedAmount|null {
     if (tokenAddress === SOL_ADDRESS) {
-        return calculateNetSOLBalanceChangeExcludingFees(parsedTransaction, positionTokenAddress, userAddress);
+        // SOL balance changes need to be calculated completely differently beacuse i am interested in amount spent, without fees
+        return calculateNetSOLBalanceChangeExcludingFees(parsedTransaction, positionTokenAddress, positionTokenType, userAddress);
     }
     else {
+        // it's much simpler when we aren't doing SOL
         return calculateNetTokenBalanceChange(parsedTransaction, tokenAddress, tokenType, userAddress)
     }
 }
@@ -112,10 +117,12 @@ function calculateNetTokenBalanceChange(parsedTransaction : ParsedTransactionWit
     return dSub(postAmount,preAmount);    
 }
 
-function calculateNetSOLBalanceChangeExcludingFees(parsedTransaction : ParsedTransactionWithMeta, tokenAddress : string, userAddress : UserAddress) : DecimalizedAmount|null {
+function calculateNetSOLBalanceChangeExcludingFees(parsedTransaction : ParsedTransactionWithMeta, tokenAddress : string, tokenTokenType : 'token'|'token-2022', userAddress : UserAddress) : DecimalizedAmount|null {
     /* Here's the issue --- rent paid on new token accounts potentially needs to be taken into account,
-    as well as fees.  So we need the position's token address to properly account for SOL balances diffs */
-    const tokenAccountAddress = deriveTokenAccount(tokenAddress, userAddress, 'token').toBase58();
+    as well as fees.  So we need the position's token address to properly account for SOL balances diffs 
+    So tokenAddress and tokenTokenType are indeed about the token, not the vsToken!
+    */
+    const tokenAccountAddress = deriveTokenAccount(tokenAddress, userAddress, tokenTokenType).toBase58();
     const mainAccountSOLBalanceDiff = calculateSolTokenBalanceDiff(parsedTransaction, userAddress.address);
     // rent
     const tokenAccountSOLBalanceDiff = calculateSolTokenBalanceDiff(parsedTransaction, tokenAccountAddress); 

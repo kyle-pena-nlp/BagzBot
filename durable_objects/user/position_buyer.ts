@@ -13,6 +13,7 @@ import { TGStatusMessage, UpdateableNotification } from "../../telegram";
 import { assertNever, strictParseBoolean } from "../../util";
 //import { insertPosition, positionExistsInTracker, removePosition, updatePosition } from "../token_pair_position_tracker/token_pair_position_tracker_DO_interop";
 import { DecimalizedAmount, dZero } from "../../decimalized/decimalized_amount";
+import { logError } from "../../logging";
 import { SubsetOf } from "../../util/builder_types";
 import { registerUser } from "../heartbeat/heartbeat_DO_interop";
 import { getTokenPrice } from "../token_pair_position_tracker/token_pair_position_tracker_DO_interop";
@@ -58,8 +59,9 @@ export class PositionBuyer {
                 finalMenuCode, 
                 positionRequest.positionID);
         }
-        catch {
-            TGStatusMessage.queue(this.channel, 'There was an unexpected error with this purchase', MenuCode.ReturnToPositionRequestEditor, positionRequest.positionID);
+        catch (e : any) {
+            logError(positionRequest.positionID, e.toString());
+            TGStatusMessage.queue(this.channel, 'There was an unexpected error with this purchase', MenuCode.Main); // should not return.  that would keep the same positionID, and submitting would just attempt to buy again.
         }
         finally {
             await TGStatusMessage.finalize(this.channel);
@@ -438,6 +440,7 @@ export class PositionBuyer {
             case 'confirmed':
                 return MenuCode.ViewOpenPosition;
             
+            // what if it's an unexpected exception? the position might still be inserted. hmmm.
             case 'failed':
                 return MenuCode.ReturnToPositionRequestEditor;
             

@@ -133,26 +133,6 @@ export class PolledTokenPairListDO {
         return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(tokenAddress);
     }
 
-    // implement rate-limiting and return null if rate limited
-    async getAllTokensFromJupiter() : Promise<Record<string,StagedTokenInfo>> {
-        const url = "https://token.jup.ag/all";
-        const response = await fetch(url);
-        const allTokensJSON = await response.json() as any[];
-        const tokenInfos : Record<string,StagedTokenInfo> = {};
-        for (const tokenJSON of allTokensJSON) {
-            const tokenInfo : StagedTokenInfo = { 
-                address: tokenJSON.address as string,
-                name: tokenJSON.name as string,
-                symbol: tokenJSON.symbol as string,
-                logoURI: tokenJSON.logoURI as string,
-                decimals: tokenJSON.decimals as number,
-                tokenType : 'token-2022' in tokenJSON.tags ? 'token-2022' : 'token'
-            };
-            tokenInfos[tokenInfo.address] = tokenInfo;
-        }
-        return tokenInfos;   
-    }
-
     async validateFetchRequest(request : Request) : Promise<[PolledTokenPairListDOFetchMethod,any]> {
         const jsonBody : any = await maybeGetJson<any>(request);
         const methodName = new URL(request.url).pathname.substring(1);
