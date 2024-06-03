@@ -221,7 +221,7 @@ export class PositionBuyer {
             return 'success';
         }
 
-        const swapExecutionError =  parseInstructionError(response.value.err, this.env);
+        const swapExecutionError =  parseInstructionError(response.value.logs||[], response.value.err, this.env);
 
         if (swapExecutionError === SwapExecutionError.InsufficientSOLBalance) {
             return 'tx-sim-insufficient-sol';

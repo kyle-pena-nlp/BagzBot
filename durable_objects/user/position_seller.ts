@@ -377,7 +377,7 @@ export class PositionSeller {
                 return 'This token has been frozen (most likely a rug) and the position has been deactivated.';
             case 'tx-sim-insufficient-sol':
             case 'insufficient-sol':
-                return 'There was not enough SOL in your account to cover transaction fees, or there were not enough tokens to cover the sale.  As a result, this position has been deactivated.  When you have deposited enough SOL to cover transaction fees you can reactivate the position.'
+                return 'There was not enough SOL in your account to cover transaction fees, or there were not enough tokens to cover the sale.  As a result, this position has been deactivated.  When you have deposited enough SOL or tokens to perform the transaction you can reactivate the position.'
             case 'timed-out':
                 return 'The transaction ran out of time to execute.';
             case 'tx-sim-failed-token-account-fee-not-initialized':
@@ -476,7 +476,7 @@ export class PositionSeller {
             return 'success';
         }
 
-        const swapExecutionError =  parseInstructionError(response.value.err, this.env);
+        const swapExecutionError =  parseInstructionError(response.value.logs||[], response.value.err, this.env);
 
         if (swapExecutionError === SwapExecutionError.InsufficientSOLBalance) {
             return 'tx-sim-insufficient-sol';
@@ -491,6 +491,9 @@ export class PositionSeller {
             return 'tx-sim-frozen-token-account';
         }
         else if (swapExecutionError === SwapExecutionError.OtherSwapExecutionError) {
+            if ((response.value?.logs||[]).filter(l => l.includes('Program log: Error: insufficient funds')).length > 0) {
+                return 'tx-sim-insufficient-sol'; // for the time being, this means is both insufficient sol and insufficient token
+            }
             const otherSellFailureCount = this.openPositions.getProperty(positionID, p => p.otherSellFailureCount);
             if ((otherSellFailureCount != null && otherSellFailureCount + 1 >= strictParseInt(this.env.OTHER_SELL_FAILURES_TO_DEACTIVATE))) {
                 return 'tx-sim-failed-other-too-many-times';

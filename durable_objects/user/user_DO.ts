@@ -75,11 +75,11 @@ const DEFAULT_POSITION_PREREQUEST : PositionPreRequest = {
     positionType : PositionType.LongTrailingStopLoss,
     tokenAddress : WEN_ADDRESS, // to be subbed in
     vsToken : getVsTokenInfo('SOL'),
-    vsTokenAmt : 1.0,
-    slippagePercent : 5.0,
-    triggerPercent : 5,
+    vsTokenAmt : 0.5,
+    slippagePercent : 1.0,
+    triggerPercent : 10,
     sellAutoDoubleSlippage : false,
-    priorityFeeAutoMultiplier: null, // TODO: set to 'auto' if feature flag on
+    priorityFeeAutoMultiplier: 5, // TODO: set to 'auto' if feature flag on
 };
 
 /* Durable Object storing state of user */
@@ -268,11 +268,38 @@ export class UserDO {
 
         // turn them into a task list
         const tasks = automaticActions.getTasks();
+
+        // if there are no tasks to be done, early out
         if (tasks.length === 0) {
             return;
         }
+
+        // put the rest of them back in a not-executing state so they can be picked up next go-around
+        for (const task of tasks.slice(1)) {
+            this.undoPendingProcessingState(task)
+        }
+
         // execute just the first one (next will be picked up again next time)
         await this.performAutomaticAction(tasks[0], startTimeMS);
+    }
+
+    private undoPendingProcessingState(task : AutomaticTask) {
+        if (task.type === 'automatic-sell') {
+            this.openPositions.mutatePosition(task.positionID, p => {
+                p.status = PositionStatus.Open;
+                p.txSellAttemptTimeMS = 0;
+            });
+        }
+        else if (task.type === 'confirm-buy') {
+            this.openPositions.mutatePosition(task.positionID, p => {
+                p.buyConfirming = false;
+            });
+        }
+        else if (task.type === 'confirm-sell') {
+            this.openPositions.mutatePosition(task.positionID, p => {
+                p.sellConfirming = false;
+            });
+        }
     }
 
     private async performAutomaticAction(task : AutomaticTask, startTimeMS : number) {
@@ -308,6 +335,7 @@ export class UserDO {
             positionSeller.executeTx(positionID, preparedSellTx)
                 .then(async status => await positionSeller.finalize(positionID, status))
                 .catch(async r => await positionSeller.finalize(positionID, 'unexpected-failure'))
+                .then(() => this.invalidateWalletBalanceCache())
                 .finally(async () => await this.flushToStorage());
         }
         else {
@@ -333,6 +361,7 @@ export class UserDO {
         buyConfirmer.maybeConfirmBuy(positionID)
             .then(async status => await buyConfirmer.finalize(positionID, status))
             .catch(async r => await buyConfirmer.handleUnexpectedFailure(positionID, r))
+            .then(() => this.invalidateWalletBalanceCache())
             .finally(async () => {
                 await this.flushToStorage();
             });
@@ -356,6 +385,7 @@ export class UserDO {
         sellConfirmer.maybeConfirmSell(positionID)
             .then(async status => await sellConfirmer.finalize(positionID, status))
             .catch(async r => await sellConfirmer.handleUnexpectedFailure(positionID, r))
+            .then(() => this.invalidateWalletBalanceCache())
             .finally(async () => {
                 this.flushToStorage();
             });
@@ -1002,6 +1032,7 @@ export class UserDO {
             positionBuyer.executeTx(positionRequest, preparedTx)
                 .then(async status => await positionBuyer.finalizeChannel(positionID, status))
                 .catch(async r => await positionBuyer.finalizeChannel(positionID, 'failed'))
+                .then(() => this.invalidateWalletBalanceCache())
                 .finally(async () => await this.flushToStorage());
         }
         else {
@@ -1027,7 +1058,9 @@ export class UserDO {
     }
 
     async manuallyClosePosition(positionID  : string, startTimeMS : number) : Promise<{ success: false, reason: 'position-DNE'|'position-closing'|'position-closed'|'buy-unconfirmed' }|{ success: null, reason: 'attempting-sale' }> {
+        
         const position = this.openPositions.get(positionID);
+        
         if (position == null) {
             return { success: false, reason: "position-DNE" };
         }
@@ -1040,9 +1073,12 @@ export class UserDO {
         else if (!position.buyConfirmed) {
             return { success: false, reason: 'buy-unconfirmed' };
         }
-        // this guards against race conditions / double selling, because 
+
+        // this prevents against race conditions / double selling
+        // TODO: make a set of methods that encapsulated these "locks" for auto sells, manual sells, etc.
         this.openPositions.mutatePosition(positionID, p => {
             p.status = PositionStatus.Closing;
+            p.txSellAttemptTimeMS = Date.now();
         });
 
         assertIs<PositionStatus.Open,typeof position.status>();
@@ -1057,6 +1093,7 @@ export class UserDO {
             positionSeller.executeTx(positionID, preparedSellTx)
                 .then(async status => await positionSeller.finalize(positionID, status))
                 .catch(async r => await positionSeller.finalize(positionID, 'unexpected-failure'))
+                .then(() => this.invalidateWalletBalanceCache())
                 .finally(async () => await this.flushToStorage());
         }
         else {
@@ -1127,5 +1164,9 @@ export class UserDO {
             }
         }
         return false;
+    }
+
+    invalidateWalletBalanceCache() {
+        this.solBalanceTracker.lastRefreshedSOLBalance = 0;
     }
 }

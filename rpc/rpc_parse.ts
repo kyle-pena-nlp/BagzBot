@@ -27,7 +27,8 @@ export function parseParsedTransactionWithMeta(params : ParseTransactionParams, 
     // if the tx has an error, early-out with the parsed error
     const err = params.parsedTransaction.meta?.err;
     if (err) {
-        const swapExecutionError = parseInstructionError(err, env);
+        const logs = params.parsedTransaction.meta?.logMessages||[];
+        const swapExecutionError = parseInstructionError(logs,err, env);
         return {
             status: swapExecutionError
         };
