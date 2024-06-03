@@ -66,7 +66,7 @@ METIS_QUOTE_API_URL = ""
 METIS_SWAP_API_URL = "false"
 DOWN_FOR_MAINTENANCE = "false"
 # don't ever set to true.  just for dev.
-TEST_NO_ADMINS_MODE = "false"
+TEST_NO_ADMINS_MODE = "true"
 # feature switches
 REBUILD_TOKENS_CRON_JOB = "true"
 TX_SIM_BEFORE_BUY = "true"

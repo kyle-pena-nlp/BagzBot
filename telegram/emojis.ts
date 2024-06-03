@@ -8,6 +8,7 @@ const emojis = {
     ':wallet:': '💰',
     ':eyes:': '👀',
     ':brain:': '🧠',
+    ':settings:': '⚙️',
 
     ':notify:': '🔔',
     ':mountain:': '🏔️',
@@ -44,6 +45,7 @@ const emojis = {
     ':briefcase:': '💼',
     ':ticket:': '🎟️',
     ':love_letter:': '💌',
+    ":down_arrow:": '↓',
 
     ':help:': '❔',
     ':none:': '',

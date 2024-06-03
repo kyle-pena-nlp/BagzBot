@@ -46,6 +46,14 @@ export class MenuMain extends Menu<UserData & AdminInfo> implements MenuCapabili
             lines.push(`<b>Total Value:</b> ${asTokenPrice(totalWalletValue)} SOL`)
         }
 
+        lines.push("");
+        lines.push(":ticket: <b>Referral Based Discounts Are Active!</b> :ticket:")
+        lines.push('<b>3</b> of your referrals were active <b>this week</b>');
+        //lines.push('<b>Referral-Based Discount</b>: <code>3</code>*<code>0.1%</code> = <code>0.3%</code>');
+        lines.push('<code>Base Fee:           </code> <code>0.75%</code>')
+        lines.push('<code>Fee Reduction:      </code> <code>0.30%</code> = <code>3</code> referrals * <code>0.10%</code>');
+        lines.push('<code>Your Discounted Fee:</code> <code>0.45%</code>');
+
         if (this.menuData.isImpersonatingUser) {
             lines.push(`Currently IMPERSONATING '${this.menuData.impersonatedUserID||''}'`)
         }
@@ -57,17 +65,30 @@ export class MenuMain extends Menu<UserData & AdminInfo> implements MenuCapabili
         const options = this.emptyMenu();
         const hasWallet = this.menuData.hasWallet;
         if (hasWallet) {
-            this.insertButtonNextLine(options, ':sparkle: New TSL Position :sparkle:', this.menuCallback(MenuCode.NewPosition));
+            this.insertButtonNextLine(options, ':sparkle: New TSL', this.menuCallback(MenuCode.NewPosition));
+            this.insertButtonSameLine(options, ':chart_up: View Open TSLs', this.menuCallback(MenuCode.ListPositions));
+            
+            this.insertButtonNextLine(options, ':sparkle: New Position', this.menuCallback(MenuCode.NewRegularPosition));
+            this.insertButtonSameLine(options, ':chart_up: View Open Positions', this.menuCallback(MenuCode.ListRegularPositions));
+            
+            this.insertButtonNextLine(options, ':sparkle: New Auto-Buy', this.menuCallback(MenuCode.NewAutoBuy));
+            this.insertButtonSameLine(options, ':chart_up: View Open Auto-Buys', this.menuCallback(MenuCode.ListAutoBuys));
+
             /*if (this.menuData.isBeta) {
                 this.insertButtonSameLine(options, ':chart_down: Auto-Buy :chart_down:', new CallbackData(MenuCode.ComingSoon, "Automatically buy the dip!"));
                 this.insertButtonSameLine(options, ':wave: Wave Rider :wave:', new CallbackData(MenuCode.ComingSoon, "Combines Auto-Buy and TSL.!"));
             }*/
-            this.insertButtonNextLine(options, ':briefcase: Wallet', this.menuCallback(MenuCode.Wallet));
-            this.insertButtonSameLine(options, ':ledger: PnL Summary', this.menuCallback(MenuCode.ViewPNLHistory));
 
-            this.insertButtonNextLine(options, ':chart_up: TSL Positions', this.menuCallback(MenuCode.ListPositions));
-            this.insertButtonSameLine(options, ':deactivated: Deactivated Positions', this.menuCallback(MenuCode.ViewDeactivatedPositions));
+            this.insertButtonNextLine(options, ':ledger: PnL Summary', this.menuCallback(MenuCode.ViewPNLHistory));
             
+            
+            this.insertButtonNextLine(options, ':briefcase: Wallet', this.menuCallback(MenuCode.Wallet));
+            this.insertButtonSameLine(options, ':ticket: Referrals', this.menuCallback(MenuCode.Referrals));
+
+            this.insertButtonNextLine(options, ':deactivated: Deactivated', this.menuCallback(MenuCode.ViewDeactivatedPositions));
+            this.insertButtonSameLine(options, ':settings: Settings', this.menuCallback(MenuCode.Settings));
+            this.insertButtonSameLine(options, ":help: Help", this.menuCallback(MenuCode.MenuWhatIsTSL));
+
             if (this.menuData.hasInviteBetaCodes) {
                 this.insertButtonNextLine(options, ":envelope: Invite Friends To Beta", this.menuCallback(MenuCode.BetaGateInviteFriends));
             }
@@ -110,7 +131,7 @@ export class MenuMain extends Menu<UserData & AdminInfo> implements MenuCapabili
             if (envVars.isBeta) {
                 this.insertButtonNextLine(options, ':love_letter: Send Feedback :love_letter:', this.menuCallback(MenuCode.BetaFeedbackQuestion));
             }
-            this.insertButtonNextLine(options, ":thinking: What is a TSL Position?", this.menuCallback(MenuCode.MenuWhatIsTSL));
+            
             //this.insertButtonSameLine(options, ":help: FAQ", this.menuCallback(MenuCode.FAQ));
         }
         this.insertButtonNextLine(options, ":refresh: Refresh", this.menuCallback(MenuCode.Main));

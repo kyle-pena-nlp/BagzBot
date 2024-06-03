@@ -2,6 +2,19 @@
 // Oftentimes, there is also a menuArg, so it should be substantially less than 63 if possible.
 
 export enum MenuCode {
+
+	/* Concept stuff */
+	NewRegularPosition = "NewRegularPosition",
+	NewAutoBuy = "NewAutoBuy",
+	ListRegularPositions = "ListRegularPositions",
+	ListAutoBuys = "ListAutoBuys",
+	Settings = "Settings",
+	Referrals = "Referrals",
+	AutomaticBuySettings = "AutomaticBuySettings",
+	ViewRegularPosition = "ViewRegularPosition",
+	ViewAutoBuy = "ViewAutoBuy",
+
+
 	Main = "Main",
 	Wallet = "Wallet",
 	ViewDecryptedWallet = "View.PK",

@@ -3,6 +3,14 @@ import { HandlerMap } from "../util";
 import * as handlers from "./handlers";
 import { BaseMenuCodeHandler } from "./handlers/base_menu_code_handler";
 
+const WEN_LOGO = '<a href="https://shdw-drive.genesysgo.net/GwJapVHVvfM4Mw4sWszkzywncUWuxxPd6s9VuFfXRgie/wen_logo.png">\u200B</a>'
+const SLERF_LOGO = '<a href="https://bafkreih44n5jgqpwuvimsxzroyebjunnm47jttqusb4ivagw3vsidil43y.ipfs.nftstorage.link/">\u200B</a>'
+
+// todo: mock up price tracking on open positioin
+// todo: new "x" editor screens
+// todo: put position types into sub-menus
+// todo: mock up referral sub-menus
+
 export const MenuCodeHandlerMap : HandlerMap<MenuCode,BaseMenuCodeHandler<MenuCode>> = {
     [MenuCode.Main]: new handlers.MainHandler(MenuCode.Main),
     [MenuCode.Wallet]: new handlers.WalletHandler(MenuCode.Wallet),
@@ -79,5 +87,139 @@ export const MenuCodeHandlerMap : HandlerMap<MenuCode,BaseMenuCodeHandler<MenuCo
     [MenuCode.SubmitAdminInvokeAlarm]: new handlers.SubmitAdminInvokeAlarmHandler(MenuCode.SubmitAdminInvokeAlarm),
     [MenuCode.Close]: new handlers.CloseHandler(MenuCode.Close),
     [MenuCode.AdminViewObject]: new handlers.AdminViewObjectHandler(MenuCode.AdminViewObject),
-    [MenuCode.SubmitAdminViewObject]: new handlers.SubmitAdminViewObjectHandler(MenuCode.SubmitAdminViewObject)
+    [MenuCode.SubmitAdminViewObject]: new handlers.SubmitAdminViewObjectHandler(MenuCode.SubmitAdminViewObject),
+
+    /* Concept stuff */
+    [MenuCode.NewRegularPosition]: new handlers.NoOpHandler(MenuCode.NewRegularPosition),
+
+
+    [MenuCode.NewAutoBuy]: new handlers.NoOpHandler(MenuCode.NewAutoBuy),
+    [MenuCode.ListRegularPositions]: new handlers.MetaMenuHandler(MenuCode.ListRegularPositions, {
+        text: ["<b>Open Positions</b>"].join("\r\n"),
+        buttons: [
+            [
+                { text: ":green: 0.10 SOL of $SLERF", menuCode: MenuCode.ViewRegularPosition }
+            ],
+            [
+                { text: ":green: 0.22 SOL of $APES", menuCode: MenuCode.ViewRegularPosition }
+            ],
+            [
+                { text: ":green: 0.34 SOL of $POPCAT", menuCode: MenuCode.ViewRegularPosition }
+            ]
+        ],
+        thisMenuCode: MenuCode.ListRegularPositions,
+        backMenuCode: MenuCode.Main,
+        includeRefresh: true
+    }),
+
+    [MenuCode.ListAutoBuys]: new handlers.MetaMenuHandler(MenuCode.ListAutoBuys, {
+        text: ["<b>Active Auto-Buys</b>", "<i>Click to open and adjust settings</i>"].join("\r\n"),
+
+        buttons: [
+            [
+                { text: ":green: 0.50 SOL $WEN :bullet: VOL :bullet: :down_arrow: 3% ", menuCode: MenuCode.ViewAutoBuy }
+            ],
+            [
+                { text: ":green: 0.25 SOL $BRETT :bullet: SELL % :bullet: > 50%", menuCode: MenuCode.ViewAutoBuy }
+            ],
+            [
+                { text: ":green: 0.25 SOL $BRETT :bullet: SELL % :bullet: > 50%", menuCode: MenuCode.ViewAutoBuy }
+            ],
+        ],
+        thisMenuCode: MenuCode.ListAutoBuys,
+        backMenuCode: MenuCode.Main,
+        includeRefresh: true
+    }),
+
+    [MenuCode.Referrals]: new handlers.MetaMenuHandler(MenuCode.Referrals, {
+        text: "<b>Manage And Send Referrals</b>",
+        buttons: [
+            [
+                "View Accepted Referrals"
+            ],
+            [
+                "Get New Referral"
+            ]
+        ],
+        thisMenuCode: MenuCode.Referrals,
+        backMenuCode: MenuCode.Main
+    }),
+
+    [MenuCode.Settings]: new handlers.MetaMenuHandler(MenuCode.Settings, {
+        text: "Adjust your settings here",
+        buttons: [
+            [
+                "Automatic Buys: On"
+            ],
+            [
+                { text: "Automatic Buy Settings", menuCode: MenuCode.AutomaticBuySettings }
+            ]
+        ],
+        thisMenuCode: MenuCode.Settings,
+        backMenuCode: MenuCode.Main
+    }),
+
+    [MenuCode.AutomaticBuySettings]: new handlers.MetaMenuHandler(MenuCode.AutomaticBuySettings, {
+        text: "Adjust your settings for Automatic Buys",
+        buttons: [
+            [
+                "Automatic Buy Type: Regular Position"
+            ],
+            [
+                "Buy Amount: 0.1 SOL"
+            ],
+            [
+                "Slippage: 1%"
+            ],
+            [
+                "Priority Fees: Boosted"
+            ]
+        ],
+        thisMenuCode: MenuCode.AutomaticBuySettings,
+        backMenuCode: MenuCode.Settings
+    }),
+
+    [MenuCode.ViewRegularPosition]: new handlers.MetaMenuHandler(MenuCode.AutomaticBuySettings, {
+        text: [`${SLERF_LOGO}<b>Open Position</b>: 0.10 SOL of $SLERF`,'<i>Adjust your settings below.</i>'].join("\r\n"),
+        buttons: [
+            [
+                ":sparkle: Sell Now :sparkle:"
+            ],
+            [
+                "Slippage: 1%"
+            ],
+            [
+                "Priority Fees: Boosted"
+            ]
+        ],
+        thisMenuCode: MenuCode.ViewRegularPosition,
+        backMenuCode: MenuCode.ListRegularPositions,
+        includeRefresh: true
+    }),
+    [MenuCode.ViewAutoBuy]: new handlers.MetaMenuHandler(MenuCode.ViewAutoBuy, {
+        text: [
+            `${WEN_LOGO}<b>Auto-Buy</b> <code>0.50</code> SOL of $WEN`, 
+            "",
+            "<b>Interpretation:</b>",
+            "<code>0.50</code> SOL of $WEN will be purchased when VOLUME decreases by 3% from peak",
+            "",
+            "<i>Adjust your settings here.</i>"].join("\r\n"),
+        buttons: [
+            [
+                "TRIGGER:","VOL",":down_arrow:","3%"
+            ],
+            [
+                "Token: $WEN", "Amount: 0.50 SOL", "Type: Regular",
+            ],
+            [
+                "Slippage: 1%",  "Priority Fees: Boosted"
+            ],
+            [
+                ":cancel: Cancel Auto-Buy"
+            ],
+        ],
+        thisMenuCode: MenuCode.ViewAutoBuy,
+        backMenuCode: MenuCode.ListAutoBuys,
+        includeRefresh: true
+    })
 }
