@@ -3,7 +3,6 @@ import { Wallet } from "../../crypto";
 import { dSub } from "../../decimalized";
 import { DecimalizedAmount, asTokenPrice } from "../../decimalized/decimalized_amount";
 import { Env } from "../../env";
-import { logError } from "../../logging";
 import { MenuCode } from "../../menus";
 import { Position, PositionStatus } from "../../positions";
 import { getLatestValidBlockhash } from "../../rpc/rpc_blocks";
@@ -22,6 +21,15 @@ import { OpenPositionsTracker } from "./trackers/open_positions_tracker";
 type TxPreparationFailure = 'timed-out'|'already-sold'|'could-not-create-tx'|'could-not-retrieve-blockheight';
 type TxSimFailure = 'tx-sim-failed-other'|'tx-sim-failed-other-too-many-times'|'tx-sim-insufficient-sol'|'tx-sim-failed-slippage'|'tx-sim-frozen-token-account'|'tx-sim-failed-token-account-fee-not-initialized'|'tx-sim-insufficient-tokens-balance';
 type TxExecutionFailure = 'tx-failed'|'unconfirmed'|'slippage-failed'|'insufficient-sol'|'insufficient-tokens-balance'|'frozen-token-account'|'token-fee-account-not-initialized'|'other-failed'|'other-failed-too-many-times';
+
+export interface PreparedSellTx {
+    signedTx : VersionedTransaction,
+    lastValidBH : number
+}
+
+export function isPreparedSellTx(obj : PreparedSellTx|string) : obj is PreparedSellTx {
+    return typeof obj !== 'string';
+}
 
 // See also SellConfirmer in sell_confirmer.ts for a full picture of the sell lifecycle
 
@@ -56,28 +64,12 @@ export class PositionSeller {
         this.closedPositions = closedPositions;
         this.deactivatedPositions = deactivatedPositions;
     }
+
     isTimedOut() : boolean {
         return Date.now() > (this.startTimeMS + strictParseInt(this.env.TX_TIMEOUT_MS));
     }
-    async sell(positionID : string) : Promise<TxPreparationFailure|TxSimFailure|TxExecutionFailure|'confirmed'|'unexpected-exception'> {
-        try {
-            const status = await this.sellInternal(positionID);
-            const statusMessage = this.makeFinalStatusMessage(positionID, status);
-            const menuCode = this.makeFinalMenuCode(status);
-            TGStatusMessage.queue(this.channel, statusMessage, menuCode, positionID);
-            return status;
-        }
-        catch (e) {
-            logError(e);
-            const menuCode = this.type === 'manual-sell' ? MenuCode.ViewOpenPosition : MenuCode.Close;
-            TGStatusMessage.queue(this.channel, "There was an unexpected error.", menuCode, positionID);
-            return 'unexpected-exception';
-        }
-    }
 
-    private async sellInternal(positionID : string) : Promise<TxPreparationFailure|TxSimFailure|TxExecutionFailure|'confirmed'> {
-        
-        // PRE-CONDITION: position is marked as closing.  that prevents a lot of shenanigans.
+    async prepareAndSimTx(positionID : string) : Promise<TxPreparationFailure|TxSimFailure|PreparedSellTx> {
 
         if (this.isTimedOut()) {
             this.markAsOpen(positionID);
@@ -122,7 +114,6 @@ export class PositionSeller {
         const position = this.openPositions.mutatePosition(positionID, p => {
             p.txSellSignature = signatureOf(signedTx);
             p.sellLastValidBlockheight = lastValidBH;
-            p.status = PositionStatus.Closing;
             p.txSellAttemptTimeMS = Date.now();
         });
 
@@ -131,56 +122,101 @@ export class PositionSeller {
             return 'could-not-create-tx';
         }
 
-        // if the position is not triggered, also don't proceed with the swap
-        // TODO: think about this
-        /*const sellTriggerConditionStillHolds = this.openPositions.trigger
-        if (this.openPositions.isTSL(positionID) && !this.openPositions.isTSLAndTSLInTriggeredState(positionID)) {
-            // TODO: better error status
-            return 'could-not-create-tx';
-        }*/
-
-        const result = await this.executeAndParseSwap(position, signedTx, lastValidBH);
-
-        // no guarantees that anything after this point executes... CF may drop it.
-
-        this.performTrackerActionBasedOnExecutionResult(positionID, result);
-
-        if (isSuccessfullyParsedSwapSummary(result)) {
-            return 'confirmed';
-        }
-        else {
-            return result;
-        }       
+        return { signedTx, lastValidBH }
     }
 
-    private performTrackerActionBasedOnExecutionResult(positionID : string, result : TxSimFailure|TxExecutionFailure|ParsedSuccessfulSwapSummary) {
-        if (result === 'tx-failed') {
+    async executeTx(positionID : string, preparedSellTx : PreparedSellTx) : Promise<TxExecutionFailure|ParsedSuccessfulSwapSummary> {
+
+        // how should i deal with the position disappearing here? will this happen?
+        const position = this.openPositions.get(positionID)!!;
+
+        const result = await this.executeAndParseSwap(position, preparedSellTx.signedTx, preparedSellTx.lastValidBH);
+
+        return result;
+    }
+
+    async finalize(positionID : string, result : TxPreparationFailure|TxSimFailure|TxExecutionFailure|'unexpected-failure'|ParsedSuccessfulSwapSummary) {
+        this.performTrackerActionBasedOnExecutionResult(positionID, result);
+        const status = isSuccessfullyParsedSwapSummary(result) ? 'confirmed' : result;
+        const statusMessage = this.makeFinalStatusMessage(positionID, status);
+        const menuCode = this.makeFinalMenuCode(status);
+        TGStatusMessage.queue(this.channel, statusMessage, menuCode, positionID);
+        await TGStatusMessage.finalize(this.channel);
+    }
+
+    private performTrackerActionBasedOnExecutionResult(positionID : string, result : TxPreparationFailure|TxSimFailure|TxExecutionFailure|'unexpected-failure'|ParsedSuccessfulSwapSummary) {
+        if (result === 'timed-out') {
+            // no-op, was an early out.
             this.markAsOpen(positionID);
         }
-        else if (result === 'slippage-failed' || result === 'tx-sim-failed-slippage') {
-            this.markAsOpenAndDoubleSlippage(positionID);
-        }
-        else if (result === 'frozen-token-account' || result === 'tx-sim-frozen-token-account') {
-            this.markAsOpenAndDeactivate(positionID);
-        }
-        else if (result === 'insufficient-sol' || result === 'tx-sim-insufficient-sol') {
-            this.markAsOpenAndDeactivate(positionID);
-        }
-        else if (result === 'token-fee-account-not-initialized' || result === 'tx-sim-failed-token-account-fee-not-initialized') {
-            this.markAsOpenAndDeactivate(positionID);
-        }
-        else if (result === 'tx-sim-insufficient-tokens-balance' || result === 'insufficient-tokens-balance') {
-            this.markAsOpenAndDeactivate(positionID);
-        }
-        else if (result === 'other-failed' || result === 'tx-sim-failed-other') {
-            this.incrementOtherSellFailureCountInTracker(positionID);
+        else if (result === 'already-sold') {
+            // no-op, was an early out.
             this.markAsOpen(positionID);
         }
-        else if (result === 'other-failed-too-many-times' || result === 'tx-sim-failed-other-too-many-times') {
+        else if (result === 'could-not-create-tx') {
+            // no-op, was an early out.
+            this.markAsOpen(positionID);
+        }
+        else if (result === 'could-not-retrieve-blockheight') {
+            // no-op, was an early out.
+            this.markAsOpen(positionID);
+        }
+        else if (result === 'tx-sim-failed-slippage') {
+            // was an early out, but indicates slippage should be doubled if desired
+            this.markAsOpenAndMaybeDoubleSlippage(positionID);
+        }
+        else if (result === 'tx-sim-frozen-token-account') {
+            // was an early out, but indicates position should be deactivated
+            this.markAsOpenAndDeactivate(positionID)
+        }
+        else if (result === 'tx-sim-insufficient-sol') {
+            // was an early out, but indicates position should be deactivated
+            this.markAsOpenAndDeactivate(positionID);
+        }
+        else if (result === 'tx-sim-insufficient-tokens-balance') {
+            // was an early out, but indicates position should be deactivated
+            this.markAsOpenAndDeactivate(positionID);
+        }
+        else if (result === 'tx-sim-failed-other') {
+            this.markAsOpenAndIncrementOtherSellFailureCountInTracker(positionID);
+        }
+        else if (result === 'tx-sim-failed-other-too-many-times') {
+            // was an early out, but indicates position should be deactivated
+            this.markAsOpenAndDeactivate(positionID);
+        }
+        else if (result === 'tx-sim-failed-token-account-fee-not-initialized') {
+            // was an early out, but indicates position should be deactivated
+            this.markAsOpenAndDeactivate(positionID);
+        }
+        else if (result === 'tx-failed') {
+            this.markAsOpen(positionID);
+        }
+        else if (result === 'slippage-failed') {
+            this.markAsOpenAndMaybeDoubleSlippage(positionID);
+        }
+        else if (result === 'frozen-token-account') {
+            this.markAsOpenAndDeactivate(positionID);
+        }
+        else if (result === 'insufficient-sol') {
+            this.markAsOpenAndDeactivate(positionID);
+        }
+        else if (result === 'token-fee-account-not-initialized') {
+            this.markAsOpenAndDeactivate(positionID);
+        }
+        else if (result === 'insufficient-tokens-balance') {
+            this.markAsOpenAndDeactivate(positionID);
+        }
+        else if (result === 'other-failed') {
+            this.markAsOpenAndIncrementOtherSellFailureCountInTracker(positionID);
+        }
+        else if (result === 'other-failed-too-many-times') {
             this.markAsOpenAndDeactivate(positionID);
         }
         else if (result === 'unconfirmed') {
             // no-op --- sellConfirmer will pick it up on next CRON job execution.
+        }
+        else if (result === 'unexpected-failure') {
+            // no-op --- who knows what state we were left in?  let the confirmer deal with it.
         }
         else if (isSuccessfullyParsedSwapSummary(result)) {
             this.markAsClosed(positionID, result);
@@ -203,17 +239,28 @@ export class PositionSeller {
     private markAsOpenAndDeactivate(positionID : string) : boolean {
         // We mark as open before deactivating so that, if reactivated, it isn't in a 'try to confirm' state
         // At this point, if 'markAsDeactivated' is invoked, we know that the sale failed and trying to confirm upon reactivation is superfluous 
+        this.openPositions.mutatePosition(positionID, p => {
+            p.status = PositionStatus.Open;
+        });
+        this.deactivate(positionID);
+        return true;
+    }
+
+    private deactivate(positionID : string) : boolean {
         const position = this.openPositions.deactivateAndReturn(positionID);
         if (position == null) {
             return false;
         }
-        position.status = PositionStatus.Open;
         this.deactivatedPositions.upsert(position);
         return true;
     }
 
-    private markAsOpenAndDoubleSlippage(positionID : string) {
+    private markAsOpenAndMaybeDoubleSlippage(positionID : string) {
         this.markAsOpen(positionID);
+        this.maybeDoubleSlippage(positionID);
+    }
+
+    private maybeDoubleSlippage(positionID : string) {
         const shouldAutodouble = this.openPositions.getProperty(positionID, p => p.sellAutoDoubleSlippage);
         if (shouldAutodouble === true) {
             this.openPositions.mutatePosition(positionID, p => {
@@ -222,7 +269,8 @@ export class PositionSeller {
         }
     }
 
-    private incrementOtherSellFailureCountInTracker(positionID : string) {
+    private markAsOpenAndIncrementOtherSellFailureCountInTracker(positionID : string) {
+        this.markAsOpen(positionID);
         this.openPositions.mutatePosition(positionID, p => {
             p.otherSellFailureCount = (p.otherSellFailureCount||0) + 1
         });
@@ -308,7 +356,7 @@ export class PositionSeller {
     }
 
 
-    private makeFinalStatusMessage(positionID : string, status : TxPreparationFailure|TxSimFailure|TxExecutionFailure|'confirmed') : string {
+    private makeFinalStatusMessage(positionID : string, status : TxPreparationFailure|TxSimFailure|TxExecutionFailure|'unexpected-failure'|'confirmed') : string {
         switch(status) {
             case 'already-sold':
                 return 'The position was already sold.';
@@ -351,6 +399,8 @@ export class PositionSeller {
                 }
             case 'unconfirmed':
                 return 'The sale could not be confirmed due to network congestion. We will reattempt confirmation within a few minutes.';
+            case 'unexpected-failure':
+                return 'There was an unexpected error.';
             case 'tx-sim-insufficient-tokens-balance':
             case 'insufficient-tokens-balance':
                 const pos = this.openPositions.get(positionID) || this.deactivatedPositions.get(positionID) || this.closedPositions.get(positionID);
@@ -365,7 +415,7 @@ export class PositionSeller {
         }
     }
 
-    private makeFinalMenuCode(status : TxPreparationFailure|TxSimFailure|TxExecutionFailure|'confirmed') : MenuCode {
+    private makeFinalMenuCode(status : TxPreparationFailure|TxSimFailure|TxExecutionFailure|'unexpected-failure'|'confirmed') : MenuCode {
         if (this.type === 'auto-sell') {
             return MenuCode.Close;
         }
@@ -406,6 +456,8 @@ export class PositionSeller {
             case 'tx-sim-insufficient-tokens-balance':
             case 'insufficient-tokens-balance':
                 return MenuCode.ViewDeactivatedPositions;
+            case 'unexpected-failure':
+                return this.type === 'manual-sell' ? MenuCode.ViewOpenPosition : MenuCode.Close;
             default:
                 assertNever(status);
         }

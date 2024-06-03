@@ -46,13 +46,13 @@ type ExecuteTxErrorCodes = 'insufficient-sol'|
 
 type ExecuteTxResultCodes = ExecuteTxErrorCodes|'confirmed';
 
-export interface PreparedTx {
+export interface PreparedBuyTx {
     signedTx: VersionedTransaction,
     lastValidBH: number,
     connection : Connection
 }
 
-export function isPreparedTx(obj : PreparedTx|string) : obj is PreparedTx {
+export function isPreparedBuyTx(obj : PreparedBuyTx|string) : obj is PreparedBuyTx {
     return typeof obj !== 'string';
 }
 
@@ -81,7 +81,7 @@ export class PositionBuyer {
     }
 
     async prepareTx(positionRequest : PositionRequest) : Promise<
-        PreparedTx|PrepareTxErrorCodes> {
+        PreparedBuyTx|PrepareTxErrorCodes> {
         // RPC connection
         const connection = new Connection(getRPCUrl(this.env));
 
@@ -136,7 +136,7 @@ export class PositionBuyer {
         }
     }
 
-    async executeTxAndFinalizeChannel(positionRequest : PositionRequest, preparedTx : PreparedTx) : Promise<void> {
+    async executeTxAndFinalizeChannel(positionRequest : PositionRequest, preparedTx : PreparedBuyTx) : Promise<void> {
         try {
             const finalStatus = await this.executeTx(positionRequest, preparedTx);
             const finalMessage = this.getFinalStatusMessage(finalStatus);
@@ -166,7 +166,7 @@ export class PositionBuyer {
     }
 
     // Lots of different kinds of things can go wrong. Hence the nasty return type.
-    async executeTx(positionRequest : PositionRequest, preparedTx : PreparedTx) : Promise<ExecuteTxResultCodes> {
+    async executeTx(positionRequest : PositionRequest, preparedTx : PreparedBuyTx) : Promise<ExecuteTxResultCodes> {
 
         // try to do the swap.
         const result = await this.executeAndParseSwap(positionRequest, preparedTx.signedTx, preparedTx.lastValidBH, preparedTx.connection);

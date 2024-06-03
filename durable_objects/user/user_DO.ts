@@ -55,8 +55,8 @@ import { UserDOBuyConfirmer } from "./confirmers/user_do_buy_confirmer";
 import { UserDOSellConfirmer } from "./confirmers/user_do_sell_confirmer";
 import { TokenPair } from "./model/token_pair";
 import { UserData } from "./model/user_data";
-import { PositionBuyer, isPreparedTx } from "./position_buyer";
-import { PositionSeller } from "./position_seller";
+import { PositionBuyer, isPreparedBuyTx } from "./position_buyer";
+import { PositionSeller, isPreparedSellTx } from "./position_seller";
 import { ClosedPositionsTracker } from "./trackers/closed_positions_tracker";
 import { DeactivatedPositionsTracker } from "./trackers/deactivated_positions_tracker";
 import { OpenPositionsTracker, UpdatePriceResult } from "./trackers/open_positions_tracker";
@@ -86,7 +86,9 @@ export class UserDO {
 
     // boilerplate DO stuff
     env : Env;
+
     state: DurableObjectState;
+    
     loadFromStorageFailed : boolean|undefined = undefined
 
     // user's ID
@@ -307,10 +309,13 @@ export class UserDO {
     // TODO: batching and awaiting of batches (to limit the number of concurrent auto-sells)
     async initiateAutomaticSale(positionID : string, startTimeMS : number) {
         logDebug(`Trying: ${positionID}`);
+        
         const position = this.openPositions.get(positionID);
+        
         if (position == null) {
             return;
         }
+        
         const channel = TGStatusMessage.createAndSend(`Initiating sale.`, false, position.chatID, this.env, 'HTML', `<a href="${position.token.logoURI}">\u200B</a><b>Automatic Sale of ${asTokenPrice(position.tokenAmt)} ${position.token.symbol}</b>: `);
         const connection = new Connection(getRPCUrl(this.env));
         const timedOut = () => (Date.now() - startTimeMS) > strictParseInt(this.env.TX_TIMEOUT_MS);
@@ -318,10 +323,19 @@ export class UserDO {
             return;
         }
         const positionSeller = new PositionSeller(connection, this.wallet.value!!, 'auto-sell', startTimeMS, channel, this.env, this.openPositions, this.closedPositions, this.deactivatedPositions);
-        // deliberate lack of await here.
-        positionSeller.sell(positionID).finally(async () => {
-            await this.flushToStorage();
-        });
+        
+        const preparedSellTx = await positionSeller.prepareAndSimTx(position.positionID);
+
+        if (isPreparedSellTx(preparedSellTx)) {
+            // deliberate fire-and-forget, with flushToStorage guaranteed in 'finally'
+            positionSeller.executeTx(positionID, preparedSellTx)
+                .then(async status => await positionSeller.finalize(positionID, status))
+                .catch(async r => await positionSeller.finalize(positionID, 'unexpected-failure'))
+                .finally(async () => await this.flushToStorage());
+        }
+        else {
+            await positionSeller.finalize(positionID, preparedSellTx);
+        }
     }
 
     initialized() : boolean {
@@ -960,7 +974,7 @@ export class UserDO {
         // this is awaited so that we are certain to flush the new position to storage no matter how long the tx takes
         const preparedTx = await positionBuyer.prepareTx(positionRequest);
 
-        if (isPreparedTx(preparedTx)) {
+        if (isPreparedBuyTx(preparedTx)) {
             // deliberate fire-and-forget here, lack of await, but writes to storage when complete
             positionBuyer.executeTx(positionRequest, preparedTx)
                 .then(async status => await positionBuyer.finalizeChannel(positionID, status))
@@ -1003,18 +1017,29 @@ export class UserDO {
         else if (!position.buyConfirmed) {
             return { success: false, reason: 'buy-unconfirmed' };
         }
+        // this guards against race conditions / double selling, because 
+        this.openPositions.mutatePosition(positionID, p => {
+            p.status = PositionStatus.Closing;
+        });
+
         assertIs<PositionStatus.Open,typeof position.status>();
         const channel = TGStatusMessage.createAndSend(`Initiating sale.`, false, position.chatID, this.env, 'HTML', `<a href="${position.token.logoURI}">\u200B</a><b>Manual Sale of ${asTokenPrice(position.tokenAmt)} ${position.token.symbol}</b>: `);
         const connection = new Connection(getRPCUrl(this.env));
         const positionSeller = new PositionSeller(connection, this.wallet.value!!, 'manual-sell', startTimeMS, channel, this.env, this.openPositions, this.closedPositions, this.deactivatedPositions);
-        this.openPositions.mutatePosition(positionID, p => {
-            p.status = PositionStatus.Closing;
-        });
-        // deliberate lack of await here (fire-and-forget). But still writes to storage. 
-        // The idea is that the DO is kept alive by the alarms 
-        positionSeller.sell(position.positionID).finally(async () => {
-            await this.flushToStorage();
-        });
+
+        const preparedSellTx = await positionSeller.prepareAndSimTx(position.positionID);
+
+        if (isPreparedSellTx(preparedSellTx)) {
+            // deliberate fire-and-forget, with flushToStorage guaranteed in 'finally'
+            positionSeller.executeTx(positionID, preparedSellTx)
+                .then(async status => await positionSeller.finalize(positionID, status))
+                .catch(async r => await positionSeller.finalize(positionID, 'unexpected-failure'))
+                .finally(async () => await this.flushToStorage());
+        }
+        else {
+            await positionSeller.finalize(positionID, preparedSellTx);
+        }
+
         // success is indeterminate (by design) (explanation: depends on what happens with the positionSeller.sell, which is unawaited, so we don't know the result yet, hence 'null')
         return { success: null, reason: 'attempting-sale' };
     }

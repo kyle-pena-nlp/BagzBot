@@ -52,6 +52,12 @@ export class UserDOSellConfirmer {
             return 'do-not-continue';
         }        
 
+        // if there was never a tx sig recorded, the sell tx was never sent, so just mark it as open again.
+        if (this.noSellTxRecorded(positionID) === true) {
+            this.markPositionAsOpen(positionID);
+            return 'continue';
+        }
+
         // recheck status of position because we are in any async method
         let confirmableStatus = this.isSellConfirmable(positionID);
         if (confirmableStatus !== 'confirmable') {
@@ -66,6 +72,19 @@ export class UserDOSellConfirmer {
         else {
             assertNever(blockheight);
         }
+    }
+    private noSellTxRecorded(positionID : string) : boolean|null {
+        const checkPosition = this.openPositions.get(positionID);
+        if (checkPosition == null) {
+            return null;
+        }
+        if (checkPosition.txSellSignature == null) {
+            return true;
+        }
+        if (checkPosition.sellLastValidBlockheight == null) {
+            return true;
+        }
+        return false;
     }
     makeTelegramSellConfirmationChannel(positionID : string) {
         const pos = this.openPositions.get(positionID)!!;
@@ -222,12 +241,6 @@ export class UserDOSellConfirmer {
         }
         if (checkPosition.status !== PositionStatus.Closing) {
             return 'position-not-closing';
-        }
-        if (checkPosition.txSellSignature == null) {
-            return 'no-sell-signature';
-        }
-        if (checkPosition.sellLastValidBlockheight) {
-            return 'no-sell-last-valid-blockheight';
         }
         return 'confirmable';
     } 
