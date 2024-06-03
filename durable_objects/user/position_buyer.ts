@@ -25,6 +25,37 @@ import { OpenPositionsTracker } from "./trackers/open_positions_tracker";
 
 type ConfirmationData = SubsetOf<Position>;
 
+type TxSimErrorCodes = 'tx-sim-failed-other'|
+    'tx-sim-insufficient-sol'|
+    'tx-sim-failed-slippage'|
+    'tx-sim-frozen-token-account'|
+    'tx-sim-failed-token-account-fee-not-initialized'|
+    'tx-sim-insufficient-tokens-balance';
+
+type PrepareTxErrorCodes = 'already-processed'|
+    'could-not-create-tx'|
+    TxSimErrorCodes;
+
+type ExecuteTxErrorCodes = 'insufficient-sol'|
+    'token-fee-account-not-initialized'|
+    'frozen-token-account'|
+    'slippage-failed'|
+    'failed'|
+    'unconfirmed'|
+    'insufficient-tokens-balance';
+
+type ExecuteTxResultCodes = ExecuteTxErrorCodes|'confirmed';
+
+export interface PreparedTx {
+    signedTx: VersionedTransaction,
+    lastValidBH: number,
+    connection : Connection
+}
+
+export function isPreparedTx(obj : PreparedTx|string) : obj is PreparedTx {
+    return typeof obj !== 'string';
+}
+
 export class PositionBuyer {
     wallet : Wallet
     env : Env
@@ -49,44 +80,8 @@ export class PositionBuyer {
         this.deactivatedPositions = deactivatedPositions;
     }
 
-    async buy(positionRequest : PositionRequest) : Promise<void> {
-        try {
-            const finalStatus = await this.buyInternal(positionRequest);
-            const finalMessage = this.getFinalStatusMessage(finalStatus);
-            const finalMenuCode = this.getFinalMenuCode(finalStatus);
-            TGStatusMessage.queue(this.channel, 
-                finalMessage, 
-                finalMenuCode, 
-                positionRequest.positionID);
-        }
-        catch (e : any) {
-            logError(positionRequest.positionID, e.toString());
-            TGStatusMessage.queue(this.channel, 'There was an unexpected error with this purchase', MenuCode.Main); // should not return.  that would keep the same positionID, and submitting would just attempt to buy again.
-        }
-        finally {
-            await TGStatusMessage.finalize(this.channel);
-        }
-    }
-
-    // Lots of different kinds of things can go wrong. Hence the nasty return type.
-    async buyInternal(positionRequest : PositionRequest) : Promise<
-        'tx-sim-failed-other'|
-        'tx-sim-frozen-token-account'|
-        'tx-sim-failed-slippage'|
-        'tx-sim-insufficient-sol'|
-        'tx-sim-failed-token-account-fee-not-initialized'|
-        'tx-sim-insufficient-tokens-balance'|
-        'already-processed'|
-        'could-not-create-tx'|
-        'failed'|
-        'slippage-failed'|
-        'insufficient-sol'|
-        'frozen-token-account'|
-        'token-fee-account-not-initialized'|
-        'insufficient-tokens-balance'|
-        'unconfirmed'|
-        'confirmed'> {
-
+    async prepareTx(positionRequest : PositionRequest) : Promise<
+        PreparedTx|PrepareTxErrorCodes> {
         // RPC connection
         const connection = new Connection(getRPCUrl(this.env));
 
@@ -136,8 +131,45 @@ export class PositionBuyer {
             return 'could-not-create-tx'; // TODO: more appropriate return code.
         }
 
+        return {
+            signedTx, lastValidBH, connection
+        }
+    }
+
+    async executeTxAndFinalizeChannel(positionRequest : PositionRequest, preparedTx : PreparedTx) : Promise<void> {
+        try {
+            const finalStatus = await this.executeTx(positionRequest, preparedTx);
+            const finalMessage = this.getFinalStatusMessage(finalStatus);
+            const finalMenuCode = this.getFinalMenuCode(finalStatus);
+            TGStatusMessage.queue(this.channel, 
+                finalMessage, 
+                finalMenuCode, 
+                positionRequest.positionID);
+        }
+        catch (e : any) {
+            logError(positionRequest.positionID, e.toString());
+            TGStatusMessage.queue(this.channel, 'There was an unexpected error with this purchase', MenuCode.Main); // should not return.  that would keep the same positionID, and submitting would just attempt to buy again.
+        }
+        finally {
+            await TGStatusMessage.finalize(this.channel);
+        }
+    }
+
+    async finalizeChannel(positionID : string, finalStatus : PrepareTxErrorCodes|ExecuteTxResultCodes) : Promise<void> {
+        const finalMessage = this.getFinalStatusMessage(finalStatus);
+        const finalMenuCode = this.getFinalMenuCode(finalStatus);
+        TGStatusMessage.queue(this.channel, 
+            finalMessage, 
+            finalMenuCode, 
+            positionID);
+        TGStatusMessage.finalize(this.channel);
+    }
+
+    // Lots of different kinds of things can go wrong. Hence the nasty return type.
+    async executeTx(positionRequest : PositionRequest, preparedTx : PreparedTx) : Promise<ExecuteTxResultCodes> {
+
         // try to do the swap.
-        const result = await this.executeAndParseSwap(positionRequest, signedTx, lastValidBH, connection);
+        const result = await this.executeAndParseSwap(positionRequest, preparedTx.signedTx, preparedTx.lastValidBH, preparedTx.connection);
 
         // no guarantees that anything after this point executes... CF may drop it.
 
@@ -177,14 +209,7 @@ export class PositionBuyer {
         return this.openPositions.has(positionID) || this.closedPositions.has(positionID) || this.deactivatedPositions.has(positionID);
     }
 
-    private async simulateTx(signedTx : VersionedTransaction, connection : Connection) : Promise<
-        'success'|
-        'tx-sim-failed-other'|
-        'tx-sim-insufficient-sol'|
-        'tx-sim-failed-slippage'|
-        'tx-sim-frozen-token-account'|
-        'tx-sim-failed-token-account-fee-not-initialized'|
-        'tx-sim-insufficient-tokens-balance'> {
+    private async simulateTx(signedTx : VersionedTransaction, connection : Connection) : Promise<'success'|TxSimErrorCodes> {
         const config: SimulateTransactionConfig = {
             sigVerify: true, // use the signature of the signedTx to verify validity of tx, rather than fetching a new blockhash
             commitment: 'confirmed' // omitting this seems to cause simulation to fail.
@@ -274,15 +299,7 @@ export class PositionBuyer {
         return signedTx;
     }
 
-    private async executeAndParseSwap(positionRequest: PositionRequest, signedTx : VersionedTransaction, lastValidBH : number, connection : Connection) : Promise<
-        'insufficient-sol'|
-        'token-fee-account-not-initialized'|
-        'frozen-token-account'|
-        'slippage-failed'|
-        'failed'|
-        'unconfirmed'|
-        'insufficient-tokens-balance'|
-        { confirmationData : ConfirmationData }> {
+    private async executeAndParseSwap(positionRequest: PositionRequest, signedTx : VersionedTransaction, lastValidBH : number, connection : Connection) : Promise<ExecuteTxErrorCodes|{ confirmationData : ConfirmationData }> {
         
         // create a time-limited tx executor and confirmer
         const swapExecutor = new SwapExecutor(this.wallet, 'buy', this.env, this.channel, connection, lastValidBH, this.startTimeMS);
@@ -353,22 +370,7 @@ export class PositionBuyer {
         };
     }
     
-    private getFinalStatusMessage(status: 'tx-sim-failed-other'|
-    'tx-sim-frozen-token-account'|
-    'tx-sim-failed-slippage'|
-    'tx-sim-insufficient-sol'|
-    'tx-sim-failed-token-account-fee-not-initialized'|
-    'tx-sim-insufficient-tokens-balance'|
-    'already-processed'|
-    'could-not-create-tx'|
-    'failed'|
-    'slippage-failed'|
-    'insufficient-sol'|
-    'frozen-token-account'|
-    'token-fee-account-not-initialized'|
-    'insufficient-tokens-balance'|
-    'unconfirmed'|
-    'confirmed') : string {
+    private getFinalStatusMessage(status: PrepareTxErrorCodes|ExecuteTxResultCodes) : string {
         switch(status) {
             
             case 'already-processed':
@@ -414,22 +416,7 @@ export class PositionBuyer {
         }
     }
 
-    private getFinalMenuCode(status: 'tx-sim-failed-other'|
-    'tx-sim-frozen-token-account'|
-    'tx-sim-failed-slippage'|
-    'tx-sim-insufficient-sol'|
-    'tx-sim-failed-token-account-fee-not-initialized'|
-    'tx-sim-insufficient-tokens-balance'|
-    'already-processed'|
-    'could-not-create-tx'|
-    'failed'|
-    'slippage-failed'|
-    'insufficient-sol'|
-    'frozen-token-account'|
-    'token-fee-account-not-initialized'|
-    'insufficient-tokens-balance'|
-    'unconfirmed'|
-    'confirmed') : MenuCode {
+    private getFinalMenuCode(status: PrepareTxErrorCodes|ExecuteTxResultCodes) : MenuCode {
         switch(status) {
             case 'already-processed':
                 return MenuCode.Main;

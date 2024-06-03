@@ -55,7 +55,7 @@ import { UserDOBuyConfirmer } from "./confirmers/user_do_buy_confirmer";
 import { UserDOSellConfirmer } from "./confirmers/user_do_sell_confirmer";
 import { TokenPair } from "./model/token_pair";
 import { UserData } from "./model/user_data";
-import { PositionBuyer } from "./position_buyer";
+import { PositionBuyer, isPreparedTx } from "./position_buyer";
 import { PositionSeller } from "./position_seller";
 import { ClosedPositionsTracker } from "./trackers/closed_positions_tracker";
 import { DeactivatedPositionsTracker } from "./trackers/deactivated_positions_tracker";
@@ -943,6 +943,7 @@ export class UserDO {
     async handleOpenNewPosition(openPositionRequest : OpenPositionRequest) : Promise<Response> {
         const startTimeMS = Date.now();
         const positionRequest = openPositionRequest.positionRequest;
+        const positionID = positionRequest.positionID;
 
         // non-blocking notification channel to push update messages to TG
         const channel = TGStatusMessage.replaceWithNotification(
@@ -956,11 +957,19 @@ export class UserDO {
 
         const positionBuyer = new PositionBuyer(this.wallet.value!!, this.env, startTimeMS, channel, this.openPositions, this.closedPositions, this.deactivatedPositions);    
         
-        // fire-and-forget here, lack of await, but writes to storage when complete
-        positionBuyer.buy(positionRequest).finally(async () => {
-            await this.flushToStorage();
-        });
+        // this is awaited so that we are certain to flush the new position to storage no matter how long the tx takes
+        const preparedTx = await positionBuyer.prepareTx(positionRequest);
 
+        if (isPreparedTx(preparedTx)) {
+            // deliberate fire-and-forget here, lack of await, but writes to storage when complete
+            positionBuyer.executeTx(positionRequest, preparedTx)
+                .then(async status => await positionBuyer.finalizeChannel(positionID, status))
+                .catch(async r => await positionBuyer.finalizeChannel(positionID, 'failed'))
+                .finally(async () => await this.flushToStorage());
+        }
+        else {
+            positionBuyer.finalizeChannel(positionID, preparedTx);
+        }
         
         return makeJSONResponse<OpenPositionResponse>({});
     }
