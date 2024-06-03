@@ -261,11 +261,13 @@ export class PositionBuyer {
             userAddress: toUserAddress(this.wallet),
     
             buyConfirmed: false, // <----------
+            buyConfirming: false,
             txBuyAttemptTimeMS: Date.now(),
             txBuySignature: signature,
             buyLastValidBlockheight: lastValidBH,
             
             sellConfirmed: false,
+            sellConfirming: false,
             txSellSignature: null,
             txSellAttemptTimeMS: null,
             sellLastValidBlockheight: null,

@@ -5,6 +5,7 @@ import { logDebug } from "../../../logging";
 import { Position, PositionStatus, PositionType } from "../../../positions";
 import { SetWithKeyFn, setDifference, setIntersection, strictParseInt, structuralEquals } from "../../../util";
 import { PositionAndMaybePNL } from "../../token_pair_position_tracker/model/position_and_PNL";
+import { AutomaticActions } from "../model/automatic_actions";
 import { TokenPair } from "../model/token_pair";
 import { UserPNL } from "../model/user_data";
 
@@ -26,6 +27,8 @@ export interface UpdatePriceParams {
     price : DecimalizedAmount
     currentPriceMS : number
     markTriggeredAsClosing : true
+    markUnconfirmedBuysAsConfirming : true
+    markUnconfirmedSellsAsConfirming : true
 }
 
 export class OpenPositionsTracker {
@@ -59,42 +62,54 @@ export class OpenPositionsTracker {
         }
         return position;
     }
-    updatePrice(params : UpdatePriceParams, env : Env) : UpdatePriceResult {
-        const triggeredTSLPositions : Position[] = [];
-        const unconfirmedBuys : Position[] = [];
-        const unconfirmedSells : Position[] = [];
+    updatePrice(params : UpdatePriceParams, env : Env) : AutomaticActions {
+
+        const automaticActions = new AutomaticActions();
 
         // update peak prices, gather triggered / unconfirmed buys / unconfirmed sells
         for (const key of Object.keys(this.positions)) {
+            
             const position = this.positions[key];
+
+            // if the token pair matches
             if (this.isThisTokenPair(position, params.tokenPair)) {
+                
+                // update price tracking on the position
                 this.updatePositionPriceTracking(position, params.price, params.currentPriceMS);
+                
+                // if it's a TSL, trigger it
                 if (this.canBeTriggeredAndMeetsTSLTriggerCondition(params.price, position)) {
                     if (params.markTriggeredAsClosing) {
                         position.status = PositionStatus.Closing;
                     }
-                    triggeredTSLPositions.push(position);
+                    automaticActions.add('automatic-sell', position);
                 }
 
-                // TODO: unconfirmed buys
+                // if it's an unconfirmed buy, confirm it
                 if (this.isStaleUnconfirmedBuy(position, env)) {
-                    unconfirmedBuys.push(position);
+                    if (params.markUnconfirmedBuysAsConfirming) {
+                        position.buyConfirming = true;
+                    }
+                    automaticActions.add('unconfirmed-buy', position);
                 }
 
-                // TODO: unconfirmed sells
+                // if it's an unconfirmed sell, confirm it
                 if (this.isStaleUnconfirmedSell(position, env)) {
-                    unconfirmedSells.push(position);
+                    if (params.markUnconfirmedSellsAsConfirming) {
+                        position.sellConfirming = true;
+                    }
+                    automaticActions.add('unconfirmed-sell', position);
                 }
             }
         }
-        return { 
-            triggeredTSLPositions: triggeredTSLPositions, 
-            unconfirmedBuys: unconfirmedBuys, 
-            unconfirmedSells: unconfirmedSells 
-        };
+
+        return automaticActions;
     }
     isStaleUnconfirmedBuy(position: Position, env : Env) : boolean {
         if (position.buyConfirmed) {
+            return false;
+        }
+        if (position.buyConfirming) {
             return false;
         }
         if (position.status === PositionStatus.Closed || position.status === PositionStatus.Closing) {
@@ -113,6 +128,9 @@ export class OpenPositionsTracker {
         }
         if (position.sellConfirmed) {
             logDebug("Sell confirmed");
+            return false;
+        }
+        if (position.sellConfirming) {
             return false;
         }
         const elapsedTimeMS = Date.now() - (position.txSellAttemptTimeMS||0);

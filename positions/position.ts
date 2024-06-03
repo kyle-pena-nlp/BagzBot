@@ -64,12 +64,15 @@ export interface Position {
 	txBuySignature : string
 	buyLastValidBlockheight : number
 	buyConfirmed : boolean
+	buyConfirming : boolean
 
 	// TODO: set this & lastvalidBH on buy
 	txSellAttemptTimeMS : number|null
 	txSellSignature : string|null
 	sellLastValidBlockheight : number|null
 	sellConfirmed : boolean
+	sellConfirming : boolean
+	
 	netPNL : DecimalizedAmount|null
 	otherSellFailureCount : number|null // null for backwards compat
 

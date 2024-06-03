@@ -16,21 +16,46 @@ import { OpenPositionsTracker } from "../trackers/open_positions_tracker";
 
 type ConfirmationData = SubsetOf<Position>;
 
+type BuyConfirmationErrorCode = 'timed-out'|
+    '429'|
+    'api-call-error'|
+    'position-DNE'|
+    'position-already-confirmed'|
+    'position-not-open'|
+    'position-DNE';
+
+type BuyTxExecutionErrorCode = 'failed'|
+        'unconfirmed'|
+        'slippage-failed'|
+        'frozen-token-account'|
+        'token-fee-account-not-initialized'|
+        'insufficient-sol'|
+        'insufficient-tokens-balance';
+
+type BuyConfirmationResult = BuyConfirmationErrorCode|BuyTxExecutionErrorCode|ConfirmationData;
+
+
 // Does the work of checking the blockchain to see if the buy succeeded.
 // Can return 'unconfirmed' when answer is uncertain.
 // Can return 'api-error' if API down... is a signal to back off the API calls.
 export class UserDOBuyConfirmer {
+    channel : UpdateableMessage
     connection : Connection    
     startTimeMS : number
     env : Env
     openPositions : OpenPositionsTracker;
     closedPositions : ClosedPositionsTracker;
     deactivatedPositions : DeactivatedPositionsTracker;
-    constructor(connection : Connection, startTimeMS : number, env : Env,
+    constructor(
+        channel: UpdateableMessage,
+        connection : Connection, 
+        startTimeMS : number, 
+        env : Env,
         openPositions : OpenPositionsTracker,
         closedPositions : ClosedPositionsTracker,
         deactivatedPositions : DeactivatedPositionsTracker,
     ) {
+        this.channel = channel;
         this.connection = connection;
         this.startTimeMS = startTimeMS;
         this.env = env;
@@ -41,40 +66,41 @@ export class UserDOBuyConfirmer {
     isTimedOut() : boolean {
         return (Date.now() > this.startTimeMS + strictParseInt(this.env.CONFIRM_TIMEOUT_MS));
     }
-    async maybeConfirmBuy(positionID : string) : Promise<'do-not-continue'|'continue'> {
+    async maybeConfirmBuy(positionID : string) : Promise<BuyConfirmationResult> {
 
         // early out if no more time on request
         if (this.isTimedOut()) {
-            return 'do-not-continue';
+            return 'timed-out';
         }
 
         // early out if API is down / rate-limited
         const blockheight : number | 'api-call-error' | '429' = await this.getBlockheight();
-        if (blockheight === '429') {
-            return 'do-not-continue';
-        }
-        else if (blockheight === 'api-call-error') {
-            return 'do-not-continue';
+        if (typeof blockheight !== 'number') {
+            return blockheight;
         }
 
         // early out if position is not in confirmable status anymore
         const positionStatus = this.ensurePositionIsConfirmable(positionID);
         if (positionStatus === 'position-DNE') {
-            return 'continue';
+            return 'position-DNE';
         }
         else if (positionStatus == 'position-already-confirmed') {
-            return 'continue';
+            return 'position-already-confirmed';
         }
         else if (positionStatus === 'position-not-open') {
-            return 'continue';
+            return 'position-not-open';
         }
 
         // confirm the position and keep the user informated with updates
         assertIs<'position-confirmable', typeof positionStatus>();
-        const channel = this.makeConfirmBuyTelegramNotificationChannel(positionID);
         const result = await this.attemptConfirmation(positionID, blockheight);
-        await this.performActionForBuyConfirmationResult(positionID, result, channel);
-        return 'continue'
+        return result;
+    }
+
+    async handleUnexpectedFailure(positionID : string, r : any) {
+        logError(r.toString())
+        this.markAsNotConfirmingBuy(positionID);
+        await TGStatusMessage.finalMessage(this.channel, "We encountered an unexpected error while trying to confirm the buy.", true);
     }
     
     private async getBlockheight() : Promise<'429'|'api-call-error'|number> {
@@ -114,20 +140,7 @@ export class UserDOBuyConfirmer {
         }
     }
 
-    private async performActionForBuyConfirmationResult(positionID : string,
-        status :
-        ConfirmationData|
-        'position-DNE'|
-        'position-already-confirmed'|
-        'position-not-open'|
-        'failed'|
-        'unconfirmed'|
-        'slippage-failed'|
-        'frozen-token-account'|
-        'token-fee-account-not-initialized'|
-        'insufficient-sol'|
-        'insufficient-tokens-balance', 
-        channel : UpdateableMessage) {
+    async finalize(positionID : string, status : BuyConfirmationResult) {
 
         // recheck before we have entered an async function
         const recheck = this.isPositionStillConfirmable(positionID);
@@ -135,56 +148,88 @@ export class UserDOBuyConfirmer {
             status = recheck;
         }
 
+        if (status === '429') {
+            TGStatusMessage.queue(this.channel, "The purchase could not be confirmed due to the RPC being temporarily unavailable. We will try again soon.", true);
+            this.markAsNotConfirmingBuy(positionID);
+        }
+        else if (status === 'api-call-error') {
+            TGStatusMessage.queue(this.channel, "The purchase could not be confirmed due to the RPC being down/inaccessible. We will try again soon.", true);
+            this.markAsNotConfirmingBuy(positionID);
+        }
+        else if (status === 'timed-out') {
+            TGStatusMessage.queue(this.channel, "The purchase could not be confirmed due to network congestion. We will try again soon.", true);
+            this.markAsNotConfirmingBuy(positionID);
+        }
         if (status === 'position-DNE') {
-            TGStatusMessage.queue(channel, "On checking, it looks like the purchase or position no longer exists or was deactivated.", true);
+            TGStatusMessage.queue(this.channel, "On checking, it looks like the purchase or position no longer exists or was deactivated.", true);
+            this.markAsNotConfirmingBuy(positionID);
         }
         else if (status === 'position-already-confirmed') {
-            TGStatusMessage.queue(channel, "On checking, it looks like this purchase has been confirmed!", true);
+            TGStatusMessage.queue(this.channel, "On checking, it looks like this purchase has been confirmed!", true);
+            this.markAsNotConfirmingBuy(positionID);
         }
         else if (status === 'position-not-open') {
-            TGStatusMessage.queue(channel, "On checking, it looks like this purchase is currently being sold or has been sold!", true);
+            TGStatusMessage.queue(this.channel, "On checking, it looks like this purchase is currently being sold or has been sold!", true);
+            this.markAsNotConfirmingBuy(positionID);
         }
         else if (status === 'unconfirmed') {
-            TGStatusMessage.queue(channel, "We had a hard time confirming the purchase because of network congestion or the transaction happened too recently - sorry, we will retry confirmation again soon.", true);
+            TGStatusMessage.queue(this.channel, "We had a hard time confirming the purchase because of network congestion or the transaction happened too recently - sorry, we will retry confirmation again soon.", true);
+            this.markAsNotConfirmingBuy(positionID);
         }
         else if (status === 'failed') {
-            TGStatusMessage.queue(channel, "After checking, we found that the purchase didn't go through.", true);
+            TGStatusMessage.queue(this.channel, "After checking, we found that the purchase didn't go through.", true);
             this.removePosition(positionID);
         }
         else if (status === 'frozen-token-account') {
             const pos = this.openPositions.get(positionID)!!;
-            TGStatusMessage.queue(channel, `After checking, we found that the purchase didn't go through because $${pos.token.symbol} has been frozen due to suspicious activity.`, true);
+            TGStatusMessage.queue(this.channel, `After checking, we found that the purchase didn't go through because $${pos.token.symbol} has been frozen due to suspicious activity.`, true);
             this.removePosition(positionID);
         }
         else if (status === 'insufficient-sol') {
-            TGStatusMessage.queue(channel, `After checking, we found that the purchase didn't go through because there wasn't enough SOL in your account to cover the purchase`, true);
+            TGStatusMessage.queue(this.channel, `After checking, we found that the purchase didn't go through because there wasn't enough SOL in your account to cover the purchase`, true);
             this.removePosition(positionID);
         }
         else if (status === 'slippage-failed') {
-            TGStatusMessage.queue(channel, `After checking, we found that the purchase didn't go through because the slippage tolerance was exceeded`, true);
+            TGStatusMessage.queue(this.channel, `After checking, we found that the purchase didn't go through because the slippage tolerance was exceeded`, true);
             this.removePosition(positionID);
         }
         else if (status === 'token-fee-account-not-initialized') {
-            TGStatusMessage.queue(channel, `After checking, we found that the purchase didn't complete.`, true);
+            TGStatusMessage.queue(this.channel, `After checking, we found that the purchase didn't complete.`, true);
             this.removePosition(positionID);
         }
         else if (status === 'insufficient-tokens-balance') {
             // This shouldn't happen because we can't have too few of the tokens we are currently buying
             // But I include this case to make TS happy
-            TGStatusMessage.queue(channel, `After checking, we found that there were not enough tokens to cover the purchase.`, true);
+            TGStatusMessage.queue(this.channel, `After checking, we found that there were not enough tokens to cover the purchase.`, true);
             this.removePosition(positionID);
+        }
+        else if (status === '429') {
+
+        }
+        else if (status === 'api-call-error') {
+
+        }
+        else if (status === 'timed-out') {
+            
         }
         else {
             assertIs<ConfirmationData, typeof status>();
-            TGStatusMessage.queue(channel, "We were able to confirm this purchase! It will be listed in your open positions.", true);
+            TGStatusMessage.queue(this.channel, "We were able to confirm this purchase! It will be listed in your open positions.", true);
             this.openPositions.mutatePosition(positionID, p => {
+                p.buyConfirming = false;
                 Object.assign(p, status);
             });
         }
-        await TGStatusMessage.finalize(channel);
+        await TGStatusMessage.finalize(this.channel);
     }
     removePosition(positionID: string) {
         this.openPositions.deletePosition(positionID);
+    }
+
+    markAsNotConfirmingBuy(positionID : string) {
+        this.openPositions.mutatePosition(positionID, p => {
+            p.buyConfirming = false;
+        });
     }
 
     private isPositionStillConfirmable(positionID : string) : 'position-DNE'|'position-already-confirmed'|'position-not-open'|'confirmable' {

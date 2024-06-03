@@ -250,7 +250,9 @@ function posWithPrice(initPrice : DecimalizedAmount) : Position {
         txBuySignature: '',
         txSellSignature: '',
         buyConfirmed: true, // <--- important to set or test will fail
+        buyConfirming: false,
         sellConfirmed: false,
+        sellConfirming: false,
         sellAutoDoubleSlippage: false,
         buyLastValidBlockheight: 0,
         sellLastValidBlockheight: null,

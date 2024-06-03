@@ -5,11 +5,11 @@ import { asTokenPrice } from "../../decimalized/decimalized_amount";
 import { Env, allowChooseAutoDoubleSlippage, allowChoosePriorityFees, getRPCUrl } from "../../env";
 import { makeFailureResponse, makeJSONResponse, makeSuccessResponse, maybeGetJson } from "../../http";
 import { logDebug, logError, logInfo } from "../../logging";
-import { Position, PositionPreRequest, PositionRequest, PositionStatus, PositionType } from "../../positions";
+import { PositionPreRequest, PositionRequest, PositionStatus, PositionType } from "../../positions";
 import { POSITION_REQUEST_STORAGE_KEY } from "../../storage_keys";
 import { TGStatusMessage, sendMessageToTG } from "../../telegram";
 import { WEN_ADDRESS, getVsTokenInfo } from "../../tokens";
-import { ChangeTrackedValue, Intersect, Structural, Subtract, assertNever, ensureArrayIsAllAndOnlyPropsOf, ensureArrayIsOnlyPropsOf, sleep, strictParseBoolean, strictParseInt } from "../../util";
+import { ChangeTrackedValue, Intersect, Structural, Subtract, assertNever, ensureArrayIsAllAndOnlyPropsOf, ensureArrayIsOnlyPropsOf, sleep, strictParseBoolean } from "../../util";
 import { assertIs } from "../../util/enums";
 import { listUnclaimedBetaInviteCodes } from "../beta_invite_codes/beta_invite_code_interop";
 import { registerUser as registerUserWithHearbeat } from "../heartbeat/heartbeat_DO_interop";
@@ -53,13 +53,14 @@ import { WakeUpRequest, WakeUpResponse } from "./actions/wake_up_request";
 import { ClosedPositionPNLSummarizer } from "./aggregators/closed_positions_pnl_summarizer";
 import { UserDOBuyConfirmer } from "./confirmers/user_do_buy_confirmer";
 import { UserDOSellConfirmer } from "./confirmers/user_do_sell_confirmer";
+import { AutomaticActions, AutomaticTask } from "./model/automatic_actions";
 import { TokenPair } from "./model/token_pair";
 import { UserData } from "./model/user_data";
 import { PositionBuyer, isPreparedBuyTx } from "./position_buyer";
 import { PositionSeller, isPreparedSellTx } from "./position_seller";
 import { ClosedPositionsTracker } from "./trackers/closed_positions_tracker";
 import { DeactivatedPositionsTracker } from "./trackers/deactivated_positions_tracker";
-import { OpenPositionsTracker, UpdatePriceResult } from "./trackers/open_positions_tracker";
+import { OpenPositionsTracker } from "./trackers/open_positions_tracker";
 import { SessionTracker } from "./trackers/session_tracker";
 import { SOLBalanceTracker } from "./trackers/sol_balance_tracker";
 import { UserDOFetchMethod, parseUserDOFetchMethod } from "./userDO_interop";
@@ -233,99 +234,71 @@ export class UserDO {
         return this.openPositions.listPositions({ includeClosing: true, includeOpen : true, includeUnconfirmed : true, includeClosed : false }).length > 0;
     }
 
-    async performAlarmActions() {
-        const startTimeMS = Date.now();
-        const tokenPairs = this.openPositions.listUniqueTokenPairs({ includeOpen: true, includeUnconfirmed : true, includeClosing : true, includeClosed : false });
-        for (const tokenPair of tokenPairs) {
-            const getTokenPriceResult = await this.getLatestPrice(tokenPair);
-            if (getTokenPriceResult.price != null)  {
-                const automaticActions = this.openPositions.updatePrice({ 
-                    tokenPair, 
-                    price: getTokenPriceResult.price, 
-                    currentPriceMS: getTokenPriceResult.currentPriceMS,
-                    markTriggeredAsClosing: true }, this.env);
-                await this.initiateAutomaticActions(automaticActions, startTimeMS);
-            }
-            else {
-                logError("Unable to retrieve price", tokenPair);
-            }
-        }
-    }
-
     async getLatestPrice(tokenPair : TokenPair) : Promise<GetTokenPriceResponse> {
         const response = await getTokenPrice(tokenPair.tokenAddress, tokenPair.vsTokenAddress, this.env);
         return response;
     }
 
-    async initiateAutomaticActions(automaticAction : UpdatePriceResult, startTimeMS : number) {
-        
-        // perform automatic sales, most expensive first.
-        // TODO: timing out, concurrency, etc?
-        automaticAction.triggeredTSLPositions.sort(p => -p.vsTokenAmt);
-        for (const triggeredTSLPosition of automaticAction.triggeredTSLPositions) {
-            await this.initiateAutomaticSale(triggeredTSLPosition.positionID, startTimeMS);
+    async performAlarmActions() {
+
+        // gather automatic actions to perform
+        const startTimeMS = Date.now();
+        const tokenPairs = this.openPositions.listUniqueTokenPairs({ includeOpen: true, includeUnconfirmed : true, includeClosing : true, includeClosed : false });
+        const automaticActions = new AutomaticActions();
+        for (const tokenPair of tokenPairs) {
+            const getTokenPriceResult = await this.getLatestPrice(tokenPair);
+            if (getTokenPriceResult.price != null)  {
+                automaticActions.update(this.openPositions.updatePrice({ 
+                    tokenPair, 
+                    price: getTokenPriceResult.price, 
+                    currentPriceMS: getTokenPriceResult.currentPriceMS,
+                    markTriggeredAsClosing: true,
+                    markUnconfirmedBuysAsConfirming : true,
+                    markUnconfirmedSellsAsConfirming : true 
+                }, this.env));
+            }
+            else {
+                logError("Unable to retrieve price", tokenPair);
+            }
         }
 
-        const allThingsToConfirm = this.combineConfirmationTasks({ buys: automaticAction.unconfirmedBuys, sells: automaticAction.unconfirmedSells })
-        const connection = new Connection(getRPCUrl(this.env));
-        const buyConfirmer = new UserDOBuyConfirmer(connection, startTimeMS, this.env, this.openPositions, this.closedPositions, this.deactivatedPositions);
-        const sellConfirmer = new UserDOSellConfirmer(connection, startTimeMS, this.env, this.openPositions, this.closedPositions, this.deactivatedPositions);
- 
-        automaticAction.unconfirmedBuys.sort(p => -p.vsTokenAmt);
-        for (const { type, position } of allThingsToConfirm) {
-            if (type === 'buy') {
-                if (buyConfirmer.isTimedOut()) {
-                    continue;
-                }
-                const confirmedBuy = await buyConfirmer.maybeConfirmBuy(position.positionID);
-                if (confirmedBuy === 'do-not-continue') {
-                    break;
-                }
-            }
-            else if (type === 'sell') {
-                if (sellConfirmer.isTimedOut()) {
-                    continue;
-                }
-                const confirmedSell = await sellConfirmer.maybeConfirmSell(position.positionID);
-                if (confirmedSell === 'do-not-continue') {
-                    break;
-                }
-            }
+        // turn them into a task list
+        const tasks = automaticActions.getTasks();
+        if (tasks.length === 0) {
+            return;
+        }
+        // execute just the first one (next will be picked up again next time)
+        await this.performAutomaticAction(tasks[0], startTimeMS);
+    }
+
+    private async performAutomaticAction(task : AutomaticTask, startTimeMS : number) {
+        switch(task.type) {
+            case 'automatic-sell':
+                await this.performAutomaticSell(task.positionID, startTimeMS);
+            case 'confirm-buy':
+                await this.performConfirmBuy(task.positionID, startTimeMS);
+            case 'confirm-sell':
+                await this.performConfirmSell(task.positionID, startTimeMS);
+                break;
+            default:
+                assertNever(task.type);
         }
     }
 
-    combineConfirmationTasks(params: { buys: Position[], sells: Position[] }) : { type: 'buy'|'sell', position : Position }[] {
-        const combinedList : { type: 'buy'|'sell', position : Position }[] = [];
-        for (const buy of params.buys) {
-            combinedList.push({ type: 'buy', position: buy });
-        }
-        for (const sell of params.sells) {  
-            combinedList.push({ type: 'sell', position: sell });
-        }
-        combinedList.sort(item => -item.position.vsTokenAmt);
-        return combinedList;
-    }
-
-    // TODO: batching and awaiting of batches (to limit the number of concurrent auto-sells)
-    async initiateAutomaticSale(positionID : string, startTimeMS : number) {
-        logDebug(`Trying: ${positionID}`);
+    
+    private async performAutomaticSell(positionID : string, startTimeMS : number) {
         
+        // double check it's still eligible for automatic sell, since we just entered an async
         const position = this.openPositions.get(positionID);
-        
-        if (position == null) {
+        if (position == null || position.status !== PositionStatus.Closing || !position.buyConfirmed) {
             return;
         }
         
         const channel = TGStatusMessage.createAndSend(`Initiating sale.`, false, position.chatID, this.env, 'HTML', `<a href="${position.token.logoURI}">\u200B</a><b>Automatic Sale of ${asTokenPrice(position.tokenAmt)} ${position.token.symbol}</b>: `);
         const connection = new Connection(getRPCUrl(this.env));
-        const timedOut = () => (Date.now() - startTimeMS) > strictParseInt(this.env.TX_TIMEOUT_MS);
-        if (timedOut()) {
-            return;
-        }
         const positionSeller = new PositionSeller(connection, this.wallet.value!!, 'auto-sell', startTimeMS, channel, this.env, this.openPositions, this.closedPositions, this.deactivatedPositions);
-        
+    
         const preparedSellTx = await positionSeller.prepareAndSimTx(position.positionID);
-
         if (isPreparedSellTx(preparedSellTx)) {
             // deliberate fire-and-forget, with flushToStorage guaranteed in 'finally'
             positionSeller.executeTx(positionID, preparedSellTx)
@@ -336,6 +309,52 @@ export class UserDO {
         else {
             await positionSeller.finalize(positionID, preparedSellTx);
         }
+    }
+
+    private async performConfirmBuy(positionID : string, startTimeMS : number) {
+
+        // double check it's still eligible for buy confirmation, since we just entered an async
+        const position = this.openPositions.get(positionID);
+        if (position == null || position.status !== PositionStatus.Open || position.buyConfirmed || !position.buyConfirming) {
+            return;
+        }
+
+        const unconfirmedPosition = this.openPositions.get(positionID)!!;
+        const buyConfirmPrefix = `:notify: <b>Attempting to confirm your earlier purchase of ${asTokenPrice(unconfirmedPosition.tokenAmt)} ${unconfirmedPosition.token.symbol}</b>: `;
+        const channel = TGStatusMessage.createAndSend('In progress...', false, unconfirmedPosition.chatID, this.env, 'HTML', buyConfirmPrefix);   
+        const connection = new Connection(getRPCUrl(this.env));
+        const buyConfirmer = new UserDOBuyConfirmer(channel, connection, startTimeMS, this.env, this.openPositions, this.closedPositions, this.deactivatedPositions);
+        
+        // deliberate fire-and-forget
+        buyConfirmer.maybeConfirmBuy(positionID)
+            .then(async status => await buyConfirmer.finalize(positionID, status))
+            .catch(async r => await buyConfirmer.handleUnexpectedFailure(positionID, r))
+            .finally(async () => {
+                await this.flushToStorage();
+            });
+    }
+
+    private async performConfirmSell(positionID : string, startTimeMS : number) {
+
+        // double check it's still eligible for sell confirmation, since we just entered an async
+        const position = this.openPositions.get(positionID);
+        if (position == null || position.status !== PositionStatus.Closing || !position.sellConfirming) {
+            return;
+        }
+
+        const pos = this.openPositions.get(positionID)!!;
+        const sellConfirmPrefix = `:notify: <b>Attempting to confirm the earlier sale of ${asTokenPrice(pos.tokenAmt)} $${pos.token.symbol}</b>: `;
+        const channel = TGStatusMessage.createAndSend('In progress...', false, pos.chatID, this.env, 'HTML', sellConfirmPrefix);
+        const connection = new Connection(getRPCUrl(this.env));
+        const sellConfirmer = new UserDOSellConfirmer(channel, connection, startTimeMS, this.env, this.openPositions, this.closedPositions, this.deactivatedPositions);
+        
+        // deliberate fire-and-forget
+        sellConfirmer.maybeConfirmSell(positionID)
+            .then(async status => await sellConfirmer.finalize(positionID, status))
+            .catch(async r => await sellConfirmer.handleUnexpectedFailure(positionID, r))
+            .finally(async () => {
+                this.flushToStorage();
+            });
     }
 
     initialized() : boolean {
