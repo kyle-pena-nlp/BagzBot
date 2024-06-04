@@ -19,6 +19,11 @@ export enum MenuCode {
 	EngageReferrals = "EngageReferrals",
 	GetReferralLink = "GetReferralLink",
 
+	AutoBuyAutoSellMain = "AutoBuyAutoSellMain",
+	ListAutoBuyAutoSell = "ListAutoBuyAutoSell",
+	ViewAutoBuyAutoSell = "ViewAutoBuyAutoSell",
+	NewAutoBuyAutoSell = "NewAutoBuyAutoSell",
+
 	Main = "Main",
 	Wallet = "Wallet",
 	ViewDecryptedWallet = "View.PK",

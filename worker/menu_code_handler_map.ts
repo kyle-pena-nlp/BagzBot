@@ -92,13 +92,12 @@ export const MenuCodeHandlerMap : HandlerMap<MenuCode,BaseMenuCodeHandler<MenuCo
     /* Concept stuff */
     [MenuCode.NewRegularPosition]: new handlers.MetaMenuHandler(MenuCode.NewRegularPosition, {
         text: [
-            `${SLERF_LOGO}<u><b>Create Open Position</b></u>: (<b>7,986.2419 of</b> $SLERF)`, 
+            `${SLERF_LOGO}<u><b>Create Open Position</b></u>: (<b>7,986.2419 of</b> $SLERF)`,
             '<code>7BgBvyjrZX1YKz4oh9mjb8ZScatkkwb8DzFx7LoiVkM3</code>',
             '',
             ':bullet:<code>Current Price:   </code>0.0₅1253 SOL ',
             '',
             '<i>Adjust your settings below.</i>'
-            
         ].join("\r\n"),
         buttons: [
             [
@@ -113,7 +112,7 @@ export const MenuCodeHandlerMap : HandlerMap<MenuCode,BaseMenuCodeHandler<MenuCo
         ],
         thisMenuCode: MenuCode.NewRegularPosition,
         backMenuCode: MenuCode.RegPosMainMenu,
-        includeRefresh: true 
+        includeRefresh: true
     }),
 
 
@@ -148,7 +147,7 @@ export const MenuCodeHandlerMap : HandlerMap<MenuCode,BaseMenuCodeHandler<MenuCo
 
 
     [MenuCode.ListRegularPositions]: new handlers.MetaMenuHandler(MenuCode.ListRegularPositions, {
-        text: ["<b>Open Positions</b>"].join("\r\n"),
+        text: ["<b>Your Open Positions</b>"].join("\r\n"),
         buttons: [
             [
                 { text: ":green: 0.10 SOL of $SLERF", menuCode: MenuCode.ViewRegularPosition }
@@ -240,7 +239,7 @@ export const MenuCodeHandlerMap : HandlerMap<MenuCode,BaseMenuCodeHandler<MenuCo
 
     [MenuCode.ViewRegularPosition]: new handlers.MetaMenuHandler(MenuCode.AutomaticBuySettings, {
         text: [
-            `${SLERF_LOGO}<u><b>Your Open Position</b></u>: (<b>7,986.2419 of</b> $SLERF)`, 
+            `${SLERF_LOGO}<u><b>Your Open Position</b></u>: (<b>7,986.2419 of</b> $SLERF)`,
             '<code>7BgBvyjrZX1YKz4oh9mjb8ZScatkkwb8DzFx7LoiVkM3</code>',
             '',
             '<b><u>Price Movement</u></b>',
@@ -248,7 +247,6 @@ export const MenuCodeHandlerMap : HandlerMap<MenuCode,BaseMenuCodeHandler<MenuCo
             ':bullet:<code>Profit:          </code>+0.0₅7682 SOL (+0.07%)',
             '',
             '<i>Adjust your settings below.</i>'
-            
         ].join("\r\n"),
         buttons: [
             [
@@ -296,7 +294,7 @@ export const MenuCodeHandlerMap : HandlerMap<MenuCode,BaseMenuCodeHandler<MenuCo
     }),
 
     [MenuCode.TSLMainMenu]: new handlers.MetaMenuHandler(MenuCode.TSLMainMenu, {
-        text: "<b>Trailing Stop Loss</b>: Main Menu",
+        text: ":chart_up:<b>Auto-Sell Positions</b>: Main Menu",
         buttons: [
             [
                 { text: ":sparkle: New Auto-Sell :sparkle:", menuCode: MenuCode.NewPosition }
@@ -324,7 +322,7 @@ export const MenuCodeHandlerMap : HandlerMap<MenuCode,BaseMenuCodeHandler<MenuCo
     }),
 
     [MenuCode.AutoBuyMainMenu]: new handlers.MetaMenuHandler(MenuCode.AutoBuyMainMenu, {
-        text: "<b>Auto-Buys</b>: Main Menu",
+        text: ":bot:<b>Auto-Buys</b>: Main Menu",
         buttons: [
             [
                 { text: ":sparkle: Create New Auto-Buy :sparkle:", menuCode: MenuCode.NewAutoBuy }
@@ -345,10 +343,9 @@ export const MenuCodeHandlerMap : HandlerMap<MenuCode,BaseMenuCodeHandler<MenuCo
             "Your platform fee will be reduced if more of your referrals use SolSentry this week.",
             "",
             "<i>Click a referral's name to send them a reminder to use SolSentry!</i>"
-        
         ].join("\r\n"),
         buttons: [
-            [":green: @kylepena [CLICK TO REMIND]"],
+            [":green: @kylealexpena [ACTIVE THIS WEEK]"],
             [":red: @somebodyelse [CLICK TO REMIND]"],
             [":red: @myotherfriend [CLICK TO REMIND]"],
         ],
@@ -356,7 +353,7 @@ export const MenuCodeHandlerMap : HandlerMap<MenuCode,BaseMenuCodeHandler<MenuCo
         backMenuCode: MenuCode.Referrals,
         includeRefresh: true
     }),
-    
+
     [MenuCode.GetReferralLink]: new handlers.MetaMenuHandler(MenuCode.GetReferralLink, {
         text: [
             "<b><u>Here is your one-time referral link to send to friends.</u></b>",
@@ -370,5 +367,66 @@ export const MenuCodeHandlerMap : HandlerMap<MenuCode,BaseMenuCodeHandler<MenuCo
         thisMenuCode: MenuCode.GetReferralLink,
         backMenuCode: MenuCode.Referrals,
         includeRefresh: true
-    })
+    }),
+
+    [MenuCode.AutoBuyAutoSellMain]: new handlers.MetaMenuHandler(MenuCode.AutoBuyAutoSellMain, {
+        text: ":bot:<b>Auto-Buy + Auto-Sell :chart_up: Positions</b>: Main Menu",
+        buttons: [
+            [
+                { text: ":sparkle: New Auto-Buy + Auto-Sell Position :sparkle:", menuCode: MenuCode.NewAutoBuyAutoSell }
+            ],
+            [
+                { text: ":chart_up: View Open Auto-Buy + Auto-Sell Positions", menuCode: MenuCode.ListAutoBuyAutoSell }
+            ]
+        ],
+        thisMenuCode: MenuCode.AutoBuyAutoSellMain,
+        backMenuCode: MenuCode.Main
+    }),
+
+    
+    [MenuCode.NewAutoBuyAutoSell]: new handlers.MetaMenuHandler(MenuCode.NewAutoBuyAutoSell, {
+        text: [
+            `${WEN_LOGO}<u><b>Create New Auto-Buy + Auto-Sell Position</b></u>`,
+            "(<code>WENWENvqqNya429ubCdR81ZmD69brwQaaBYY6p3LCpk</code>)",
+            "",
+            "<b>Interpretation:</b>",
+            ":bullet: <code>0.50</code> SOL of $WEN will be purchased when VOLUME decreases by 3% from latest peak",
+            ":bullet: Then, all $WEN will be automatically sold when PRICE decreases by 5% from latest peak",
+            "",
+            "<i>Adjust your settings here.</i>"
+        ].join("\r\n"),
+        buttons: [
+            [
+                ":pencil: Change Token", ":dollars: 0.50 SOL"
+            ],
+            [
+                "BUY:", "VOL :mountain:", ":down_arrow:", "3%"
+            ],
+            [
+                "SELL:", "PRICE :mountain:", ":down_arrow:", "5%"
+            ],
+            [
+                ":twisted_arrows: Slippage: 1%", "Priority Fees: Boosted"
+            ],
+            [
+                ":sparkle: Create Auto-Buy + Auto-Sell Position :sparkle:"
+            ],
+        ],
+        thisMenuCode: MenuCode.NewAutoBuyAutoSell,
+        backMenuCode: MenuCode.AutoBuyAutoSellMain,
+        includeRefresh: true
+    }),
+
+
+    [MenuCode.ListAutoBuyAutoSell]: new handlers.MetaMenuHandler(MenuCode.ListAutoBuyAutoSell, {
+        text: "<u><b>Your :bot: Auto-Buy + Auto-Sell :chart_up: Positions</b></u>",
+        buttons: [
+            [ ":blue: 0.50 SOL :bullet: $WEN (Waiting To Buy)"],
+            [ ":green: 0.10 SOL :bullet: $SLERF (Waiting To Sell)"],
+        ],
+        thisMenuCode: MenuCode.ListAutoBuyAutoSell,
+        backMenuCode: MenuCode.AutoBuyAutoSellMain,
+        includeRefresh: true
+    }),
+    [MenuCode.ViewAutoBuyAutoSell]: new handlers.NoOpHandler(MenuCode.ViewAutoBuyAutoSell)
 }
