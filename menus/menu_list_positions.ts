@@ -10,7 +10,7 @@ import { PaginationOpts } from "./pagination";
 
 export class MenuListPositions extends PaginatedMenu<PositionAndMaybePNL,{ items: PositionAndMaybePNL[], pageIndex: number }> implements MenuCapabilities {
     renderText(): string {
-        const lines = [ `<b>Your TSL Positions</b>` ];
+        const lines = [ `<b>Your Auto-Sell Positions</b>` ];
         const maybeTotalPNL = this.maybeCalcTotalPNL();
         if (maybeTotalPNL != null) {
             let pnlLine = `<b>Total Unrealized PnL</b> ${toFriendlyString(maybeTotalPNL, 4, { useSubscripts: false, addCommas: true, includePlusSign: true })} SOL`;
@@ -36,7 +36,7 @@ export class MenuListPositions extends PaginatedMenu<PositionAndMaybePNL,{ items
             this.insertButtonNextLine(options, positionLabel, callbackData);
         }
         this.insertPaginationButtons(options, MenuCode.ListPositions);
-        this.insertButtonNextLine(options, ':back: Back', this.menuCallback(MenuCode.Main));        
+        this.insertButtonNextLine(options, ':back: Back', this.menuCallback(MenuCode.TSLMainMenu));        
         this.insertButtonSameLine(options, ':refresh: Refresh', this.menuCallback(MenuCode.ListPositions))
         return options;
     }

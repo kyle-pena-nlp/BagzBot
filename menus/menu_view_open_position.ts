@@ -98,7 +98,7 @@ export class MenuViewOpenPosition extends Menu<MenuData> implements MenuCapabili
         // name and amount of position, and token address
         const statusEmoji = this.statusEmoji();
         const lines = [
-            `${statusEmoji} <u><b>Your TSL Position</b></u> (<b>${asTokenPrice(this.position().tokenAmt)} of $${this.position().token.symbol}</b>)`,
+            `${statusEmoji} <u><b>Your Auto-Sell Position</b></u> (<b>${asTokenPrice(this.position().tokenAmt)} of $${this.position().token.symbol}</b>)`,
             ` (<code>${this.position().token.address}</code>)`,
             ""
         ];

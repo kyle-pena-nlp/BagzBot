@@ -12,7 +12,7 @@ export class MenuEditPositionRequest extends Menu< { positionRequest: PositionRe
         const positionRequest = this.menuData.positionRequest;
         
         const lines : string[] = [
-            `<b>:sparkle: Create TSL Position</b>`,
+            `<b>:sparkle: Create Auto-Sell Position</b>`,
             ``
         ];
 
@@ -34,12 +34,18 @@ export class MenuEditPositionRequest extends Menu< { positionRequest: PositionRe
         const options = this.emptyMenu();
         const positionRequest = this.menuData.positionRequest;
         
+        this.insertButtonNextLine(options, 'TRIGGER:', this.menuCallback(MenuCode.NewPosition));
+        this.insertButtonSameLine(options, "PRICE :mountain:", this.menuCallback(MenuCode.NewPosition));
+        this.insertButtonSameLine(options, ":down_arrow:", this.menuCallback(MenuCode.NewPosition));
+        this.insertButtonSameLine(options, "3%", this.menuCallback(MenuCode.NewPosition));
+        
+
         //this.insertButtonNextLine(options, `Buying With: ${positionRequest.vsToken.symbol}`, new CallbackData(MenuCode.TrailingStopLossPickVsTokenMenu, positionRequest.vsToken.symbol));
         this.insertButtonNextLine(options, `:pencil: Change Token`, new CallbackData(MenuCode.EditPositionChangeToken));
 
-        this.insertButtonNextLine(options, `:dollars: ${positionRequest.vsTokenAmt} ${positionRequest.vsToken.symbol}`, new CallbackData(MenuCode.TrailingStopLossEntryBuyQuantityMenu, positionRequest.vsTokenAmt.toString()));
-        this.insertButtonNextLine(options, `:chart_down: ${positionRequest.triggerPercent}% Trigger`, new CallbackData(MenuCode.TrailingStopLossTriggerPercentMenu, positionRequest.triggerPercent.toString()));
-        this.insertButtonSameLine(options, `:twisted_arrows: ${positionRequest.slippagePercent}% Slippage`, new CallbackData(MenuCode.TrailingStopLossSlippagePctMenu, positionRequest.slippagePercent.toString()));
+        this.insertButtonSameLine(options, `:dollars: ${positionRequest.vsTokenAmt} ${positionRequest.vsToken.symbol}`, new CallbackData(MenuCode.TrailingStopLossEntryBuyQuantityMenu, positionRequest.vsTokenAmt.toString()));
+        
+        this.insertButtonNextLine(options, `:twisted_arrows: ${positionRequest.slippagePercent}% Slippage`, new CallbackData(MenuCode.TrailingStopLossSlippagePctMenu, positionRequest.slippagePercent.toString()));
 
         const nextLine = options.length + 1;
         if (allowChoosePriorityFees(this.env)) {
@@ -56,7 +62,7 @@ export class MenuEditPositionRequest extends Menu< { positionRequest: PositionRe
         this.insertButtonSameLine(options, `Close`, new CallbackData(MenuCode.Close));
         //this.insertButtonSameLine(options, ':help: Help', new CallbackData(MenuCode.EditPositionHelp));
 
-        this.insertButtonNextLine(options, `:sparkle: Submit :sparkle:`, new CallbackData(MenuCode.TrailingStopLossEditorFinalSubmit));
+        this.insertButtonNextLine(options, `:sparkle: Submit :sparkle:`, new CallbackData(MenuCode.NewPosition));
         return options;
     }
     renderURLPreviewNormally(): boolean {

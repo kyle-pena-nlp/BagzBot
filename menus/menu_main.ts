@@ -1,5 +1,5 @@
 import { dAdd, toFriendlyString } from "../decimalized";
-import { asPercentDeltaString, asTokenPrice } from "../decimalized/decimalized_amount";
+import { asTokenPrice } from "../decimalized/decimalized_amount";
 import { UserData } from "../durable_objects/user/model/user_data";
 import { getCommonEnvironmentVariables } from "../env";
 import { CallbackButton } from "../telegram";
@@ -37,7 +37,7 @@ export class MenuMain extends Menu<UserData & AdminInfo> implements MenuCapabili
 
         if (this.menuData.maybePNL != null) {
             lines.push(
-                `<b>Total Value of Open Positions</b>: ${asTokenPrice(this.menuData.maybePNL.currentTotalValue)} SOL (${asPercentDeltaString(this.menuData.maybePNL.PNLpercent)})`
+                `<b>Total Value of Open Positions</b>: 14.23 SOL (+13.1%)`
             );
         }
 
@@ -65,24 +65,18 @@ export class MenuMain extends Menu<UserData & AdminInfo> implements MenuCapabili
         const options = this.emptyMenu();
         const hasWallet = this.menuData.hasWallet;
         if (hasWallet) {
-            this.insertButtonNextLine(options, ':sparkle: New TSL', this.menuCallback(MenuCode.NewPosition));
-            this.insertButtonSameLine(options, ':chart_up: View Open TSLs', this.menuCallback(MenuCode.ListPositions));
-            
-            this.insertButtonNextLine(options, ':sparkle: New Position', this.menuCallback(MenuCode.NewRegularPosition));
-            this.insertButtonSameLine(options, ':chart_up: View Open Positions', this.menuCallback(MenuCode.ListRegularPositions));
-            
-            this.insertButtonNextLine(options, ':sparkle: New Auto-Buy', this.menuCallback(MenuCode.NewAutoBuy));
-            this.insertButtonSameLine(options, ':chart_up: View Open Auto-Buys', this.menuCallback(MenuCode.ListAutoBuys));
+            this.insertButtonNextLine(options, ':bot: Auto-Buy Position', this.menuCallback(MenuCode.AutoBuyMainMenu));
+            this.insertButtonNextLine(options, ':chart_up: Auto-Sell Position', this.menuCallback(MenuCode.TSLMainMenu));
+            this.insertButtonNextLine(options, ':bot: :chart_up: Auto-Buy + Auto-Sell', this.menuCallback(MenuCode.TSLMainMenu));
+            this.insertButtonNextLine(options, ':dollars: Regular Position', this.menuCallback(MenuCode.RegPosMainMenu));
 
             /*if (this.menuData.isBeta) {
                 this.insertButtonSameLine(options, ':chart_down: Auto-Buy :chart_down:', new CallbackData(MenuCode.ComingSoon, "Automatically buy the dip!"));
                 this.insertButtonSameLine(options, ':wave: Wave Rider :wave:', new CallbackData(MenuCode.ComingSoon, "Combines Auto-Buy and TSL.!"));
             }*/
 
-            this.insertButtonNextLine(options, ':ledger: PnL Summary', this.menuCallback(MenuCode.ViewPNLHistory));
-            
-            
             this.insertButtonNextLine(options, ':briefcase: Wallet', this.menuCallback(MenuCode.Wallet));
+            this.insertButtonSameLine(options, ':ledger: PnL', this.menuCallback(MenuCode.ViewPNLHistory));
             this.insertButtonSameLine(options, ':ticket: Referrals', this.menuCallback(MenuCode.Referrals));
 
             this.insertButtonNextLine(options, ':deactivated: Deactivated', this.menuCallback(MenuCode.ViewDeactivatedPositions));

@@ -13,7 +13,11 @@ export enum MenuCode {
 	AutomaticBuySettings = "AutomaticBuySettings",
 	ViewRegularPosition = "ViewRegularPosition",
 	ViewAutoBuy = "ViewAutoBuy",
-
+	TSLMainMenu = "TSLMainMenu",
+	RegPosMainMenu = "RegPosMainMenu",
+	AutoBuyMainMenu = "AutoBuyMainMenu",
+	EngageReferrals = "EngageReferrals",
+	GetReferralLink = "GetReferralLink",
 
 	Main = "Main",
 	Wallet = "Wallet",

@@ -1,4 +1,4 @@
-import { MenuCode } from "../menus";
+import { MenuCode, logoHack } from "../menus";
 import { HandlerMap } from "../util";
 import * as handlers from "./handlers";
 import { BaseMenuCodeHandler } from "./handlers/base_menu_code_handler";
@@ -90,10 +90,63 @@ export const MenuCodeHandlerMap : HandlerMap<MenuCode,BaseMenuCodeHandler<MenuCo
     [MenuCode.SubmitAdminViewObject]: new handlers.SubmitAdminViewObjectHandler(MenuCode.SubmitAdminViewObject),
 
     /* Concept stuff */
-    [MenuCode.NewRegularPosition]: new handlers.NoOpHandler(MenuCode.NewRegularPosition),
+    [MenuCode.NewRegularPosition]: new handlers.MetaMenuHandler(MenuCode.NewRegularPosition, {
+        text: [
+            `${SLERF_LOGO}<u><b>Create Open Position</b></u>: (<b>7,986.2419 of</b> $SLERF)`, 
+            '<code>7BgBvyjrZX1YKz4oh9mjb8ZScatkkwb8DzFx7LoiVkM3</code>',
+            '',
+            ':bullet:<code>Current Price:   </code>0.0₅1253 SOL ',
+            '',
+            '<i>Adjust your settings below.</i>'
+            
+        ].join("\r\n"),
+        buttons: [
+            [
+                ":pencil: Change Token"
+            ],
+            [
+                "Slippage: 1%"
+            ],
+            [
+                "Priority Fees: Boosted"
+            ]
+        ],
+        thisMenuCode: MenuCode.NewRegularPosition,
+        backMenuCode: MenuCode.RegPosMainMenu,
+        includeRefresh: true 
+    }),
 
 
-    [MenuCode.NewAutoBuy]: new handlers.NoOpHandler(MenuCode.NewAutoBuy),
+    [MenuCode.NewAutoBuy]: new handlers.MetaMenuHandler(MenuCode.NewAutoBuy, {
+        text: [
+            `${WEN_LOGO}<b>Create New Auto-Buy Position </b>`,
+            "(<code>WENWENvqqNya429ubCdR81ZmD69brwQaaBYY6p3LCpk</code>)",
+            "",
+            "<b>Interpretation:</b>",
+            "<code>0.50</code> SOL of $WEN will be purchased when VOLUME decreases by 3% from latest peak",
+            "",
+            "<i>Adjust your settings here.</i>"
+        ].join("\r\n"),
+        buttons: [
+            [
+                "TRIGGER:", "VOL :mountain:", ":down_arrow:", "3%"
+            ],
+            [
+                ":pencil: Change Token", ":dollars: 0.50 SOL", "Type: Regular",
+            ],
+            [
+                ":twisted_arrows: Slippage: 1%", "Priority Fees: Boosted"
+            ],
+            [
+                ":sparkle: Create Auto-Buy Position :sparkle:"
+            ],
+        ],
+        thisMenuCode: MenuCode.NewAutoBuy,
+        backMenuCode: MenuCode.AutoBuyMainMenu,
+        includeRefresh: true
+    }),
+
+
     [MenuCode.ListRegularPositions]: new handlers.MetaMenuHandler(MenuCode.ListRegularPositions, {
         text: ["<b>Open Positions</b>"].join("\r\n"),
         buttons: [
@@ -108,7 +161,7 @@ export const MenuCodeHandlerMap : HandlerMap<MenuCode,BaseMenuCodeHandler<MenuCo
             ]
         ],
         thisMenuCode: MenuCode.ListRegularPositions,
-        backMenuCode: MenuCode.Main,
+        backMenuCode: MenuCode.RegPosMainMenu,
         includeRefresh: true
     }),
 
@@ -127,18 +180,24 @@ export const MenuCodeHandlerMap : HandlerMap<MenuCode,BaseMenuCodeHandler<MenuCo
             ],
         ],
         thisMenuCode: MenuCode.ListAutoBuys,
-        backMenuCode: MenuCode.Main,
+        backMenuCode: MenuCode.AutoBuyMainMenu,
         includeRefresh: true
     }),
 
     [MenuCode.Referrals]: new handlers.MetaMenuHandler(MenuCode.Referrals, {
-        text: "<b>Manage And Send Referrals</b>",
+        text: [
+            `${logoHack()}:ticket: <b>Manage And Send Referrals</b> :ticket:`,
+            ":bullet: You have sent 14 referrals",
+            ":bullet: Of these, 3 actively traded this week",
+            "",
+            "<i>Send new referrals or engage with your existing referrals here:</i>"
+        ].join("\r\n"),
         buttons: [
             [
-                "View Accepted Referrals"
+                { text: "View Referral Activity", menuCode: MenuCode.EngageReferrals }
             ],
             [
-                "Get New Referral"
+                { text: "Send New Referrals", menuCode: MenuCode.GetReferralLink }
             ]
         ],
         thisMenuCode: MenuCode.Referrals,
@@ -180,7 +239,17 @@ export const MenuCodeHandlerMap : HandlerMap<MenuCode,BaseMenuCodeHandler<MenuCo
     }),
 
     [MenuCode.ViewRegularPosition]: new handlers.MetaMenuHandler(MenuCode.AutomaticBuySettings, {
-        text: [`${SLERF_LOGO}<b>Open Position</b>: 0.10 SOL of $SLERF`,'<i>Adjust your settings below.</i>'].join("\r\n"),
+        text: [
+            `${SLERF_LOGO}<u><b>Your Open Position</b></u>: (<b>7,986.2419 of</b> $SLERF)`, 
+            '<code>7BgBvyjrZX1YKz4oh9mjb8ZScatkkwb8DzFx7LoiVkM3</code>',
+            '',
+            '<b><u>Price Movement</u></b>',
+            ':bullet:<code>Current Price:   </code>0.0₅1253 SOL ',
+            ':bullet:<code>Profit:          </code>+0.0₅7682 SOL (+0.07%)',
+            '',
+            '<i>Adjust your settings below.</i>'
+            
+        ].join("\r\n"),
         buttons: [
             [
                 ":sparkle: Sell Now :sparkle:"
@@ -196,23 +265,26 @@ export const MenuCodeHandlerMap : HandlerMap<MenuCode,BaseMenuCodeHandler<MenuCo
         backMenuCode: MenuCode.ListRegularPositions,
         includeRefresh: true
     }),
+
     [MenuCode.ViewAutoBuy]: new handlers.MetaMenuHandler(MenuCode.ViewAutoBuy, {
         text: [
-            `${WEN_LOGO}<b>Auto-Buy</b> <code>0.50</code> SOL of $WEN`, 
+            `${WEN_LOGO}:green: <b>Your Auto-Buy Position </b>`,
+            "(<code>WENWENvqqNya429ubCdR81ZmD69brwQaaBYY6p3LCpk</code>)",
             "",
             "<b>Interpretation:</b>",
             "<code>0.50</code> SOL of $WEN will be purchased when VOLUME decreases by 3% from peak",
             "",
-            "<i>Adjust your settings here.</i>"].join("\r\n"),
+            "<i>Adjust your settings here.</i>"
+        ].join("\r\n"),
         buttons: [
             [
-                "TRIGGER:","VOL",":down_arrow:","3%"
+                "TRIGGER:", "VOL :mountain:", ":down_arrow:", "3%"
             ],
             [
-                "Token: $WEN", "Amount: 0.50 SOL", "Type: Regular",
+                ":pencil: Change Token", ":dollars: 0.50 SOL", "Type: Regular",
             ],
             [
-                "Slippage: 1%",  "Priority Fees: Boosted"
+                ":twisted_arrows: Slippage: 1%", "Priority Fees: Boosted"
             ],
             [
                 ":cancel: Cancel Auto-Buy"
@@ -220,6 +292,83 @@ export const MenuCodeHandlerMap : HandlerMap<MenuCode,BaseMenuCodeHandler<MenuCo
         ],
         thisMenuCode: MenuCode.ViewAutoBuy,
         backMenuCode: MenuCode.ListAutoBuys,
+        includeRefresh: true
+    }),
+
+    [MenuCode.TSLMainMenu]: new handlers.MetaMenuHandler(MenuCode.TSLMainMenu, {
+        text: "<b>Trailing Stop Loss</b>: Main Menu",
+        buttons: [
+            [
+                { text: ":sparkle: New Auto-Sell :sparkle:", menuCode: MenuCode.NewPosition }
+            ],
+            [
+                { text: ":chart_up: View Open Auto-Sell Positions", menuCode: MenuCode.ListPositions }
+            ]
+        ],
+        thisMenuCode: MenuCode.TSLMainMenu,
+        backMenuCode: MenuCode.Main
+    }),
+
+    [MenuCode.RegPosMainMenu]: new handlers.MetaMenuHandler(MenuCode.RegPosMainMenu, {
+        text: "<b>Regular Positions</b>: Main Menu",
+        buttons: [
+            [
+                { text: ":sparkle: New Regular Position :sparkle:", menuCode: MenuCode.NewRegularPosition }
+            ],
+            [
+                { text: ":chart_up: View Open Regular Positions", menuCode: MenuCode.ListRegularPositions }
+            ]
+        ],
+        thisMenuCode: MenuCode.RegPosMainMenu,
+        backMenuCode: MenuCode.Main
+    }),
+
+    [MenuCode.AutoBuyMainMenu]: new handlers.MetaMenuHandler(MenuCode.AutoBuyMainMenu, {
+        text: "<b>Auto-Buys</b>: Main Menu",
+        buttons: [
+            [
+                { text: ":sparkle: Create New Auto-Buy :sparkle:", menuCode: MenuCode.NewAutoBuy }
+            ],
+            [
+                { text: ":bot: View Active Auto-Buys", menuCode: MenuCode.ListAutoBuys }
+            ]
+        ],
+        thisMenuCode: MenuCode.AutoBuyMainMenu,
+        backMenuCode: MenuCode.Main
+    }),
+
+    [MenuCode.EngageReferrals]: new handlers.MetaMenuHandler(MenuCode.EngageReferrals, {
+        text: [
+            `${logoHack()}<b>My Referrals</b>`,
+            "",
+            "<b><u>Engage to Reduce Platform Fees!</u></b>",
+            "Your platform fee will be reduced if more of your referrals use SolSentry this week.",
+            "",
+            "<i>Click a referral's name to send them a reminder to use SolSentry!</i>"
+        
+        ].join("\r\n"),
+        buttons: [
+            [":green: @kylepena [CLICK TO REMIND]"],
+            [":red: @somebodyelse [CLICK TO REMIND]"],
+            [":red: @myotherfriend [CLICK TO REMIND]"],
+        ],
+        thisMenuCode: MenuCode.EngageReferrals,
+        backMenuCode: MenuCode.Referrals,
+        includeRefresh: true
+    }),
+    
+    [MenuCode.GetReferralLink]: new handlers.MetaMenuHandler(MenuCode.GetReferralLink, {
+        text: [
+            "<b><u>Here is your one-time referral link to send to friends.</u></b>",
+            "<i>Click to copy and send the link</i>",
+            "",
+            ":ticket:<code>https://t.me/solsentry?start=VW7XI23W</code>:ticket:",
+            "",
+            `${logoHack()}`
+        ].join("\r\n"),
+        buttons: [],
+        thisMenuCode: MenuCode.GetReferralLink,
+        backMenuCode: MenuCode.Referrals,
         includeRefresh: true
     })
 }
