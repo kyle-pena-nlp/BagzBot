@@ -65,9 +65,9 @@ export class MenuMain extends Menu<UserData & AdminInfo> implements MenuCapabili
         const options = this.emptyMenu();
         const hasWallet = this.menuData.hasWallet;
         if (hasWallet) {
-            this.insertButtonNextLine(options, ':bot: Auto-Buy Position', this.menuCallback(MenuCode.AutoBuyMainMenu));
+            this.insertButtonNextLine(options, ':sparkle: Auto-Buy Position', this.menuCallback(MenuCode.AutoBuyMainMenu));
             this.insertButtonSameLine(options, ':chart_up: Auto-Sell Position', this.menuCallback(MenuCode.TSLMainMenu));
-            this.insertButtonNextLine(options, ':bot: Auto-Buy + Auto-Sell :chart_up:', this.menuCallback(MenuCode.AutoBuyAutoSellMain));
+            this.insertButtonNextLine(options, ':sparkle: Auto-Buy + Auto-Sell :chart_up:', this.menuCallback(MenuCode.AutoBuyAutoSellMain));
             this.insertButtonNextLine(options, ':dollars: Regular Position', this.menuCallback(MenuCode.RegPosMainMenu));
 
             /*if (this.menuData.isBeta) {

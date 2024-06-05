@@ -170,7 +170,7 @@ export class TokenPairPositionTrackerDO {
     // This has been useful during dev
     /*__DELETE_ALL_POSITIONS() {
         throw new Error("");
-        if (this.env.ENVIRONMENT !== 'dev') {
+        if (this.env.ENVIRONMENT !== 'devconcept') {
             return;
         }
         logError("Deleting all positions", this);
@@ -294,7 +294,7 @@ export class TokenPairPositionTrackerDO {
 
     async handleAdminDeleteAllInTracker(body: AdminDeleteAllInTrackerRequest) : Promise<Response> {
         // this is really the nuclear option.  that's why I'm putting these checks in place.
-        if (this.env.ENVIRONMENT === 'dev') {
+        if (this.env.ENVIRONMENT === 'devconcept') {
             const userID = body.userID;
             if (!isAdminOrSuperAdmin(userID,this.env)) {
                 return makeJSONResponse<AdminDeleteAllInTrackerResponse>({});

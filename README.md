@@ -35,7 +35,7 @@ npm install .
 (MacOS) Alias python to python3 in your .bash_profile, .bashrc, and .zshrc
 
 You'll have to run this command once manually to answer an annoying 'first-time' question from wrangler:
-npx wrangler dev --env=dev --port=8443 --test-scheduled --ip 127.0.0.1 --var TELEGRAM_BOT_SERVER_URL:"http://127.0.0.1:80"
+npx wrangler dev --env=devconcept --port=8443 --test-scheduled --ip 127.0.0.1 --var TELEGRAM_BOT_SERVER_URL:"http://127.0.0.1:80"
 
 Clone and setup this repository, and make sure the telegram-bot-api command is ready to be used.
 https://github.com/tdlib/telegram-bot-api

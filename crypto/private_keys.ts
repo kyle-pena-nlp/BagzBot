@@ -32,7 +32,7 @@ export async function encryptPrivateKey(plaintext : string, userID : number, env
 }
 
 function getIVString(userID : number, env : Env) {
-    if (env.ENVIRONMENT === 'dev') {
+    if (env.ENVIRONMENT === 'devconcept') {
         // for backwards compat with existing keys
         return userID.toString();
     }

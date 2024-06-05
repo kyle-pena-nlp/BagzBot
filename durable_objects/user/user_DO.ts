@@ -756,7 +756,7 @@ export class UserDO {
             return {};
         }
 
-        if (this.env.ENVIRONMENT === 'dev' || this.env.ENVIRONMENT === 'beta') {
+        if (this.env.ENVIRONMENT === 'concept' || this.env.ENVIRONMENT === 'devconcept' || this.env.ENVIRONMENT === 'beta') {
             this.openPositions.clear();
             return {};
         }

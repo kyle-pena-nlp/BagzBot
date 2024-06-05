@@ -108,7 +108,7 @@ export function getCommonEnvironmentVariables(env : EnvironmentVariables) : Comm
 	return {
 		botName : `${env.TELEGRAM_BOT_DISPLAY_NAME}`,
 		botTagline: env.TELEGRAM_BOT_TAGLINE,
-		isDev: env.ENVIRONMENT === 'dev',
+		isDev: env.ENVIRONMENT === 'devconcept',
 		isBeta: env.ENVIRONMENT === 'beta',
 		isInviteCodeGated: strictParseBoolean(env.IS_BETA_CODE_GATED)
 	};

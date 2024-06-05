@@ -6,8 +6,9 @@ from wrangler_common import *
 from commands import COMMANDS
 from dev.local_dev_common import *
 
+ENV = "devconcept"
+
 def run_cloudflare_worker(args):
-    ENV = "sim" if args.sim else "dev"
     env_vars : Dict[str,str] = convert_env_vars_to_dict(args.env_vars)   
     if args.sim:
         env_vars["TELEGRAM_BOT_SERVER_URL"] = f"http://localhost:{FAKE_TELEGRAM_SERVER_PORT}"
@@ -65,14 +66,14 @@ def do_it(args):
         if not args.sim:
 
             print("Starting local telegram-bot-api server")
-            api_id   = get_secret("SECRET__TELEGRAM_API_ID", "dev")
-            api_hash = get_secret("SECRET__TELEGRAM_API_HASH", "dev")
+            api_id   = get_secret("SECRET__TELEGRAM_API_ID", ENV)
+            api_hash = get_secret("SECRET__TELEGRAM_API_HASH", ENV)
             child_procs.append(fork_shell_telegram_bot_api_local_server(api_id = api_id, api_hash = api_hash))
             child_procs.append(start_simulated_user_viewer())
 
             print("Setting up bot locally")
-            bot_token = get_secret("SECRET__TELEGRAM_BOT_TOKEN", "dev")
-            bot_secret_token = get_secret("SECRET__TELEGRAM_BOT_WEBHOOK_SECRET_TOKEN", "dev")
+            bot_token = get_secret("SECRET__TELEGRAM_BOT_TOKEN", ENV)
+            bot_secret_token = get_secret("SECRET__TELEGRAM_BOT_WEBHOOK_SECRET_TOKEN", ENV)
 
             migrate_and_configure_bot_for_local_server(bot_token, bot_secret_token)
 

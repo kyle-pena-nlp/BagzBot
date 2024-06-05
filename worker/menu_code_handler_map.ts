@@ -322,13 +322,13 @@ export const MenuCodeHandlerMap : HandlerMap<MenuCode,BaseMenuCodeHandler<MenuCo
     }),
 
     [MenuCode.AutoBuyMainMenu]: new handlers.MetaMenuHandler(MenuCode.AutoBuyMainMenu, {
-        text: ":bot:<b>Auto-Buys</b>: Main Menu",
+        text: ":sparkle:<b>Auto-Buys</b>: Main Menu",
         buttons: [
             [
                 { text: ":sparkle: Create New Auto-Buy :sparkle:", menuCode: MenuCode.NewAutoBuy }
             ],
             [
-                { text: ":bot: View Active Auto-Buys", menuCode: MenuCode.ListAutoBuys }
+                { text: ":sparkle: View Active Auto-Buys", menuCode: MenuCode.ListAutoBuys }
             ]
         ],
         thisMenuCode: MenuCode.AutoBuyMainMenu,
@@ -370,7 +370,7 @@ export const MenuCodeHandlerMap : HandlerMap<MenuCode,BaseMenuCodeHandler<MenuCo
     }),
 
     [MenuCode.AutoBuyAutoSellMain]: new handlers.MetaMenuHandler(MenuCode.AutoBuyAutoSellMain, {
-        text: ":bot:<b>Auto-Buy + Auto-Sell :chart_up: Positions</b>: Main Menu",
+        text: ":sparkle:<b>Auto-Buy + Auto-Sell :chart_up: Positions</b>: Main Menu",
         buttons: [
             [
                 { text: ":sparkle: New Auto-Buy + Auto-Sell Position :sparkle:", menuCode: MenuCode.NewAutoBuyAutoSell }
@@ -419,7 +419,7 @@ export const MenuCodeHandlerMap : HandlerMap<MenuCode,BaseMenuCodeHandler<MenuCo
 
 
     [MenuCode.ListAutoBuyAutoSell]: new handlers.MetaMenuHandler(MenuCode.ListAutoBuyAutoSell, {
-        text: "<u><b>Your :bot: Auto-Buy + Auto-Sell :chart_up: Positions</b></u>",
+        text: "<u><b>Your :sparkle: Auto-Buy + Auto-Sell :chart_up: Positions</b></u>",
         buttons: [
             [ ":blue: 0.50 SOL :bullet: $WEN (Waiting To Buy)"],
             [ ":green: 0.10 SOL :bullet: $SLERF (Waiting To Sell)"],

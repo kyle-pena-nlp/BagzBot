@@ -13,6 +13,70 @@ new_classes = ["UserDO","TokenPairPositionTrackerDO","PolledTokenPairListDO","Be
 
 # 1632540473
 
+[env.devconcept.vars]
+# do not change this string EVER post launch
+MAX_BETA_INVITE_CODE_CHAIN_DEPTH = "1"
+INVITE_CODES_PER_USER = "5"
+ENVIRONMENT = "concept"
+CLOUDFLARE_ACCOUNT_ID = "kp1197"
+TELEGRAM_BOT_INSTANCE_DISPLAY_NAME = "DEV MOCKUP"
+POLLING_ON = "false"
+PLATFORM_FEE_BPS = "100"
+IS_BETA_CODE_GATED = "false"
+BETA_CODE_GATE_EXCEPTIONS = ""
+ADMIN_TELEGRAM_USER_IDS = "6434185018"
+SUPER_ADMIN_USER_ID = "6434185018"
+FORBIDDEN_TOKENS = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v,Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB"
+SOL_BUY_LIMIT = "5"
+TELEGRAM_BOT_DISPLAY_NAME = "SolSentry"
+TELEGRAM_BOT_TAGLINE = "Lock in your gains and limit your losses."
+TELEGRAM_BOT_SERVER_URL = "https://api.telegram.org"
+TELEGRAM_BOT_ID = "6764280746"
+TELEGRAM_BOT_USERNAME = "sol_sentry_dev_concept_bot"
+JUPITER_PRICE_API_URL = "https://price.jup.ag/v6/price"
+JUPITER_QUOTE_API_URL = "https://quote-api.jup.ag/v6/quote"
+JUPITER_SWAP_API_URL = "https://quote-api.jup.ag/v6/swap"
+RPC_ENDPOINT_URL = "https://mainnet.helius-rpc.com"
+DEFAULT_TLS_VS_TOKEN_FRACTION = "0.01"
+JUPITER_SWAP_PROGRAM_SLIPPAGE_ERROR_CODE = "6001"
+JUPITER_SWAP_PROGRAM_FEE_ACCOUNT_NOT_INITIALIZED_ERROR_CODE = "3012"
+JUPITER_SWAP_PROGRAM_INSUFFICIENT_BALANCE_ERROR_CODE = "1"
+JUPITER_USE_DYNAMIC_COMPUTE_UNIT_LIMIT = "false"
+JUPITER_SWAP_PROGRAM_ID = "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4"
+TX_TIMEOUT_MS = "120000"
+CONFIRM_TIMEOUT_MS = "20000"
+PRICE_POLL_INTERVAL_MS = "5000"
+RPC_SEND_RAW_TRANSACTION_MAX_RETRIES = "10"
+RPC_REBROADCAST_DELAY_MS = "750"
+RPC_REATTEMPT_CONFIRM_DELAY = "1000"
+RPC_MAX_CONFIRM_EXCEPTIONS = "10"
+RPC_CONFIRM_TIMEOUT_MS = "275000"
+MAX_BLOCK_FINALIZATION_TIME_MS = "60000"
+WALLET_BALANCE_REFRESH_INTERVAL_MS = "5000"
+TOKEN_LIST_REFRESH_TIMEOUT = "30000"
+USER_PNL_CALCULATION_REFRESH_MS = "10000"
+USE_QUICKNODE = "true"
+QUICKNODE_RPC_URL = "https://small-polished-pallet.solana-mainnet.quiknode.pro"
+USE_METIS = "false"
+METIS_PRICE_API_URL = ""
+METIS_QUOTE_API_URL = ""
+METIS_SWAP_API_URL = "false"
+DOWN_FOR_MAINTENANCE = "false"
+# don't ever set to true.  just for dev.
+TEST_NO_ADMINS_MODE = "true"
+# feature switches
+REBUILD_TOKENS_CRON_JOB = "false"
+TX_SIM_BEFORE_BUY = "true"
+ALLOW_CHOOSE_AUTO_DOUBLE_SLIPPAGE = "true"
+JUP_QUOTE_RESTRICT_INTERMEDIATE_TOKENS = "true"
+# When you try to swap a rugged token
+JUPITER_SWAP_PROGRAM_TOKEN_ACCOUNT_FROZEN_ERROR_CODE = "17"
+OTHER_SELL_FAILURES_TO_DEACTIVATE = "5"
+ALLOW_PRIORITY_FEE_MULTIPLIERS = "true"
+PRIORITY_FEE_MULTIPLIER_OPTIONS = "5:Boosted,10:Ultra"
+QUESTION_TIMEOUT_MS = "30000"
+POLL_PRICE_USING_JUPITER_QUOTE_API = "true"
+
 [env.concept.vars]
 # do not change this string EVER post launch
 MAX_BETA_INVITE_CODE_CHAIN_DEPTH = "1"
@@ -76,6 +140,15 @@ ALLOW_PRIORITY_FEE_MULTIPLIERS = "true"
 PRIORITY_FEE_MULTIPLIER_OPTIONS = "5:Boosted,10:Ultra"
 QUESTION_TIMEOUT_MS = "30000"
 POLL_PRICE_USING_JUPITER_QUOTE_API = "true"
+
+[env.devconcept.durable_objects]
+bindings = [
+    {name = "UserDO", class_name = "UserDO" },
+    {name = "TokenPairPositionTrackerDO", class_name = "TokenPairPositionTrackerDO" },
+    {name = "PolledTokenPairListDO", class_name = "PolledTokenPairListDO" },
+    {name = "BetaInviteCodesDO", class_name = "BetaInviteCodesDO" },
+    {name = "HeartbeatDO", class_name = "HeartbeatDO" }
+]
 
 [env.concept.durable_objects]
 bindings = [
