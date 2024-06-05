@@ -13,7 +13,7 @@ new_classes = ["UserDO","TokenPairPositionTrackerDO","PolledTokenPairListDO","Be
 
 # 1632540473
 
-[env.dev.concept]
+[env.concept.vars]
 # do not change this string EVER post launch
 MAX_BETA_INVITE_CODE_CHAIN_DEPTH = "1"
 INVITE_CODES_PER_USER = "5"
