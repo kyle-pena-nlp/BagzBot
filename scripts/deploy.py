@@ -35,13 +35,18 @@ def maybe_delete_webhook(env : str):
     else:
         print("Ok! Continuing onwards.")
 
-def assert_clean_main():
+def assert_clean_checkout_and_correct_branch(env):
     
     # Check if the current branch is main
     current_branch = subprocess.check_output(
         ["git", "rev-parse", "--abbrev-ref", "HEAD"]
     ).strip().decode('utf-8')
-    assert current_branch == "main", "Not on main branch"
+
+    if current_branch not in ["main","feature-concept"]:
+        raise Exception("Must be on main to deploy (unless it's the interactive mockup)")
+    
+    if current_branch == "feature-concept" and env != "concept":
+        raise Exception("Can only deploy environment 'concept' if on feature-concept branch")
     
     # Check if the working directory is clean
     status = subprocess.check_output(
@@ -58,7 +63,7 @@ def assert_clean_main():
 
 def deploy(env : str):
 
-    assert_clean_main()
+    assert_clean_checkout_and_correct_branch(env)
 
     if do_you_want_to("Wrangler login?"):
         do_wrangler_login()
