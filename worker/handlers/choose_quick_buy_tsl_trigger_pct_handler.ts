@@ -18,7 +18,7 @@ export class ChooseQuickBuyTSLTriggerPctHandler extends BaseMenuCodeHandler<Menu
             text: "",
             submitMenuCode: MenuCode.SubmitQuickBuyTSLTriggerPercent,
             backMenuCode: MenuCode.Settings,
-            customTSLTriggerPercentMenuCode: MenuCode.CustomQuickBuyTSLTriggerPct,
+            customTSLTriggerPercentMenuCode: MenuCode.CustomQuickBuyTSLTriggerPercent,
             defaultCustomTSLTriggerPercent: triggerPct
         };
         return new Menus.MenuChooseTSLTriggerPercent(menuParams, triggerPct, env);             

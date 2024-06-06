@@ -5,27 +5,7 @@ import { logoHack } from "../logo_hack";
 import { Menu, MenuCapabilities } from "../menu";
 import { MenuCode } from "../menu_code";
 
-type Template<T extends object> = {
-    [K in keyof T] : string
-}[keyof T]
 
-type TextTemplate<T extends object> = `DUMMY TEXT ${Template<T>}`
-
-type TemplateSubstitution<T extends object> = {
-    [K in keyof T]: string | (() => string);
-};
-
-function renderTemplate<T extends object>(template: string, values: TemplateSubstitution<T>): string {
-    let result = template;
-    for (const key in values) {
-      let subValue = values[key];
-      if (typeof subValue !== 'string') {
-        subValue = subValue();
-      }
-      result = result.replace(new RegExp(`\\\${${key}}`, 'g'), subValue);
-    }
-    return result;
-}
 
 export interface MetaMenuOption<T extends object> {
     textTemplate : TextTemplate<T>,
@@ -78,3 +58,25 @@ export class MetaMenu<T extends object> extends Menu<T> implements MenuCapabilit
 
 // TODO: pick option menus, custom quantity menus, etc.
 // THEN: meta handlers.
+
+type Template<T extends object> = {
+    [K in keyof T] : string
+}[keyof T]
+
+type TextTemplate<T extends object> = `DUMMY TEXT ${Template<T>}`
+
+type TemplateSubstitution<T extends object> = {
+    [K in keyof T]: string | (() => string);
+};
+
+function renderTemplate<T extends object>(template: string, values: TemplateSubstitution<T>): string {
+    let result = template;
+    for (const key in values) {
+      let subValue = values[key];
+      if (typeof subValue !== 'string') {
+        subValue = subValue();
+      }
+      result = result.replace(new RegExp(`\\\${${key}}`, 'g'), subValue);
+    }
+    return result;
+}
