@@ -1,5 +1,4 @@
 import { DecimalizedAmount } from "../../decimalized";
-import { QuantityAndToken } from "../../durable_objects/user/model/quantity_and_token";
 import { TokenSymbolAndAddress } from "../../durable_objects/user/model/token_name_and_address";
 import { getPositionFromUserDO, getUserData, manuallyClosePosition, readSessionObj, sendMessageToUser } from "../../durable_objects/user/userDO_interop";
 import { Env } from "../../env";
@@ -63,15 +62,6 @@ export class BaseMenuCodeHandler<T extends Menus.MenuCode> {
             tokenAddress: positionRequest.vsToken.address
         };
     }
-
-    protected async getTrailingStopLossPositionQuantityAndVsTokenFromSession(telegramUserID : number, chatID : number, messageID : number, env: Env) : Promise<QuantityAndToken> {
-        const positionRequest = await readSessionObj<PositionRequest>(telegramUserID, chatID, messageID, POSITION_REQUEST_STORAGE_KEY, env);
-        return {
-            thisTokenSymbol:  positionRequest.vsToken.symbol,
-            thisTokenAddress: positionRequest.vsToken.address,
-            quantity: positionRequest.vsTokenAmt
-        };
-    }    
 
     protected async makeOpenPositionMenu(params : CallbackHandlerParams, positionID : string, env: Env) : Promise<Menus.BaseMenu> {
         const positionAndMaybePNL = await getPositionFromUserDO(params.getTelegramUserID(), params.chatID, positionID, env);

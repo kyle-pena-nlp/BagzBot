@@ -17,6 +17,12 @@ export class TrailingStopLossSlippagePctMenuHandler extends BaseMenuCodeHandler<
         const messageID = params.messageID;
         const x = await readSessionObj<PositionRequest>(params.getTelegramUserID(), params.chatID, messageID, POSITION_REQUEST_STORAGE_KEY, env);
         const slippagePercent = x.slippagePercent;
-        return new Menus.MenuTrailingStopLossSlippagePercent(slippagePercent, env);
+        return new Menus.MenuChooseSlippagePercent({
+            text: `Pick a Slippage Percent tolerance. The same percentage will apply on the automatic sell.`,
+            submitMenuCode: MenuCode.SubmitSlippagePct,
+            backMenuCode: MenuCode.ReturnToPositionRequestEditor,
+            chooseCustomSlippagePctMenuCode: MenuCode.CustomSlippagePct,
+            defaultCustomSlippagePercent: slippagePercent
+        }, env);
     }
 }

@@ -1,5 +1,7 @@
 import { DecimalizedAmount } from "../../decimalized";
+import { getUserSettings } from "../../durable_objects/user/userDO_interop";
 import { Env } from "../../env";
+import * as Menus from "../../menus";
 import { BaseMenu, MenuCode } from "../../menus";
 import { ReplyQuestion } from "../../reply_question";
 import { CallbackHandlerParams } from "../model/callback_handler_params";
@@ -10,6 +12,15 @@ export class ChooseQuickBuyTSLTriggerPctHandler extends BaseMenuCodeHandler<Menu
         super(menuCode);
     }
     async handleCallback(params : CallbackHandlerParams, maybeSOLBalance : DecimalizedAmount|null, context: FetchEvent, env: Env) : Promise<BaseMenu|ReplyQuestion|void> {
-        
+        const userSettings = await getUserSettings(params.getTelegramUserID(), params.chatID, env);
+        const triggerPct = userSettings.userSettings.quickBuyTSLTriggerPct;
+        const menuParams : Menus.ChooseTSLTriggerPercentMenuParams = {
+            text: "",
+            submitMenuCode: MenuCode.SubmitQuickBuyTSLTriggerPercent,
+            backMenuCode: MenuCode.Settings,
+            customTSLTriggerPercentMenuCode: MenuCode.CustomQuickBuyTSLTriggerPct,
+            defaultCustomTSLTriggerPercent: triggerPct
+        };
+        return new Menus.MenuChooseTSLTriggerPercent(menuParams, triggerPct, env);             
     }
 }

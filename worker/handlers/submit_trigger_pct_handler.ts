@@ -10,8 +10,8 @@ import * as Util from "../../util";
 import { CallbackHandlerParams } from "../model/callback_handler_params";
 import { BaseMenuCodeHandler, MenuCodeHandlerCapabilities } from "./base_menu_code_handler";
 
-export class SubmitTriggerPctHandler extends BaseMenuCodeHandler<MenuCode.SubmitTriggerPct> implements MenuCodeHandlerCapabilities {
-    constructor(menuCode : MenuCode.SubmitTriggerPct) {
+export class SubmitTriggerPctHandler extends BaseMenuCodeHandler<MenuCode.SubmitTSLPositionRequestTriggerPct> implements MenuCodeHandlerCapabilities {
+    constructor(menuCode : MenuCode.SubmitTSLPositionRequestTriggerPct) {
         super(menuCode);
     }
     async handleCallback(params : CallbackHandlerParams, maybeSOLBalance : DecimalizedAmount|null, context: FetchEvent, env: Env) : Promise<BaseMenu|ReplyQuestion|void> {

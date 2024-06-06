@@ -91,8 +91,8 @@ export enum MenuCode {
 
 	// Trailing Stop Loss: set trigger percent UI
 	TrailingStopLossTriggerPercentMenu = "TSL.TriggerPercentMenu",
-	CustomTriggerPct = "TSL.TriggerPercentKeypad", 
-	SubmitTriggerPct = "TSL.TriggerPercentKeypadSubmit", 
+	CustomTSLPositionRequestTriggerPct = "TSL.TriggerPercentKeypad", 
+	SubmitTSLPositionRequestTriggerPct = "TSL.TriggerPercentKeypadSubmit", 
 
 	TrailingStopLossEditorFinalSubmit = "TSL.EditorFinalSubmit",
 
