@@ -52,6 +52,32 @@ export function ensureNoProperties<TObj>() {
 export type SubsetOf<T> = Partial<T> & {
     [K in keyof T]?: T[K];
   };
-  
+
+/*export type X<T> = {
+    [P in keyof T]: T[P] extends  null|undefined ? never : T[P]
+}*/
+/*
+export type MakeAllPropsNullable<T> = {
+    [P in keyof T]: T[P] extends null | undefined ? never : T[P];
+} & {
+    [P in keyof T as T[P] extends null | undefined ? never : P]?: T[P];
+};*/
+
+export type MakeAllPropsNullable<T> = {
+    [P in keyof T]? : T[P] extends null|undefined ? never : T[P]
+}
+
+export function assignChangesFrom<T>(target : T, source : MakeAllPropsNullable<T>) {
+    for (const key of Object.keys(source)) {
+        const prop = key as keyof MakeAllPropsNullable<T>;
+        if (source.hasOwnProperty(prop)) {
+            const value = source[prop];
+            if (value != null) {
+                const targetProp = prop as keyof T;
+                target[targetProp] = value;
+            }
+        }
+    }
+}
 
 

@@ -79,5 +79,21 @@ export const MenuCodeHandlerMap : HandlerMap<MenuCode,BaseMenuCodeHandler<MenuCo
     [MenuCode.SubmitAdminInvokeAlarm]: new handlers.SubmitAdminInvokeAlarmHandler(MenuCode.SubmitAdminInvokeAlarm),
     [MenuCode.Close]: new handlers.CloseHandler(MenuCode.Close),
     [MenuCode.AdminViewObject]: new handlers.AdminViewObjectHandler(MenuCode.AdminViewObject),
-    [MenuCode.SubmitAdminViewObject]: new handlers.SubmitAdminViewObjectHandler(MenuCode.SubmitAdminViewObject)
+    [MenuCode.SubmitAdminViewObject]: new handlers.SubmitAdminViewObjectHandler(MenuCode.SubmitAdminViewObject),
+    
+    [MenuCode.Settings]: new handlers.SettingsHandler(MenuCode.Settings),
+    [MenuCode.ChooseQuickBuyEnabled]: new handlers.ChooseQuickBuyEnabledHandler(MenuCode.ChooseQuickBuyEnabled),
+	[MenuCode.ChooseQuickBuySOLAmount]: new handlers.ChooseQuickBuySOLAmountHandler(MenuCode.ChooseQuickBuySOLAmount),
+	[MenuCode.ChooseQuickBuyTSLTriggerPercent]: new handlers.ChooseQuickBuyTSLTriggerPctHandler(MenuCode.ChooseQuickBuyTSLTriggerPercent),
+	[MenuCode.ChooseQuickBuyPriorityFee]: new handlers.ChooseQuickBuyPriorityFeeHandler(MenuCode.ChooseQuickBuyPriorityFee),
+	[MenuCode.ChooseQuickBuySlippagePct]: new handlers.ChooseQuickBuySlippagePctHandler(MenuCode.ChooseQuickBuySlippagePct),
+    [MenuCode.ChooseQuickBuyAutoDoubleSlippage]: new handlers.ChooseQuickBuyAutoDoubleSlippageHandler(MenuCode.ChooseQuickBuyAutoDoubleSlippage),
+
+    [MenuCode.SubmitQuickBuyEnabled]: new handlers.SubmitQuickBuyEnabledHandler(MenuCode.SubmitQuickBuyEnabled),
+	[MenuCode.SubmitQuickBuySOLAmount]: new handlers.SubmitQuickBuySOLAmountHandler(MenuCode.SubmitQuickBuySOLAmount),
+	[MenuCode.SubmitQuickBuyTSLTriggerPercent]: new handlers.SubmitQuickBuyTSLTriggerPctHandler(MenuCode.SubmitQuickBuyTSLTriggerPercent),
+	[MenuCode.SubmitQuickBuyPriorityFee]: new handlers.SubmitQuickBuyPriorityFeeHandler(MenuCode.SubmitQuickBuyPriorityFee),
+	[MenuCode.SubmitQuickBuySlippagePct]: new handlers.SubmitQuickBuySlippagePctHandler(MenuCode.SubmitQuickBuySlippagePct),
+    [MenuCode.SubmitQuickBuyAutoDoubleSlippage]: new handlers.SubmitQuickBuyAutoDoubleSlippageHandler(MenuCode.SubmitQuickBuyAutoDoubleSlippage),
+
 }

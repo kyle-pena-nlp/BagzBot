@@ -33,6 +33,8 @@ import { GetLegalAgreementStatusRequest, GetLegalAgreementStatusResponse } from 
 import { GetPositionFromUserDORequest, GetPositionFromUserDOResponse } from "./actions/get_position_from_user_do";
 import { GetSessionValuesRequest, GetSessionValuesWithPrefixRequest, GetSessionValuesWithPrefixResponse } from "./actions/get_session_values";
 import { GetUserDataRequest } from "./actions/get_user_data";
+import { GetUserSettingsRequest, GetUserSettingsResponse } from "./actions/get_user_settings";
+import { SetUserSettingsRequest, SetUserSettingsResponse } from "./actions/get_user_settings_request";
 import { GetUserWalletSOLBalanceRequest, GetUserWalletSOLBalanceResponse } from "./actions/get_user_wallet_balance";
 import { GetWalletDataRequest, GetWalletDataResponse } from "./actions/get_wallet_data";
 import { ImpersonateUserRequest, ImpersonateUserResponse } from "./actions/impersonate_user";
@@ -57,6 +59,7 @@ import { UserDOSellConfirmer } from "./confirmers/user_do_sell_confirmer";
 import { AutomaticActions, AutomaticTask } from "./model/automatic_actions";
 import { TokenPair } from "./model/token_pair";
 import { UserData } from "./model/user_data";
+import { UserSettings } from "./model/user_settings";
 import { PositionBuyer, isPreparedBuyTx } from "./position_buyer";
 import { PositionSeller, isPreparedSellTx } from "./position_seller";
 import { ClosedPositionsTracker } from "./trackers/closed_positions_tracker";
@@ -64,6 +67,7 @@ import { DeactivatedPositionsTracker } from "./trackers/deactivated_positions_tr
 import { OpenPositionsTracker } from "./trackers/open_positions_tracker";
 import { SessionTracker } from "./trackers/session_tracker";
 import { SOLBalanceTracker } from "./trackers/sol_balance_tracker";
+import { UserSettingsTracker } from "./trackers/user_settings_tracker";
 import { UserDOFetchMethod, parseUserDOFetchMethod } from "./userDO_interop";
 
 type MIGRATION_FLAG = 'unmigrated'|'migrated_1';
@@ -146,6 +150,8 @@ export class UserDO {
     closedPositions : ClosedPositionsTracker = new ClosedPositionsTracker();
 
     deactivatedPositions : DeactivatedPositionsTracker = new DeactivatedPositionsTracker();
+
+    userSettingsTracker : UserSettingsTracker = new UserSettingsTracker();
 
     constructor(state : DurableObjectState, env : any) {
         this.env                = env;
@@ -558,12 +564,60 @@ export class UserDO {
             case UserDOFetchMethod.wakeUp:
                 response = await this.handleWakeUp(userAction);
                 break;
+            case UserDOFetchMethod.getUserSettings:
+                response = await this.handleGetUserSettings(userAction);
+                break;
+            case UserDOFetchMethod.setUserSettings:
+                response = await this.setUserSettings(userAction);
+                break;
             default:
                 assertNever(method);
         }
 
         return [method,userAction,response];
     }
+
+    async setUserSettings(userAction : SetUserSettingsRequest) : Promise<Response> {
+        const changes = userAction.changes;
+        if (changes.quickBuyEnabled != null) {
+            this.userSettingsTracker.quickBuyEnabled.value = changes.quickBuyEnabled;
+        }
+        if (changes.quickBuyPriorityFee !=  null) {
+            this.userSettingsTracker.quickBuyPriorityFee.value = changes.quickBuyPriorityFee;
+        }
+        if (changes.quickBuySOLAmount != null) {
+            this.userSettingsTracker.quickBuySOLAmount.value = changes.quickBuySOLAmount;
+        }
+        if (changes.quickBuySlippagePct != null) {
+            this.userSettingsTracker.quickBuySlippagePct.value = changes.quickBuySlippagePct;
+        }
+        if (changes.quickBuyTSLTriggerPct != null) {
+            this.userSettingsTracker.quickBuyTSLTriggerPct.value = changes.quickBuyTSLTriggerPct;
+        }
+        if (changes.quickBuyAutoDoubleSlippage != null) {
+            this.userSettingsTracker.quickBuyAutoDoubleSlippage.value = changes.quickBuyAutoDoubleSlippage;
+        }
+        const userSettings  = this.getUserSettings();
+        return makeJSONResponse<SetUserSettingsResponse>({ userSettings : userSettings });
+    }
+
+    async handleGetUserSettings(userAction : GetUserSettingsRequest) : Promise<Response> {
+        const userSettings = this.getUserSettings();
+        return makeJSONResponse<GetUserSettingsResponse>({ userSettings: userSettings });
+    }
+
+    private getUserSettings() : UserSettings {
+        const userSettings : UserSettings = {
+            quickBuyEnabled: this.userSettingsTracker.quickBuyEnabled.value,
+            quickBuyPriorityFee: this.userSettingsTracker.quickBuyPriorityFee.value||'auto',
+            quickBuySlippagePct: this.userSettingsTracker.quickBuySlippagePct.value||1.0,
+            quickBuySOLAmount: this.userSettingsTracker.quickBuySOLAmount.value||0.05,
+            quickBuyTSLTriggerPct: this.userSettingsTracker.quickBuyTSLTriggerPct.value||10,
+            quickBuyAutoDoubleSlippage: this.userSettingsTracker.quickBuyAutoDoubleSlippage.value||false
+        };
+        return userSettings;
+    }
+
     async handleAdminGetInfo(userAction: AdminGetInfoRequest): Promise<Response> {
         if (this.telegramUserID.value == null) {
             return makeJSONResponse({ msg: "Not initialized" });

@@ -4,6 +4,7 @@ import { makeJSONRequest, makeRequest } from "../../http";
 import { Position } from "../../positions";
 import { TokenInfo } from "../../tokens";
 import { Structural } from "../../util";
+import { MakeAllPropsNullable } from "../../util/builder_types";
 import { PositionAndMaybePNL } from "../token_pair_position_tracker/model/position_and_PNL";
 import { AdminDeleteAllPositionsRequest, AdminDeleteAllPositionsResponse } from "./actions/admin_delete_all_positions";
 import { AdminDeleteClosedPositionsRequest, AdminDeleteClosedPositionsResponse } from "./actions/admin_delete_closed_positions";
@@ -20,6 +21,8 @@ import { GetLegalAgreementStatusRequest, GetLegalAgreementStatusResponse } from 
 import { GetPositionFromUserDORequest, GetPositionFromUserDOResponse } from "./actions/get_position_from_user_do";
 import { GetSessionValuesRequest, GetSessionValuesWithPrefixRequest, GetSessionValuesWithPrefixResponse, SessionValuesResponse } from "./actions/get_session_values";
 import { GetUserDataRequest } from "./actions/get_user_data";
+import { GetUserSettingsRequest, GetUserSettingsResponse } from "./actions/get_user_settings";
+import { SetUserSettingsRequest, SetUserSettingsResponse } from "./actions/get_user_settings_request";
 import { GetUserWalletSOLBalanceRequest, GetUserWalletSOLBalanceResponse } from "./actions/get_user_wallet_balance";
 import { GetWalletDataRequest, GetWalletDataResponse } from "./actions/get_wallet_data";
 import { ImpersonateUserRequest, ImpersonateUserResponse } from "./actions/impersonate_user";
@@ -40,6 +43,7 @@ import { UnimpersonateUserRequest, UnimpersonateUserResponse } from "./actions/u
 import { WakeUpRequest, WakeUpResponse } from "./actions/wake_up_request";
 import { SessionKey } from "./model/session";
 import { UserData } from "./model/user_data";
+import { UserSettings } from "./model/user_settings";
 
 export enum UserDOFetchMethod {
 	wakeUp = "wakeUp",
@@ -76,7 +80,23 @@ export enum UserDOFetchMethod {
 	getDeactivatedPosition = "getDeactivatedPosition",
 	doubleSellSlippage = "doubleSellSlippage",
 	setOpenPositionSellPriorityFee = "setOpenPositionSellPriorityFee",
-	registerPositionAsDeactivated = "registerPositionAsDeactivated"
+	registerPositionAsDeactivated = "registerPositionAsDeactivated",
+	getUserSettings = "getUserSettings",
+	setUserSettings = "setUserSettings"
+}
+
+export async function setUserSettings(telegramUserID : number, chatID : number, changes : MakeAllPropsNullable<UserSettings>, env : Env) : Promise<SetUserSettingsResponse> {
+	const request : SetUserSettingsRequest = { telegramUserID, chatID, changes };
+	const method = UserDOFetchMethod.setUserSettings;
+	const response = await sendJSONRequestToUserDO<SetUserSettingsRequest,SetUserSettingsResponse>(telegramUserID, method, request, env);
+	return response;
+}
+
+export async function getUserSettings(telegramUserID : number, chatID : number, env : Env) : Promise<GetUserSettingsResponse> {
+	const request : GetUserSettingsRequest = { telegramUserID, chatID };
+	const method = UserDOFetchMethod.getUserSettings;
+	const response = await sendJSONRequestToUserDO<GetUserSettingsRequest,GetUserSettingsResponse>(telegramUserID, method, request, env);
+	return response;
 }
 
 export async function wakeUp(telegramUserID : number, chatID : number, env : Env) : Promise<WakeUpResponse> {

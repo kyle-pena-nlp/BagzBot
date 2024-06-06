@@ -104,5 +104,20 @@ export enum MenuCode {
 	AdminInvokeAlarm = "AdminInvokeAlarm",
 	SubmitAdminInvokeAlarm = "SubmitAdminInvokeAlarm",
 
-	Close = "Close"
+	Close = "Close",
+	Settings = "Settings",
+
+	ChooseQuickBuyEnabled = "CAB.Enabled",
+	ChooseQuickBuySOLAmount = "CAB.SOL",
+	ChooseQuickBuyTSLTriggerPercent = "CAB.TSLTRIGPCT",
+	ChooseQuickBuyPriorityFee = "CAB.PRIORITY",
+	ChooseQuickBuySlippagePct = "CAB.SLIP",
+	ChooseQuickBuyAutoDoubleSlippage = "CAB.ADSLIP",
+
+	SubmitQuickBuyEnabled = "SAB.Enabled",
+	SubmitQuickBuySOLAmount = "SAB.SOL",
+	SubmitQuickBuyTSLTriggerPercent = "SAB.TSLTRIGPCT",
+	SubmitQuickBuyPriorityFee = "SAB.PRIORITY",
+	SubmitQuickBuySlippagePct = "SAB.SLIP",
+	SubmitQuickBuyAutoDoubleSlippage = "SAB.ADSLIP",
 };

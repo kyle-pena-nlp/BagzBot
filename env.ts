@@ -129,6 +129,10 @@ export function parsePriorityFeeOptions(env : EnvironmentVariables) : Map<number
 	return new Map<number,string>(priorityFeeOptions);
 }
 
+export function renderPriorityFeeString(priorityFee : number, env : EnvironmentVariables) : string {
+	return parsePriorityFeeOptions(env).get(priorityFee) || `${priorityFee.toString(10)}x`;
+}
+
 export function isUserBetaCodeExempt(telegramUserID : number, env : EnvironmentVariables) {
 	return env.BETA_CODE_GATE_EXCEPTIONS.split(",").map(x => tryParseInt(x)).includes(telegramUserID);
 }

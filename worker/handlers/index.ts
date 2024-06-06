@@ -11,6 +11,12 @@ import { AdminViewClosedPositionsHandler } from "./admin_view_closed_positions_h
 import { AdminViewObjectHandler } from "./admin_view_object_handler"
 import { BetaFeedbackQuestionHandler } from "./beta_feedback_question_handler"
 import { BetaGateInviteFriendsHandler } from "./beta_gate_invite_friends_handler"
+import { ChooseQuickBuyAutoDoubleSlippageHandler } from "./choose_automatic_buy_auto_double_slippage_handler"
+import { ChooseQuickBuyEnabledHandler } from "./choose_automatic_buy_enabled_handler"
+import { ChooseQuickBuyPriorityFeeHandler } from "./choose_automatic_buy_priority_fee_handler"
+import { ChooseQuickBuySlippagePctHandler } from "./choose_automatic_buy_slippage_pct_handler"
+import { ChooseQuickBuySOLAmountHandler } from "./choose_automatic_buy_sol_amount_handler"
+import { ChooseQuickBuyTSLTriggerPctHandler } from "./choose_automatic_buy_tsl_trigger_pct_handler"
 import { CloseHandler } from "./close_handler"
 import { ClosePositionManuallyActionHandler } from "./close_position_manually_action_handler"
 import { ComingSoonHandler } from "./coming_soon_handler"
@@ -45,11 +51,18 @@ import { NewPositionHandler } from "./new_position_handler"
 import { PosRequestChooseAutoDoubleSlippageOptionsHandler } from "./pos_request_choose_auto_double_slippage_options_handler"
 import { ReactivatePositionHandler } from "./reactivate_position_handler"
 import { ReturnToPositionRequestEditorHandler } from "./return_to_position_request_editor_handler"
+import { SettingsHandler } from "./settings_handler"
 import { SubmitAdminDeletePositionByIDHandler } from "./submit_admin_delete_position_by_i_d_handler"
 import { SubmitAdminDevSetPriceHandler } from "./submit_admin_dev_set_price_handler"
 import { SubmitAdminInvokeAlarmHandler } from "./submit_admin_invoke_alarm_handler"
 import { SubmitAdminSendUserMessageHandler } from "./submit_admin_send_user_message_handler"
 import { SubmitAdminViewObjectHandler } from "./submit_admin_view_object_handler"
+import { SubmitQuickBuyAutoDoubleSlippageHandler } from "./submit_automatic_buy_auto_double_slippage_handler"
+import { SubmitQuickBuyEnabledHandler } from "./submit_automatic_buy_enabled_handler"
+import { SubmitQuickBuyPriorityFeeHandler } from "./submit_automatic_buy_priority_fee_handler"
+import { SubmitQuickBuySlippagePctHandler } from "./submit_automatic_buy_slippage_percent_handler"
+import { SubmitQuickBuySOLAmountHandler } from "./submit_automatic_buy_sol_amount_handler"
+import { SubmitQuickBuyTSLTriggerPctHandler } from "./submit_automatic_buy_tsl_trigger_pct_handler"
 import { SubmitBetaFeedbackHandler } from "./submit_beta_feedback_handler"
 import { SubmitBuyQuantityHandler } from "./submit_buy_quantity_handler"
 import { SubmitImpersonateUserHandler } from "./submit_impersonate_user_handler"
@@ -74,8 +87,10 @@ import { ViewOpenPositionHandler } from "./view_open_position_handler"
 import { ViewPNLHistoryHandler } from "./view_p_n_l_history_handler"
 import { WalletHandler } from "./wallet_handler"
 import { WelcomeScreenPart1Handler } from "./welcome_screen_part_1_handler"
+
 export {
-    AdminCountPositionsHandler, AdminDeleteAllPositionsHandler, AdminDeleteClosedPositionsHandler, AdminDeletePositionByIDHandler, AdminDevSetPriceHandler, AdminInvokeAlarmHandler, AdminResetPositionRequestDefaultsHandler, AdminSendUserMessageHandler, AdminViewClosedPositionHandler, AdminViewClosedPositionsHandler, AdminViewObjectHandler, BetaFeedbackQuestionHandler, BetaGateInviteFriendsHandler, CloseHandler, ClosePositionManuallyActionHandler, ComingSoonHandler, CustomBuyQuantityHandler, CustomSlippagePctHandler, CustomTriggerPctHandler, DeactivatePositionHandler, EditOpenPositionAutoDoubleSlippageHandler, EditOpenPositionCustomSlippagePercentHandler, EditOpenPositionCustomTriggerPercentHandler, EditOpenPositionPriorityFeeHandler, EditOpenPositionSellSlippagePercentHandler, EditOpenPositionSubmitCustomSlippagePercentHandler, EditOpenPositionSubmitCustomTriggerPercentHandler, EditOpenPositionSubmitPriorityFeeHandler, EditOpenPositionTriggerPercentHandler, EditPositionChangeTokenHandler, EditPositionChangeTokenSubmitHandler, EditPositionHelpHandler, EditPositionRequestPriorityFeesHandler, EditPositionRequestSubmitPriorityFeesHandler, ErrorHandler, FAQHandler, ImpersonateUserHandler, LegalAgreementAgreeHandler, LegalAgreementHandler, LegalAgreementRefuseHandler, ListPositionsHandler, MainHandler, MenuWhatIsTSLHandler, NewPositionHandler, PosRequestChooseAutoDoubleSlippageOptionsHandler, ReactivatePositionHandler, ReturnToPositionRequestEditorHandler, SubmitAdminDeletePositionByIDHandler, SubmitAdminDevSetPriceHandler, SubmitAdminInvokeAlarmHandler, SubmitAdminSendUserMessageHandler, SubmitAdminViewObjectHandler, SubmitBetaFeedbackHandler, SubmitBuyQuantityHandler, SubmitImpersonateUserHandler, SubmitOpenPositionAutoDoubleSlippageHandler, SubmitOpenPositionSellSlippagePercentHandler, SubmitOpenPositionTriggerPctHandler, SubmitPosRequestAutoDoubleSlippageOptionsHandler, SubmitSlippagePctHandler, SubmitTriggerPctHandler, TrailingStopLossEditorFinalSubmitHandler, TrailingStopLossEntryBuyQuantityMenuHandler, TrailingStopLossPickVsTokenMenuHandler, TrailingStopLossPickVsTokenMenuSubmitHandler,
+    AdminCountPositionsHandler, AdminDeleteAllPositionsHandler, AdminDeleteClosedPositionsHandler, AdminDeletePositionByIDHandler, AdminDevSetPriceHandler, AdminInvokeAlarmHandler, AdminResetPositionRequestDefaultsHandler, AdminSendUserMessageHandler, AdminViewClosedPositionHandler, AdminViewClosedPositionsHandler, AdminViewObjectHandler, BetaFeedbackQuestionHandler, BetaGateInviteFriendsHandler, ChooseQuickBuyAutoDoubleSlippageHandler, ChooseQuickBuyEnabledHandler, ChooseQuickBuyPriorityFeeHandler, ChooseQuickBuySOLAmountHandler, ChooseQuickBuySlippagePctHandler, ChooseQuickBuyTSLTriggerPctHandler, CloseHandler, ClosePositionManuallyActionHandler, ComingSoonHandler, CustomBuyQuantityHandler, CustomSlippagePctHandler, CustomTriggerPctHandler, DeactivatePositionHandler, EditOpenPositionAutoDoubleSlippageHandler, EditOpenPositionCustomSlippagePercentHandler, EditOpenPositionCustomTriggerPercentHandler, EditOpenPositionPriorityFeeHandler, EditOpenPositionSellSlippagePercentHandler, EditOpenPositionSubmitCustomSlippagePercentHandler, EditOpenPositionSubmitCustomTriggerPercentHandler, EditOpenPositionSubmitPriorityFeeHandler, EditOpenPositionTriggerPercentHandler, EditPositionChangeTokenHandler, EditPositionChangeTokenSubmitHandler, EditPositionHelpHandler, EditPositionRequestPriorityFeesHandler, EditPositionRequestSubmitPriorityFeesHandler, ErrorHandler, FAQHandler, ImpersonateUserHandler, LegalAgreementAgreeHandler, LegalAgreementHandler, LegalAgreementRefuseHandler, ListPositionsHandler, MainHandler, MenuWhatIsTSLHandler, NewPositionHandler, PosRequestChooseAutoDoubleSlippageOptionsHandler, ReactivatePositionHandler, ReturnToPositionRequestEditorHandler, SettingsHandler, SubmitAdminDeletePositionByIDHandler, SubmitAdminDevSetPriceHandler, SubmitAdminInvokeAlarmHandler, SubmitAdminSendUserMessageHandler, SubmitAdminViewObjectHandler, SubmitBetaFeedbackHandler, SubmitBuyQuantityHandler, SubmitImpersonateUserHandler, SubmitOpenPositionAutoDoubleSlippageHandler, SubmitOpenPositionSellSlippagePercentHandler, SubmitOpenPositionTriggerPctHandler, SubmitPosRequestAutoDoubleSlippageOptionsHandler, SubmitQuickBuyAutoDoubleSlippageHandler, SubmitQuickBuyEnabledHandler, SubmitQuickBuyPriorityFeeHandler,
+    SubmitQuickBuySOLAmountHandler, SubmitQuickBuySlippagePctHandler, SubmitQuickBuyTSLTriggerPctHandler, SubmitSlippagePctHandler, SubmitTriggerPctHandler, TrailingStopLossEditorFinalSubmitHandler, TrailingStopLossEntryBuyQuantityMenuHandler, TrailingStopLossPickVsTokenMenuHandler, TrailingStopLossPickVsTokenMenuSubmitHandler,
     TrailingStopLossSlippagePctMenuHandler, TrailingStopLossTriggerPercentMenuHandler, TransferFundsHandler, UnimpersonateUserHandler, ViewDeactivatedPositionHandler, ViewDeactivatedPositionsHandler, ViewDecryptedWalletHandler, ViewOpenPositionHandler, ViewPNLHistoryHandler, WalletHandler, WelcomeScreenPart1Handler
 }
 
