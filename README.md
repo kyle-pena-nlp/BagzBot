@@ -3,23 +3,9 @@
 
 A Solana Telegram bot offering unique trade types for users who want better features.
 
-## Legal
+## Update
 
-### Confidentiality
-
-You are required to:
-
-- Maintain the confidentiality of all disclosed information.
-- Not disclose, share, or disseminate information to any third party without prior written consent.
-
-Disclosure of the contents of this repository without express consent can cause irreparable harm and significant material damage to our company. Should you breach these confidentiality obligations, we reserve the right to pursue all available legal remedies, including but not limited to:
-
-- Seeking injunctive relief to prevent further breaches and to protect the confidentiality of the disclosed information.
-- Pursuing damages, including consequential damages, against any party responsible for the breach of these terms.
-
-### Acknowledgment of Terms
-
-By accessing this repository, you acknowledge that you have read, understood, and agreed to abide by these non-disclosure obligations. You also acknowledge that the unauthorized disclosure of confidential information from this repository could cause irreparable harm to our company for which we will seek full legal redress.
+I am open-sourcing the SolSentry code.  I would do the project a bit differently in retrospect.  Nonetheless I think there are some solid engineering choices here as well.
 
 ## Description
 
